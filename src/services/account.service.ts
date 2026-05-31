@@ -1,0 +1,123 @@
+import { prisma } from "@/lib/prisma";
+import { hashPassword } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
+import { audit } from "@/lib/audit";
+
+export function listClients(tenantId: string) {
+  return prisma.account.findMany({
+    where: { tenantId },
+    orderBy: { createdAt: "desc" },
+    include: { user: { select: { email: true, status: true } }, manager: { select: { id: true, name: true } } },
+  });
+}
+
+async function nextLogin(tx: any, tenantId: string, type: string) {
+  const name = type === "DEMO" ? "demo" : "live";
+  const start = type === "DEMO" ? 100100 : 800100;
+  let c = await tx.counter.findUnique({ where: { tenantId_name: { tenantId, name } } });
+  if (!c) c = await tx.counter.create({ data: { tenantId, name, nextVal: BigInt(start) } });
+  const val = c.nextVal;
+  await tx.counter.update({ where: { id: c.id }, data: { nextVal: val + BigInt(1) } });
+  return type === "DEMO" ? "DEMO" + val.toString() : val.toString();
+}
+
+export async function createClient(tenantId: string, input: any, actor = "admin") {
+  const type = input.type || "LIVE";
+  const acc = await prisma.$transaction(async (tx) => {
+    const email = input.email.toLowerCase();
+    let user = await tx.user.findFirst({ where: { tenantId, email } });
+    if (!user) {
+      const passwordHash = await hashPassword(input.password);
+      user = await tx.user.create({ data: { tenantId, email, name: input.name, passwordHash, role: "CLIENT" } });
+    }
+    if (type === "DEMO") {
+      const demoCount = await tx.account.count({ where: { userId: user.id, type: "DEMO" } });
+      if (demoCount >= 1) throw new Error("Client already has a demo account");
+    }
+    const login = await nextLogin(tx, tenantId, type);
+    return tx.account.create({
+      data: {
+        tenantId, login, userId: user.id, name: input.name, type,
+        leverage: input.leverage || 100, currency: input.currency || "USD",
+        managerId: input.managerId || null, phone: input.phone || null, country: input.country || null,
+        isPool: !!input.isPool,
+        deposit: type === "DEMO" ? new Prisma.Decimal(input.deposit ?? 10000) : new Prisma.Decimal(input.deposit ?? 0),
+      },
+    });
+  });
+  await audit(tenantId, "client.create", acc.login + " " + input.email, actor);
+  return acc;
+}
+
+export function getClient(tenantId: string, id: string) {
+  return prisma.account.findFirst({
+    where: { tenantId, id },
+    include: {
+      user: { select: { email: true, status: true } },
+      manager: { select: { id: true, name: true } },
+      financials: { orderBy: { appliedAt: "desc" }, take: 50 },
+    },
+  });
+}
+
+export async function updateClient(tenantId: string, id: string, data: any, actor = "admin") {
+  const acc = await prisma.account.findFirst({ where: { tenantId, id } });
+  if (!acc) throw new Error("Account not found");
+  const patch: any = {};
+  if (data.leverage !== undefined) patch.leverage = Number(data.leverage);
+  if (data.locked !== undefined) patch.locked = !!data.locked;
+  if (data.doNotLiquidate !== undefined) patch.doNotLiquidate = !!data.doNotLiquidate;
+  if (data.mcLevel !== undefined) patch.mcLevel = new Prisma.Decimal(data.mcLevel);
+  if (data.currency !== undefined) patch.currency = data.currency;
+  if (data.managerId !== undefined) patch.managerId = data.managerId || null; if (data.phone !== undefined) patch.phone = data.phone || null; if (data.country !== undefined) patch.country = data.country || null; if (data.isPool !== undefined) patch.isPool = !!data.isPool; if (data.deactivated !== undefined) patch.deactivated = !!data.deactivated;
+  const updated = await prisma.account.update({ where: { id }, data: patch });
+  await audit(tenantId, "client.update", acc.login + " " + JSON.stringify(patch), actor);
+  return updated;
+}
+
+export async function adjustBalance(tenantId: string, id: string, type: string, amount: number, description: string, by: string) {
+  const acc = await prisma.account.findFirst({ where: { tenantId, id } });
+  if (!acc) throw new Error("Account not found");
+  const amt = new Prisma.Decimal(amount);
+  let data: any = {};
+  if (type === "DEPOSIT") data = { deposit: { increment: amt } };
+  else if (type === "WITHDRAWAL") data = { withdrawal: { increment: amt } };
+  else if (type === "CREDIT_IN") data = { credit: { increment: amt } };
+  else if (type === "CREDIT_OUT") data = { credit: { decrement: amt } };
+  else if (type === "BONUS") data = { bonus: { increment: amt } };
+  else if (type === "INSURANCE") data = { insurance: { increment: amt } };
+  else throw new Error("Invalid type");
+  const res = await prisma.$transaction(async (tx) => {
+    await tx.account.update({ where: { id }, data });
+    await tx.financialHistory.create({ data: { accountId: id, type: type as any, amount: amt, description, mode: "MANUAL", createdBy: by } });
+    return tx.account.findUnique({ where: { id } });
+  });
+  await audit(tenantId, "balance." + type, acc.login + " " + amount, by);
+  return res;
+}
+
+export async function manualPnl(tenantId: string, id: string, amount: number, note: string, by: string) {
+  const acc = await prisma.account.findFirst({ where: { tenantId, id } });
+  if (!acc) throw new Error("Account not found");
+  await prisma.account.update({ where: { id }, data: { pnl: { increment: new Prisma.Decimal(amount) } } });
+  await audit(tenantId, "client.manualPnl", acc.login + " " + amount + " " + (note || ""), by);
+  return { ok: true };
+}
+
+export async function resetPassword(tenantId: string, id: string, newPass: string, by: string) {
+  const acc = await prisma.account.findFirst({ where: { tenantId, id } });
+  if (!acc || !acc.userId) throw new Error("Account not found");
+  const passwordHash = await hashPassword(newPass);
+  await prisma.user.update({ where: { id: acc.userId }, data: { passwordHash } });
+  await audit(tenantId, "client.resetPassword", acc.login, by);
+  return { ok: true };
+}
+
+export async function deleteClient(tenantId: string, id: string, by = "admin") {
+  const acc = await prisma.account.findFirst({ where: { tenantId, id } });
+  if (!acc) throw new Error("Account not found");
+  await prisma.account.delete({ where: { id } });
+  if (acc.userId) await prisma.user.delete({ where: { id: acc.userId } }).catch(() => {});
+  await audit(tenantId, "client.delete", acc.login, by);
+  return { ok: true };
+}

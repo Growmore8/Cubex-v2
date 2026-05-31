@@ -1,0 +1,395 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { io, Socket } from "socket.io-client";
+import TVChart from "@/components/TVChart";
+import PriceCell from "@/components/PriceCell";
+import instruments from "@/config/instruments";
+import { contractFor } from "@/config/contracts";
+
+const DARK: any = { "--bg": "#0b1220", "--panel": "#0f1826", "--border": "#1f2a3a", "--text": "#e6edf6", "--muted": "#8b97a8", "--soft": "#16202e" };
+const LIGHT: any = { "--bg": "#f1f5f9", "--panel": "#ffffff", "--border": "#e2e8f0", "--text": "#0f172a", "--muted": "#64748b", "--soft": "#eef2f7" };
+const BUY = "#16c784", SELL = "#e05260", GOLD = "#f1b53d";
+const LOTS = [0.01, 0.05, 0.1, 0.5, 1];
+const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
+
+const DIGITS: Record<string, number> = {};
+function dg(sym: string, f = 2) { return DIGITS[sym] ?? instruments[sym]?.digits ?? f; }
+function pnlOf(p: any, price: number, cs: number) {
+
+  const dir = p.type === "BUY" ? 1 : -1;
+  return (price - p.openPrice) * dir * p.lots * (cs || 100000);
+}
+
+export default function ClientTerminal() {
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  useEffect(() => { const t = localStorage.getItem("cubex-theme"); if (t === "light" || t === "dark") setTheme(t); }, []);
+  function toggleTheme() { setTheme((t) => { const n = t === "dark" ? "light" : "dark"; localStorage.setItem("cubex-theme", n); return n; }); }
+
+  const [account, setAccount] = useState<any>(null);
+  const [accts, setAccts] = useState<any[]>([]);
+  const [accId, setAccId] = useState("");
+  const accIdRef = useRef("");
+  const [positions, setPositions] = useState<any[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [symbols, setSymbols] = useState<any[]>([]);
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [dirs, setDirs] = useState<Record<string, number>>({});
+  const [selSym, setSelSym] = useState("");
+  const [tf, setTf] = useState("1M");
+  const [orderType, setOrderType] = useState<"MARKET" | "PENDING">("MARKET");
+  const [vol, setVol] = useState(0.1);
+  const [sl, setSl] = useState("");
+  const [tp, setTp] = useState("");
+  const [trail, setTrail] = useState("");
+  const [rightTab, setRightTab] = useState("TRADE");
+  const [ctx, setCtx] = useState<{ x: number; y: number; sym: string } | null>(null);
+  const [botTab, setBotTab] = useState<"positions" | "pending" | "history">("positions");
+  const [err, setErr] = useState("");
+  const [pinLock, setPinLock] = useState(false);
+  const [pinHasPin, setPinHasPin] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinModal, setPinModal] = useState(false);
+  const [pinForm, setPinForm] = useState<any>({});
+  const [pinErr, setPinErr] = useState("");
+  const [notis, setNotis] = useState<any[]>([]);
+  const [pendingPrice, setPendingPrice] = useState("");
+  const [pending, setPending] = useState<any[]>([]);
+  const [notiOpen, setNotiOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [mwW, setMwW] = useState(220);
+  const [rtW, setRtW] = useState(250);
+  const [tbH, setTbH] = useState(200);
+  const [dragging, setDragging] = useState(false);
+
+  const selSymRef = useRef(selSym);
+  useEffect(() => { selSymRef.current = selSym; }, [selSym]);
+  const prevRef = useRef<Record<string, number>>({});
+  const timersRef = useRef<Record<string, any>>({});
+
+  async function load() {
+    const id = accIdRef.current;
+    const d = await fetch("/api/client/account" + (id ? "?accountId=" + id : "")).then((r) => r.json());
+    if (!d.ok) { setErr(d.error || "Failed"); return; }
+    setAccount(d.account); setPositions(d.positions); setHistory(d.history); setSymbols(d.symbols);
+    (d.symbols || []).forEach((s: any) => { DIGITS[s.symbol] = s.digits; });
+    if (!selSymRef.current && d.symbols.length) setSelSym(d.symbols[0].symbol);
+    fetch("/api/client/accounts").then((r) => r.json()).then((ad) => { if (ad.ok) { setAccts(ad.accounts || []); if (!accIdRef.current && ad.accounts && ad.accounts.length) { accIdRef.current = ad.accounts[0].id; setAccId(ad.accounts[0].id); } } }).catch(() => {});
+    fetch("/api/client/notifications").then((r) => r.json()).then((nd) => { if (nd.ok) setNotis(nd.items || []); }).catch(() => {});
+    fetch("/api/client/pending?accountId=" + (accIdRef.current || "")).then((r) => r.json()).then((pd) => { if (pd.ok) setPending(pd.pending || []); }).catch(() => {});
+  }
+  useEffect(() => { load(); }, []);
+  useEffect(() => { fetch("/api/client/pin").then((r) => r.json()).then((d) => { if (d.ok && d.hasPin) { setPinHasPin(true); if (sessionStorage.getItem("cubex-pin-ok") !== "1") setPinLock(true); } }).catch(() => {}); }, []);
+
+  useEffect(() => {
+    const socket: Socket = io({ path: "/socket.io" });
+    socket.on("tick", ({ symbol, price }: any) => {
+      const prev = prevRef.current[symbol];
+      if (prev != null && prev !== price) { const dr = price > prev ? 1 : -1; setDirs((dd) => ({ ...dd, [symbol]: dr })); clearTimeout(timersRef.current[symbol]); timersRef.current[symbol] = setTimeout(() => setDirs((dd) => ({ ...dd, [symbol]: 0 })), 500); }
+      prevRef.current[symbol] = price;
+      setPrices((pp) => ({ ...pp, [symbol]: price }));
+    });
+    socket.on("refresh", () => load());
+    return () => { socket.disconnect(); };
+  }, []);
+
+  async function place(type: "BUY" | "SELL") {
+    setErr("");
+    if (orderType === "PENDING") {
+      const trig = Number(pendingPrice); if (!trig) { setErr("Enter a trigger price"); return; }
+      const mkt = prices[selSym] ?? trig;
+      const kind = type === "BUY" ? (trig < mkt ? "LIMIT" : "STOP") : (trig > mkt ? "LIMIT" : "STOP");
+      const rp = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), price: trig, kind, sl: Number(sl) || 0, tp: Number(tp) || 0, accountId: accIdRef.current }) });
+      const dp = await rp.json(); if (!dp.ok) { setErr(dp.error || "Failed"); return; } setPendingPrice(""); load(); return;
+    }
+    const r = await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), sl: Number(sl) || 0, tp: Number(tp) || 0, accountId: accIdRef.current }) });
+    const d = await r.json();
+    if (!d.ok) { setErr(d.error || "Order failed"); return; }
+    load();
+  }
+  async function quickTrade(sym: string, side: "BUY" | "SELL") {
+    setSelSym(sym); setErr("");
+    const r = await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol: sym, side, lots: Number(vol), sl: 0, tp: 0, accountId: accIdRef.current }) });
+    const d = await r.json();
+    if (!d.ok) { setErr(d.error || "Order failed"); return; }
+    load();
+  }
+  async function cancelPending(id: string) { await fetch("/api/client/pending/" + id, { method: "DELETE" }); load(); }
+  function urlB64ToUint8Array(base64String: string) { const padding = "=".repeat((4 - (base64String.length % 4)) % 4); const b = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/"); const raw = atob(b); const arr = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i); return arr; }
+  async function enablePush() {
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) { setErr("Push not supported in this browser"); return; }
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") { setErr("Notifications blocked"); return; }
+      const keyRes = await fetch("/api/client/push").then((r) => r.json());
+      if (!keyRes.publicKey) { setErr("Push not configured on server"); return; }
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(keyRes.publicKey) });
+      const j: any = sub.toJSON();
+      await fetch("/api/client/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: j.endpoint, keys: j.keys }) });
+      alert("Push alerts enabled");
+    } catch (e) { setErr("Failed to enable alerts"); }
+  }
+  async function addPasskey() {
+    try {
+      const mod: any = await import("@simplewebauthn/browser");
+      const optRes = await fetch("/api/client/webauthn/register/options").then((r) => r.json());
+      if (!optRes.ok) { setErr(optRes.error || "Failed"); return; }
+      const attResp = await mod.startRegistration(optRes.options);
+      const vr = await fetch("/api/client/webauthn/register/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(attResp) }).then((r) => r.json());
+      if (!vr.ok) { setErr(vr.error || "Verification failed"); return; }
+      alert("Passkey added");
+    } catch (e: any) { setErr((e && e.message) || "Passkey failed"); }
+  }
+  async function unlockPasskey() {
+    setPinErr("");
+    try {
+      const mod: any = await import("@simplewebauthn/browser");
+      const optRes = await fetch("/api/client/webauthn/auth/options").then((r) => r.json());
+      if (!optRes.ok) { setPinErr(optRes.error || "No passkey"); return; }
+      const asResp = await mod.startAuthentication(optRes.options);
+      const vr = await fetch("/api/client/webauthn/auth/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(asResp) }).then((r) => r.json());
+      if (!vr.ok) { setPinErr(vr.error || "Failed"); return; }
+      sessionStorage.setItem("cubex-pin-ok", "1"); setPinLock(false);
+    } catch (e: any) { setPinErr((e && e.message) || "Passkey unlock failed"); }
+  }
+  async function unlock() {
+    setPinErr("");
+    const r = await fetch("/api/client/pin/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: pinInput }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+    if (!r.ok) { setPinErr(r.error || "Incorrect PIN"); return; }
+    sessionStorage.setItem("cubex-pin-ok", "1"); setPinLock(false); setPinInput("");
+  }
+  async function savePin() {
+    setPinErr("");
+    const r = await fetch("/api/client/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: pinForm.pin, current: pinForm.current }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+    if (!r.ok) { setPinErr(r.error || "Failed"); return; }
+    setPinHasPin(true); setPinModal(false); setPinForm({}); sessionStorage.setItem("cubex-pin-ok", "1");
+  }
+  async function close(id: string) {
+    const r = await fetch("/api/client/orders/" + id + "/close", { method: "POST" });
+    const d = await r.json(); if (!d.ok) { setErr(d.error || "Close failed"); return; } load();
+  }
+  function switchAcc(id: string) { accIdRef.current = id; setAccId(id); load(); }
+  async function openAccount(type: "DEMO" | "LIVE") {
+    setErr("");
+    const r = await fetch("/api/client/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+    if (!r.ok) { setErr(r.error || "Failed"); return; }
+    if (r.account) { accIdRef.current = r.account.id; setAccId(r.account.id); }
+    load();
+  }
+  async function topUp() {
+    const amt = prompt("Top-up amount for this demo account:", "10000");
+    if (!amt) return;
+    const r = await fetch("/api/client/topup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accIdRef.current, amount: Number(amt) }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+    if (!r.ok) { setErr(r.error || "Top-up failed"); return; }
+    load();
+  }
+
+  function dragX(e: any, which: "mw" | "rt") { e.preventDefault(); setDragging(true); const sx = e.clientX; const sw = which === "mw" ? mwW : rtW; const mv = (ev: any) => { const dx = ev.clientX - sx; if (which === "mw") setMwW(Math.max(150, Math.min(380, sw + dx))); else setRtW(Math.max(200, Math.min(380, sw - dx))); }; const up = () => { setDragging(false); document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }; document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); }
+  function dragY(e: any) { e.preventDefault(); setDragging(true); const sy = e.clientY; const sh = tbH; const mv = (ev: any) => { const dy = sy - ev.clientY; setTbH(Math.max(120, Math.min(520, sh + dy))); }; const up = () => { setDragging(false); document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }; document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); }
+  function toggleCat(c: string) { setCollapsed((o) => ({ ...o, [c]: !o[c] })); }
+
+  const unread = notis.filter((n: any) => !n.read).length;
+  const curAcct = accts.find((a) => a.id === accId);
+  const catMap: Record<string, string> = Object.fromEntries(symbols.map((s) => [s.symbol, s.category || "forex"]));
+  function csz(sym: string) { return contractFor(catMap[sym] || "forex", sym); }
+  const floating = positions.reduce((s, p) => s + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
+  const balance = account ? account.deposit - account.withdrawal + account.credit + account.bonus + account.pnl : 0;
+  const equity = balance + floating;
+  const used = account ? positions.reduce((m, p) => { const cs = csz(p.symbol); const pr = prices[p.symbol] ?? p.openPrice; return m + (p.lots * cs * pr) / account.leverage; }, 0) : 0;
+  const free = equity - used;
+  const level = used > 0 ? (equity / used) * 100 : 0;
+  const price = prices[selSym];
+  const d = dg(selSym);
+  const bid = price ?? 0, ask = price != null ? price + Math.pow(10, -d) * 2 : 0;
+  const margin = price != null ? (vol * csz(selSym) * price) / (account?.leverage || 100) : 0;
+  const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const groups: Record<string, any[]> = {};
+  symbols.forEach((s) => { const c = s.category || "other"; (groups[c] || (groups[c] = [])).push(s); });
+  const tab = (active: boolean) => "px-3 py-1.5 text-[11px] " + (active ? "" : "text-[var(--muted)]");
+
+  return (
+    <div style={theme === "dark" ? DARK : LIGHT} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm">
+        <div className="flex items-center gap-2"><span className="inline-block h-4 w-4 rounded bg-[#3b82f6]"></span><b className="font-medium">Acme Markets</b><select value={accId} onChange={(e) => switchAcc(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-1 text-[11px] text-[var(--text)]">{accts.map((a) => <option key={a.id} value={a.id}>{a.login} - {a.type}</option>)}</select><button onClick={() => openAccount("DEMO")} className="rounded border border-[var(--border)] px-2 py-1 text-[11px]">+ Demo</button><button onClick={() => openAccount("LIVE")} className="rounded border border-[var(--border)] px-2 py-1 text-[11px]">+ Live</button>{curAcct?.type === "DEMO" && <button onClick={topUp} className="rounded px-2 py-1 text-[11px]" style={{ background: GOLD, color: "#1a1300" }}>Top up</button>}</div>
+        <div className="flex items-center gap-2 text-[11px]">
+          
+          <div className="relative">
+            <button onClick={() => { const w = !notiOpen; setNotiOpen(w); if (w && unread > 0) { fetch("/api/client/notifications", { method: "POST" }).then(() => setNotis((ns) => ns.map((n) => ({ ...n, read: true })))); } }} className="relative rounded border border-[var(--border)] px-2 py-1">Alerts{unread > 0 && <span className="absolute -right-1 -top-1 rounded-full px-1 text-[9px]" style={{ background: SELL, color: "#fff" }}>{unread}</span>}</button>
+            {notiOpen && (<><div className="fixed inset-0 z-[80]" onClick={() => setNotiOpen(false)} /><div className="absolute right-0 z-[90] mt-1 max-h-80 w-72 overflow-auto rounded-md border p-1 text-left text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>{notis.length === 0 ? <div className="px-2 py-3 text-center text-[var(--muted)]">No notifications</div> : notis.map((n, i) => (<div key={i} className="border-b px-2 py-2 last:border-0" style={{ borderColor: "var(--border)" }}><div className="font-medium text-[var(--text)]">{n.title}</div>{n.body && <div className="mt-0.5 text-[var(--muted)]">{n.body}</div>}{n.image && <img src={n.image} alt="" className="mt-1 max-h-28 w-full rounded object-cover" />}<div className="mt-1 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div></div>))}</div></>)}
+          </div>
+          <button onClick={toggleTheme} className="rounded border border-[var(--border)] px-2 py-1">{theme === "dark" ? "Light" : "Dark"}</button>
+          <a href="/client/wallet" className="rounded border border-[var(--border)] px-2 py-1">Withdraw</a>
+          <a href="/client/wallet" className="rounded px-2 py-1" style={{ background: BUY, color: "#04140e" }}>Deposit</a>
+          <a href="/client/kyc" className="rounded border border-[var(--border)] px-2 py-1">KYC</a>
+          <button onClick={() => { setPinErr(""); setPinForm({}); setPinModal(true); }} className="rounded border border-[var(--border)] px-2 py-1">PIN</button>
+          <button onClick={enablePush} className="rounded border border-[var(--border)] px-2 py-1">Push</button>
+          <button onClick={addPasskey} className="rounded border border-[var(--border)] px-2 py-1">Passkey</button>
+          <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="rounded px-2 py-1" style={{ background: SELL, color: "#1a0606" }}>Logout</button>
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1">
+        {ctx && (<>
+            <div className="fixed inset-0 z-[80]" onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
+            <div className="fixed z-[90] min-w-[150px] overflow-hidden rounded border border-[var(--border)] bg-[var(--panel)] py-1 text-[12px] shadow-lg" style={{ left: ctx.x, top: ctx.y }}>
+              <div className="px-3 py-1 text-[10px] text-[var(--muted)]">{ctx.sym}</div>
+              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setSelSym(ctx.sym); setCtx(null); }}>New Order</button>
+              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setSelSym(ctx.sym); setCtx(null); }}>Open Chart</button>
+              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { if (navigator.clipboard) navigator.clipboard.writeText(ctx.sym); setCtx(null); }}>Copy Symbol</button>
+            </div>
+          </>)}
+          <aside className="flex flex-col border-r border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
+          <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">MARKET WATCH</div>
+          
+          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[1fr_64px_64px] bg-[var(--panel)] px-2 py-1 text-[10px] text-[var(--muted)]"><span>Symbol</span><span className="text-right pr-2">Bid</span><span className="text-right pr-2">Ask</span></div>
+            {Object.entries(groups).map(([c, list]) => (
+              <div key={c}>
+                <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
+                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const b = p != null ? p * 0.9999 : null; const a = p != null ? p * 1.0001 : null; const dir = dirs[s.symbol] || 0; const fc = dir > 0 ? BUY : dir < 0 ? SELL : "var(--text)"; const bg = dir > 0 ? "rgba(22,199,132,0.32)" : dir < 0 ? "rgba(224,82,96,0.32)" : "transparent"; return (
+                  <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
+                    <button onClick={() => setSelSym(s.symbol)} className="truncate text-left">{s.symbol}</button>
+                    <PriceCell value={b != null ? b.toFixed(dd) : "..."} dir={dir} />
+                    <PriceCell value={a != null ? a.toFixed(dd) : "..."} dir={dir} /><span style={{ display: "none" }}>
+                      
+                      
+                    </span>
+                  </div>); })}
+              </div>
+            ))}
+          </div>
+        </aside>
+        <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
+            <b className="font-medium">{selSym}</b>
+            <div className="ml-auto flex gap-1">{TFS.map((t) => <button key={t} onClick={() => setTf(t)} className="rounded px-1.5 py-0.5 text-[10px]" style={tf === t ? { background: BUY, color: "#04140e" } : { color: "var(--muted)" }}>{t}</button>)}</div>
+          </div>
+          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><TVChart symbol={selSym} tf={tf} theme={theme} /></div>
+        </div>
+        <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
+
+        <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: rtW }}>
+          <div className="flex border-b border-[var(--border)] text-[10px]">
+            {["TRADE"].map((t) => <button key={t} onClick={() => setRightTab(t)} className={"flex-1 py-1.5 " + (rightTab === t ? "" : "text-[var(--muted)]")} style={rightTab === t ? { color: BUY } : undefined}>{t}</button>)}
+          </div>
+          <div className="flex-1 overflow-auto">
+          {rightTab !== "TRADE" ? (
+            <div className="p-6 text-center text-[11px] text-[var(--muted)]">{rightTab} panel - coming soon</div>
+          ) : (
+            <div className="p-2">
+              <div className="mb-2 flex gap-1 text-[10px]">
+                <button onClick={() => setOrderType("MARKET")} className="flex-1 rounded py-1.5" style={orderType === "MARKET" ? { background: "#16243a", color: "#5aa9ff" } : { color: "var(--muted)" }}>Market order</button>
+                <button onClick={() => setOrderType("PENDING")} className="flex-1 rounded py-1.5" style={orderType === "PENDING" ? { background: "#16243a", color: "#5aa9ff" } : { color: "var(--muted)" }}>Pending order</button>
+              </div>
+              <div className="mb-2 grid grid-cols-2 gap-1">
+                <div className="rounded py-2 text-center" style={{ background: theme === "dark" ? "#241016" : "#fde8e8" }}><div className="text-[9px] text-[var(--muted)]">BID</div><div className="text-sm" style={{ color: SELL }}>{price?.toFixed(d) ?? "..."}</div></div>
+                <div className="rounded py-2 text-center" style={{ background: theme === "dark" ? "#0f2018" : "#e6f7ef" }}><div className="text-[9px] text-[var(--muted)]">ASK</div><div className="text-sm" style={{ color: BUY }}>{ask?.toFixed(d) ?? "..."}</div></div>
+              </div>
+              {orderType === "PENDING" && (<><div className="text-[9px] text-[var(--muted)]">Trigger price</div><input type="number" value={pendingPrice} onChange={(e) => setPendingPrice(e.target.value)} className="mb-2 mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[11px] text-[var(--text)]" placeholder={price ? price.toFixed(d) : "price"} /></>)}
+              <div className="text-[9px] text-[var(--muted)]">Volume (lots)</div>
+              <div className="mb-1 mt-1 flex items-center gap-1">
+                <button onClick={() => setVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="rounded border border-[var(--border)] px-2">-</button>
+                <input type="number" step="0.01" value={vol} onChange={(e) => setVol(Number(e.target.value))} className="flex-1 rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[11px] text-[var(--text)]" />
+                <button onClick={() => setVol((v) => +(v + 0.01).toFixed(2))} className="rounded border border-[var(--border)] px-2">+</button>
+              </div>
+              <div className="mb-2 flex gap-1">{LOTS.map((l) => <button key={l} onClick={() => setVol(l)} className="flex-1 rounded py-0.5 text-[9px]" style={vol === l ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{l}</button>)}</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><div className="text-[9px] text-[var(--muted)]">Stop loss</div><input value={sl} onChange={(e) => setSl(e.target.value)} placeholder="-" className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[10px] text-[var(--text)]" /></div>
+                <div><div className="text-[9px] text-[var(--muted)]">Take profit</div><input value={tp} onChange={(e) => setTp(e.target.value)} placeholder="-" className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[10px] text-[var(--text)]" /></div>
+              </div>
+              <div className="mt-2 text-[9px] text-[var(--muted)]">Trailing stop</div>
+              <input value={trail} onChange={(e) => setTrail(e.target.value)} placeholder="-" className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[10px] text-[var(--text)]" />
+              <div className="mt-2 flex justify-between border-t border-[var(--border)] pt-2 text-[10px] text-[var(--muted)]">Margin<span className="text-[var(--text)]">{margin ? "$" + fmt(margin) : "$0"}</span></div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="rounded py-2 text-center text-[11px] disabled:opacity-50" style={{ background: SELL, color: "#1a0606" }}>Sell<br />{bid?.toFixed(d) ?? "..."}</button>
+                <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="rounded py-2 text-center text-[11px] disabled:opacity-50" style={{ background: BUY, color: "#04140e" }}>Buy<br />{ask?.toFixed(d) ?? "..."}</button>
+              </div>
+              {!account && <div className="mt-2 text-center text-[10px]" style={{ color: SELL }}>No account</div>}
+              {err && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{err}</div>}
+            </div>
+          )}
+          </div>
+        </aside>
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[10px]" style={{ color: GOLD }}>
+        <span>Balance: <span className="text-[var(--text)]">{account ? fmt(balance) : "--"}</span></span>
+        <span>Flt P/L: <span style={{ color: floating >= 0 ? BUY : SELL }}>{account ? fmt(floating) : "--"}</span></span>
+        <span>Equity: <span className="text-[var(--text)]">{account ? fmt(equity) : "--"}</span></span>
+        <span>Used Margin: <span className="text-[var(--text)]">{account ? fmt(used) : "--"}</span></span>
+        <span>Free Margin: <span className="text-[var(--text)]">{account ? fmt(free) : "--"}</span></span>
+        <span>Margin Level: <span className="text-[var(--text)]">{account && level ? level.toFixed(1) + "%" : "--"}</span></span>
+      </div>
+
+      <div onMouseDown={dragY} className="h-1 cursor-row-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
+
+      <div className="flex shrink-0 flex-col" style={{ height: tbH }}>
+        <div className="flex gap-1 border-b border-[var(--border)] px-2">
+          <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length}</button>
+          <button onClick={() => setBotTab("pending")} className={tab(botTab === "pending")} style={botTab === "pending" ? { color: BUY } : undefined}>Pending {pending.length}</button>
+          <button onClick={() => setBotTab("history")} className={tab(botTab === "history")} style={botTab === "history" ? { color: BUY } : undefined}>History</button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          {botTab === "positions" && (
+            <table className="w-full text-[10px]">
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Name</th><th className="px-2 py-1 font-normal">Date</th><th className="px-2 py-1 font-normal text-right">Qty</th><th className="px-2 py-1 font-normal text-right">Open</th><th className="px-2 py-1 font-normal text-right">TP</th><th className="px-2 py-1 font-normal text-right">SL</th><th className="px-2 py-1 font-normal text-right">Swap</th><th className="px-2 py-1 font-normal text-right">Gross P/L</th><th className="px-2 py-1 font-normal text-right">Net P/L</th><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
+              <tbody>
+                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={10}>No open positions.</td></tr> : positions.map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); return (
+                  <tr key={p.id} className="border-t border-[var(--border)]">
+                    <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span></td>
+                    <td className="px-2 py-1 text-[var(--muted)]">{new Date(p.openedAt).toLocaleDateString()}</td>
+                    <td className="px-2 py-1 text-right">{p.lots}</td><td className="px-2 py-1 text-right">{p.openPrice.toFixed(dg(p.symbol))}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{p.tp || "-"}</td><td className="px-2 py-1 text-right text-[var(--muted)]">{p.sl || "-"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">0.00</td>
+                    <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
+                    <td className="px-2 py-1 text-right"><button style={{ color: SELL }} onClick={() => close(p.id)}>X</button></td>
+                  </tr>); })}
+              </tbody>
+            </table>
+          )}
+          {botTab === "pending" && (<table className="w-full text-[10px]"><thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Symbol</th><th className="px-2 py-1 font-normal">Side</th><th className="px-2 py-1 font-normal">Kind</th><th className="px-2 py-1 font-normal text-right">Qty</th><th className="px-2 py-1 font-normal text-right">Trigger</th><th className="px-2 py-1 font-normal text-right"></th></tr></thead><tbody>{pending.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={6}>No pending orders.</td></tr> : pending.map((o: any) => (<tr key={o.id} className="border-t border-[var(--border)]"><td className="px-2 py-1">{o.symbol}</td><td className="px-2 py-1" style={{ color: o.side === "BUY" ? BUY : SELL }}>{o.side}</td><td className="px-2 py-1">{o.kind}</td><td className="px-2 py-1 text-right">{o.lots}</td><td className="px-2 py-1 text-right">{Number(o.price).toFixed(dg(o.symbol))}</td><td className="px-2 py-1 text-right"><button style={{ color: SELL }} onClick={() => cancelPending(o.id)}>X</button></td></tr>))}</tbody></table>)}
+          {botTab === "history" && (
+            <table className="w-full text-[10px]">
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Name</th><th className="px-2 py-1 font-normal">Closed</th><th className="px-2 py-1 font-normal text-right">Qty</th><th className="px-2 py-1 font-normal text-right">Open</th><th className="px-2 py-1 font-normal text-right">Close</th><th className="px-2 py-1 font-normal text-right">P/L</th></tr></thead>
+              <tbody>
+                {history.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={6}>No history.</td></tr> : history.map((h) => (
+                  <tr key={h.id} className="border-t border-[var(--border)]"><td className="px-2 py-1">{h.symbol} {h.side}</td><td className="px-2 py-1 text-[var(--muted)]">{new Date(h.closedAt).toLocaleString()}</td><td className="px-2 py-1 text-right">{h.lots}</td><td className="px-2 py-1 text-right">{h.openPrice.toFixed(dg(h.symbol))}</td><td className="px-2 py-1 text-right">{h.closePrice.toFixed(dg(h.symbol))}</td><td className="px-2 py-1 text-right" style={{ color: h.pnl >= 0 ? BUY : SELL }}>{(h.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(h.pnl))}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {pinModal && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setPinModal(false)}>
+          <div className="w-[300px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 text-sm font-semibold">{pinHasPin ? "Change PIN" : "Set PIN"}</div>
+            {pinHasPin && (<><div className="text-[10px] text-[var(--muted)]">Current PIN</div><input type="password" inputMode="numeric" value={pinForm.current || ""} onChange={(e) => setPinForm({ ...pinForm, current: e.target.value })} className="mb-2 mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[var(--text)]" /></>)}
+            <div className="text-[10px] text-[var(--muted)]">New PIN (4-6 digits)</div>
+            <input type="password" inputMode="numeric" value={pinForm.pin || ""} onChange={(e) => setPinForm({ ...pinForm, pin: e.target.value })} className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[var(--text)]" />
+            {pinErr && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{pinErr}</div>}
+            <button onClick={savePin} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Save PIN</button>
+          </div>
+        </div>
+      )}
+      {pinLock && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(5,9,16,0.96)" }}>
+          <div className="w-[300px] rounded-lg border p-5 text-center" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+            <div className="mb-1 text-sm font-semibold">Enter your PIN</div>
+            <div className="mb-3 text-[10px] text-[var(--muted)]">This terminal is locked.</div>
+            <input type="password" inputMode="numeric" autoFocus value={pinInput} onChange={(e) => setPinInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") unlock(); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-center text-lg tracking-widest text-[var(--text)]" />
+            {pinErr && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{pinErr}</div>}
+            <button onClick={unlock} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Unlock</button>
+            <button onClick={unlockPasskey} className="mt-2 w-full rounded border border-[var(--border)] py-2 text-xs">Unlock with passkey</button>
+          </div>
+        </div>
+      )}
+      {dragging && <div className="fixed inset-0 z-[60]" />}
+    </div>
+  );
+}

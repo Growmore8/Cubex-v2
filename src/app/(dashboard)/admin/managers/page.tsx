@@ -1,0 +1,149 @@
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+
+interface Manager {
+  id: string; name: string; email: string; status: string;
+  perms: Record<string, boolean>; _count: { managedAccounts: number };
+}
+const PERMS = ["canManageClients", "canAdjustBalance", "canViewReports", "canManageTrades"];
+const empty = { name: "", email: "", password: "", perms: {} as Record<string, boolean> };
+
+export default function AdminManagersPage() {
+  const [managers, setManagers] = useState<Manager[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState<any>({ ...empty });
+
+  async function load() {
+    setLoading(true);
+    const d = await fetch("/api/admin/managers").then((r) => r.json());
+    setLoading(false);
+    if (d.ok) setManagers(d.managers); else setErr(d.error || "Failed");
+  }
+  useEffect(() => { load(); }, []);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault(); setErr("");
+    const r = await fetch("/api/admin/managers", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
+    });
+    const d = await r.json();
+    if (!d.ok) { setErr(d.error || "Create failed"); return; }
+    setForm({ ...empty, perms: {} }); setShowCreate(false); load();
+  }
+
+  async function togglePerm(m: Manager, key: string) {
+    const perms = { ...m.perms, [key]: !m.perms?.[key] };
+    await fetch("/api/admin/managers/" + m.id, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ perms }),
+    });
+    load();
+  }
+
+  async function toggleStatus(m: Manager) {
+    await fetch("/api/admin/managers/" + m.id, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: m.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE" }),
+    });
+    load();
+  }
+
+  async function remove(m: Manager) {
+    if (!confirm("Delete manager " + m.email + "?")) return;
+    await fetch("/api/admin/managers/" + m.id, { method: "DELETE" });
+    load();
+  }
+
+  const input = "w-full rounded-md border px-3 py-2 text-sm";
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Managers</h1>
+          
+        </div>
+        <button onClick={() => setShowCreate((v) => !v)} style={{ backgroundColor: "var(--brand-primary)" }}
+          className="rounded-md px-4 py-2 text-sm font-medium text-white">
+          {showCreate ? "Close" : "New manager"}
+        </button>
+      </div>
+
+      {err && <p className="text-sm text-red-600">{err}</p>}
+
+      {showCreate && (
+        <form onSubmit={create} className="space-y-3 rounded-lg border bg-white p-4">
+          <div className="grid grid-cols-3 gap-3">
+            <input className={input} placeholder="Name" required value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input className={input} type="email" placeholder="Email" required value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <input className={input} type="password" placeholder="Password (min 6)" required value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          </div>
+          <div className="flex flex-wrap gap-4 text-sm">
+            {PERMS.map((p) => (
+              <label key={p} className="flex items-center gap-1">
+                <input type="checkbox" checked={!!form.perms[p]}
+                  onChange={(e) => setForm({ ...form, perms: { ...form.perms, [p]: e.target.checked } })} />
+                {p}
+              </label>
+            ))}
+          </div>
+          <button type="submit" className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white">Create manager</button>
+        </form>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border bg-white">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-gray-50 text-left text-gray-600">
+            <tr>
+              <th className="px-3 py-2">Name</th><th className="px-3 py-2">Email</th>
+              <th className="px-3 py-2">Clients</th><th className="px-3 py-2">Permissions</th>
+              <th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td className="px-3 py-4" colSpan={6}>Loading...</td></tr>
+            ) : managers.length === 0 ? (
+              <tr><td className="px-3 py-4" colSpan={6}>No managers yet.</td></tr>
+            ) : managers.map((m) => (
+              <tr key={m.id} className="border-b last:border-0 align-top">
+                <td className="px-3 py-2">{m.name}</td>
+                <td className="px-3 py-2">{m.email}</td>
+                <td className="px-3 py-2">{m._count.managedAccounts}</td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-wrap gap-2">
+                    {PERMS.map((p) => (
+                      <label key={p} className="flex items-center gap-1 text-xs">
+                        <input type="checkbox" checked={!!m.perms?.[p]} onChange={() => togglePerm(m, p)} />
+                        {p.replace("can", "")}
+                      </label>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <span className={"rounded px-2 py-0.5 text-xs " + (m.status === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700")}>
+                    {m.status}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right space-x-2">
+                  <button className="text-yellow-700" onClick={() => toggleStatus(m)}>
+                    {m.status === "ACTIVE" ? "Suspend" : "Activate"}
+                  </button>
+                  <button className="text-red-600" onClick={() => remove(m)}>Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+

@@ -1,0 +1,27 @@
+import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/guard";
+import { prisma } from "@/lib/prisma";
+import { createKyc } from "@/services/kyc.service";
+import { saveUpload } from "@/lib/upload";
+import { audit } from "@/lib/audit";
+
+export async function POST(req: Request) {
+  const s = await requireAdmin();
+  if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  try {
+    const form = await req.formData();
+    const accountId = String(form.get("accountId") || "");
+    const docType = String(form.get("docType") || "document");
+    const file = form.get("file") as File | null;
+    if (!accountId) throw new Error("Select a client account");
+    if (!file || file.size === 0) throw new Error("File required");
+    const account = await prisma.account.findFirst({ where: { id: accountId, tenantId: s.tenantId! } });
+    if (!account) throw new Error("Account not in your scope");
+    const key = await saveUpload(file, "kyc/" + account.id);
+    const doc = await createKyc(account.id, docType, key);
+    await audit(s.tenantId!, "kyc.upload", account.login + " " + docType, s.email);
+    return NextResponse.json({ ok: true, doc });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e.message || "Upload failed" }, { status: 400 });
+  }
+}

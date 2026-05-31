@@ -1,0 +1,83 @@
+"use client";
+import { useEffect, useState } from "react";
+
+const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
+  { sec: "Users", items: [["createClients", "Create Clients"], ["deleteClients", "Delete Clients"], ["manageManagers", "Manage Managers"]] },
+  { sec: "Funds", items: [["processDeposits", "Process Deposits"], ["processWithdrawals", "Process Withdrawals"], ["creditBonus", "Credit / Bonus / Insurance"], ["transferFunds", "Transfer Funds"], ["editFinancial", "Edit Financial History"], ["deleteFinancial", "Delete Financial History"]] },
+  { sec: "Trades", items: [["manualTrade", "Manual Trade Entry"], ["closeTrades", "Close Trades"], ["editTrades", "Edit Trade Records"], ["deleteTrades", "Delete Trades"]] },
+  { sec: "Reports", items: [["viewAudit", "View Audit Log"], ["exportPdf", "Export PDF Reports"]] },
+  { sec: "Communication", items: [["sendNotifications", "Send Notifications"]] },
+];
+
+export default function StaffConsole({ role, title, subtitle, newLabel }: { role: string; title: string; subtitle: string; newLabel: string }) {
+  const [rows, setRows] = useState<any[]>([]);
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [q, setQ] = useState(""); const [err, setErr] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState<any>({});
+  const [permFor, setPermFor] = useState<any>(null);
+  const [perms, setPerms] = useState<any>({});
+
+  async function load() { try { const d = await fetch("/api/superadmin/staff?role=" + role).then((r) => r.json()); if (d.ok) setRows(d.users); } catch (e) {} }
+  async function loadTenants() { try { const d = await fetch("/api/platform/tenants").then((r) => r.json()); if (d.ok) setTenants(d.tenants); } catch (e) {} }
+  useEffect(() => { load(); loadTenants(); }, [role]);
+
+  async function act(id: string, action: string, extra: any) { setErr(""); const r = await fetch("/api/superadmin/staff/" + id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...extra }) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; } load(); }
+  async function create() { setErr(""); const r = await fetch("/api/superadmin/staff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role, name: form.name, email: form.email, password: form.password, tenantId: form.tenantId }) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Create failed"); return; } setCreateOpen(false); setForm({}); load(); }
+  function openPerms(u: any) { setPermFor(u); setPerms(u.perms || {}); }
+  async function savePerms() { if (!permFor) return; await act(permFor.id, "perms", { perms }); setPermFor(null); }
+
+  const filtered = rows.filter((u: any) => !q || (u.name + u.email).toLowerCase().includes(q.toLowerCase()));
+  const inp = "rounded-md border px-2 py-1.5 text-sm";
+  return (<div className="space-y-4">
+    <div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">{title}</h1><p className="text-sm text-gray-500">{subtitle}</p></div>
+      <button onClick={() => { setForm({ tenantId: tenants[0] ? tenants[0].id : "" }); setCreateOpen(true); }} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">+ {newLabel}</button>
+    </div>
+    {err && <div className="text-sm text-red-600">{err}</div>}
+    <div className="rounded-lg border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+      <div className="mb-3 flex items-center gap-2"><input className={inp + " min-w-[200px] flex-1"} placeholder="Search name / email" value={q} onChange={(e) => setQ(e.target.value)} /><span className="text-sm text-gray-500">{filtered.length} rows</span></div>
+      <div className="overflow-x-auto"><table className="w-full text-sm">
+        <thead className="text-left text-gray-500"><tr><th className="px-2 py-1 font-normal">Name / Email</th><th className="px-2 py-1 font-normal">Company</th><th className="px-2 py-1 font-normal">Status</th><th className="px-2 py-1 font-normal">Permissions</th><th className="px-2 py-1 font-normal text-right">Actions</th></tr></thead>
+        <tbody>
+          {filtered.map((u: any) => (<tr key={u.id} className="border-t" style={{ borderColor: "#eef2f7" }}>
+            <td className="px-2 py-2 font-medium">{u.name}<div className="text-xs text-gray-400">{u.email}</div></td>
+            <td className="px-2 py-2">{u.company || "—"}</td>
+            <td className="px-2 py-2"><span className={"sab " + (u.status === "ACTIVE" ? "sab-green" : "sab-red")}>{u.status}</span></td>
+            <td className="px-2 py-2"><button className="rounded border px-2 py-1 text-xs" onClick={() => openPerms(u)}><i className="fa-solid fa-user-shield" style={{ marginRight: 4 }}></i>Permissions</button></td>
+            <td className="px-2 py-2 space-x-1 text-right">
+              <button title={u.status === "LOCKED" ? "Unlock" : "Lock"} className="mx-0.5 rounded px-2 py-1" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent2)" }} onClick={() => act(u.id, u.status === "LOCKED" ? "unlock" : "lock", {})}><i className={"fa-solid " + (u.status === "LOCKED" ? "fa-lock-open" : "fa-lock")}></i></button>
+              <button title="Reset password" className="mx-0.5 rounded px-2 py-1" style={{ background: "color-mix(in srgb, var(--amber) 16%, transparent)", color: "#b45309" }} onClick={() => { const p = prompt("New password for " + u.email); if (p) act(u.id, "resetPassword", { password: p }); }}><i className="fa-solid fa-key"></i></button>
+              <button title="Delete" className="mx-0.5 rounded px-2 py-1" style={{ background: "color-mix(in srgb, var(--red) 16%, transparent)", color: "#b91c1c" }} onClick={() => { if (confirm("Delete " + u.email + "?")) act(u.id, "delete", {}); }}><i className="fa-solid fa-trash"></i></button>
+            </td>
+          </tr>))}
+          {filtered.length === 0 && <tr><td className="px-2 py-4 text-gray-400" colSpan={5}>None yet.</td></tr>}
+        </tbody>
+      </table></div>
+    </div>
+
+    {createOpen && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setCreateOpen(false)}>
+      <div className="w-[360px] rounded-lg bg-white p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-2 text-sm font-semibold">{newLabel}</div>
+        <div className="space-y-2">
+          <input className={inp + " w-full"} placeholder="Name" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <input className={inp + " w-full"} placeholder="Email" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <input className={inp + " w-full"} type="password" placeholder="Password (min 6)" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <select className={inp + " w-full"} value={form.tenantId || ""} onChange={(e) => setForm({ ...form, tenantId: e.target.value })}><option value="">- outsource -</option>{tenants.map((t: any) => <option key={t.id} value={t.id}>{t.brandName || t.name}</option>)}</select>
+        </div>
+        <div className="mt-3 flex justify-end gap-2"><button className="rounded border px-3 py-1.5 text-sm" onClick={() => setCreateOpen(false)}>Cancel</button><button className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white" onClick={create}>Create</button></div>
+      </div>
+    </div>)}
+
+    {permFor && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setPermFor(null)}>
+      <div className="max-h-[80vh] w-[480px] overflow-auto rounded-lg bg-white p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-1 text-sm font-semibold">Permissions &mdash; {permFor.name}</div>
+        <div className="mb-3 text-xs text-gray-500">Personal permissions (still gated by the outsource permissions).</div>
+        {PERM_GROUPS.map((g) => (<div key={g.sec} className="mb-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{g.sec}</div>
+          <div className="grid grid-cols-2 gap-1">{g.items.map(([k, lbl]) => (<label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={perms[k] !== false} onChange={(e) => setPerms({ ...perms, [k]: e.target.checked })} />{lbl}</label>))}</div>
+        </div>))}
+        <div className="mt-3 flex justify-end gap-2"><button className="rounded border px-3 py-1.5 text-sm" onClick={() => setPermFor(null)}>Cancel</button><button className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white" onClick={savePerms}>Save Permissions</button></div>
+      </div>
+    </div>)}
+  </div>);
+}

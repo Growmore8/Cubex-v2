@@ -1,0 +1,100 @@
+import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/guard";
+import { prisma } from "@/lib/prisma";
+import { audit } from "@/lib/audit";
+import { Prisma } from "@prisma/client";
+import { assertCan } from "@/lib/perms";
+
+export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const s = await requireAdmin();
+  if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  try {
+    const b = await req.json();
+    const tenantId = s.tenantId as string;
+    const acc = await prisma.account.findFirst({ where: { id: params.id, tenantId } });
+    if (!acc) throw new Error("Account not found");
+    const actor = s.email || "admin";
+    const permMap: Record<string, string> = { manualPnl: "manualPnl", transfer: "transfer", status: "lockClient", settings: "editClient", accountId: "editClient", rename: "editClient", assignManager: "assignManager", subAccount: "createClients", assignGroup: "assignGroup" };
+    if (permMap[b.action]) await assertCan(s, permMap[b.action]);
+
+    switch (b.action) {
+      case "settings": {
+        const data: any = {};
+        if (b.leverage !== undefined) data.leverage = Number(b.leverage) || acc.leverage;
+        if (b.mcLevel !== undefined) data.mcLevel = new Prisma.Decimal(Number(b.mcLevel) || 0);
+        if (b.doNotLiquidate !== undefined) data.doNotLiquidate = !!b.doNotLiquidate;
+        if (b.currency !== undefined) data.currency = b.currency;
+        await prisma.account.update({ where: { id: acc.id }, data });
+        await audit(tenantId, "client.settings", acc.login + " " + JSON.stringify(data), actor);
+        break;
+      }
+      case "status": {
+        await prisma.account.update({ where: { id: acc.id }, data: { locked: !!b.locked } });
+        await audit(tenantId, "client.status", acc.login + (b.locked ? " locked" : " unlocked"), actor);
+        break;
+      }
+      case "accountId": {
+        const login = String(b.login || "").trim();
+        if (!login) throw new Error("Account ID required");
+        const clash = await prisma.account.findFirst({ where: { tenantId, login, NOT: { id: acc.id } } });
+        if (clash) throw new Error("That account ID is already in use");
+        await prisma.account.update({ where: { id: acc.id }, data: { login } });
+        await audit(tenantId, "client.accountId", acc.login + " -> " + login, actor);
+        break;
+      }
+      case "assignManager": {
+        await prisma.account.update({ where: { id: acc.id }, data: { managerId: b.managerId || null } });
+        await audit(tenantId, "client.assignManager", acc.login + " manager=" + (b.managerId || "none"), actor);
+        break;
+      }
+      case "rename": {
+        const name = String(b.name || acc.name);
+        const data: any = { name };
+        if (b.email !== undefined) data.email = String(b.email);
+        if (b.country !== undefined) data.country = String(b.country);
+        await prisma.account.update({ where: { id: acc.id }, data });
+        await audit(tenantId, "client.rename", acc.login + " -> " + name, actor);
+        break;
+      }
+      case "manualPnl": {
+        const amt = Number(b.amount);
+        if (!amt) throw new Error("Amount required");
+        await prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: new Prisma.Decimal(amt) } } });
+        await audit(tenantId, "client.manualPnl", acc.login + " " + amt, actor);
+        break;
+      }
+      case "transfer": {
+        const amt = Number(b.amount);
+        if (!amt || amt <= 0) throw new Error("Amount must be positive");
+        const dest = await prisma.account.findFirst({ where: { tenantId, login: String(b.toLogin || "").trim() } });
+        if (!dest) throw new Error("Destination account not found");
+        if (dest.id === acc.id) throw new Error("Cannot transfer to the same account");
+        await prisma.$transaction([
+          prisma.account.update({ where: { id: acc.id }, data: { withdrawal: { increment: new Prisma.Decimal(amt) } } }),
+          prisma.account.update({ where: { id: dest.id }, data: { deposit: { increment: new Prisma.Decimal(amt) } } }),
+        ]);
+        await audit(tenantId, "client.transfer", acc.login + " -> " + dest.login + " " + amt, actor);
+        break;
+      }
+      case "subAccount": {
+        const accs = await prisma.account.findMany({ where: { tenantId }, select: { login: true } });
+        let max = 800100;
+        for (const a of accs) { const n = parseInt(a.login, 10); if (!isNaN(n) && String(n) === a.login && n > max) max = n; }
+        const login = String(max + 1);
+        await prisma.account.create({ data: { tenantId, login, name: b.name || (acc.name + " sub"), type: acc.type, leverage: acc.leverage, currency: acc.currency, managerId: acc.managerId, parentId: acc.id } });
+        await audit(tenantId, "client.subAccount", "parent " + acc.login + " -> " + login, actor);
+        break;
+      }
+      case "assignGroup": {
+        await prisma.account.update({ where: { id: acc.id }, data: { groupId: b.groupId || null } });
+        await audit(tenantId, "client.assignGroup", acc.login + " group=" + (b.groupId || "none"), actor);
+        break;
+      }
+      default:
+        throw new Error("Unknown action");
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
+  }
+}

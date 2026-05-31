@@ -1,0 +1,380 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+model Tenant {
+  id           String        @id @default(uuid())
+  name         String
+  slug         String        @unique
+  subdomain    String        @unique
+  customDomain String?       @unique
+  status       TenantStatus  @default(ACTIVE)
+  brandName    String?
+  logoUrl      String?
+  faviconUrl   String?
+  primaryColor String?       @default("#2563eb")
+  accentColor  String?       @default("#22c55e")
+  supportEmail String?
+  permissions  Json          @default("{}")
+  subscription Subscription?
+  users        User[]
+  accounts     Account[]
+  symbols      Symbol[]
+  groups       TradeGroup[]
+  counters     Counter[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+model Subscription {
+  id        String    @id @default(uuid())
+  tenantId  String    @unique
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan      Plan      @default(STARTER)
+  status    SubStatus @default(TRIALING)
+  seats     Int       @default(5)
+  startsAt  DateTime  @default(now())
+  endsAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+model User {
+  id              String     @id @default(uuid())
+  tenantId        String?
+  tenant          Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email           String
+  passwordHash    String
+  name            String
+  role            Role       @default(CLIENT)
+  status          UserStatus @default(ACTIVE)
+  perms           Json       @default("{}")
+  lastLoginAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  accounts        Account[]  @relation("AccountOwner")
+  managedAccounts Account[]  @relation("ManagerAccounts")
+  @@unique([tenantId, email])
+  @@index([role])
+}
+model Account {
+  id              String             @id @default(uuid())
+  tenantId        String
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  login           String
+  userId          String?
+  user            User?              @relation("AccountOwner", fields: [userId], references: [id], onDelete: SetNull)
+  name            String
+  email           String?
+  phone           String?
+  country         String?
+  type            AccountType        @default(LIVE)
+  leverage        Int                @default(100)
+  currency        Currency           @default(USD)
+  mcLevel         Decimal            @default(0) @db.Decimal(6, 2)
+  doNotLiquidate  Boolean            @default(false)
+  locked          Boolean            @default(false)
+  deactivated     Boolean            @default(false)
+  isPool          Boolean            @default(false)
+  isOnline        Boolean            @default(false)
+  lastPing        DateTime?
+  lastDevice      String?
+  kycStatus       KycStatus?
+  deposit         Decimal            @default(0) @db.Decimal(18, 2)
+  withdrawal      Decimal            @default(0) @db.Decimal(18, 2)
+  credit          Decimal            @default(0) @db.Decimal(18, 2)
+  bonus           Decimal            @default(0) @db.Decimal(18, 2)
+  insurance       Decimal            @default(0) @db.Decimal(18, 2)
+  pnl             Decimal            @default(0) @db.Decimal(18, 2)
+  managerId       String?
+  manager         User?              @relation("ManagerAccounts", fields: [managerId], references: [id], onDelete: SetNull)
+  parentId        String?
+  parent          Account?           @relation("SubAccounts", fields: [parentId], references: [id], onDelete: SetNull)
+  children        Account[]          @relation("SubAccounts")
+  groupId         String?
+  group           TradeGroup?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  trades          Trade[]
+  history         TradeHistory[]
+  financials      FinancialHistory[]
+  kyc             KycDocument[]
+  paymentRequests PaymentRequest[]
+  pendingOrders   PendingOrder[]
+  symbolOverrides AccountSymbolOverride[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  @@unique([tenantId, login])
+  @@index([tenantId])
+}
+model Counter {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name     String
+  nextVal  BigInt @default(800100)
+  @@unique([tenantId, name])
+}
+model Trade {
+  id        BigInt   @id @default(autoincrement())
+  ticket    BigInt   @unique
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol    String
+  type      Side
+  lots      Decimal  @db.Decimal(10, 2)
+  openPrice Decimal  @db.Decimal(18, 5)
+  sl        Decimal  @default(0) @db.Decimal(18, 5)
+  tp        Decimal  @default(0) @db.Decimal(18, 5)
+  openedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  @@index([accountId])
+  @@index([symbol])
+}
+model TradeHistory {
+  id          BigInt      @id @default(autoincrement())
+  ticket      BigInt
+  accountId   String
+  account     Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol      String
+  side        Side
+  lots        Decimal     @db.Decimal(10, 2)
+  openPrice   Decimal     @db.Decimal(18, 5)
+  closePrice  Decimal     @db.Decimal(18, 5)
+  sl          Decimal     @default(0) @db.Decimal(18, 5)
+  tp          Decimal     @default(0) @db.Decimal(18, 5)
+  pnl         Decimal     @db.Decimal(18, 2)
+  closeReason CloseReason @default(MANUAL)
+  openedAt    DateTime
+  closedAt    DateTime    @default(now())
+  @@index([accountId])
+  @@index([closedAt])
+}
+model FinancialHistory {
+  id          BigInt   @id @default(autoincrement())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type        FinType
+  amount      Decimal  @db.Decimal(18, 2)
+  description String?
+  reference   String?
+  mode        FinMode  @default(REALTIME)
+  appliedAt   DateTime @default(now())
+  createdBy   String   @default("admin")
+  createdAt   DateTime @default(now())
+  @@index([accountId])
+}
+model Symbol {
+  id       String  @id @default(uuid())
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  symbol   String
+  display  String
+  category String  @default("forex")
+  digits   Int     @default(5)
+  feed     String?
+  enabled  Boolean @default(true)
+  @@unique([tenantId, symbol])
+}
+model AccountSymbolOverride {
+  id        String   @id @default(uuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol    String
+  disabled  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  @@unique([accountId, symbol])
+  @@index([accountId])
+}
+model TradeGroup {
+  id       String    @id @default(uuid())
+  tenantId String
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name     String
+  spread   Decimal   @default(0) @db.Decimal(10, 2)
+  config   Json      @default("{}")
+  accounts Account[]
+  @@unique([tenantId, name])
+}
+model KycDocument {
+  id         String    @id @default(uuid())
+  accountId  String
+  account    Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  docType    String
+  fileUrl    String
+  mimeType   String?
+  status     KycStatus @default(PENDING)
+  note       String?
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+model AuditLog {
+  id          BigInt        @id @default(autoincrement())
+  tenantId    String?
+  tenant      Tenant?       @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  action      String
+  detail      String?
+  category    AuditCategory @default(ADMIN)
+  performedBy String        @default("Admin")
+  device      String?
+  ipAddress   String?
+  createdAt   DateTime      @default(now())
+  @@index([category])
+  @@index([createdAt])
+}
+model Setting {
+  key       String   @id
+  value     Json     @default("{}")
+  updatedAt DateTime @updatedAt
+}
+model CryptoWallet {
+  id        String   @id @default(uuid())
+  network   String
+  asset     String   @default("USDT")
+  address   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+model PendingOrder {
+  id        String   @id @default(uuid())
+  tenantId  String
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol    String
+  side      Side
+  kind      String
+  lots      Decimal  @default(0) @db.Decimal(18, 2)
+  price     Decimal  @default(0) @db.Decimal(18, 8)
+  sl        Decimal  @default(0) @db.Decimal(18, 8)
+  tp        Decimal  @default(0) @db.Decimal(18, 8)
+  createdAt DateTime @default(now())
+  @@index([accountId])
+}
+model PaymentRequest {
+  id           String        @id @default(uuid())
+  tenantId     String
+  accountId    String
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  kind         PaymentKind
+  amount       Decimal       @db.Decimal(18, 2)
+  method       String?
+  details      Json          @default("{}")
+  slipUrl      String?
+  note         String?
+  status       RequestStatus @default(PENDING)
+  reviewedBy   String?
+  rejectReason String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  @@index([tenantId])
+  @@index([accountId])
+}
+model Notification {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  title       String
+  body        String?
+  image       String?
+  type        String?
+  senderId    String?
+  senderRole  String?
+  targetScope String?
+  batchId     String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  @@index([userId])
+  @@index([batchId])
+}
+model GlobalSymbol {
+  id        String   @id @default(uuid())
+  symbol    String   @unique
+  display   String
+  category  String   @default("forex")
+  digits    Int      @default(5)
+  feed      String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+enum Role {
+  SUPERADMIN
+  ADMIN
+  MANAGER
+  CLIENT
+}
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+}
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  LOCKED
+}
+enum Plan {
+  STARTER
+  PRO
+  ENTERPRISE
+}
+enum SubStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+enum AccountType {
+  LIVE
+  DEMO
+}
+enum Currency {
+  USD
+  EUR
+  GBP
+}
+enum Side {
+  BUY
+  SELL
+}
+enum CloseReason {
+  MANUAL
+  TP
+  SL
+  MC
+}
+enum FinType {
+  DEPOSIT
+  WITHDRAWAL
+  CREDIT_IN
+  CREDIT_OUT
+  BONUS
+  INSURANCE
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+enum FinMode {
+  REALTIME
+  MANUAL
+}
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+enum AuditCategory {
+  SUPERADMIN
+  ADMIN
+  MANAGER
+  CLIENT
+}
+enum PaymentKind {
+  DEPOSIT
+  WITHDRAWAL
+}
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}

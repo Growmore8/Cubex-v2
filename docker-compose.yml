@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cubex_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cubex
+      POSTGRES_PASSWORD: cubex_pass
+      POSTGRES_DB: cubex
+    ports:
+      - "5432:5432"
+    volumes:
+      - cubex_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: cubex_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - cubex_redis:/data
+
+volumes:
+  cubex_pgdata:
+  cubex_redis:
