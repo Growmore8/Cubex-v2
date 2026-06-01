@@ -18,8 +18,8 @@ export async function POST(req: Request) {
     const file = form.get("file") as File | null;
     if (!file) throw new Error("No file");
     const up = await saveUpload(file, "avatars");
-    await prisma.user.update({ where: { id: s.sub }, data: { avatarUrl: up.fileUrl } });
-    return NextResponse.json({ ok: true, avatarUrl: up.fileUrl });
+    await prisma.user.update({ where: { id: s.sub }, data: { avatarUrl: up } });
+return NextResponse.json({ ok: true, avatarUrl: up });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
   }

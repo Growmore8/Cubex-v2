@@ -12,8 +12,8 @@ export async function POST(req: Request) {
     if (!b.fromId || !b.toId) throw new Error("Pick both accounts");
     if (b.fromId === b.toId) throw new Error("Pick two different accounts");
     if (!amount || amount <= 0) throw new Error("Enter a valid amount");
-    const from = await prisma.account.findFirst({ where: { id: b.fromId, tenantId: s.tenantId, userId: s.sub } });
-    const to = await prisma.account.findFirst({ where: { id: b.toId, tenantId: s.tenantId, userId: s.sub } });
+    const from = await prisma.account.findFirst({ where: { id: b.fromId, tenantId: s.tenantId ?? undefined, userId: s.sub ?? undefined } });
+    const to = await prisma.account.findFirst({ where: { id: b.toId, tenantId: s.tenantId ?? undefined, userId: s.sub ?? undefined } });
     if (!from || !to) throw new Error("Account not found");
     const bal = Number(from.deposit) - Number(from.withdrawal) + Number(from.credit) + Number(from.bonus) + Number(from.pnl);
     if (amount > bal) throw new Error("Insufficient balance");
