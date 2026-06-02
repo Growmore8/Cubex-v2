@@ -8,7 +8,15 @@ export async function authenticate(host: string | null, email: string, password:
   const tenant = await resolveTenant(host);
   const tenantId = tenant?.id ?? null;
 
-  const user = await prisma.user.findFirst({ where: { tenantId, email: email.toLowerCase() } });
+  const user = tenantId
+    ? await prisma.user.findFirst({
+        where: { tenantId, email: email.toLowerCase() },
+      })
+    : await prisma.user.findFirst({
+        where: { email: email.toLowerCase() },
+        orderBy: { createdAt: "asc" },
+      });
+
   if (!user) throw new Error("Invalid email or password");
   if (user.status !== "ACTIVE") throw new Error("Account is " + user.status.toLowerCase());
   if (tenant && tenant.status !== "ACTIVE") throw new Error("This workspace is not active");
