@@ -3,10 +3,11 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { readUpload, contentType } from "@/lib/upload";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await getSession();
   if (!s) return NextResponse.json({ ok: false }, { status: 401 });
-  const doc = await prisma.kycDocument.findUnique({ where: { id: params.id }, include: { account: true } });
+  const doc = await prisma.kycDocument.findUnique({ where: { id: id }, include: { account: true } });
   if (!doc) return NextResponse.json({ ok: false }, { status: 404 });
   const acc = doc.account;
   const allowed =

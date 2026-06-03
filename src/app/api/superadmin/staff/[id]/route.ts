@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireSuperAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const b = await req.json();
-    const u: any = await prisma.user.findUnique({ where: { id: params.id } });
+    const u: any = await prisma.user.findUnique({ where: { id: id } });
     if (!u) throw new Error("User not found");
     if (b.action === "lock") await prisma.user.update({ where: { id: u.id }, data: { status: "LOCKED" as any } });
     else if (b.action === "unlock") await prisma.user.update({ where: { id: u.id }, data: { status: "ACTIVE" as any } });

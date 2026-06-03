@@ -22,11 +22,12 @@ function parseId(raw: string): { kind: "TRADE" | "FIN"; id: bigint } | null {
   return null;
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
-    const p = parseId(params.id);
+    const p = parseId(id);
     if (!p) throw new Error("Bad id");
     await assertCan(s, p.kind === "TRADE" ? "deleteTrades" : "deleteFinancial");
     if (p.kind === "TRADE") {
@@ -53,11 +54,12 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
-    const p = parseId(params.id);
+    const p = parseId(id);
     if (!p) throw new Error("Bad id");
     const b = await req.json();
     await assertCan(s, p.kind === "TRADE" ? "editTrades" : "editFinancial");

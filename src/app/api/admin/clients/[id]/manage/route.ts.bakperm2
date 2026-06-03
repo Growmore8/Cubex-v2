@@ -5,13 +5,14 @@ import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
 import { assertCan } from "@/lib/perms";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const b = await req.json();
     const tenantId = s.tenantId as string;
-    const acc = await prisma.account.findFirst({ where: { id: params.id, tenantId } });
+    const acc = await prisma.account.findFirst({ where: { id: id, tenantId } });
     if (!acc) throw new Error("Account not found");
     const actor = s.email || "admin";
     const permMap: Record<string, string> = { manualPnl: "manualPnl", transfer: "transfer", status: "lockClient", settings: "editClient", accountId: "editClient", rename: "editClient", assignManager: "assignManager", subAccount: "createClients", assignGroup: "assignGroup" };

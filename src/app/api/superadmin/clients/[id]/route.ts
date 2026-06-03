@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { adjustBalance } from "@/services/account.service";
 import { audit } from "@/lib/audit";
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }:  { params: Promise<{ id: string }> }) {
   const s = await requireSuperAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
    const { id } = await params;

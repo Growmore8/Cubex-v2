@@ -5,12 +5,13 @@ import { audit } from "@/lib/audit";
 import { assertCan } from "@/lib/perms";
 import { Prisma } from "@prisma/client";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const b = await req.json();
-    const rec = await prisma.paymentRequest.findFirst({ where: { id: params.id, tenantId: s.tenantId as string } });
+    const rec = await prisma.paymentRequest.findFirst({ where: { id: id, tenantId: s.tenantId as string } });
     if (!rec) throw new Error("Payment not found");
     if (rec.status !== "PENDING") throw new Error("Already " + String(rec.status).toLowerCase());
     const approve = b.action === "approve";

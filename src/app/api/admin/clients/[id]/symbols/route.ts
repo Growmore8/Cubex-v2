@@ -3,17 +3,19 @@ import { requireAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  const acc = await prisma.account.findFirst({ where: { id: params.id, tenantId: s.tenantId! } });
+  const acc = await prisma.account.findFirst({ where: { id: id, tenantId: s.tenantId! } });
   if (!acc) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   const overrides = await prisma.accountSymbolOverride.findMany({ where: { accountId: acc.id } });
   const disabled = overrides.filter((o) => o.disabled).map((o) => o.symbol);
   return NextResponse.json({ ok: true, disabled });
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
@@ -21,7 +23,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const symbol = String(b.symbol || "").trim();
     if (!symbol) throw new Error("Symbol required");
     const disabled = !!b.disabled;
-    const acc = await prisma.account.findFirst({ where: { id: params.id, tenantId: s.tenantId! } });
+    const acc = await prisma.account.findFirst({ where: { id:id, tenantId: s.tenantId! } });
     if (!acc) throw new Error("Account not found");
     if (disabled) {
       await prisma.accountSymbolOverride.upsert({

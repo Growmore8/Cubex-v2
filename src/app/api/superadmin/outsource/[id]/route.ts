@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireSuperAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const b = await req.json();
-    const t: any = await prisma.tenant.findUnique({ where: { id: params.id } });
+    const t: any = await prisma.tenant.findUnique({ where: { id: id } });
     if (!t) throw new Error("Outsource not found");
     if (b.action === "perms") await prisma.tenant.update({ where: { id: t.id }, data: { permissions: b.perms || {} } });
     else if (b.action === "open") await prisma.tenant.update({ where: { id: t.id }, data: { status: "ACTIVE" as any } });

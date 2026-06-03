@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { adjustBalance } from "@/services/account.service";
 import { audit } from "@/lib/audit";
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireSuperAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const b = await req.json();
-    const acc: any = await prisma.account.findUnique({ where: { id: params.id } });
+    const acc: any = await prisma.account.findUnique({ where: { id: id } });
     if (!acc) throw new Error("Account not found");
     if (b.action === "lock") await prisma.account.update({ where: { id: acc.id }, data: { locked: true } });
     else if (b.action === "unlock") await prisma.account.update({ where: { id: acc.id }, data: { locked: false } });

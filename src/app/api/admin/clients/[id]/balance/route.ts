@@ -9,14 +9,15 @@ const schema = z.object({
   amount: z.number().positive(), description: z.string().optional(),
 });
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const { type, amount, description } = schema.parse(await req.json());
     const balMap: Record<string, string> = { DEPOSIT: "processDeposits", WITHDRAWAL: "processWithdrawals", CREDIT_IN: "creditBonus", CREDIT_OUT: "creditBonus", BONUS: "creditBonus", INSURANCE: "creditBonus" };
     await assertCan(s, balMap[type] || "adjustBalance");
-    const account = await adjustBalance(s.tenantId!, params.id, type, amount, description || "", s.email);
+    const account = await adjustBalance(s.tenantId!, id, type, amount, description || "", s.email);
     return NextResponse.json({ ok: true, account });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

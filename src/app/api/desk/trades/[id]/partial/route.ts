@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { contractFor } from "@/config/contracts";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const b = await req.json();
-    const t: any = await prisma.trade.findUnique({ where: { id: Number(params.id) }, include: { account: true } });
+    const t: any = await prisma.trade.findUnique({ where: { id: Number(id) }, include: { account: true } });
     if (!t) throw new Error("Position not found");
     if (t.account.tenantId !== s.tenantId) throw new Error("Forbidden");
     const lots = Number(b.lots);

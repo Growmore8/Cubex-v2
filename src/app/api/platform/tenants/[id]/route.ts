@@ -24,23 +24,25 @@ const patchSchema = z.object({
   }).optional(),
 });
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await guard())) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const body = patchSchema.parse(await req.json());
     const { subscription, ...tenantData } = body;
-    const tenant = await updateTenant(params.id, tenantData);
-    if (subscription) await updateSubscription(params.id, subscription);
+    const tenant = await updateTenant(id, tenantData);
+    if (subscription) await updateSubscription(id, subscription);
     return NextResponse.json({ ok: true, tenant });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Update failed" }, { status: 400 });
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await guard())) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
-    await deleteTenant(params.id);
+    await deleteTenant(id);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Delete failed" }, { status: 400 });

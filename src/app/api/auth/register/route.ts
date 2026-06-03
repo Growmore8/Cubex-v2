@@ -14,7 +14,7 @@ const schema = z.object({
 export async function POST(req: Request) {
   try {
     const { name, email, password } = schema.parse(await req.json());
-    const host = headers().get("host");
+    const host = (await headers()).get("host");
     const session = await registerClient(host, name, email.toLowerCase(), password);
     const token = await signSession(session);
     const res = NextResponse.json({ ok: true, redirect: ROLE_HOME[session.role] });
