@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 
 type Item = { href: string; label: string; icon: string; sub?: boolean; section?: string };
 const NAV: Item[] = [
@@ -119,7 +120,9 @@ const CSS = `
 
 export default function SuperadminLayout({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const [dark, setDark] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const dark = mounted ? resolvedTheme === "dark" : false;
   const [vol, setVol] = useState(1.5);
   const [notifs, setNotifs] = useState<any[]>([]);
   const [unread, setUnread] = useState(0);
@@ -150,16 +153,11 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
     } catch (e) {}
   }
   useEffect(() => {
-    if (!document.getElementById("fa6")) {
-      const l = document.createElement("link"); l.id = "fa6"; l.rel = "stylesheet";
-      l.href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css";
-      document.head.appendChild(l);
-    }
-    try { if (localStorage.getItem("sa_theme") === "dark") setDark(true); } catch (e) {}
+    setMounted(true);
     try { const v = parseFloat(localStorage.getItem("sa_notifVol") || "1.5"); volRef.current = v; setVol(v); } catch (e) {}
     loadNotifs(); const t = setInterval(loadNotifs, 30000); return () => clearInterval(t);
   }, []);
-  function toggleTheme() { const n = !dark; setDark(n); try { localStorage.setItem("sa_theme", n ? "dark" : "light"); } catch (e) {} }
+ function toggleTheme() { setTheme(dark ? "light" : "dark"); }
   function setVolume(v: number) { volRef.current = v; setVol(v); try { localStorage.setItem("sa_notifVol", String(v)); } catch (e) {} beep(880, 0.08, 0.25); }
   function openPanel() { setPanel((p) => { const n = !p; if (n) setUnread(0); return n; }); }
 
@@ -195,7 +193,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
             <input type="range" className="sb-vol-slider" min="0" max="5" step="0.1" value={vol} onChange={(e) => setVolume(parseFloat(e.target.value))} />
             <span className="sb-vol-val">{Math.round((vol / 5) * 100)}%</span>
           </div>
-          <div className="sb-user">QubeX</div>
+          <div className="sb-user">CubeX</div>
           <button className="sb-logout" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }}>
             <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 4 }}></i>Logout
           </button>

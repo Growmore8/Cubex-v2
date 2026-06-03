@@ -10,7 +10,7 @@ export interface Brand {
 }
 
 export async function getBrand(): Promise<Brand> {
-  const host = headers().get("host");
+  const host = (await headers()).get("host");
   const tenant = await resolveTenant(host);
   if (!tenant) {
     return { name: process.env.APP_NAME || "Cubex", primaryColor: "#2563eb", accentColor: "#22c55e", logoUrl: null, tenantId: null };

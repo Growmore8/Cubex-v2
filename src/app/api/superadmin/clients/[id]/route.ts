@@ -7,9 +7,10 @@ import { audit } from "@/lib/audit";
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const s = await requireSuperAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+   const { id } = await params;
   try {
     const b = await req.json();
-    const acc: any = await prisma.account.findUnique({ where: { id: params.id } });
+    const acc: any = await prisma.account.findUnique({ where: { id } });
     if (!acc) throw new Error("Account not found");
     if (b.action === "lock") await prisma.account.update({ where: { id: acc.id }, data: { locked: true } });
     else if (b.action === "unlock") await prisma.account.update({ where: { id: acc.id }, data: { locked: false } });
