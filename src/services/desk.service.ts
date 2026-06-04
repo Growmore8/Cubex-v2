@@ -3,6 +3,7 @@ import { assertTradingOpen, assertCan } from "@/lib/perms";
 import { getPrice } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
+import { pnlFor } from "@/lib/trademath";
 
 function accountWhere(s: any) {
   if (s.role === "ADMIN" || s.role === "SUPERADMIN") return { tenantId: s.tenantId };
@@ -103,9 +104,7 @@ export async function forceClose(s: any, tradeId: string) {
   if (!trade) throw new Error("Position not found");
   const price = await getPrice(trade.symbol);
   if (price == null) throw new Error("No price");
-  const meta = instruments[trade.symbol] || { contractSize: 100000 };
-  const dir = trade.type === "BUY" ? 1 : -1;
-  const pnl = (price - Number(trade.openPrice)) * dir * Number(trade.lots) * meta.contractSize;
+  const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
   await prisma.$transaction(async (tx) => {
     await tx.tradeHistory.create({
       data: { ticket: trade.ticket, accountId: trade.accountId, symbol: trade.symbol, side: trade.type, lots: trade.lots, openPrice: trade.openPrice, closePrice: new Prisma.Decimal(price), sl: trade.sl, tp: trade.tp, pnl: new Prisma.Decimal(pnl), openedAt: trade.openedAt },

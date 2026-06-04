@@ -5,7 +5,7 @@ import NotificationBell from "@/components/shared/NotificationBell";
 
 export default function Chrome({ brandName, primary, accent, name, role, children }: any) {
   const path = usePathname() || "";
-  const bare = path.startsWith("/client") || path.startsWith("/admin/desk");
+  const bare = path.startsWith("/client") || path.startsWith("/admin/desk") || path.startsWith("/admin/platform");
   const vars: any = { ["--brand-primary"]: primary, ["--brand-accent"]: accent };
   if (bare) return <div className="min-h-screen" style={vars}>{children}</div>;
   return (

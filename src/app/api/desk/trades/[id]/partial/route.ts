@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { contractFor } from "@/config/contracts";
+import { pnlFor } from "@/lib/trademath";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,9 +19,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!lots || lots <= 0 || lots >= full) throw new Error("Lots must be between 0 and " + full);
     const price = Number(b.price) || Number(t.openPrice);
     const gs = await prisma.globalSymbol.findUnique({ where: { symbol: t.symbol } }).catch(() => null);
-    const cs = contractFor(gs && gs.category ? gs.category : "forex", t.symbol);
-    const dir = t.type === "BUY" ? 1 : -1;
-    const realized = (price - Number(t.openPrice)) * dir * lots * cs;
+    const realized = pnlFor(t.symbol, t.type as any, Number(t.openPrice), price, lots, gs?.category || "forex");
     await prisma.$transaction([
       prisma.trade.update({ where: { id: t.id }, data: { lots: full - lots } }),
       prisma.account.update({ where: { id: t.accountId }, data: { pnl: { increment: realized } } }),

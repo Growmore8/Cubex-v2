@@ -9,10 +9,6 @@ export default function KycPanel() {
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [view, setView] = useState("");
-  const [upLogin, setUpLogin] = useState("");
-  const [upType, setUpType] = useState("ID");
-  const [upFile, setUpFile] = useState<File | null>(null);
-  const [upMsg, setUpMsg] = useState("");
 
   async function load() {
     const r = await fetch("/api/admin/kyc").then((x) => x.json()).catch(() => ({ ok: false }));
@@ -39,17 +35,6 @@ export default function KycPanel() {
     load();
   }
 
-  async function upload() {
-    setErr(""); setUpMsg("");
-    if (!upLogin) { setErr("Enter client login"); return; }
-    if (!upFile) { setErr("Choose a file"); return; }
-    const fd = new FormData();
-    fd.append("login", upLogin); fd.append("docType", upType); fd.append("file", upFile);
-    const r = await fetch("/api/admin/kyc/upload", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false }));
-    if (!r.ok) { setErr(r.error || "Upload failed"); return; }
-    setUpMsg("Uploaded"); setUpLogin(""); setUpFile(null); setTimeout(() => setUpMsg(""), 1500); load();
-  }
-
   const tabs = ["PENDING", "APPROVED", "REJECTED", "ALL"];
   const rows = list.filter((p) => (status === "ALL" || st(p) === status)).filter((p) => (name(p) + " " + login(p) + " " + email(p)).toLowerCase().includes(q.toLowerCase()));
   const chip = (active: boolean) => "rounded px-2 py-0.5 text-[10px] " + (active ? "" : "text-[var(--muted)]");
@@ -64,14 +49,6 @@ export default function KycPanel() {
         {tabs.map((t) => <button key={t} onClick={() => setStatus(t)} className={chip(status === t)} style={status === t ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)" }}>{t[0] + t.slice(1).toLowerCase()}</button>)}
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / email / account" className="ml-auto w-44 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
         <button onClick={load} className="rounded border border-[var(--border)] px-2 py-0.5">Refresh</button>
-      </div>
-      <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-1 py-1">
-        <span className="text-[var(--muted)]">Upload for client:</span>
-        <input value={upLogin} onChange={(e) => setUpLogin(e.target.value)} placeholder="Login (e.g. 1001)" className="w-28 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
-        <input value={upType} onChange={(e) => setUpType(e.target.value)} placeholder="Doc type" className="w-24 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
-        <input type="file" onChange={(e) => setUpFile(e.target.files?.[0] || null)} className="text-[9px]" />
-        <button onClick={upload} className="rounded px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Upload</button>
-        {upMsg && <span style={{ color: BUY }}>{upMsg}</span>}
       </div>
       {err && <div className="px-2 py-1" style={{ color: SELL }}>{err}</div>}
       <div className="flex-1 overflow-auto">

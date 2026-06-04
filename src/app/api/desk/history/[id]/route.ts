@@ -12,7 +12,7 @@ const FIN: Record<string, { col: string; sign: number }> = {
   BONUS: { col: "bonus", sign: 1 },
   INSURANCE: { col: "insurance", sign: 1 },
   TRANSFER_IN: { col: "deposit", sign: 1 },
-  TRANSFER_OUT: { col: "deposit", sign: -1 },
+  TRANSFER_OUT: { col: "withdrawal", sign: 1 },
 };
 
 function parseId(raw: string): { kind: "TRADE" | "FIN"; id: bigint } | null {
@@ -45,6 +45,15 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       const ops: any[] = [];
       if (rule) ops.push(prisma.account.update({ where: { id: row.accountId }, data: { [rule.col]: { increment: -rule.sign * Math.abs(Number(row.amount)) } } as any }));
       ops.push(prisma.financialHistory.delete({ where: { id: p.id } }));
+      // Transfer delete-sync: remove the paired entry on the other account too
+      if ((row.type === "TRANSFER_IN" || row.type === "TRANSFER_OUT") && row.reference) {
+        const pair = await prisma.financialHistory.findFirst({ where: { reference: row.reference, NOT: { id: row.id } } });
+        if (pair) {
+          const prule = FIN[pair.type];
+          if (prule) ops.push(prisma.account.update({ where: { id: pair.accountId }, data: { [prule.col]: { increment: -prule.sign * Math.abs(Number(pair.amount)) } } as any }));
+          ops.push(prisma.financialHistory.delete({ where: { id: pair.id } }));
+        }
+      }
       await prisma.$transaction(ops);
       await audit(s.tenantId!, "history.deleteFin", row.type + " " + Number(row.amount), s.email);
     }
@@ -80,6 +89,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     } else {
       const row = await prisma.financialHistory.findFirst({ where: { id: p.id, account: { tenantId: s.tenantId! } } });
       if (!row) throw new Error("Not found");
+      if (row.type === "TRANSFER_IN" || row.type === "TRANSFER_OUT") throw new Error("Transfers cannot be edited — delete and recreate instead");
       const data: any = {};
       let amtDelta = 0;
       if (b.amount != null) { const na = Math.abs(Number(b.amount)); amtDelta = na - Math.abs(Number(row.amount)); data.amount = na; }

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdmin, requireAdminOrManager } from "@/lib/guard";
 import { listClients, createClient } from "@/services/account.service";
 import { assertCan } from "@/lib/perms";
 
 export async function GET() {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  const clients = await listClients(s.tenantId!);
+  const clients = await listClients(s.tenantId!, s.role === "MANAGER" ? s.sub : null);
   return NextResponse.json({ ok: true, clients });
 }
 

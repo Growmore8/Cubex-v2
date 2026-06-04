@@ -10,8 +10,10 @@ const schema = z.object({ email: z.string().email(), password: z.string().min(1)
 export async function POST(req: Request) {
   try {
     const { email, password } = schema.parse(await req.json());
-    const host = (await headers()).get("host");
-    const session = await authenticate(host, email, password);
+    const h = await headers();
+    const host = h.get("host");
+    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || undefined;
+    const session = await authenticate(host, email, password, ip);
     const token = await signSession(session);
     const res = NextResponse.json({
       ok: true,

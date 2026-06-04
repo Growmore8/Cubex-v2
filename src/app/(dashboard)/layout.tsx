@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { getBrand } from "@/lib/brand";
 import { redirect } from "next/navigation";
 import Chrome from "@/components/layout/Chrome";
+import SessionGuard from "@/components/SessionGuard";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -9,6 +10,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const brand = await getBrand();
   return (
     <Chrome brandName={brand.name} primary={brand.primaryColor} accent={brand.accentColor} name={session.name} role={session.role}>
+      <SessionGuard />
       {children}
     </Chrome>
   );

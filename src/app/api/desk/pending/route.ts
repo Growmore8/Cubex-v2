@@ -1,13 +1,34 @@
 import { NextResponse } from "next/server";
-import { requireStaff } from "@/lib/guard";
+import { requireStaff, assertWritable } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen, assertCan } from "@/lib/perms";
 import { audit } from "@/lib/audit";
+
+export async function GET() {
+  const s = await requireStaff();
+  if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  const where: any = s.role === "SUPERADMIN" ? {} : { tenantId: s.tenantId };
+  if (s.role === "MANAGER") where.account = { managerId: s.sub };
+  const orders = await prisma.pendingOrder.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    include: { account: { select: { login: true, name: true } } },
+  });
+  return NextResponse.json({
+    ok: true,
+    pending: orders.map((o) => ({
+      id: o.id, accountId: o.accountId, accountLogin: o.account?.login, accountName: o.account?.name,
+      symbol: o.symbol, side: o.side, kind: o.kind, lots: Number(o.lots), price: Number(o.price),
+      sl: Number(o.sl), tp: Number(o.tp), createdAt: o.createdAt,
+    })),
+  });
+}
 
 export async function POST(req: Request) {
   const s = await requireStaff();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
+    await assertWritable(s);
     await assertTradingOpen();
     await assertCan(s, "manualTrade");
     const b = await req.json();

@@ -4,6 +4,7 @@ import { clientAccount } from "@/services/kyc.service";
 import { listClientPayments, createPayment } from "@/services/payment.service";
 import { notifyTenantAdmins } from "@/services/notification.service";
 import { saveUpload } from "@/lib/upload";
+import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
 
 export async function GET() {
   const s = await requireClient();
@@ -27,6 +28,11 @@ export async function POST(req: Request) {
     const note = form.get("note") ? String(form.get("note")) : undefined;
     if (!["DEPOSIT", "WITHDRAWAL"].includes(kind)) throw new Error("Invalid kind");
     if (!(amount > 0)) throw new Error("Amount must be positive");
+    if (kind === "WITHDRAWAL") {
+      const pnlOnly = await getFundsPnlOnly(s.tenantId!);
+      const movable = withdrawableBalance(account as any, pnlOnly);
+      if (amount > movable) throw new Error(pnlOnly ? `Only your profit (PNL) balance is withdrawable (max ${movable.toFixed(2)})` : "Insufficient balance");
+    }
     let slipUrl: string | undefined;
     const file = form.get("file") as File | null;
     if (file && file.size > 0) slipUrl = await saveUpload(file, "slips/" + account.id);

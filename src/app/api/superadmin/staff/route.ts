@@ -7,9 +7,25 @@ import { audit } from "@/lib/audit";
 export async function GET(req: Request) {
   const s = await requireSuperAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  const role = new URL(req.url).searchParams.get("role") || "MANAGER";
-  const users = await prisma.user.findMany({ where: { role: role as any }, orderBy: { createdAt: "desc" }, include: { tenant: { select: { name: true, brandName: true } } } });
-  return NextResponse.json({ ok: true, users: users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, status: u.status, company: u.tenant ? (u.tenant.brandName || u.tenant.name) : null, perms: u.perms, createdAt: u.createdAt })) });
+  const sp = new URL(req.url).searchParams;
+  const role = sp.get("role") || "MANAGER";
+  const tenantId = sp.get("tenantId");
+  const where: any = { role: role as any };
+  if (tenantId) where.tenantId = tenantId;
+  const users = await prisma.user.findMany({ where, orderBy: { createdAt: "desc" }, include: { tenant: { select: { name: true, brandName: true } } } });
+  // Fetch lastLoginIp via raw SQL to avoid Prisma cache issues
+  const userIds = users.map((u) => u.id);
+  const ipMap: Record<string, string | null> = {};
+  if (userIds.length) {
+    try {
+      const rows = await prisma.$queryRawUnsafe<{ id: string; lastLoginIp: string | null }[]>(
+        `SELECT id, "lastLoginIp" FROM "User" WHERE id = ANY($1::uuid[])`, userIds,
+      );
+      rows.forEach((r) => { ipMap[r.id] = r.lastLoginIp; });
+    } catch {}
+  }
+  const staff = users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, status: u.status, tenantId: u.tenantId, company: u.tenant ? (u.tenant.brandName || u.tenant.name) : null, perms: u.perms, lastLoginAt: u.lastLoginAt, lastLoginIp: ipMap[u.id] ?? null, createdAt: u.createdAt }));
+  return NextResponse.json({ ok: true, users: staff, staff });
 }
 
 export async function POST(req: Request) {

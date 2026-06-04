@@ -3,16 +3,38 @@ import { assertTradingOpen } from "@/lib/perms";
 import { getPrice } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
+import { marginFor, pnlFor, validateSlTp } from "@/lib/trademath";
 
 export async function placeOrder(tenantId: string, userId: string, input: any) {
   const account = input.accountId
     ? await prisma.account.findFirst({ where: { tenantId, userId, id: input.accountId } })
     : await prisma.account.findFirst({ where: { tenantId, userId }, orderBy: { createdAt: "asc" } });
   if (!account) throw new Error("No trading account");
-  if (account.locked) throw new Error("Account is locked");
+  if (account.deactivated) throw new Error("Account is deactivated");
+  if (account.locked) throw new Error("Account is locked (read-only)");
   await assertTradingOpen();
   const price = await getPrice(input.symbol);
   if (price == null) throw new Error("No price for " + input.symbol);
+
+  // TP/SL placement validation
+  const slErr = validateSlTp(input.side, price, input.sl, input.tp);
+  if (slErr) throw new Error(slErr);
+
+  // Free-margin check — must have enough free margin to open this trade
+  const lev = account.leverage || 100;
+  const existing = await prisma.trade.findMany({ where: { accountId: account.id } });
+  let floating = 0, usedMargin = 0;
+  for (const t of existing) {
+    const cur = (await getPrice(t.symbol)) ?? Number(t.openPrice);
+    floating += pnlFor(t.symbol, t.type as any, Number(t.openPrice), cur, Number(t.lots));
+    usedMargin += marginFor(t.symbol, Number(t.lots), cur, lev);
+  }
+  const balance = Number(account.deposit) - Number(account.withdrawal) + Number(account.credit) + Number(account.bonus) + Number(account.pnl);
+  const equity = balance + floating;
+  const freeMargin = equity - usedMargin;
+  const requiredMargin = marginFor(input.symbol, Number(input.lots), price, lev);
+  if (freeMargin <= 0 || freeMargin < requiredMargin) throw new Error("Not enough money");
+
   const ticket = BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
   const trade = await prisma.trade.create({
     data: {
@@ -29,13 +51,13 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
 }
 
 export async function closeOrder(tenantId: string, userId: string, tradeId: string) {
-  const trade = await prisma.trade.findFirst({ where: { id: BigInt(tradeId), account: { tenantId, userId } } });
+  const trade = await prisma.trade.findFirst({ where: { id: BigInt(tradeId), account: { tenantId, userId } }, include: { account: true } });
   if (!trade) throw new Error("Position not found");
+  if (trade.account.deactivated) throw new Error("Account is deactivated");
+  if (trade.account.locked) throw new Error("Account is locked (read-only)");
   const price = await getPrice(trade.symbol);
   if (price == null) throw new Error("No price");
-  const meta = instruments[trade.symbol] || { contractSize: 100000 };
-  const dir = trade.type === "BUY" ? 1 : -1;
-  const pnl = (price - Number(trade.openPrice)) * dir * Number(trade.lots) * meta.contractSize;
+  const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
 
   await prisma.$transaction(async (tx) => {
     await tx.tradeHistory.create({

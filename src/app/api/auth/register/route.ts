@@ -9,13 +9,17 @@ const schema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(6),
+  phone: z.string().optional(),
+  country: z.string().optional(),
+  type: z.enum(["DEMO", "LIVE"]).optional(),
+  tenantSlug: z.string().optional(),
 });
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password } = schema.parse(await req.json());
+    const { name, email, password, phone, country, type, tenantSlug } = schema.parse(await req.json());
     const host = (await headers()).get("host");
-    const session = await registerClient(host, name, email.toLowerCase(), password);
+    const session = await registerClient(host, name, email.toLowerCase(), password, phone, country, type, tenantSlug);
     const token = await signSession(session);
     const res = NextResponse.json({ ok: true, redirect: ROLE_HOME[session.role] });
     res.cookies.set(SESSION_COOKIE, token, {

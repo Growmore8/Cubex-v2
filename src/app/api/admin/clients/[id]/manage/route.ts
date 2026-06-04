@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager, assertWritable } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
 import { assertCan } from "@/lib/perms";
 
+const MANAGER_ALLOWED = ["status", "deactivate", "rename", "pool", "clearPin"];
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
+    await assertWritable(s);
     const b = await req.json();
     const tenantId = s.tenantId as string;
-    const acc = await prisma.account.findFirst({ where: { id:id, tenantId } });
+    const acc = await prisma.account.findFirst({ where: { id, tenantId } });
     if (!acc) throw new Error("Account not found");
+    if (s.role === "MANAGER" && !MANAGER_ALLOWED.includes(b.action)) {
+      throw new Error("Not permitted for manager role");
+    }
     const actor = s.email || "admin";
     const permMap: Record<string, string> = { manualPnl: "editFinancial", transfer: "transferFunds", subAccount: "createClients" };
     if (permMap[b.action]) await assertCan(s, permMap[b.action]);
@@ -52,7 +58,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const name = String(b.name || acc.name);
         const data: any = { name };
         if (b.email !== undefined) data.email = String(b.email);
-        if (b.country !== undefined) data.country = String(b.country);
+        if (b.phone !== undefined) data.phone = b.phone || null;
+        if (b.country !== undefined) data.country = b.country || null;
         await prisma.account.update({ where: { id: acc.id }, data });
         await audit(tenantId, "client.rename", acc.login + " -> " + name, actor);
         break;
@@ -70,9 +77,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const dest = await prisma.account.findFirst({ where: { tenantId, login: String(b.toLogin || "").trim() } });
         if (!dest) throw new Error("Destination account not found");
         if (dest.id === acc.id) throw new Error("Cannot transfer to the same account");
+        const ref = "TRF-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
         await prisma.$transaction([
           prisma.account.update({ where: { id: acc.id }, data: { withdrawal: { increment: new Prisma.Decimal(amt) } } }),
           prisma.account.update({ where: { id: dest.id }, data: { deposit: { increment: new Prisma.Decimal(amt) } } }),
+          prisma.financialHistory.create({ data: { accountId: acc.id, type: "TRANSFER_OUT" as any, amount: new Prisma.Decimal(amt), description: "Transfer to " + dest.login, reference: ref, mode: "MANUAL", createdBy: actor } }),
+          prisma.financialHistory.create({ data: { accountId: dest.id, type: "TRANSFER_IN" as any, amount: new Prisma.Decimal(amt), description: "Transfer from " + acc.login, reference: ref, mode: "MANUAL", createdBy: actor } }),
         ]);
         await audit(tenantId, "client.transfer", acc.login + " -> " + dest.login + " " + amt, actor);
         break;
@@ -94,6 +104,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       case "clearPin": {
         if (acc.userId) await prisma.user.update({ where: { id: acc.userId }, data: { pinHash: null } });
         await audit(tenantId, "client.clearPin", acc.login, actor);
+        break;
+      }
+      case "deactivate": {
+        await prisma.account.update({ where: { id: acc.id }, data: { deactivated: !!b.deactivated } });
+        await audit(tenantId, "client.deactivate", acc.login + (b.deactivated ? " deactivated" : " activated"), actor);
+        break;
+      }
+      case "pool": {
+        await prisma.account.update({ where: { id: acc.id }, data: { isPool: !!b.promote } });
+        await audit(tenantId, "client.pool", acc.login + (b.promote ? " promoted to pool" : " demoted from pool"), actor);
         break;
       }
       default:

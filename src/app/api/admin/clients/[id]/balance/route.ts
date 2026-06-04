@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdmin, assertWritable } from "@/lib/guard";
 import { adjustBalance } from "@/services/account.service";
 import { assertCan } from "@/lib/perms";
 
@@ -14,6 +14,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
+    await assertWritable(s);
     const { type, amount, description } = schema.parse(await req.json());
     const balMap: Record<string, string> = { DEPOSIT: "processDeposits", WITHDRAWAL: "processWithdrawals", CREDIT_IN: "creditBonus", CREDIT_OUT: "creditBonus", BONUS: "creditBonus", INSURANCE: "creditBonus" };
     await assertCan(s, balMap[type] || "adjustBalance");

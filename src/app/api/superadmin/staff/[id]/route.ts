@@ -12,12 +12,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const b = await req.json();
     const u: any = await prisma.user.findUnique({ where: { id: id } });
     if (!u) throw new Error("User not found");
-    if (b.action === "lock") await prisma.user.update({ where: { id: u.id }, data: { status: "LOCKED" as any } });
-    else if (b.action === "unlock") await prisma.user.update({ where: { id: u.id }, data: { status: "ACTIVE" as any } });
-    else if (b.action === "resetPassword") { if (!b.password || b.password.length < 6) throw new Error("Password too short"); await prisma.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(b.password) } }); }
-    else if (b.action === "perms") await prisma.user.update({ where: { id: u.id }, data: { perms: b.perms || {} } });
-    else if (b.action === "delete") await prisma.user.delete({ where: { id: u.id } });
-    else throw new Error("Unknown action");
+    if (b.action === "edit") {
+      const data: any = {};
+      if (b.name) data.name = b.name;
+      if (b.email) {
+        const emailLower = b.email.toLowerCase();
+        const clash = await prisma.user.findFirst({ where: { email: emailLower, tenantId: u.tenantId, NOT: { id: u.id } } });
+        if (clash) throw new Error("Email already in use");
+        data.email = emailLower;
+      }
+      if (b.tenantId !== undefined) data.tenantId = b.tenantId || null;
+      await prisma.user.update({ where: { id: u.id }, data });
+    } else if (b.action === "suspend") {
+      await prisma.user.update({ where: { id: u.id }, data: { status: "SUSPENDED" as any } });
+    } else if (b.action === "lock") {
+      await prisma.user.update({ where: { id: u.id }, data: { status: "LOCKED" as any } });
+    } else if (b.action === "unlock") {
+      await prisma.user.update({ where: { id: u.id }, data: { status: "ACTIVE" as any } });
+    } else if (b.action === "resetPassword") {
+      if (!b.password || b.password.length < 6) throw new Error("Password too short");
+      await prisma.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(b.password) } });
+    } else if (b.action === "perms") {
+      await prisma.user.update({ where: { id: u.id }, data: { perms: b.perms || {} } });
+    } else if (b.action === "delete") {
+      await prisma.user.delete({ where: { id: u.id } });
+    } else {
+      throw new Error("Unknown action");
+    }
     await audit(u.tenantId, "sa.staff." + b.action, u.email, s.email);
     return NextResponse.json({ ok: true });
   } catch (e: any) {

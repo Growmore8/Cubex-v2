@@ -4,9 +4,18 @@ import { io, Socket } from "socket.io-client";
 import instruments from "@/config/instruments";
 
 function pnlOf(p: any, price: number) {
-  const meta = instruments[p.symbol] || { contractSize: 100000 };
+  const sym = String(p.symbol || "");
   const dir = p.type === "BUY" ? 1 : -1;
-  return (price - p.openPrice) * dir * p.lots * meta.contractSize;
+  const diff = (price - p.openPrice) * dir;
+  const isFx = !/^(XAU|XAG|XPT|XPD)/.test(sym) && !sym.endsWith("USDT") && /^[A-Z]{6}$/.test(sym);
+  if (isFx) {
+    const pip = /JPY$/i.test(sym) ? 0.01 : 0.0001;
+    let pf = (diff / pip) * p.lots;
+    if (/^USD/i.test(sym)) pf = pf / (price || 1);
+    return pf;
+  }
+  const meta = instruments[sym] || { contractSize: 100000 };
+  return diff * p.lots * meta.contractSize;
 }
 
 export default function TradeDesk() {

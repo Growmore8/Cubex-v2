@@ -6,4 +6,5 @@ export interface SessionPayload {
   tenantId: string | null;
   email: string;
   name: string;
+  sid?: string; // active-session id for single-device enforcement (staff roles)
 }

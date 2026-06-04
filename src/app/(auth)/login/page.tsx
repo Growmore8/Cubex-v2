@@ -1,11 +1,19 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "other-device") setNotice("You were signed out because your account was logged in on another device.");
+    else if (reason === "deactivated") setNotice("Your account has been deactivated. Please contact support.");
+    else if (reason === "expired") setNotice("Your session expired. Please sign in again.");
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,6 +33,7 @@ export default function LoginPage() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <h1 className="text-xl font-semibold text-zinc-500">Sign in</h1>
+      {notice && <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{notice}</p>}
       {err && <p className="text-sm text-red-600">{err}</p>}
       <div className="space-y-1">
         <label className="text-sm text-gray-600">Email</label>

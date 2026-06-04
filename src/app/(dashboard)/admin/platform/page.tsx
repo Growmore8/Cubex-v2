@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import MiniChart from "@/components/MiniChart";
+import LWChart from "@/components/LWChart";
+import PriceCell from "@/components/PriceCell";
 import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
 import instruments from "@/config/instruments";
@@ -9,12 +10,20 @@ import { contractFor } from "@/config/contracts";
 import { DARK, LIGHT, BUY, SELL, GOLD } from "@/config/theme";
 
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
-const TABS: [string, string][] = [["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"]];
+const TABS: [string, string][] = [["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"]];
 
 function pnlOf(p: any, price: number, cs: number) {
-
+  const sym = String(p.symbol || "");
   const dir = p.type === "BUY" ? 1 : -1;
-  return (price - p.openPrice) * dir * p.lots * (cs || 100000);
+  const diff = (price - p.openPrice) * dir;
+  const isFx = !/^(XAU|XAG|XPT|XPD)/.test(sym) && !sym.endsWith("USDT") && /^[A-Z]{6}$/.test(sym);
+  if (isFx) {
+    const pip = /JPY$/i.test(sym) ? 0.01 : 0.0001;
+    let pf = (diff / pip) * p.lots; // $1 per pip per 1.0 lot (USD quote)
+    if (/^USD/i.test(sym)) pf = pf / (price || 1); // USD base -> convert to USD
+    return pf;
+  }
+  return diff * p.lots * (cs || 100000);
 }
 
 export default function AdminDeskPage() {
@@ -40,21 +49,21 @@ export default function AdminDeskPage() {
   const [sl, setSl] = useState(0);
   const [tp, setTp] = useState(0);
   const [tab, setTab] = useState("trade");
-  const [tabState, setTabState] = useState<Record<string, boolean>>({ trade: true, history: true, summary: true, audit: true, payments: true, kyc: true });
+  const [tabState, setTabState] = useState<Record<string, boolean>>({ trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true });
   const [menu, setMenu] = useState<{ x: number; y: number; acc: any } | null>(null);
   const [menuSub, setMenuSub] = useState("");
   const [act, setAct] = useState<any>(null);
   const [aform, setAform] = useState<any>({});
-  const [newOpen, setNewOpen] = useState(false);
-  const [viewOpen, setViewOpen] = useState(false);
+  const [topMenu, setTopMenu] = useState<string>("");
   const [modal, setModal] = useState<"" | "client" | "manager" | "group" | "notify">("");
   useEffect(() => { if (modal === "notify") fetch("/api/admin/notify").then((r) => r.json()).then((d) => { if (d.ok) setNrecent(d.recent || []); }).catch(() => {}); }, [modal]);
   const [form, setForm] = useState<any>({ type: "LIVE", leverage: 100, currency: "USD" });
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+  const [toasts, setToasts] = useState<any[]>([]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [navW, setNavW] = useState(210);
-  const [mwW, setMwW] = useState(230);
+  const [navW, setNavW] = useState(248);
+  const [mwW, setMwW] = useState(278);
   const [tbH, setTbH] = useState(180);
   const [layout, setLayout] = useState(1);
   const [openCharts, setOpenCharts] = useState<string[]>([]);
@@ -71,6 +80,46 @@ export default function AdminDeskPage() {
   const [pform, setPform] = useState<any>({});
   const [tradeSel, setTradeSel] = useState<Record<string, boolean>>({});
   const [histSel, setHistSel] = useState<Record<string, boolean>>({});
+  const [inlineEdit, setInlineEdit] = useState<Record<string, any>>({});
+  const [cliQ, setCliQ] = useState("");
+  const [cliType, setCliType] = useState("ALL");
+  const [cliStatus, setCliStatus] = useState("ALL");
+  const [navTab, setNavTab] = useState<"live" | "demo">("live");
+  const [navSearch, setNavSearch] = useState("");
+  const [showOC, setShowOC] = useState(true); // chart buy/sell strip visibility
+  const [fundPnlOnly, setFundPnlOnly] = useState(false);
+  useEffect(() => { fetch("/api/admin/fund-settings").then((r) => r.json()).then((d) => { if (d.ok) setFundPnlOnly(!!d.pnlOnly); }).catch(() => {}); }, []);
+  async function toggleFundPnlOnly() {
+    setTopMenu("");
+    const next = !fundPnlOnly;
+    const r = await fetch("/api/admin/fund-settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pnlOnly: next }) });
+    const d = await r.json();
+    if (d.ok) { setFundPnlOnly(d.pnlOnly); setOk("Withdraw/Transfer policy: " + (d.pnlOnly ? "PNL only" : "Full balance")); }
+  }
+  const [symPerm, setSymPerm] = useState<any>(null); // { symbols, disabled[], scope, q }
+  async function openSymPerm() {
+    setTopMenu("");
+    try {
+      const d = await fetch("/api/admin/symbol-perms").then((r) => r.json());
+      if (d.ok) setSymPerm({ symbols: d.symbols, disabled: d.disabled || [], scope: d.scope, q: "" });
+    } catch {}
+  }
+  async function toggleSymPerm(symbol: string, disabled: boolean) {
+    const r = await fetch("/api/admin/symbol-perms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol, disabled }) });
+    const d = await r.json();
+    if (d.ok) { setSymPerm((p: any) => ({ ...p, disabled: d.disabled })); loadAll(); }
+  }
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  async function loadPending() { try { const d = await fetch("/api/desk/pending").then((r) => r.json()); if (d.ok) setPendingOrders(d.pending || []); } catch {} }
+  useEffect(() => { loadPending(); const t = setInterval(loadPending, 6000); return () => clearInterval(t); }, []);
+  async function cancelPending(id: string) { const r = await fetch("/api/desk/pending/" + id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadPending(); }
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifs, setNotifs] = useState<any[]>([]);
+  const [notifUnread, setNotifUnread] = useState(0);
+  const [kycUploadFor, setKycUploadFor] = useState<any>(null);
+  const [kycUploadType, setKycUploadType] = useState("PASSPORT");
+  const [kycUploadFile, setKycUploadFile] = useState<File | null>(null);
+  const [kycUpMsg, setKycUpMsg] = useState("");
   const [hfPreset, setHfPreset] = useState("ALL");
   const [hfFrom, setHfFrom] = useState("");
   const [hfTo, setHfTo] = useState("");
@@ -84,6 +133,18 @@ export default function AdminDeskPage() {
 
   const digitsMap: Record<string, number> = Object.fromEntries(symbols.map((s) => [s.symbol, s.digits]));
   function dg(sym: string) { return digitsMap[sym] ?? instruments[sym]?.digits ?? 2; }
+  // Magnitude-aware: never lose precision on small-value symbols (e.g. ADAUSDT 0.18940)
+  function pxFmt(sym: string, val: any) {
+    if (val == null || val === "") return "-";
+    const n = Number(val);
+    if (!isFinite(n)) return "-";
+    let d = dg(sym);
+    const a = Math.abs(n);
+    if (a > 0 && a < 1) d = Math.max(d, 5);
+    else if (a < 10) d = Math.max(d, 4);
+    else if (a < 100) d = Math.max(d, 3);
+    return n.toFixed(d);
+  }
   const catMap: Record<string, string> = Object.fromEntries(symbols.map((s) => [s.symbol, s.category || "forex"]));
   function csz(sym: string) { return contractFor(catMap[sym] || "forex", sym); }
 
@@ -98,7 +159,7 @@ export default function AdminDeskPage() {
       fetch("/api/admin/groups").then((r) => r.json()).catch(() => ({ ok: false })),
     ]);
     if (c.ok) setClients(c.clients);
-    if (sy.ok) { setSymbols(sy.symbols); if (!selSymRef.current && sy.symbols.length) setSelSym(sy.symbols[0].symbol); }
+    if (sy.ok) { const seen = new Set<string>(); const uniq = (sy.symbols || []).filter((s: any) => { if (seen.has(s.symbol)) return false; seen.add(s.symbol); return true; }); setSymbols(uniq); if (!selSymRef.current && uniq.length) setSelSym(uniq[0].symbol); }
     if (o.ok) setOpen(o.trades);
     if (h.ok) setHistory(h.history);
     if (a.ok) setAudit(a.logs);
@@ -106,20 +167,39 @@ export default function AdminDeskPage() {
     if (gr.ok) setTradeGroups(gr.groups || []);
   }
   useEffect(() => { loadAll(); }, []);
+  async function loadNotifs() { try { const d = await fetch("/api/notifications").then((r) => r.json()); if (d.ok) { setNotifs(d.items || []); setNotifUnread(d.unread || 0); } } catch {} }
+  useEffect(() => { loadNotifs(); const t = setInterval(loadNotifs, 20000); return () => clearInterval(t); }, []);
+  async function openNotifs() { setNotifOpen((v) => !v); if (!notifOpen && notifUnread > 0) { try { await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch {} setNotifUnread(0); } }
+  function toast(msg: string, kind: string) { const id = Date.now() + Math.random(); setToasts((t) => [...t, { id, msg, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500); }
+  useEffect(() => { if (ok) toast(ok, "ok"); }, [ok]);
   useEffect(() => { if (symbols.length && openCharts.length === 0) { const init = symbols.slice(0, 4).map((s) => s.symbol); setOpenCharts(init); setSelSym(init[0]); } }, [symbols]);
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
+    // Batch high-frequency ticks: accumulate in refs, flush to state once per
+    // animation frame so 57 symbols can't trigger hundreds of re-renders/sec.
+    const pP: Record<string, number> = {};
+    const pD: Record<string, number> = {};
+    let raf = 0;
+    const flush = () => {
+      raf = 0;
+      const px = pP; const dr = pD;
+      if (Object.keys(px).length) { setPrices((pp) => ({ ...pp, ...px })); for (const k in px) delete px[k]; }
+      if (Object.keys(dr).length) { setDirs((dd) => ({ ...dd, ...dr })); for (const k in dr) delete dr[k]; }
+    };
     socket.on("tick", ({ symbol, price }: any) => {
       const prev = prevRef.current[symbol];
-      if (prev != null && prev !== price) { const dr = price > prev ? 1 : -1; setDirs((dd) => ({ ...dd, [symbol]: dr })); clearTimeout(timersRef.current[symbol]); timersRef.current[symbol] = setTimeout(() => setDirs((dd) => ({ ...dd, [symbol]: 0 })), 500); }
+      if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
-      setPrices((pp) => ({ ...pp, [symbol]: price }));
+      pP[symbol] = price;
+      if (!raf) raf = requestAnimationFrame(flush);
     });
+    // Single timer clears the up/down flash for all symbols (cheap vs per-symbol timers)
+    const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
     socket.on("liquidation", () => loadAll());
     socket.on("refresh", () => loadAll());
     const t = setInterval(() => fetch("/api/desk/trades").then((r) => r.json()).then((d) => d.ok && setOpen(d.trades)).catch(() => {}), 7000);
-    return () => { socket.disconnect(); clearInterval(t); };
+    return () => { socket.disconnect(); clearInterval(t); clearInterval(clr); if (raf) cancelAnimationFrame(raf); };
   }, []);
 
   function dragX(e: any, which: "nav" | "mw") { e.preventDefault(); const sx = e.clientX; const sw = which === "nav" ? navW : mwW; const mv = (ev: any) => { const dx = ev.clientX - sx; if (which === "nav") setNavW(Math.max(120, Math.min(360, sw + dx))); else setMwW(Math.max(120, Math.min(380, sw - dx))); }; const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }; document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); }
@@ -156,7 +236,7 @@ export default function AdminDeskPage() {
     if (act.kind === "money") { const amt = Number(aform.amount); if (!amt || amt <= 0) { setErr("Enter an amount"); return; } url = "/api/admin/clients/" + id + "/balance"; body = { type: act.finType, amount: amt, description: aform.note || ("Desk " + (act.label || act.finType)) }; }
     else if (act.kind === "manualpnl") { const amt = Number(aform.amount); if (!amt) { setErr("Enter an amount (use - for a loss)"); return; } url = "/api/admin/clients/" + id + "/manage"; body = { action: "manualPnl", amount: amt, description: aform.note || "Manual P/L" }; }
     else if (act.kind === "transfer") { const amt = Number(aform.amount); if (!amt || amt <= 0) { setErr("Enter an amount"); return; } if (!aform.toLogin) { setErr("Enter the destination account ID"); return; } url = "/api/admin/clients/" + id + "/manage"; body = { action: "transfer", amount: amt, toLogin: aform.toLogin }; }
-    else if (act.kind === "rename") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "rename", name: aform.name ?? act.acc.name }; }
+    else if (act.kind === "rename") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "rename", name: aform.name ?? act.acc.name, email: aform.email ?? act.acc.email, phone: aform.phone ?? act.acc.phone, country: aform.country ?? act.acc.country }; }
     else if (act.kind === "accountid") { const login = String(aform.login ?? act.acc.login).trim(); if (!login) { setErr("Enter an account ID"); return; } url = "/api/admin/clients/" + id + "/manage"; body = { action: "accountId", login }; }
     else if (act.kind === "password") { const pw = aform.password || ""; if (pw.length < 6) { setErr("Min 6 characters"); return; } url = "/api/admin/clients/" + id + "/password"; body = { password: pw }; }
     else if (act.kind === "assignmgr") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assignManager", managerId: aform.managerId || null }; }
@@ -173,6 +253,11 @@ export default function AdminDeskPage() {
   async function doStatus(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "status", locked: !acc.locked }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   async function doDeactivate(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deactivated: !acc.deactivated }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   async function doDNL(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "settings", doNotLiquidate: !acc.doNotLiquidate }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
+  async function doClearPin(acc: any) { setMenu(null); if (!confirm("Reset (clear) the PIN for " + acc.login + "? They can set a new one next login.")) return; const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "clearPin" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else setOk("PIN reset"); }
+  async function doPool(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "pool", promote: !acc.isPool }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
+  async function doDeactivateManage(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deactivate", deactivated: !acc.deactivated }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
+  async function modifyTrade(id: string, fields: any) { const r = await fetch("/api/desk/trades/" + id + "/modify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Modify failed"); return; } setInlineEdit((e) => { const n = { ...e }; delete n[id]; return n; }); loadAll(); }
+  async function uploadKyc() { setErr(""); setKycUpMsg(""); if (!kycUploadFor || !kycUploadFile) { setErr("No file selected"); return; } const fd = new FormData(); fd.append("login", kycUploadFor.login); fd.append("docType", kycUploadType); fd.append("file", kycUploadFile); const r = await fetch("/api/admin/kyc/upload", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); if (!r.ok) { setErr(r.error || "Upload failed"); return; } setKycUpMsg("Uploaded successfully"); setKycUploadFile(null); setTimeout(() => { setKycUploadFor(null); setKycUpMsg(""); }, 1500); loadAll(); }
 
   function openPos(kind: string, t: any) { setPosMenu(null); setErr(""); setPform(kind === "modify" ? { sl: t.sl || 0, tp: t.tp || 0 } : { lots: Number((Number(t.lots) / 2).toFixed(2)) || 0.01 }); setPos({ kind, t }); }
   async function submitPos() {
@@ -184,7 +269,7 @@ export default function AdminDeskPage() {
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
     setPos(null); loadAll();
   }
-  function openModal(kind: any) { setNewOpen(false); setErr(""); setOk(""); setForm({ type: "LIVE", leverage: 100, currency: "USD" }); setModal(kind); }
+  function openModal(kind: any) { setTopMenu(""); setErr(""); setOk(""); setForm({ type: "LIVE", leverage: 100, currency: "USD" }); setModal(kind); }
   async function submit(url: string, body: any, label: string) { setErr(""); setOk(""); const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; } setOk(label + " created"); setModal(""); loadAll(); }
   const f = (k: string, v: any) => setForm((o: any) => ({ ...o, [k]: v }));
   async function delHist(h: any) {
@@ -219,6 +304,15 @@ export default function AdminDeskPage() {
   }
   async function placeMT() {
     if (!mt) return; setErr("");
+    const kind = mt.kind || "MARKET"; // MARKET | LIMIT | STOP
+    if (kind !== "MARKET") {
+      // Pending order
+      const trig = Number(mt.openPrice) || (prices[mt.symbol] ?? 0);
+      if (!trig) { setErr("Enter a trigger price"); return; }
+      const r = await fetch("/api/desk/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: mt.acc.id, symbol: mt.symbol, side: mt.type, kind, lots: Number(mt.lots), price: trig, sl: Number(mt.sl) || 0, tp: Number(mt.tp) || 0 }) });
+      const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
+      setMt(null); loadPending(); loadAll(); return;
+    }
     const body = { accountId: mt.acc.id, symbol: mt.symbol, type: mt.type, lots: Number(mt.lots), sl: Number(mt.sl) || 0, tp: Number(mt.tp) || 0, openPrice: Number(mt.openPrice) || (prices[mt.symbol] ?? 0), openedAt: mt.date ? new Date(mt.date).toISOString() : undefined };
     const r = await fetch("/api/desk/manual-trade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
@@ -239,11 +333,12 @@ export default function AdminDeskPage() {
   function openTicket(sym: string) { setTicket(sym); setTform({ vol: lot, sl: 0, tp: 0, type: "Market", price: 0 }); }
 
   const accOpen = selAcc ? open.filter((o) => o.accountLogin === selAcc.login) : open;
+  const accPending = selAcc ? pendingOrders.filter((o) => o.accountLogin === selAcc.login) : pendingOrders;
   const balOfFn = (a: any) => a ? Number(a.deposit) - Number(a.withdrawal) + Number(a.credit) + Number(a.bonus) + Number(a.pnl) : 0;
   const floating = accOpen.reduce((s, p) => s + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
   const balance = balOfFn(selAcc);
   const equity = balance + floating;
-  const used = selAcc ? accOpen.reduce((m, p) => { const cs = csz(p.symbol); const pr = prices[p.symbol] ?? p.openPrice; return m + (p.lots * cs * pr) / (selAcc.leverage || 100); }, 0) : 0;
+  const used = selAcc ? accOpen.reduce((m, p) => { const cs = csz(p.symbol); const pr = prices[p.symbol] ?? p.openPrice; let mg = (p.lots * cs * pr) / (selAcc.leverage || 100); if (/JPY$/i.test(p.symbol)) mg = mg / 100; return m + mg; }, 0) : 0;
   const free = equity - used;
   const level = used > 0 ? (equity / used) * 100 : 0;
 
@@ -251,69 +346,181 @@ export default function AdminDeskPage() {
   const demoAccs = clients.filter((c) => String(c.login).toUpperCase().startsWith("DEMO"));
   const groups: Record<string, any[]> = {};
   symbols.forEach((s) => { const cat = s.category || "other"; (groups[cat] || (groups[cat] = [])).push(s); });
+  // Market watch category order: Crypto, Forex, Indices, then the rest
+  const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "agriculture", "other"];
+  const orderedGroups = Object.entries(groups).sort((a, b) => {
+    const ia = CAT_ORDER.indexOf(a[0]); const ib = CAT_ORDER.indexOf(b[0]);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
 
   const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const px = (sym: string) => prices[sym]?.toFixed(dg(sym)) ?? "...";
   const dot = (c: string) => (<span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: c }} />);
   const inp = "mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--text)]";
   const lab = "text-[10px] text-[var(--muted)]";
-  const mi = "block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]";
-  const subi = "block w-full px-5 py-1.5 text-left hover:bg-[var(--soft)]";
+  const mi = "flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)] transition-colors";
+  const subi = "flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)] transition-colors";
+  const mIco = (icon: string, color?: string) => <i className={"fa-solid " + icon} style={{ width: 13, fontSize: 11, textAlign: "center", color: color || "var(--muted)" }} />;
   const tgl = (on: boolean) => "rounded border border-[var(--border)] px-2 py-1 " + (on ? "" : "opacity-50");
   function toggleCat(c: string) { setCollapsed((o) => ({ ...o, [c]: !o[c] })); }
   function togglePanel(k: "nav" | "mw" | "toolbox") { setPanels((p) => ({ ...p, [k]: !p[k] })); }
+  const stTag = (txt: string, col: string) => (<span className="rounded px-1 text-[8px] font-semibold" style={{ background: col + "22", color: col }}>{txt}</span>);
+  const sIco = (icon: string, col: string, title: string) => (<i className={"fa-solid " + icon} title={title} style={{ fontSize: 9.5, color: col }} />);
   const acctRow = (c: any) => (
     <button key={c.id} onClick={() => setSelAcc(c)} onContextMenu={(e) => { e.preventDefault(); setSelAcc(c); setMenu({ x: e.clientX, y: e.clientY, acc: c }); }}
-      className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left" style={selAcc?.id === c.id ? { background: "var(--soft)", color: GOLD } : undefined}>
-      {dot(c.locked ? SELL : BUY)}<span className="truncate">{c.login} - {c.name}</span>
+      className="flex w-full items-center gap-1 rounded px-1.5 py-1 text-left" style={selAcc?.id === c.id ? { background: "var(--soft)", color: GOLD } : undefined}>
+      {dot(c.deactivated ? "var(--muted)" : c.locked ? SELL : BUY)}<span className="flex-1 truncate">{c.login} - {c.name}</span>
+      <span className="flex shrink-0 items-center gap-1.5">
+        {/* Active / Deactivated */}
+        {c.deactivated ? sIco("fa-ban", "#8b97a8", "Deactivated") : sIco("fa-circle-check", BUY, "Active")}
+        {/* Locked */}
+        {c.locked ? sIco("fa-lock", SELL, "Locked") : null}
+        {/* Do Not Liquidate */}
+        {c.doNotLiquidate ? sIco("fa-hand", GOLD, "Do Not Liquidate (DNL)") : null}
+        {/* KYC status */}
+        {c.kycStatus === "APPROVED"
+          ? sIco("fa-id-card", BUY, "KYC Verified")
+          : c.kycStatus === "PENDING"
+          ? sIco("fa-id-card", GOLD, "KYC Pending")
+          : sIco("fa-id-card", "#6b7280", "KYC Not Verified")}
+      </span>
     </button>
   );
 
   const shown: { sym: string; i: number }[] = layout === 1 ? (openCharts[activeChart] ? [{ sym: openCharts[activeChart], i: activeChart }] : []) : openCharts.slice(0, layout).map((sym, i) => ({ sym, i }));
-  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const bid = p != null ? (p * 0.9999).toFixed(d) : "..."; const ask = p != null ? (p * 1.0001).toFixed(d) : "..."; return (
-    <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-md px-1 py-1 text-[11px]" style={{ background: "rgba(11,14,17,0.78)", border: "0.5px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-      <button onClick={() => place(sym, "SELL")} className="rounded px-2 py-1 font-medium" style={{ background: SELL, color: "#150404" }}>Sell {bid}</button>
-      <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} className="w-12 rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-1 text-center text-[var(--text)]" />
-      <button onClick={() => place(sym, "BUY")} className="rounded px-2 py-1 font-medium" style={{ background: "#2f81f7", color: "#041226" }}>Buy {ask}</button>
+  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const bid = p != null ? (p * 0.9999).toFixed(d) : "..."; const ask = p != null ? (p * 1.0001).toFixed(d) : "...";
+    if (!showOC) return (
+      <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-2 top-2 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
+        <i className="fa-solid fa-bolt" /> Trade
+      </button>
+    );
+    return (
+    <div className="absolute left-2 top-2 z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "rgba(9,12,18,0.90)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
+      <button onClick={() => place(sym, "SELL")} className="flex flex-col items-center rounded-lg px-4 py-1.5 font-bold transition-opacity hover:opacity-90 active:scale-95" style={{ background: "rgba(224,82,96,0.92)", color: "#fff", minWidth: 72, lineHeight: 1.2 }}>
+        <span style={{ fontSize: 13, letterSpacing: "0.02em" }}>Sell</span>
+        <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{bid}</span>
+      </button>
+      <div className="flex flex-col items-center gap-0.5">
+        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Lots</div>
+        <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} className="w-14 rounded border text-center font-mono" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", color: "#e2e8f0", padding: "3px 4px", fontSize: 12, outline: "none" }} />
+      </div>
+      <button onClick={() => place(sym, "BUY")} className="flex flex-col items-center rounded-lg px-4 py-1.5 font-bold transition-opacity hover:opacity-90 active:scale-95" style={{ background: "rgba(47,129,247,0.92)", color: "#fff", minWidth: 72, lineHeight: 1.2 }}>
+        <span style={{ fontSize: 13, letterSpacing: "0.02em" }}>Buy</span>
+        <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{ask}</span>
+      </button>
+      <button onClick={(e) => { e.stopPropagation(); setShowOC(false); }} className="ml-1 self-start text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }} title="Hide buy/sell"><i className="fa-solid fa-eye-slash" /></button>
     </div>); };
   return (
     <div style={theme === "dark" ? DARK : LIGHT} className="relative flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <div className="flex items-stretch border-b border-[var(--border)] bg-[var(--panel)] text-[11px]">
         <div className="flex items-center gap-2 border-r border-[var(--border)] px-3 py-1.5" style={{ width: panels.nav ? navW + 1 : undefined }}>
-          <span className="inline-block h-4 w-4 rounded" style={{ background: "var(--accent)" }} /><b className="font-medium">CubeX</b>
+          <span className="inline-block h-4 w-4 rounded" style={{ background: "var(--accent)" }} /><b className="font-medium">Platform</b>
         </div>
-        <div className="flex flex-1 items-center gap-1 px-2 py-1.5">
-          <button onClick={() => openTicket(selSym)} className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: "var(--accent)" }}>New order</button>
-          <div className="relative">
-            <button onClick={() => setNewOpen((o) => !o)} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]">New +</button>
-            {newOpen && (<><div className="fixed inset-0 z-40" onClick={() => setNewOpen(false)} />
-              <div className="absolute left-0 z-50 mt-1 w-40 overflow-hidden rounded-md border" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
-                <button onClick={() => openModal("client")} className={mi}>New Client</button>
-                <button onClick={() => openModal("manager")} className={mi}>New Manager</button>
-                <button onClick={() => openModal("group")} className={mi}>New Group</button>
-                <button onClick={() => openModal("notify")} className={mi}>Send Notification</button>
-              </div></>)}
-          </div>
-          <span className="mx-1 h-3 w-px bg-[var(--border)]" />
-          {[1, 2, 4].map((n) => (<button key={n} onClick={() => setLayout(n)} className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={layout === n ? { color: "var(--text)" } : { color: "var(--muted)" }}>{n === 1 ? "1" : n === 2 ? "1|1" : "4"}</button>))}
-          
+        <div className="flex flex-1 items-center gap-0.5 px-2 py-1">
+          {(() => {
+            const tm = (name: string) => () => setTopMenu((m) => (m === name ? "" : name));
+            const closeTm = () => setTopMenu("");
+            const topBtn = (name: string, label: string, icon: string) => (
+              <button onClick={tm(name)} className="flex items-center gap-1.5 rounded px-2.5 py-1 hover:bg-[var(--soft)]" style={{ color: topMenu === name ? "var(--text)" : "var(--muted)", background: topMenu === name ? "var(--soft)" : "transparent" }}>
+                <i className={"fa-solid " + icon} style={{ fontSize: 11 }} />{label}<i className="fa-solid fa-chevron-down" style={{ fontSize: 7, opacity: 0.5 }} />
+              </button>
+            );
+            const dItem = (onClick: () => void, icon: string, label: string, color?: string, active?: boolean, key?: string) => (
+              <button key={key || label} onClick={() => { onClick(); closeTm(); }} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)] transition-colors">
+                <i className={"fa-solid " + icon} style={{ width: 14, fontSize: 11, textAlign: "center", color: color || "var(--muted)" }} />
+                <span className="flex-1">{label}</span>
+                {active !== undefined && <i className="fa-solid fa-check" style={{ fontSize: 9, color: active ? BUY : "transparent" }} />}
+              </button>
+            );
+            const dDivider = <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />;
+            const dHead = (t: string) => <div className="px-3 pt-1.5 pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{t}</div>;
+            const panel = "absolute left-0 z-50 mt-1 w-52 overflow-hidden rounded-lg border py-1";
+            const panelStyle = { background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" } as any;
+            return (<>
+              {/* NEW MENU */}
+              <div className="relative">
+                {topBtn("new", "New", "fa-plus")}
+                {topMenu === "new" && (<><div className="fixed inset-0 z-40" onClick={closeTm} />
+                  <div className={panel} style={panelStyle}>
+                    {dItem(() => openTicket(selSym), "fa-bolt", "New Order", "var(--accent)")}
+                    {dDivider}
+                    {dHead("Create")}
+                    {dItem(() => openModal("client"), "fa-user-plus", "New Client", BUY)}
+                    {dItem(() => openModal("manager"), "fa-user-tie", "New Manager")}
+                    {dItem(() => openModal("group"), "fa-layer-group", "New Group")}
+                    {dDivider}
+                    {dItem(() => openModal("notify"), "fa-paper-plane", "Send Notification", GOLD)}
+                  </div></>)}
+              </div>
+
+              {/* CHARTS MENU */}
+              <div className="relative">
+                {topBtn("charts", "Charts", "fa-chart-candlestick")}
+                {topMenu === "charts" && (<><div className="fixed inset-0 z-40" onClick={closeTm} />
+                  <div className={panel} style={panelStyle}>
+                    {dHead("Layout")}
+                    {dItem(() => setLayout(1), "fa-square", "Single Chart", undefined, layout === 1)}
+                    {dItem(() => setLayout(2), "fa-table-columns", "Split (1 | 1)", undefined, layout === 2)}
+                    {dItem(() => setLayout(4), "fa-table-cells-large", "Grid (4 Charts)", undefined, layout === 4)}
+                    {dDivider}
+                    {dHead("Timeframe")}
+                    <div className="flex flex-wrap gap-1 px-3 py-1">
+                      {TFS.map((t) => <button key={t} onClick={() => { setTf(t); closeTm(); }} className="rounded px-2 py-0.5 text-[10px]" style={tf === t ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{t}</button>)}
+                    </div>
+                  </div></>)}
+              </div>
+
+              {/* VIEW MENU — all panels in one place */}
+              <div className="relative">
+                {topBtn("view", "View", "fa-table-cells")}
+                {topMenu === "view" && (<><div className="fixed inset-0 z-40" onClick={closeTm} />
+                  <div className={panel} style={panelStyle}>
+                    {dHead("Panels")}
+                    {dItem(() => togglePanel("nav"), "fa-folder-tree", "Navigator", undefined, panels.nav)}
+                    {dItem(() => togglePanel("mw"), "fa-list", "Market Watch", undefined, panels.mw)}
+                    {dItem(() => togglePanel("toolbox"), "fa-toolbox", "Toolbox", undefined, panels.toolbox)}
+                    {dDivider}
+                    {dHead("Toolbox Tabs")}
+                    {TABS.map(([k, lbl]) => dItem(() => setTabState((s) => ({ ...s, [k]: !s[k] })), "fa-table-list", lbl, undefined, tabState[k], "tab-" + k))}
+                    {dDivider}
+                    {dItem(openSymPerm, "fa-eye-slash", "Symbol Access…", "var(--accent)")}
+                    {dItem(toggleFundPnlOnly, "fa-money-bill-transfer", "Withdraw/Transfer: PNL only", fundPnlOnly ? BUY : "var(--muted)", fundPnlOnly)}
+                  </div></>)}
+              </div>
+
+              {/* REPORTS MENU */}
+              <div className="relative">
+                {topBtn("report", "Reports", "fa-file-lines")}
+                {topMenu === "report" && (<><div className="fixed inset-0 z-40" onClick={closeTm} />
+                  <div className={panel} style={panelStyle}>
+                    {dHead("Account Reports")}
+                    {dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } window.open("/api/desk/reports?accountId=" + selAcc.id, "_blank"); }, "fa-file-pdf", "Export PDF Statement", "#ef4444")}
+                  </div></>)}
+              </div>
+            </>);
+          })()}
+
           <span className="flex-1" />
-          <button onClick={() => togglePanel("nav")} className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: panels.nav ? "var(--text)" : "var(--muted)" }}>Navigator</button>
-          <button onClick={() => togglePanel("mw")} className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: panels.mw ? "var(--text)" : "var(--muted)" }}>Market Watch</button>
-          <button onClick={() => togglePanel("toolbox")} className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: panels.toolbox ? "var(--text)" : "var(--muted)" }}>Toolbox</button>
+          <button onClick={toggleTheme} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]" title={theme === "dark" ? "Light mode" : "Dark mode"}><i className={"fa-solid " + (theme === "dark" ? "fa-sun" : "fa-moon")} /></button>
           <div className="relative">
-            <button onClick={() => setViewOpen((o) => !o)} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]">View</button>
-            {viewOpen && (<><div className="fixed inset-0 z-40" onClick={() => setViewOpen(false)} />
-              <div className="absolute right-0 z-50 mt-1 w-44 overflow-hidden rounded-md border p-1" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
-                <div className="px-2 py-1 text-[10px] text-[var(--muted)]">Panels</div>
-                {(["nav", "mw", "toolbox"] as const).map((k) => (<button key={k} onClick={() => togglePanel(k)} className="flex w-full items-center justify-between rounded px-2 py-1 text-left hover:bg-[var(--soft)]">{k === "nav" ? "Navigator" : k === "mw" ? "Market Watch" : "Toolbox"}{panels[k] ? <span style={{ color: BUY }}>ok</span> : null}</button>))}
-                <div className="px-2 py-1 text-[10px] text-[var(--muted)]">Toolbox tabs</div>
-                {TABS.map(([k, lbl]) => (<button key={k} onClick={() => setTabState((s) => ({ ...s, [k]: !s[k] }))} className="flex w-full items-center justify-between rounded px-2 py-1 text-left hover:bg-[var(--soft)]">{lbl}{tabState[k] ? <span style={{ color: BUY }}>ok</span> : null}</button>))}
+            <button onClick={openNotifs} className="relative rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]" title="Notifications">
+              <i className="fa-solid fa-bell" />
+              {notifUnread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: SELL }}>{notifUnread}</span>}
+            </button>
+            {notifOpen && (<><div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+              <div className="absolute right-0 z-50 mt-1 max-h-96 w-80 overflow-auto rounded-lg border shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
+                <div className="sticky top-0 border-b px-3 py-2 text-[11px] font-semibold" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>Notifications</div>
+                {notifs.length === 0 ? <div className="px-3 py-6 text-center text-[11px] text-[var(--muted)]"><i className="fa-solid fa-bell-slash mb-1 block text-lg opacity-40" />No notifications</div>
+                  : notifs.map((n: any) => (
+                    <div key={n.id} className="border-b px-3 py-2 last:border-0" style={{ borderColor: "var(--border)" }}>
+                      <div className="text-[11px] font-medium">{n.title}</div>
+                      {n.body && <div className="mt-0.5 text-[10px] text-[var(--muted)]">{n.body}</div>}
+                      <div className="mt-0.5 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div>
+                    </div>
+                  ))}
               </div></>)}
           </div>
-          <button onClick={() => { if (!selAcc) { setErr("Select an account first"); return; } window.open("/api/desk/reports?accountId=" + selAcc.id, "_blank"); }} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]">PDF</button>
-          <button onClick={toggleTheme} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]">{theme === "dark" ? "Light" : "Dark"}</button>
-          <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: SELL }}>Logout</button>
+          <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: SELL }} title="Logout"><i className="fa-solid fa-right-from-bracket" /></button>
         </div>
       </div>      {ok && <div className="px-3 py-1 text-[11px]" style={{ color: BUY }}>{ok}</div>}
 
@@ -321,11 +528,20 @@ export default function AdminDeskPage() {
         {panels.nav && (<>
           <aside className="flex flex-col border-r border-[var(--border)] bg-[var(--panel)]" style={{ width: navW }}>
             <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">NAVIGATOR<button onClick={() => togglePanel("nav")} aria-label="hide">x</button></div>
+            {/* Live / Demo tabs */}
+            <div className="flex border-b border-[var(--border)] text-[10px]">
+              <button onClick={() => setNavTab("live")} className="flex-1 py-1.5 font-semibold" style={navTab === "live" ? { color: BUY, borderBottom: `2px solid ${BUY}` } : { color: "var(--muted)" }}>LIVE ({liveAccs.length})</button>
+              <button onClick={() => setNavTab("demo")} className="flex-1 py-1.5 font-semibold" style={navTab === "demo" ? { color: "var(--accent)", borderBottom: `2px solid var(--accent)` } : { color: "var(--muted)" }}>DEMO ({demoAccs.length})</button>
+            </div>
+            <div className="border-b border-[var(--border)] px-1.5 py-1">
+              <input value={navSearch} onChange={(e) => setNavSearch(e.target.value)} placeholder="Search login / name\u2026" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[10px] text-[var(--text)]" />
+            </div>
             <div className="flex-1 overflow-auto p-1 text-[11px]">
-              <div className="cursor-pointer px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]" onClick={() => toggleCat("__live")}>{collapsed["__live"] ? "\u25B8" : "\u25BE"} Live ({liveAccs.length})</div>
-              {!collapsed["__live"] && <div className="flex flex-col gap-0.5 pl-1">{liveAccs.length ? liveAccs.map(acctRow) : <div className="px-2 py-1 text-[var(--muted)]">None</div>}</div>}
-              <div className="mt-1 cursor-pointer px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]" onClick={() => toggleCat("__demo")}>{collapsed["__demo"] ? "\u25B8" : "\u25BE"} Demo ({demoAccs.length})</div>
-              {!collapsed["__demo"] && <div className="flex flex-col gap-0.5 pl-1">{demoAccs.length ? demoAccs.map(acctRow) : <div className="px-2 py-1 text-[var(--muted)]">None</div>}</div>}
+              {(() => {
+                const base = navTab === "live" ? liveAccs : demoAccs;
+                const list = navSearch ? base.filter((c: any) => (c.login + " " + c.name + " " + (c.user?.email || c.email || "")).toLowerCase().includes(navSearch.toLowerCase())) : base;
+                return <div className="flex flex-col gap-0.5">{list.length ? list.map(acctRow) : <div className="px-2 py-3 text-center text-[var(--muted)]">No {navTab} accounts.</div>}</div>;
+              })()}
             </div>
           </aside>
           <div onMouseDown={(e) => dragX(e, "nav")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
@@ -335,7 +551,7 @@ export default function AdminDeskPage() {
           <div className="flex items-center gap-1 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
             <div className="flex flex-1 items-center gap-1 overflow-auto">
               {openCharts.map((s, i) => (
-                <span key={s} onClick={() => setActive(i)} className="flex cursor-pointer items-center gap-1 rounded border px-2 py-0.5" style={i === activeChart ? { borderColor: "var(--accent)", color: "var(--text)" } : { borderColor: "var(--border)", color: "var(--muted)" }}>
+                <span key={s + "-" + i} onClick={() => setActive(i)} className="flex cursor-pointer items-center gap-1 rounded border px-2 py-0.5" style={i === activeChart ? { borderColor: "var(--accent)", color: "var(--text)" } : { borderColor: "var(--border)", color: "var(--muted)" }}>
                   {s} <span style={{ color: i === activeChart ? "var(--text)" : "var(--accent)" }}>{px(s)}</span>
                   <button onClick={(e) => { e.stopPropagation(); removeChart(i); }} className="text-[var(--muted)]">{"\u00D7"}</button>
                 </span>
@@ -350,7 +566,10 @@ export default function AdminDeskPage() {
               <div key={sym + i} className="relative min-h-0 bg-[var(--bg)]" onClick={() => setActive(i)}>
                 
                 {ocStrip(sym)}
-                <MiniChart symbol={sym} tf={tf} theme={theme} />
+                <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} positions={[
+                  ...open.filter((o) => o.symbol === sym && (!selAcc || o.accountLogin === selAcc.login)).map((o) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
+                  ...pendingOrders.filter((o) => o.symbol === sym && (!selAcc || o.accountLogin === selAcc.login)).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
+                ]} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} />
               </div>
             ))}
           </div>
@@ -361,15 +580,16 @@ export default function AdminDeskPage() {
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
             <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide">x</button></div>
             <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]">
-              <div className="sticky top-0 z-10 grid grid-cols-[1fr_56px_56px] bg-[var(--panel)] px-2 py-1 text-[10px] text-[var(--muted)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span></div>
-              {Object.entries(groups).map(([cat, list]) => (
+              <div className="sticky top-0 z-10 grid grid-cols-[1fr_72px_72px] bg-[var(--panel)] px-2 py-1 text-[10px] text-[var(--muted)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span></div>
+              {orderedGroups.map(([cat, list]) => (
                 <div key={cat}>
                   <div onClick={() => toggleCat(cat)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[cat] ? "\u25B8" : "\u25BE"} {cat.toUpperCase()}</div>
-                  {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dg(s.symbol); const bid = p != null ? (p * 0.9999).toFixed(d) : "..."; const ask = p != null ? (p * 1.0001).toFixed(d) : "..."; const dir = dirs[s.symbol] || 0; const col = dir > 0 ? BUY : dir < 0 ? SELL : "var(--text)"; return (
-                    <div key={s.symbol} onDoubleClick={() => setTile(s.symbol)} className={"grid grid-cols-[1fr_56px_56px] items-center px-2 py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
-                      <button onClick={() => setTile(s.symbol)} className="truncate text-left">{s.symbol}</button>
-                      <span className="text-right pr-1" style={{ color: col }}>{bid}</span>
-                      <span className="text-right pr-1" style={{ color: col }}>{ask}</span>
+                  {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dg(s.symbol); const bid = p != null ? (p * 0.9999).toFixed(d) : "..."; const ask = p != null ? (p * 1.0001).toFixed(d) : "..."; const dir = dirs[s.symbol] || 0;
+                    return (
+                    <div key={s.symbol} onDoubleClick={() => setTile(s.symbol)} className={"grid grid-cols-[1fr_72px_72px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")} style={{ borderRadius: 3, minHeight: 22 }}>
+                      <button onClick={() => setTile(s.symbol)} className="truncate pl-2 text-left">{s.symbol}</button>
+                      <PriceCell value={bid} dir={dir} />
+                      <PriceCell value={ask} dir={dir} />
                     </div>); })}
                 </div>
               ))}
@@ -395,7 +615,7 @@ export default function AdminDeskPage() {
             <div className="flex flex-1 gap-1 overflow-auto">
               {TABS.filter(([k]) => tabState[k]).map(([k, lbl]) => (
                 <span key={k} className="flex items-center">
-                  <button onClick={() => setTab(k)} className="px-3 py-1.5 text-xs" style={tab === k ? { color: "var(--accent)" } : { color: "var(--muted)" }}>{lbl}{k === "trade" ? " (" + accOpen.length + ")" : ""}</button>
+                  <button onClick={() => setTab(k)} className="px-3 py-1.5 text-xs" style={tab === k ? { color: "var(--accent)" } : { color: "var(--muted)" }}>{lbl}{k === "trade" ? " (" + accOpen.length + (accPending.length ? " + " + accPending.length + "p" : "") + ")" : ""}</button>
                   <button onClick={() => setTabState((s) => ({ ...s, [k]: false }))} className="text-[var(--muted)]">{"\u00D7"}</button>
                 </span>
               ))}
@@ -419,22 +639,79 @@ export default function AdminDeskPage() {
                     <th className={thc + " text-right"}>Current</th><th className={thc + " text-right"}>PnL</th><th className={thc + " text-right"}>Action</th>
                   </tr></thead>
                   <tbody>
-                    {tSelIds.length > 0 && (<tr><td colSpan={12} className="px-2 py-1"><button onClick={() => { if (confirm("Close " + tSelIds.length + " trade(s)?")) { tSelIds.forEach((id) => close(id)); setTradeSel({}); } }} className="rounded px-2 py-0.5" style={{ background: SELL, color: "#1a0606" }}>Close Selected ({tSelIds.length})</button></td></tr>)}
-                    {accOpen.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No open trades.</td></tr> : accOpen.map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); return (
-                      <tr key={p.id} className="border-b border-[var(--border)] hover:bg-[var(--soft)]" onContextMenu={(e) => { e.preventDefault(); setPosMenu({ x: e.clientX, y: e.clientY, t: p }); }}>
-                        <td className="px-2 py-1"><input type="checkbox" checked={!!tradeSel[p.id]} onChange={() => setTradeSel((s) => ({ ...s, [p.id]: !s[p.id] }))} /></td>
-                        <td className="px-2 py-1 text-[var(--muted)]">{odt(p)}</td>
-                        <td className="px-2 py-1">{oid(p)}</td>
-                        <td className="px-2 py-1">{p.symbol}</td>
-                        <td className="px-2 py-1" style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type}</td>
-                        <td className="px-2 py-1 text-right">{p.lots}</td>
-                        <td className="px-2 py-1 text-right">{p.openPrice.toFixed(dg(p.symbol))}</td>
-                        <td className="px-2 py-1 text-right">{p.sl ? Number(p.sl).toFixed(dg(p.symbol)) : "-"}</td>
-                        <td className="px-2 py-1 text-right">{p.tp ? Number(p.tp).toFixed(dg(p.symbol)) : "-"}</td>
-                        <td className="px-2 py-1 text-right">{cur.toFixed(dg(p.symbol))}</td>
-                        <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{pl.toFixed(2)}</td>
-                        <td className="px-2 py-1 text-right"><button style={{ color: SELL }} onClick={() => close(p.id)}>Close</button></td>
-                      </tr>); })}
+                    {tSelIds.length > 0 && (<tr><td colSpan={12} className="px-2 py-1"><button onClick={() => { if (confirm("Close " + tSelIds.length + " trade(s)?")) { tSelIds.forEach((id) => close(id)); setTradeSel({}); } }} className="rounded px-2 py-0.5 text-[9px] font-medium" style={{ background: SELL, color: "#fff" }}>Close Selected ({tSelIds.length})</button></td></tr>)}
+                    {accOpen.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No open trades.</td></tr> : accOpen.map((p) => {
+                      const cur = prices[p.symbol] ?? p.openPrice;
+                      const pl = pnlOf(p, cur, csz(p.symbol));
+                      const ie = inlineEdit[p.id] || {};
+                      const isEditing = !!inlineEdit[p.id];
+                      const ei = (f: string, def: any) => ie[f] !== undefined ? ie[f] : def;
+                      const setIe = (f: string, v: any) => setInlineEdit((e) => ({ ...e, [p.id]: { ...(e[p.id] || {}), [f]: v } }));
+                      const tInp = "rounded border bg-[var(--soft)] border-[var(--border)] text-[var(--text)] text-right px-1 py-0.5 text-[9px] w-16 outline-none";
+                      return (
+                        <tr key={p.id} className={"border-b border-[var(--border)] " + (isEditing ? "bg-[var(--soft)]" : "hover:bg-[var(--soft)]")} onContextMenu={(e) => { e.preventDefault(); setPosMenu({ x: e.clientX, y: e.clientY, t: p }); }}>
+                          <td className="px-2 py-1"><input type="checkbox" checked={!!tradeSel[p.id]} onChange={() => setTradeSel((s) => ({ ...s, [p.id]: !s[p.id] }))} /></td>
+                          <td className="px-2 py-1 text-[var(--muted)]">
+                            {isEditing ? <input type="datetime-local" className="rounded border bg-[var(--soft)] border-[var(--border)] text-[var(--text)] px-1 py-0.5 text-[9px] w-32" value={ei("openedAt", new Date(p.openedAt || p.createdAt).toISOString().slice(0,16))} onChange={(e) => setIe("openedAt", e.target.value)} /> : odt(p)}
+                          </td>
+                          <td className="px-2 py-1">{oid(p)}</td>
+                          <td className="px-2 py-1">{p.symbol}</td>
+                          <td className="px-2 py-1">
+                            {isEditing ? <select className="rounded border bg-[var(--soft)] border-[var(--border)] text-[var(--text)] text-[9px] px-1 py-0.5" value={ei("type", p.type)} onChange={(e) => setIe("type", e.target.value)}><option>BUY</option><option>SELL</option></select>
+                              : <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type}</span>}
+                          </td>
+                          <td className="px-2 py-1 text-right">
+                            {isEditing ? <input type="number" step="0.01" min="0.01" className={tInp} value={ei("lots", p.lots)} onChange={(e) => setIe("lots", e.target.value)} /> : p.lots}
+                          </td>
+                          <td className="px-2 py-1 text-right">
+                            {isEditing ? <input type="number" step="0.00001" className={tInp} value={ei("openPrice", pxFmt(p.symbol, p.openPrice))} onChange={(e) => setIe("openPrice", e.target.value)} /> : pxFmt(p.symbol, p.openPrice)}
+                          </td>
+                          <td className="px-2 py-1 text-right">
+                            <input type="number" step="0.00001" className={tInp} placeholder="0" value={ei("sl", p.sl ? Number(p.sl).toFixed(dg(p.symbol)) : "")} onChange={(e) => { setIe("sl", e.target.value); }} />
+                          </td>
+                          <td className="px-2 py-1 text-right">
+                            <input type="number" step="0.00001" className={tInp} placeholder="0" value={ei("tp", p.tp ? Number(p.tp).toFixed(dg(p.symbol)) : "")} onChange={(e) => { setIe("tp", e.target.value); }} />
+                          </td>
+                          <td className="px-2 py-1 text-right">{pxFmt(p.symbol, cur)}</td>
+                          <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{pl.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right whitespace-nowrap">
+                            {isEditing ? (<>
+                              <button onClick={() => modifyTrade(p.id, { sl: ie.sl !== undefined ? Number(ie.sl) : Number(p.sl) || 0, tp: ie.tp !== undefined ? Number(ie.tp) : Number(p.tp) || 0, ...(ie.lots ? { lots: ie.lots } : {}), ...(ie.openPrice ? { openPrice: ie.openPrice } : {}), ...(ie.type ? { type: ie.type } : {}), ...(ie.openedAt ? { openedAt: ie.openedAt } : {}) })} className="mr-1 rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: BUY, color: "#fff" }}>Save</button>
+                              <button onClick={() => setInlineEdit((e) => { const n = { ...e }; delete n[p.id]; return n; })} className="mr-1 rounded px-1.5 py-0.5 text-[9px]" style={{ background: "var(--soft)", color: "var(--muted)" }}>✕</button>
+                            </>) : (
+                              <button onClick={() => setInlineEdit((e) => ({ ...e, [p.id]: { sl: p.sl ? Number(p.sl) : "", tp: p.tp ? Number(p.tp) : "" } }))} className="mr-1 rounded px-1.5 py-0.5 text-[9px]" title="Edit trade" style={{ background: "var(--soft)", color: "var(--accent)" }}>
+                                <i className="fa-solid fa-pen" style={{ fontSize: 8 }} />
+                              </button>
+                            )}
+                            <button onClick={() => close(p.id)} className="rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "rgba(224,82,96,0.15)", color: SELL, border: "1px solid rgba(224,82,96,0.3)" }}>
+                              Close ×
+                            </button>
+                          </td>
+                        </tr>);
+                    })}
+                    {accPending.length > 0 && (
+                      <tr><td colSpan={12} className="px-2 pt-2 pb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--accent)" }}>
+                        <i className="fa-solid fa-hourglass-half mr-1" />Pending Orders ({accPending.length})
+                      </td></tr>
+                    )}
+                    {accPending.map((o) => (
+                      <tr key={"pnd-" + o.id} className="border-b border-[var(--border)]" style={{ background: "color-mix(in srgb, var(--accent) 6%, transparent)" }}>
+                        <td className="px-2 py-1"><i className="fa-solid fa-clock text-[9px]" style={{ color: "var(--accent)" }} /></td>
+                        <td className="px-2 py-1 text-[var(--muted)]">{new Date(o.createdAt).toLocaleString()}</td>
+                        <td className="px-2 py-1">—</td>
+                        <td className="px-2 py-1">{o.symbol}</td>
+                        <td className="px-2 py-1" style={{ color: o.side === "BUY" ? BUY : SELL }}>{o.side} {o.kind}</td>
+                        <td className="px-2 py-1 text-right">{o.lots}</td>
+                        <td className="px-2 py-1 text-right" title="Trigger price">{pxFmt(o.symbol, o.price)} <span className="text-[8px] text-[var(--muted)]">trig</span></td>
+                        <td className="px-2 py-1 text-right">{o.sl ? pxFmt(o.symbol, o.sl) : "-"}</td>
+                        <td className="px-2 py-1 text-right">{o.tp ? pxFmt(o.symbol, o.tp) : "-"}</td>
+                        <td className="px-2 py-1 text-right">{pxFmt(o.symbol, prices[o.symbol] ?? o.price)}</td>
+                        <td className="px-2 py-1 text-right text-[var(--muted)]">pending</td>
+                        <td className="px-2 py-1 text-right whitespace-nowrap">
+                          <button onClick={() => cancelPending(o.id)} className="rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "rgba(224,82,96,0.15)", color: SELL, border: "1px solid rgba(224,82,96,0.3)" }}>Cancel ×</button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               );
@@ -482,8 +759,8 @@ export default function AdminDeskPage() {
                             <td className="px-2 py-1" style={{ color: hType(h) === "BUY" ? BUY : SELL }}>{h.side || h.type || "-"}</td>
                             <td className="px-2 py-1">{h.symbol}</td>
                             <td className="px-2 py-1 text-[var(--muted)]">{h.description || h.desc || h.closeReason || "-"}</td>
-                            <td className="px-2 py-1 text-right">{h.openPrice != null ? Number(h.openPrice).toFixed(dg(h.symbol)) : "-"}</td>
-                            <td className="px-2 py-1 text-right">{h.closePrice != null ? Number(h.closePrice).toFixed(dg(h.symbol)) : "-"}</td>
+                            <td className="px-2 py-1 text-right">{h.openPrice != null && Number(h.openPrice) !== 0 ? pxFmt(h.symbol, h.openPrice) : "-"}</td>
+                            <td className="px-2 py-1 text-right">{h.closePrice != null && Number(h.closePrice) !== 0 ? pxFmt(h.symbol, h.closePrice) : "-"}</td>
                             <td className="px-2 py-1 text-right">{h.sl ? Number(h.sl).toFixed(dg(h.symbol)) : "-"}</td>
                             <td className="px-2 py-1 text-right">{h.tp ? Number(h.tp).toFixed(dg(h.symbol)) : "-"}</td>
                             <td className="px-2 py-1 text-[var(--muted)]">{hdt(h) ? new Date(hdt(h)).toLocaleString() : "-"}</td>
@@ -504,6 +781,74 @@ export default function AdminDeskPage() {
                 ))}
               </div>
             )}
+            {tab === "clients" && (() => {
+              const balOf = (c: any) => Number(c.deposit) - Number(c.withdrawal) + Number(c.credit) + Number(c.bonus) + Number(c.pnl);
+              const cliRows = clients.filter((c: any) => {
+                if (cliType !== "ALL" && c.type !== cliType) return false;
+                if (cliStatus === "ACTIVE" && (c.locked || c.deactivated)) return false;
+                if (cliStatus === "LOCKED" && !c.locked) return false;
+                if (cliStatus === "INACTIVE" && !c.deactivated) return false;
+                if (cliQ) { const q = cliQ.toLowerCase(); if (!((c.login || "").toLowerCase().includes(q) || (c.name || "").toLowerCase().includes(q) || ((c.user?.email || c.email || "").toLowerCase().includes(q)))) return false; }
+                return true;
+              });
+              const thc = "px-2 py-1 text-left font-normal text-[var(--muted)] whitespace-nowrap";
+              return (
+                <div className="flex h-full flex-col text-[10px]">
+                  <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-2 py-1">
+                    <input value={cliQ} onChange={(e) => setCliQ(e.target.value)} placeholder="Search login / name / email" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[var(--text)] min-w-[160px]" />
+                    <select value={cliType} onChange={(e) => setCliType(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All Types</option><option value="LIVE">Live</option><option value="DEMO">Demo</option></select>
+                    <select value={cliStatus} onChange={(e) => setCliStatus(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All Status</option><option value="ACTIVE">Active</option><option value="LOCKED">Locked</option><option value="INACTIVE">Inactive</option></select>
+                    <span className="text-[var(--muted)]">{cliRows.length} clients</span>
+                  </div>
+                  <div className="flex-1 overflow-auto">
+                    <table className="w-full">
+                      <thead><tr className="border-b border-[var(--border)] sticky top-0 bg-[var(--panel)] z-10">
+                        <th className={thc}>Login</th><th className={thc}>Name</th><th className={thc}>Email</th>
+                        <th className={thc}>Phone</th><th className={thc}>Country</th><th className={thc}>Manager</th>
+                        <th className={thc}>Type</th><th className={thc}>Balance</th><th className={thc}>Online</th>
+                        <th className={thc}>Last IP</th><th className={thc}>Status</th><th className={thc + " text-right"}>Actions</th>
+                      </tr></thead>
+                      <tbody>
+                        {cliRows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No clients.</td></tr> : cliRows.map((c: any) => {
+                          const email = c.user?.email || c.email || "-";
+                          const lastIp = c.user?.lastLoginIp || "-";
+                          const bal = balOf(c);
+                          const statusLabel = c.deactivated ? "Inactive" : c.locked ? "Locked" : "Active";
+                          const statusCol = c.deactivated ? GOLD : c.locked ? SELL : BUY;
+                          return (
+                            <tr key={c.id} className="border-b border-[var(--border)] hover:bg-[var(--soft)]" onContextMenu={(e) => { e.preventDefault(); setSelAcc(c); setMenu({ x: e.clientX, y: e.clientY, acc: c }); }}>
+                              <td className="px-2 py-1 font-medium" style={{ color: GOLD }}>
+                                <button onClick={() => setSelAcc(c)} title="Select account">{c.login}</button>
+                                {c.isPool && <span className="ml-1 text-[9px] rounded px-0.5" style={{ background: GOLD + "22", color: GOLD }}>POOL</span>}
+                              </td>
+                              <td className="px-2 py-1">{c.name}</td>
+                              <td className="px-2 py-1 text-[var(--muted)]">{email}</td>
+                              <td className="px-2 py-1 text-[var(--muted)]">{c.phone || "-"}</td>
+                              <td className="px-2 py-1 text-[var(--muted)]">{c.country || "-"}</td>
+                              <td className="px-2 py-1 text-[var(--muted)]">{c.manager?.name || "-"}</td>
+                              <td className="px-2 py-1">{c.type}</td>
+                              <td className="px-2 py-1 text-right" style={{ color: bal >= 0 ? BUY : SELL }}>{bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-2 py-1 text-center"><span className={"inline-block h-1.5 w-1.5 rounded-full " + (c.isOnline ? "bg-green-400" : "bg-gray-600")} /></td>
+                              <td className="px-2 py-1 text-[var(--muted)]">{lastIp}</td>
+                              <td className="px-2 py-1" style={{ color: statusCol }}>{statusLabel}</td>
+                              <td className="px-2 py-1 text-right whitespace-nowrap">
+                                <button title="Edit" onClick={() => openAct("rename", c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen-to-square" /></button>
+                                <button title={c.locked ? "Unlock" : "Lock"} onClick={() => doStatus(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: c.locked ? BUY : SELL }}><i className={"fa-solid " + (c.locked ? "fa-lock-open" : "fa-lock")} /></button>
+                                <button title={c.deactivated ? "Activate" : "Deactivate"} onClick={() => doDeactivateManage(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: GOLD }}><i className={"fa-solid " + (c.deactivated ? "fa-circle-check" : "fa-ban")} /></button>
+                                <button title={c.isPool ? "Demote from Pool" : "Promote to Pool"} onClick={() => doPool(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "#a78bfa" }}><i className={"fa-solid " + (c.isPool ? "fa-circle-minus" : "fa-circle-plus")} /></button>
+                                <button title="Change ID" onClick={() => openAct("accountid", c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--muted)" }}><i className="fa-solid fa-id-card" /></button>
+                                <button title="Upload KYC" onClick={() => { setKycUploadFor(c); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); }} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "#38bdf8" }}><i className="fa-solid fa-id-card-clip" /></button>
+                                <button title="Delete" onClick={() => delClient(c)} className="rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
             {tab === "audit" && <div className="px-2 py-2 text-[10px] text-[var(--muted)]">{audit.length ? audit.slice(0, 60).map((l) => <div key={l.id} className="border-b border-[var(--border)] py-1">{l.performedBy} - {l.action} <span className="text-[var(--text)]">{l.detail}</span></div>) : "No activity."}</div>}
             {tab === "payments" && <PaymentsPanel />}
             {tab === "kyc" && <KycPanel />}
@@ -513,45 +858,55 @@ export default function AdminDeskPage() {
 
       {menu && (<>
         <div className="fixed inset-0 z-40" onClick={() => { setMenu(null); setMenuSub(""); }} />
-        <div className="fixed z-50 w-56 overflow-visible rounded-md border text-[11px]" style={{ left: menu.x, top: menu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
-          <div className="border-b px-3 py-1.5 text-[10px] text-[var(--muted)]" style={{ borderColor: "var(--border)" }}>{menu.acc.login} - {menu.acc.name}</div>
-          <button onClick={() => { setSelAcc(menu.acc); setMenu(null); }} className={mi}>Login to account</button>
-          <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-[var(--soft)]">Money <span className="text-[var(--muted)]">{menuSub === "money" ? "\u25BE" : "\u25B8"}</span></button>
-          {menuSub === "money" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-md border" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
-            <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>Deposit</button>
-            <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>Withdrawal</button>
-            <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>Credit In</button>
-            <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>Credit Out</button>
-            <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus")} className={subi} style={{ color: BUY }}>Bonus</button>
-            <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>Insurance</button>
-            <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>Manual P/L</button>
-            <button onClick={() => openAct("transfer", menu.acc)} className={subi}>Transfer Between Accounts</button>
+        <div className="fixed z-50 w-60 overflow-visible rounded-lg border py-1 text-[11px]" style={{ left: menu.x, top: menu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
+          <div className="mx-1 mb-1 flex items-center gap-2 rounded-md px-2 py-2" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)" }}>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "var(--accent)", color: "#fff" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
+            <div className="min-w-0">
+              <div className="truncate font-semibold" style={{ color: GOLD }}>{menu.acc.login}</div>
+              <div className="truncate text-[9px] text-[var(--muted)]">{menu.acc.name}</div>
+            </div>
+          </div>
+          <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-coins", GOLD)}<span className="flex-1">Money</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "money" ? "fa-chevron-down" : "fa-chevron-right")} /></button>
+          {menuSub === "money" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
+            <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>{mIco("fa-arrow-down-to-bracket", BUY)}Deposit</button>
+            <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>{mIco("fa-arrow-up-from-bracket", GOLD)}Withdrawal</button>
+            <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-plus", BUY)}Credit In</button>
+            <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-minus", GOLD)}Credit Out</button>
+            <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus")} className={subi} style={{ color: BUY }}>{mIco("fa-gift", BUY)}Bonus</button>
+            <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>{mIco("fa-shield-halved")}Insurance</button>
+            <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>{mIco("fa-chart-line")}Manual P/L</button>
+            <button onClick={() => openAct("transfer", menu.acc)} className={subi}>{mIco("fa-right-left")}Transfer Between Accounts</button>
           </div>)}
-          <button onClick={() => openMT(menu.acc)} className={mi}>Manual Trade</button>
-          <button onClick={() => openAct("subaccount", menu.acc)} className={mi}>Create Sub-Account</button>
-          <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-[var(--soft)]">Edit Client <span className="text-[var(--muted)]">{menuSub === "edit" ? "\u25BE" : "\u25B8"}</span></button>
-          {menuSub === "edit" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-md border" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
-            <button onClick={() => openAct("rename", menu.acc)} className={subi}>Edit Details</button>
-            <button onClick={() => openAct("accountid", menu.acc)} className={subi}>Change Account ID</button>
-            <button onClick={() => openAct("password", menu.acc)} className={subi}>Change Password</button>
-            <button onClick={() => openAct("assignmgr", menu.acc)} className={subi}>Assign Manager</button>
-            <button onClick={() => openAct("assigngroup", menu.acc)} className={subi}>Assign Group</button>
+          <button onClick={() => openMT(menu.acc)} className={mi}>{mIco("fa-bolt", "var(--accent)")}Manual Trade</button>
+          <button onClick={() => openAct("subaccount", menu.acc)} className={mi}>{mIco("fa-sitemap")}Create Sub-Account</button>
+          <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
+          <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-pen-to-square")}<span className="flex-1">Edit Client</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "edit" ? "fa-chevron-down" : "fa-chevron-right")} /></button>
+          {menuSub === "edit" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
+            <button onClick={() => openAct("rename", menu.acc)} className={subi}>{mIco("fa-user-pen")}Edit Details</button>
+            <button onClick={() => openAct("accountid", menu.acc)} className={subi}>{mIco("fa-id-card")}Change Account ID</button>
+            <button onClick={() => openAct("password", menu.acc)} className={subi}>{mIco("fa-key")}Change Password</button>
+            <button onClick={() => openAct("assignmgr", menu.acc)} className={subi}>{mIco("fa-user-tie")}Assign Manager</button>
+            <button onClick={() => openAct("assigngroup", menu.acc)} className={subi}>{mIco("fa-layer-group")}Assign Group</button>
+            <button onClick={() => doClearPin(menu.acc)} className={subi}>{mIco("fa-unlock-keyhole")}Reset PIN</button>
           </div>)}
-          <button onClick={() => { setTab("kyc"); setTabState((s) => ({ ...s, kyc: true })); setMenu(null); }} className={mi}>KYC</button>
-          <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-[var(--soft)]">Settings <span className="text-[var(--muted)]">{menuSub === "settings" ? "\u25BE" : "\u25B8"}</span></button>
-          {menuSub === "settings" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-md border" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
-            <button onClick={() => openAct("leverage", menu.acc)} className={subi}>Change Leverage</button>
-            <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>Set Margin Call Level</button>
-            <button onClick={() => openSymOv(menu.acc)} className={subi}>Disable Symbols</button>
+          <button onClick={() => { setTab("kyc"); setTabState((s) => ({ ...s, kyc: true })); setMenu(null); }} className={mi}>{mIco("fa-id-card-clip")}View KYC</button>
+          <button onClick={() => { setKycUploadFor(menu.acc); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); setMenu(null); }} className={mi}>{mIco("fa-cloud-arrow-up", "#38bdf8")}Upload KYC Document</button>
+          <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
+          <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-gear")}<span className="flex-1">Settings</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "settings" ? "fa-chevron-down" : "fa-chevron-right")} /></button>
+          {menuSub === "settings" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
+            <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
+            <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
+            <button onClick={() => openSymOv(menu.acc)} className={subi}>{mIco("fa-ban")}Disable Symbols</button>
+            <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
           </div>)}
-          <button onClick={() => setMenuSub(menuSub === "status" ? "" : "status")} className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-[var(--soft)]">Status <span className="text-[var(--muted)]">{menuSub === "status" ? "\u25BE" : "\u25B8"}</span></button>
-          {menuSub === "status" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-md border" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
-            <button onClick={() => doStatus(menu.acc)} className={subi}>{menu.acc.locked ? "Unlock Client" : "Lock Client"}</button>
-            <button onClick={() => doDeactivate(menu.acc)} className={subi}>{menu.acc.deactivated ? "Activate Client" : "Deactivate Client"}</button>
-            <button onClick={() => doDNL(menu.acc)} className={subi}>{menu.acc.doNotLiquidate ? "Disable DNL" : "Enable DNL"}</button>
+          <button onClick={() => setMenuSub(menuSub === "status" ? "" : "status")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-toggle-on")}<span className="flex-1">Status</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "status" ? "fa-chevron-down" : "fa-chevron-right")} /></button>
+          {menuSub === "status" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
+            <button onClick={() => doStatus(menu.acc)} className={subi}>{mIco(menu.acc.locked ? "fa-lock-open" : "fa-lock", menu.acc.locked ? BUY : SELL)}{menu.acc.locked ? "Unlock Client" : "Lock Client"}</button>
+            <button onClick={() => doDeactivate(menu.acc)} className={subi}>{mIco(menu.acc.deactivated ? "fa-circle-check" : "fa-ban", GOLD)}{menu.acc.deactivated ? "Activate Client" : "Deactivate Client"}</button>
+            <button onClick={() => doDNL(menu.acc)} className={subi}>{mIco("fa-hand", menu.acc.doNotLiquidate ? GOLD : undefined)}{menu.acc.doNotLiquidate ? "Disable DNL" : "Enable DNL"}</button>
           </div>)}
-          <div className="border-t" style={{ borderColor: "var(--border)" }} />
-          <button onClick={() => delClient(menu.acc)} className={mi} style={{ color: SELL }}>Delete</button>
+          <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
+          <button onClick={() => delClient(menu.acc)} className={mi} style={{ color: SELL }}>{mIco("fa-trash", SELL)}Delete Client</button>
         </div>
       </>)}
 
@@ -622,7 +977,12 @@ export default function AdminDeskPage() {
               <div className={lab + " mt-2"}>To account ID</div>
               <input className={inp} value={aform.toLogin || ""} onChange={(e) => af("toLogin", e.target.value)} placeholder="e.g. 800140" />
             </>)}
-            {act.kind === "rename" && (<><div className={lab}>Client name</div><input className={inp} value={aform.name ?? act.acc.name} onChange={(e) => af("name", e.target.value)} autoFocus /></>)}
+            {act.kind === "rename" && (<>
+              <div className={lab}>Client name</div><input className={inp} value={aform.name ?? act.acc.name} onChange={(e) => af("name", e.target.value)} autoFocus />
+              <div className={lab + " mt-2"}>Email</div><input className={inp} value={aform.email ?? (act.acc.email || "")} onChange={(e) => af("email", e.target.value)} />
+              <div className={lab + " mt-2"}>Phone</div><input className={inp} value={aform.phone ?? (act.acc.phone || "")} onChange={(e) => af("phone", e.target.value)} />
+              <div className={lab + " mt-2"}>Country</div><input className={inp} value={aform.country ?? (act.acc.country || "")} onChange={(e) => af("country", e.target.value)} />
+            </>)}
             {act.kind === "accountid" && (<><div className={lab}>New account ID</div><input className={inp} value={aform.login ?? act.acc.login} onChange={(e) => af("login", e.target.value)} autoFocus /></>)}
             {act.kind === "password" && (<><div className={lab}>New password (min 6)</div><input className={inp} value={aform.password || ""} onChange={(e) => af("password", e.target.value)} autoFocus /></>)}
             {act.kind === "assignmgr" && (<><div className={lab}>Manager</div><select className={inp} value={aform.managerId ?? (act.acc.managerId || "")} onChange={(e) => af("managerId", e.target.value)}><option value="">- none -</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></>)}
@@ -725,13 +1085,20 @@ export default function AdminDeskPage() {
             <div className="mb-2 text-sm font-semibold">Manual Trade - <span style={{ color: "var(--accent)" }}>{mt.acc.login} - {mt.acc.name}</span></div>
             <div className={lab}>Symbol</div>
             <select className={inp} value={mt.symbol} onChange={(e) => setMt({ ...mt, symbol: e.target.value, openPrice: mt.follow ? (prices[e.target.value] ?? 0) : mt.openPrice })}>{symbols.map((s) => <option key={s.symbol} value={s.symbol}>{s.symbol}</option>)}</select>
+            <div className="mt-2"><div className={lab}>Order Kind</div>
+              <select className={inp} value={mt.kind || "MARKET"} onChange={(e) => setMt({ ...mt, kind: e.target.value, follow: e.target.value === "MARKET" })}>
+                <option value="MARKET">Market (open now)</option>
+                <option value="LIMIT">Limit (Buy below / Sell above market)</option>
+                <option value="STOP">Stop (Buy above / Sell below market)</option>
+              </select>
+            </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <div><div className={lab}>Date & Time</div><input type="datetime-local" className={inp} value={mt.date} onChange={(e) => setMt({ ...mt, date: e.target.value })} /></div>
+              {(!mt.kind || mt.kind === "MARKET") && <div><div className={lab}>Date & Time</div><input type="datetime-local" className={inp} value={mt.date} onChange={(e) => setMt({ ...mt, date: e.target.value })} /></div>}
               <div><div className={lab}>Type</div><select className={inp} value={mt.type} onChange={(e) => setMt({ ...mt, type: e.target.value })}><option>BUY</option><option>SELL</option></select></div>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div><div className={lab}>Lot Size</div><input type="number" step="0.01" className={inp} value={mt.lots} onChange={(e) => setMt({ ...mt, lots: e.target.value })} /></div>
-              <div><div className="flex items-center justify-between"><span className={lab}>Open Price</span>{mt.follow ? <span className="text-[9px]" style={{ color: GOLD }}>Following live</span> : null}</div><input type="number" className={inp} value={mt.follow ? (prices[mt.symbol] ?? mt.openPrice) : mt.openPrice} onChange={(e) => setMt({ ...mt, openPrice: e.target.value, follow: false })} /></div>
+              <div><div className="flex items-center justify-between"><span className={lab}>{mt.kind && mt.kind !== "MARKET" ? "Trigger Price" : "Open Price"}</span>{mt.follow ? <span className="text-[9px]" style={{ color: GOLD }}>● Following live</span> : <button onClick={() => setMt({ ...mt, follow: true, openPrice: prices[mt.symbol] ?? mt.openPrice })} className="text-[9px] underline" style={{ color: "var(--accent)" }}>Follow live</button>}</div><input type="number" className={inp} value={mt.follow ? (prices[mt.symbol] != null ? prices[mt.symbol].toFixed(dg(mt.symbol)) : mt.openPrice) : mt.openPrice} onChange={(e) => setMt({ ...mt, openPrice: e.target.value, follow: false })} /></div>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div><div className={lab}>Stop Loss (0=OFF)</div><input type="number" className={inp} value={mt.sl} onChange={(e) => setMt({ ...mt, sl: e.target.value })} /></div>
@@ -741,7 +1108,7 @@ export default function AdminDeskPage() {
             {err && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
             <div className="mt-3 flex gap-2">
               <button onClick={() => setMt(null)} className="flex-1 rounded border border-[var(--border)] py-2 text-xs">Cancel</button>
-              <button onClick={placeMT} className="flex-1 rounded py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Place Trade</button>
+              <button onClick={placeMT} className="flex-1 rounded py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>{mt.kind && mt.kind !== "MARKET" ? "Place Pending Order" : "Place Trade"}</button>
             </div>
           </div>
         </div>
@@ -763,6 +1130,73 @@ export default function AdminDeskPage() {
           </div>
         </div>
       ); })()}
+      {toasts.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+          {toasts.map((t) => (<div key={t.id} className="rounded-md border px-3 py-2 text-[11px] shadow-lg" style={{ background: "var(--panel)", borderColor: t.kind === "err" ? SELL : BUY, color: "var(--text)", minWidth: 180 }}><span style={{ color: t.kind === "err" ? SELL : BUY }}>{t.kind === "err" ? "Error" : "Success"}</span> {t.msg}</div>))}
+        </div>
+      )}
+
+      {/* Symbol Access Modal */}
+      {symPerm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setSymPerm(null)}>
+          <div className="flex max-h-[82vh] w-[420px] flex-col rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm font-semibold">Symbol Access</div>
+            <div className="mb-2 text-[10px]" style={{ color: "var(--muted)" }}>
+              {symPerm.scope === "manager"
+                ? "Switching a symbol OFF hides it only for YOUR assigned clients."
+                : "Switching a symbol OFF hides it across the ENTIRE tenant (all clients, managers, desk). Other tenants are unaffected."}
+            </div>
+            <input value={symPerm.q || ""} onChange={(e) => setSymPerm((p: any) => ({ ...p, q: e.target.value }))} placeholder="Search symbol" className="mb-2 rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--text)]" />
+            <div className="flex-1 overflow-auto">
+              {symPerm.symbols.filter((s: any) => s.symbol.toLowerCase().includes((symPerm.q || "").toLowerCase())).map((s: any) => {
+                const off = symPerm.disabled.includes(s.symbol);
+                return (
+                  <div key={s.symbol} className="flex items-center justify-between border-b border-[var(--border)] py-1.5 text-[11px]">
+                    <div><span className="font-medium">{s.symbol}</span> <span style={{ color: "var(--muted)" }}>{s.display}</span></div>
+                    <button onClick={() => toggleSymPerm(s.symbol, !off)} className="rounded px-2 py-0.5 text-[10px] font-semibold" style={off ? { background: "rgba(224,82,96,0.16)", color: SELL } : { background: "rgba(38,166,154,0.16)", color: BUY }}>
+                      {off ? "OFF" : "ON"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <button onClick={() => setSymPerm(null)} className="mt-3 w-full rounded border border-[var(--border)] py-1.5 text-xs">Done</button>
+          </div>
+        </div>
+      )}
+
+      {/* KYC Upload Modal */}
+      {kycUploadFor && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setKycUploadFor(null)}>
+          <div className="w-[360px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 text-sm font-semibold">Upload KYC Document</div>
+            <div className="mb-3 text-[10px]" style={{ color: "var(--muted)" }}>{kycUploadFor.login} — {kycUploadFor.name}</div>
+            <div className="space-y-2">
+              <div>
+                <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Document Type</div>
+                <select className="w-full rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} value={kycUploadType} onChange={(e) => setKycUploadType(e.target.value)}>
+                  <option value="PASSPORT">Passport</option>
+                  <option value="ID">National ID</option>
+                  <option value="DRIVING_LICENSE">Driving License</option>
+                  <option value="UTILITY_BILL">Utility Bill</option>
+                  <option value="BANK_STATEMENT">Bank Statement</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+              <div>
+                <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>File</div>
+                <input type="file" accept="image/*,.pdf" onChange={(e) => setKycUploadFile(e.target.files?.[0] || null)} className="w-full text-[10px]" style={{ color: "var(--text)" }} />
+              </div>
+            </div>
+            {err && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{err}</div>}
+            {kycUpMsg && <div className="mt-2 text-[10px]" style={{ color: BUY }}>{kycUpMsg}</div>}
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setKycUploadFor(null)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
+              <button onClick={uploadKyc} className="flex-1 rounded py-2 text-[11px] font-semibold" style={{ background: BUY, color: "#04140e" }}>Upload</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

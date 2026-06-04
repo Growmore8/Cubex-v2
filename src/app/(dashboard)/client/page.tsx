@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import TVChart from "@/components/TVChart";
+import LWChart from "@/components/LWChart";
 import PriceCell from "@/components/PriceCell";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
@@ -17,9 +17,17 @@ const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD
 const DIGITS: Record<string, number> = {};
 function dg(sym: string, f = 2) { return DIGITS[sym] ?? instruments[sym]?.digits ?? f; }
 function pnlOf(p: any, price: number, cs: number) {
-
+  const sym = String(p.symbol || "");
   const dir = p.type === "BUY" ? 1 : -1;
-  return (price - p.openPrice) * dir * p.lots * (cs || 100000);
+  const diff = (price - p.openPrice) * dir;
+  const isFx = !/^(XAU|XAG|XPT|XPD)/.test(sym) && !sym.endsWith("USDT") && /^[A-Z]{6}$/.test(sym);
+  if (isFx) {
+    const pip = /JPY$/i.test(sym) ? 0.01 : 0.0001;
+    let pf = (diff / pip) * p.lots;
+    if (/^USD/i.test(sym)) pf = pf / (price || 1);
+    return pf;
+  }
+  return diff * p.lots * (cs || 100000);
 }
 
 export default function ClientTerminal() {
@@ -36,6 +44,7 @@ export default function ClientTerminal() {
   const accIdRef = useRef("");
   const [positions, setPositions] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [financials, setFinancials] = useState<any[]>([]);
   const [symbols, setSymbols] = useState<any[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
@@ -60,6 +69,8 @@ export default function ClientTerminal() {
   const [pendingPrice, setPendingPrice] = useState("");
   const [pending, setPending] = useState<any[]>([]);
   const [notiOpen, setNotiOpen] = useState(false);
+  const [acctMenu, setAcctMenu] = useState(false);
+  const [acctSwitchOpen, setAcctSwitchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [mwW, setMwW] = useState(220);
   const [rtW, setRtW] = useState(250);
@@ -88,8 +99,11 @@ export default function ClientTerminal() {
   async function load() {
     const id = accIdRef.current;
     const d = await fetch("/api/client/account" + (id ? "?accountId=" + id : "")).then((r) => r.json());
-    if (!d.ok) { setErr(d.error || "Failed"); return; }
-    setAccount(d.account); setPositions(d.positions); setHistory(d.history); setSymbols(d.symbols);
+    if (!d.ok) {
+      if (d.code === "DEACTIVATED") { await fetch("/api/auth/logout", { method: "POST" }).catch(() => {}); window.location.href = "/login?reason=deactivated"; return; }
+      setErr(d.error || "Failed"); return;
+    }
+    setAccount(d.account); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols);
     (d.symbols || []).forEach((s: any) => { DIGITS[s.symbol] = s.digits; });
     if (!selSymRef.current && d.symbols.length) setSelSym(d.symbols[0].symbol);
     fetch("/api/client/accounts").then((r) => r.json()).then((ad) => { if (ad.ok) { setAccts(ad.accounts || []); if (!accIdRef.current && ad.accounts && ad.accounts.length) { accIdRef.current = ad.accounts[0].id; setAccId(ad.accounts[0].id); } } }).catch(() => {});
@@ -101,18 +115,30 @@ export default function ClientTerminal() {
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
+    const pP: Record<string, number> = {};
+    const pD: Record<string, number> = {};
+    let raf = 0;
+    const flush = () => {
+      raf = 0;
+      const px = pP; const dr = pD;
+      if (Object.keys(px).length) { setPrices((pp) => ({ ...pp, ...px })); for (const k in px) delete px[k]; }
+      if (Object.keys(dr).length) { setDirs((dd) => ({ ...dd, ...dr })); for (const k in dr) delete dr[k]; }
+    };
     socket.on("tick", ({ symbol, price }: any) => {
       const prev = prevRef.current[symbol];
-      if (prev != null && prev !== price) { const dr = price > prev ? 1 : -1; setDirs((dd) => ({ ...dd, [symbol]: dr })); clearTimeout(timersRef.current[symbol]); timersRef.current[symbol] = setTimeout(() => setDirs((dd) => ({ ...dd, [symbol]: 0 })), 500); }
+      if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
-      setPrices((pp) => ({ ...pp, [symbol]: price }));
+      pP[symbol] = price;
+      if (!raf) raf = requestAnimationFrame(flush);
     });
+    const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
     socket.on("refresh", () => load());
-    return () => { socket.disconnect(); };
+    return () => { socket.disconnect(); clearInterval(clr); if (raf) cancelAnimationFrame(raf); };
   }, []);
 
   async function place(type: "BUY" | "SELL") {
     setErr("");
+    if (account?.locked) { setErr("Your account is read-only (locked). Trading is disabled."); return; }
     if (orderType === "PENDING") {
       const trig = Number(pendingPrice); if (!trig) { setErr("Enter a trigger price"); return; }
       const mkt = prices[selSym] ?? trig;
@@ -126,13 +152,25 @@ export default function ClientTerminal() {
     if (!d.ok) { setErr(d.error || "Order failed"); return; }
     load();
   }
-  async function quickTrade(sym: string, side: "BUY" | "SELL") {
+  async function quickTrade(sym: string, side: "BUY" | "SELL", lots?: number) {
     setSelSym(sym); setErr("");
+    if (account?.locked) { setErr("Account is read-only."); return false; }
     const r = await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol: sym, side, lots: Number(vol), sl: 0, tp: 0, accountId: accIdRef.current }) });
+      body: JSON.stringify({ symbol: sym, side, lots: Number(lots ?? vol), sl: 0, tp: 0, accountId: accIdRef.current }) });
     const d = await r.json();
-    if (!d.ok) { setErr(d.error || "Order failed"); return; }
-    load();
+    if (!d.ok) { setErr(d.error || "Order failed"); return false; }
+    load(); return true;
+  }
+  // Mobile/explicit pending order: kind = LIMIT | STOP
+  async function placePending(sym: string, side: "BUY" | "SELL", kind: "LIMIT" | "STOP", trigger: number, lots: number, slv = 0, tpv = 0) {
+    setErr("");
+    if (account?.locked) { setErr("Account is read-only."); return false; }
+    if (!trigger || trigger <= 0) { setErr("Enter a trigger price"); return false; }
+    const r = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol: sym, side, kind, lots: Number(lots), price: trigger, sl: slv, tp: tpv, accountId: accIdRef.current }) });
+    const d = await r.json();
+    if (!d.ok) { setErr(d.error || "Pending failed"); return false; }
+    load(); return true;
   }
   async function cancelPending(id: string) { await fetch("/api/client/pending/" + id, { method: "DELETE" }); load(); }
   function urlB64ToUint8Array(base64String: string) { const padding = "=".repeat((4 - (base64String.length % 4)) % 4); const b = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/"); const raw = atob(b); const arr = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i); return arr; }
@@ -186,6 +224,7 @@ export default function ClientTerminal() {
     setPinHasPin(true); setPinModal(false); setPinForm({}); sessionStorage.setItem("cubex-pin-ok", "1");
   }
   async function close(id: string) {
+    if (account?.locked) { setErr("Your account is read-only. Closing is disabled."); return; }
     const r = await fetch("/api/client/orders/" + id + "/close", { method: "POST" });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Close failed"); return; } load();
   }
@@ -201,6 +240,7 @@ export default function ClientTerminal() {
   }
   async function openAccount(type: "DEMO" | "LIVE") {
     setErr("");
+    if (account?.locked) { setErr("Your account is read-only. Cannot create new accounts."); return; }
     const r = await fetch("/api/client/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { setErr(r.error || "Failed"); return; }
     if (r.account) { accIdRef.current = r.account.id; setAccId(r.account.id); }
@@ -220,45 +260,93 @@ export default function ClientTerminal() {
 
   const unread = notis.filter((n: any) => !n.read).length;
   const curAcct = accts.find((a) => a.id === accId);
+  const readOnly = !!account?.locked;
   const catMap: Record<string, string> = Object.fromEntries(symbols.map((s) => [s.symbol, s.category || "forex"]));
   function csz(sym: string) { return contractFor(catMap[sym] || "forex", sym); }
   const floating = positions.reduce((s, p) => s + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
   const balance = account ? account.deposit - account.withdrawal + account.credit + account.bonus + account.pnl : 0;
   const equity = balance + floating;
-  const used = account ? positions.reduce((m, p) => { const cs = csz(p.symbol); const pr = prices[p.symbol] ?? p.openPrice; return m + (p.lots * cs * pr) / account.leverage; }, 0) : 0;
+  const used = account ? positions.reduce((m, p) => { const cs = csz(p.symbol); const pr = prices[p.symbol] ?? p.openPrice; let mg = (p.lots * cs * pr) / account.leverage; if (/JPY$/i.test(p.symbol)) mg = mg / 100; return m + mg; }, 0) : 0;
   const free = equity - used;
   const level = used > 0 ? (equity / used) * 100 : 0;
   const price = prices[selSym];
   const d = dg(selSym);
   const bid = price ?? 0, ask = price != null ? price + Math.pow(10, -d) * 2 : 0;
-  const margin = price != null ? (vol * csz(selSym) * price) / (account?.leverage || 100) : 0;
+  const margin = price != null ? ((vol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0;
   const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const groups: Record<string, any[]> = {};
   symbols.forEach((s) => { const c = s.category || "other"; (groups[c] || (groups[c] = [])).push(s); });
+  const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "agriculture", "other"];
+  const orderedGroups = Object.entries(groups).sort((a, b) => { const ia = CAT_ORDER.indexOf(a[0]); const ib = CAT_ORDER.indexOf(b[0]); return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib); });
   const histShown = history.filter((h: any) => { if (histRange === "all") return true; const t = new Date(h.closedAt).getTime(); const now = Date.now(); const day = 86400000; if (histRange === "today") return t >= now - day; if (histRange === "week") return t >= now - 7 * day; return t >= now - 30 * day; });
   const tab = (active: boolean) => "px-3 py-1.5 text-[11px] " + (active ? "" : "text-[var(--muted)]");
 
-  if (isMobile) return <ClientMobile t={{ theme, account, accts, accId, positions, pending, symbols, prices, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, close, cancelPending, switchAcc, openAccount, topUp, toggleTheme, enablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, pinForm, setPinForm, savePin } }} />;
+  if (isMobile) return <ClientMobile t={{ theme, account, accts, accId, readOnly, positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, logout: async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, pinForm, setPinForm, savePin } }} />;
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm">
-        <div className="flex items-center gap-2"><input type="file" accept="image/*" style={{ display: "none" }} ref={avatarInputRef} onChange={uploadAvatar} /><button onClick={() => avatarInputRef.current && avatarInputRef.current.click()} title="Change photo" className="h-6 w-6 overflow-hidden rounded-full border border-[var(--border)]">{avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <span className="inline-block h-full w-full bg-[#3b82f6]" />}</button><b className="font-medium">Acme Markets</b><select value={accId} onChange={(e) => switchAcc(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-1 text-[11px] text-[var(--text)]">{accts.map((a) => <option key={a.id} value={a.id}>{a.login} - {a.type}</option>)}</select><button onClick={() => openAccount("DEMO")} className="rounded border border-[var(--border)] px-2 py-1 text-[11px]">+ Demo</button><button onClick={() => openAccount("LIVE")} className="rounded border border-[var(--border)] px-2 py-1 text-[11px]">+ Live</button>{accts.length >= 2 && <button onClick={() => { setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); }} className="rounded border border-[var(--border)] px-2 py-1 text-[11px]">Transfer</button>}{curAcct?.type === "DEMO" && <button onClick={topUp} className="rounded px-2 py-1 text-[11px]" style={{ background: GOLD, color: "#1a1300" }}>Top up</button>}</div>
-        <div className="flex items-center gap-2 text-[11px]">
-          
+        <div className="flex items-center gap-2"><input type="file" accept="image/*" style={{ display: "none" }} ref={avatarInputRef} onChange={uploadAvatar} /><button onClick={() => avatarInputRef.current && avatarInputRef.current.click()} title="Change photo" className="h-6 w-6 overflow-hidden rounded-full border border-[var(--border)]">{avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <span className="inline-block h-full w-full bg-[#3b82f6]" />}</button><b className="font-medium">Acme Markets</b>{curAcct && <span className="rounded px-2 py-0.5 text-[11px]" style={{ background: "var(--soft)", color: curAcct.type === "DEMO" ? GOLD : BUY }}>{curAcct.login} · {curAcct.type}</span>}</div>
+        <div className="flex items-center gap-1.5 text-[11px]">
+          {/* Account switcher — icon dropdown */}
           <div className="relative">
-            <button onClick={() => { const w = !notiOpen; setNotiOpen(w); if (w && unread > 0) { fetch("/api/client/notifications", { method: "POST" }).then(() => setNotis((ns) => ns.map((n) => ({ ...n, read: true })))); } }} className="relative rounded border border-[var(--border)] px-2 py-1">Alerts{unread > 0 && <span className="absolute -right-1 -top-1 rounded-full px-1 text-[9px]" style={{ background: SELL, color: "#fff" }}>{unread}</span>}</button>
+            <button onClick={() => setAcctSwitchOpen((o) => !o)} title="Switch account" className="flex items-center gap-1 rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-arrow-right-arrow-left" /><i className="fa-solid fa-chevron-down text-[8px] opacity-60" /></button>
+            {acctSwitchOpen && (<><div className="fixed inset-0 z-[80]" onClick={() => setAcctSwitchOpen(false)} />
+              <div className="absolute right-0 z-[90] mt-1 w-56 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
+                <div className="px-3 pb-1 pt-1.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Switch Account</div>
+                {accts.map((a) => (
+                  <button key={a.id} onClick={() => { switchAcc(a.id); setAcctSwitchOpen(false); }} className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-[var(--soft)]" style={a.id === accId ? { background: "var(--soft)" } : undefined}>
+                    <span><span className="font-medium">{a.login}</span> <span style={{ color: a.type === "DEMO" ? GOLD : BUY }}>{a.type}</span></span>
+                    {a.id === accId && <i className="fa-solid fa-check text-[10px]" style={{ color: BUY }} />}
+                  </button>
+                ))}
+              </div></>)}
+          </div>
+          {/* Consolidated account/funds/security menu */}
+          <div className="relative">
+            <button onClick={() => setAcctMenu((o) => !o)} className="flex items-center gap-1.5 rounded border border-[var(--border)] px-2.5 py-1 hover:bg-[var(--soft)]"><i className="fa-solid fa-bars-staggered" /> Menu <i className="fa-solid fa-chevron-down text-[8px] opacity-60" /></button>
+            {acctMenu && (() => {
+              const close = () => setAcctMenu(false);
+              const mItem = (onClick: () => void, icon: string, label: string, color?: string, disabled?: boolean) => (
+                <button disabled={disabled} onClick={() => { if (disabled) return; onClick(); close(); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[var(--soft)] disabled:opacity-40 disabled:cursor-not-allowed">
+                  <i className={"fa-solid " + icon} style={{ width: 14, textAlign: "center", color: color || "var(--muted)" }} />{label}
+                </button>
+              );
+              const head = (t: string) => <div className="px-3 pt-2 pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{t}</div>;
+              const div = <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />;
+              return (<><div className="fixed inset-0 z-[80]" onClick={close} />
+                <div className="absolute right-0 z-[90] mt-1 w-56 overflow-hidden rounded-lg border py-1 text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
+                  {head("Funds")}
+                  {mItem(() => { window.location.href = "/client/wallet"; }, "fa-arrow-down-to-bracket", "Deposit", BUY, readOnly)}
+                  {mItem(() => { window.location.href = "/client/wallet"; }, "fa-arrow-up-from-bracket", "Withdraw", GOLD, readOnly)}
+                  {accts.length >= 2 && mItem(() => { setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); }, "fa-right-left", "Transfer", undefined, readOnly)}
+                  {curAcct?.type === "DEMO" && mItem(topUp, "fa-coins", "Top up Demo", GOLD, readOnly)}
+                  {div}
+                  {head("Accounts")}
+                  {mItem(() => openAccount("DEMO"), "fa-vial", "Open Demo Account", undefined, readOnly)}
+                  {mItem(() => openAccount("LIVE"), "fa-bolt", "Open Live Account", BUY, readOnly)}
+                  {mItem(() => { window.location.href = "/client/kyc"; }, "fa-id-card", "KYC Verification")}
+                  {div}
+                  {head("Security")}
+                  {mItem(() => { setPinErr(""); setPinForm({}); setPinModal(true); }, "fa-shield-halved", pinHasPin ? "Change PIN" : "Set PIN")}
+                  {mItem(addPasskey, "fa-fingerprint", "Biometrics / Face ID")}
+                  {mItem(enablePush, "fa-bell-concierge", "Push Notifications")}
+                </div></>);
+            })()}
+          </div>
+          <button onClick={toggleTheme} title={theme === "dark" ? "Light mode" : "Dark mode"} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className={"fa-solid " + (theme === "dark" ? "fa-sun" : "fa-moon")} /></button>
+          <div className="relative">
+            <button onClick={() => { const w = !notiOpen; setNotiOpen(w); if (w && unread > 0) { fetch("/api/client/notifications", { method: "POST" }).then(() => setNotis((ns) => ns.map((n) => ({ ...n, read: true })))); } }} title="Notifications" className="relative rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-bell" />{unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 text-[8px] font-bold" style={{ background: SELL, color: "#fff" }}>{unread}</span>}</button>
             {notiOpen && (<><div className="fixed inset-0 z-[80]" onClick={() => setNotiOpen(false)} /><div className="absolute right-0 z-[90] mt-1 max-h-80 w-72 overflow-auto rounded-md border p-1 text-left text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>{notis.length === 0 ? <div className="px-2 py-3 text-center text-[var(--muted)]">No notifications</div> : notis.map((n, i) => (<div key={i} className="border-b px-2 py-2 last:border-0" style={{ borderColor: "var(--border)" }}><div className="font-medium text-[var(--text)]">{n.title}</div>{n.body && <div className="mt-0.5 text-[var(--muted)]">{n.body}</div>}{n.image && <img src={n.image} alt="" className="mt-1 max-h-28 w-full rounded object-cover" />}<div className="mt-1 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div></div>))}</div></>)}
           </div>
-          <button onClick={toggleTheme} className="rounded border border-[var(--border)] px-2 py-1">{theme === "dark" ? "Light" : "Dark"}</button>
-          <a href="/client/wallet" className="rounded border border-[var(--border)] px-2 py-1">Withdraw</a>
-          <a href="/client/wallet" className="rounded px-2 py-1" style={{ background: BUY, color: "#04140e" }}>Deposit</a>
-          <a href="/client/kyc" className="rounded border border-[var(--border)] px-2 py-1">KYC</a>
-          <button onClick={() => { setPinErr(""); setPinForm({}); setPinModal(true); }} className="rounded border border-[var(--border)] px-2 py-1">PIN</button>
-          <button onClick={enablePush} className="rounded border border-[var(--border)] px-2 py-1">Push</button>
-          <button onClick={addPasskey} className="rounded border border-[var(--border)] px-2 py-1">Passkey</button>
-          <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="rounded px-2 py-1" style={{ background: SELL, color: "#1a0606" }}>Logout</button>
+          <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} title="Logout" className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-right-from-bracket" /></button>
         </div>
       </div>
+
+      {readOnly && (
+        <div className="flex items-center justify-center gap-2 py-1.5 text-[11px] font-semibold" style={{ background: "rgba(224,82,96,0.16)", color: SELL, borderBottom: "1px solid rgba(224,82,96,0.35)" }}>
+          <i className="fa-solid fa-lock" /> READ ONLY ACCESS — You can view everything, but all actions are disabled.
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
         {ctx && (<>
@@ -286,7 +374,7 @@ export default function ClientTerminal() {
                   </div>); })}
               </div>
             )}
-            {Object.entries(groups).map(([c, list]) => (
+            {orderedGroups.map(([c, list]) => (
               <div key={c}>
                 <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
                 {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const b = p != null ? p * 0.9999 : null; const a = p != null ? p * 1.0001 : null; const dir = dirs[s.symbol] || 0; const fc = dir > 0 ? BUY : dir < 0 ? SELL : "var(--text)"; const bg = dir > 0 ? "rgba(22,199,132,0.32)" : dir < 0 ? "rgba(224,82,96,0.32)" : "transparent"; return (
@@ -309,15 +397,15 @@ export default function ClientTerminal() {
             <b className="font-medium">{selSym}</b>
             <div className="ml-auto flex gap-1">{TFS.map((t) => <button key={t} onClick={() => setTf(t)} className="rounded px-1.5 py-0.5 text-[10px]" style={tf === t ? { background: BUY, color: "#04140e" } : { color: "var(--muted)" }}>{t}</button>)}</div>
           </div>
-          <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1"><span className="text-[9px] text-[var(--muted)]">Indicators</span>{INDS.map(([label, id]) => <button key={id} onClick={() => toggleInd(id)} className="rounded px-1.5 py-0.5 text-[9px]" style={indicators.includes(id) ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{label}</button>)}</div>
-          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><TVChart symbol={selSym} tf={tf} theme={theme} studies={indicators} /></div>
+          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><LWChart symbol={selSym} tf={tf} theme={theme} digits={d} positions={[
+            ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
+            ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
+          ]} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} /></div>
         </div>
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
         <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: rtW }}>
-          <div className="flex border-b border-[var(--border)] text-[10px]">
-            {["TRADE", "NEWS"].map((t) => <button key={t} onClick={() => setRightTab(t)} className={"flex-1 py-1.5 " + (rightTab === t ? "" : "text-[var(--muted)]")} style={rightTab === t ? { color: BUY } : undefined}>{t}</button>)}
-          </div>
+          <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-semibold" style={{ color: BUY }}>NEW ORDER</div>
           <div className="flex-1 overflow-auto">
           {rightTab === "NEWS" ? (
             <div className="p-2 text-[11px]">
@@ -340,7 +428,9 @@ export default function ClientTerminal() {
                 <div className="rounded py-2 text-center" style={{ background: theme === "dark" ? "#241016" : "#fde8e8" }}><div className="text-[9px] text-[var(--muted)]">BID</div><div className="text-sm" style={{ color: SELL }}>{price?.toFixed(d) ?? "..."}</div></div>
                 <div className="rounded py-2 text-center" style={{ background: theme === "dark" ? "#0f2018" : "#e6f7ef" }}><div className="text-[9px] text-[var(--muted)]">ASK</div><div className="text-sm" style={{ color: BUY }}>{ask?.toFixed(d) ?? "..."}</div></div>
               </div>
-              {orderType === "PENDING" && (<><div className="text-[9px] text-[var(--muted)]">Trigger price</div><input type="number" value={pendingPrice} onChange={(e) => setPendingPrice(e.target.value)} className="mb-2 mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[11px] text-[var(--text)]" placeholder={price ? price.toFixed(d) : "price"} /></>)}
+              {orderType === "PENDING" && (<><div className="text-[9px] text-[var(--muted)]">Trigger price</div><input type="number" value={pendingPrice} onChange={(e) => setPendingPrice(e.target.value)} className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[11px] text-[var(--text)]" placeholder={price ? price.toFixed(d) : "price"} />
+                {(() => { const trig = Number(pendingPrice); const mkt = price ?? 0; if (!trig || !mkt) return <div className="mb-2 mt-1 text-[9px] text-[var(--muted)]">Enter trigger — type auto-detects (Limit/Stop)</div>; const buyKind = trig < mkt ? "Buy Limit" : "Buy Stop"; const sellKind = trig > mkt ? "Sell Limit" : "Sell Stop"; return <div className="mb-2 mt-1 flex justify-between text-[9px]"><span style={{ color: BUY }}>{buyKind}</span><span style={{ color: SELL }}>{sellKind}</span></div>; })()}
+              </>)}
               <div className="text-[9px] text-[var(--muted)]">Volume (lots)</div>
               <div className="mb-1 mt-1 flex items-center gap-1">
                 <button onClick={() => setVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="rounded border border-[var(--border)] px-2">-</button>
@@ -355,10 +445,19 @@ export default function ClientTerminal() {
               <div className="mt-2 text-[9px] text-[var(--muted)]">Trailing stop</div>
               <input value={trail} onChange={(e) => setTrail(e.target.value)} placeholder="-" className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[10px] text-[var(--text)]" />
               <div className="mt-2 flex justify-between border-t border-[var(--border)] pt-2 text-[10px] text-[var(--muted)]">Margin<span className="text-[var(--text)]">{margin ? "$" + fmt(margin) : "$0"}</span></div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="rounded py-2 text-center text-[11px] disabled:opacity-50" style={{ background: SELL, color: "#1a0606" }}>Sell<br />{bid?.toFixed(d) ?? "..."}</button>
-                <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="rounded py-2 text-center text-[11px] disabled:opacity-50" style={{ background: BUY, color: "#04140e" }}>Buy<br />{ask?.toFixed(d) ?? "..."}</button>
-              </div>
+              {orderType === "PENDING" ? (
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  <button onClick={() => placePending(selSym, "BUY", "LIMIT", Number(pendingPrice), Number(vol), Number(sl) || 0, Number(tp) || 0)} disabled={!account || account?.locked} className="rounded py-2 text-center text-[10px] font-semibold disabled:opacity-50" style={{ background: "rgba(47,129,247,0.18)", color: "#6ab0ff", border: "1px solid rgba(47,129,247,0.4)" }}>Buy Limit</button>
+                  <button onClick={() => placePending(selSym, "SELL", "LIMIT", Number(pendingPrice), Number(vol), Number(sl) || 0, Number(tp) || 0)} disabled={!account || account?.locked} className="rounded py-2 text-center text-[10px] font-semibold disabled:opacity-50" style={{ background: "rgba(224,82,96,0.16)", color: SELL, border: "1px solid rgba(224,82,96,0.4)" }}>Sell Limit</button>
+                  <button onClick={() => placePending(selSym, "BUY", "STOP", Number(pendingPrice), Number(vol), Number(sl) || 0, Number(tp) || 0)} disabled={!account || account?.locked} className="rounded py-2 text-center text-[10px] font-semibold disabled:opacity-50" style={{ background: "rgba(47,129,247,0.18)", color: "#6ab0ff", border: "1px solid rgba(47,129,247,0.4)" }}>Buy Stop</button>
+                  <button onClick={() => placePending(selSym, "SELL", "STOP", Number(pendingPrice), Number(vol), Number(sl) || 0, Number(tp) || 0)} disabled={!account || account?.locked} className="rounded py-2 text-center text-[10px] font-semibold disabled:opacity-50" style={{ background: "rgba(224,82,96,0.16)", color: SELL, border: "1px solid rgba(224,82,96,0.4)" }}>Sell Stop</button>
+                </div>
+              ) : (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="rounded py-2 text-center text-[11px] disabled:opacity-50" style={{ background: SELL, color: "#1a0606" }}>Sell<br />{bid?.toFixed(d) ?? "..."}</button>
+                  <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="rounded py-2 text-center text-[11px] disabled:opacity-50" style={{ background: BUY, color: "#04140e" }}>Buy<br />{ask?.toFixed(d) ?? "..."}</button>
+                </div>
+              )}
               {!account && <div className="mt-2 text-center text-[10px]" style={{ color: SELL }}>No account</div>}
               {err && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{err}</div>}
             </div>
@@ -380,8 +479,7 @@ export default function ClientTerminal() {
 
       <div className="flex shrink-0 flex-col" style={{ height: tbH }}>
         <div className="flex gap-1 border-b border-[var(--border)] px-2">
-          <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length}</button>
-          <button onClick={() => setBotTab("pending")} className={tab(botTab === "pending")} style={botTab === "pending" ? { color: BUY } : undefined}>Pending {pending.length}</button>
+          <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length}{pending.length ? " + " + pending.length + " pending" : ""}</button>
           <button onClick={() => setBotTab("history")} className={tab(botTab === "history")} style={botTab === "history" ? { color: BUY } : undefined}>History</button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
@@ -410,7 +508,20 @@ export default function ClientTerminal() {
               </tbody>
             </table>
           )}
-          {botTab === "pending" && (<table className="w-full text-[10px]"><thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Symbol</th><th className="px-2 py-1 font-normal">Side</th><th className="px-2 py-1 font-normal">Kind</th><th className="px-2 py-1 font-normal text-right">Qty</th><th className="px-2 py-1 font-normal text-right">Trigger</th><th className="px-2 py-1 font-normal text-right"></th></tr></thead><tbody>{pending.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={6}>No pending orders.</td></tr> : pending.map((o: any) => (<tr key={o.id} className="border-t border-[var(--border)]"><td className="px-2 py-1">{o.symbol}</td><td className="px-2 py-1" style={{ color: o.side === "BUY" ? BUY : SELL }}>{o.side}</td><td className="px-2 py-1">{o.kind}</td><td className="px-2 py-1 text-right">{o.lots}</td><td className="px-2 py-1 text-right">{Number(o.price).toFixed(dg(o.symbol))}</td><td className="px-2 py-1 text-right"><button style={{ color: SELL }} onClick={() => cancelPending(o.id)}>X</button></td></tr>))}</tbody></table>)}
+          {botTab === "positions" && pending.length > 0 && (
+            <table className="w-full text-[10px]">
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal" colSpan={6}><span style={{ color: "var(--accent, #5aa9ff)" }}>⏳ Pending Orders ({pending.length})</span></th></tr></thead>
+              <tbody>{pending.map((o: any) => (
+                <tr key={o.id} className="border-t border-[var(--border)]" style={{ background: "rgba(90,169,255,0.06)" }}>
+                  <td className="px-2 py-1">{o.symbol} <span style={{ color: o.side === "BUY" ? BUY : SELL }}>{o.side} {o.kind}</span></td>
+                  <td className="px-2 py-1 text-[var(--muted)]">pending</td>
+                  <td className="px-2 py-1 text-right">{o.lots}</td>
+                  <td className="px-2 py-1 text-right" title="Trigger">{Number(o.price).toFixed(dg(o.symbol))}</td>
+                  <td className="px-2 py-1 text-right text-[var(--muted)]">{o.tp ? "TP " + o.tp : ""} {o.sl ? "SL " + o.sl : ""}</td>
+                  <td className="px-2 py-1 text-right"><button style={{ color: SELL }} onClick={() => cancelPending(o.id)}>X</button></td>
+                </tr>))}</tbody>
+            </table>
+          )}
           {botTab === "history" && (
             <div className="flex gap-1 px-2 py-1 text-[9px]">
               {(["all", "today", "week", "month"] as const).map((r) => <button key={r} onClick={() => setHistRange(r)} className="rounded px-2 py-0.5" style={histRange === r ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{r === "all" ? "All" : r === "today" ? "Today" : r === "week" ? "Week" : "Month"}</button>)}

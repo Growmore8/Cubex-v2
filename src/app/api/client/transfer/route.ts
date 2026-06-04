@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
 
 export async function POST(req: Request) {
   const s = await requireClient();
@@ -15,14 +16,16 @@ export async function POST(req: Request) {
     const from = await prisma.account.findFirst({ where: { id: b.fromId, tenantId: s.tenantId ?? undefined, userId: s.sub ?? undefined } });
     const to = await prisma.account.findFirst({ where: { id: b.toId, tenantId: s.tenantId ?? undefined, userId: s.sub ?? undefined } });
     if (!from || !to) throw new Error("Account not found");
-    const bal = Number(from.deposit) - Number(from.withdrawal) + Number(from.credit) + Number(from.bonus) + Number(from.pnl);
-    if (amount > bal) throw new Error("Insufficient balance");
+    const pnlOnly = await getFundsPnlOnly(s.tenantId!);
+    const movable = withdrawableBalance(from, pnlOnly);
+    if (amount > movable) throw new Error(pnlOnly ? "Only your profit (PNL) balance is transferable" : "Insufficient balance");
     const amt = new Prisma.Decimal(amount);
+    const ref = "TRF-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
     await prisma.$transaction(async (tx) => {
       await tx.account.update({ where: { id: from.id }, data: { withdrawal: { increment: amt } } });
       await tx.account.update({ where: { id: to.id }, data: { deposit: { increment: amt } } });
-      await tx.financialHistory.create({ data: { accountId: from.id, type: "TRANSFER_OUT" as any, amount: amt, description: "Transfer to " + to.login, mode: "MANUAL", createdBy: s.email } });
-      await tx.financialHistory.create({ data: { accountId: to.id, type: "TRANSFER_IN" as any, amount: amt, description: "Transfer from " + from.login, mode: "MANUAL", createdBy: s.email } });
+      await tx.financialHistory.create({ data: { accountId: from.id, type: "TRANSFER_OUT" as any, amount: amt, description: "Transfer to " + to.login, reference: ref, mode: "MANUAL", createdBy: s.email } });
+      await tx.financialHistory.create({ data: { accountId: to.id, type: "TRANSFER_IN" as any, amount: amt, description: "Transfer from " + from.login, reference: ref, mode: "MANUAL", createdBy: s.email } });
     });
     return NextResponse.json({ ok: true });
   } catch (e: any) {

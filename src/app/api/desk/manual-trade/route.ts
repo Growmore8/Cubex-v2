@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireStaff } from "@/lib/guard";
+import { requireStaff, assertWritable } from "@/lib/guard";
 import { manualTrade } from "@/services/desk.service";
 
 const schema = z.object({
@@ -12,6 +12,7 @@ export async function POST(req: Request) {
   const s = await requireStaff();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
+    await assertWritable(s);
     const input = schema.parse(await req.json());
     const trade = await manualTrade(s, input);
     return NextResponse.json({ ok: true, trade });

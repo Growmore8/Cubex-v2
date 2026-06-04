@@ -19,6 +19,13 @@ export default function MiniChart({ symbol, tf, theme }: { symbol: string; tf: s
   if (!symbol) return <div style={{ height: "100%", width: "100%" }} />;
   const url = "https://s.tradingview.com/widgetembed/?symbol=" + encodeURIComponent(tvSymbol(symbol)) +
     "&interval=" + tvInterval(tf) + "&theme=" + theme + "&style=1&locale=en&timezone=Etc/UTC" +
-    "&hidetoptoolbar=1&hide_top_toolbar=1&hidesidetoolbar=1&hide_side_toolbar=1&hideideas=1&withdateranges=0&saveimage=0&allow_symbol_change=0";
+    "&hidetoptoolbar=1&hide_top_toolbar=1" +
+    "&hide_drawing_toolbar=1" +
+    "&hidesidetoolbar=1&hide_side_toolbar=1" +
+    "&hideideas=1&withdateranges=0&saveimage=0&allow_symbol_change=0" +
+    "&studies=%5B%5D" +
+    "&no_referral_id=1" +
+    "&hide_volume=1" +
+    "&hide_legend=0";
   return <iframe key={url} src={url} title={symbol} style={{ width: "100%", height: "100%", border: 0, display: "block" }} />;
 }

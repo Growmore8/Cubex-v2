@@ -3,15 +3,18 @@ import { hashPassword } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 import { audit } from "@/lib/audit";
 
-export function listClients(tenantId: string) {
+export function listClients(tenantId: string, managerId?: string | null) {
   return prisma.account.findMany({
-    where: { tenantId },
+    where: managerId ? { tenantId, managerId } : { tenantId },
     orderBy: { createdAt: "desc" },
-    include: { user: { select: { email: true, status: true } }, manager: { select: { id: true, name: true } } },
+    include: {
+      user: { select: { email: true, status: true, lastLoginIp: true, lastLoginAt: true } },
+      manager: { select: { id: true, name: true } },
+    },
   });
 }
 
-async function nextLogin(tx: any, tenantId: string, type: string) {
+export async function nextLogin(tx: any, tenantId: string, type: string) {
   const name = type === "DEMO" ? "demo" : "live";
   const start = type === "DEMO" ? 100100 : 800100;
   let c = await tx.counter.findUnique({ where: { tenantId_name: { tenantId, name } } });

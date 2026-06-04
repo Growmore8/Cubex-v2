@@ -8,14 +8,38 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const reqAccId = url.searchParams.get("accountId");
-  const account = await prisma.account.findFirst({
-    where: reqAccId ? { tenantId: s.tenantId!, userId: s.sub, id: reqAccId } : { tenantId: s.tenantId!, userId: s.sub },
+
+  // Instant-logout on deactivation: if the client has no active (non-deactivated)
+  // account, signal the client to log out.
+  const activeCount = await prisma.account.count({ where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false } });
+  if (activeCount === 0) {
+    const total = await prisma.account.count({ where: { tenantId: s.tenantId!, userId: s.sub } });
+    if (total > 0) return NextResponse.json({ ok: false, code: "DEACTIVATED", error: "Your account has been deactivated. Please contact support." }, { status: 403 });
+  }
+
+  // Resolve the requested account, but never land on a deactivated one if an active exists.
+  let account = await prisma.account.findFirst({
+    where: reqAccId ? { tenantId: s.tenantId!, userId: s.sub, id: reqAccId, deactivated: false } : { tenantId: s.tenantId!, userId: s.sub, deactivated: false },
     orderBy: { createdAt: "asc" },
     include: {
       trades: { orderBy: { openedAt: "desc" } },
       history: { orderBy: { closedAt: "desc" }, take: 50 },
+      financials: { orderBy: { appliedAt: "desc" }, take: 50 },
+      user: { select: { name: true, email: true } },
     },
   });
+  if (!account) {
+    account = await prisma.account.findFirst({
+      where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false },
+      orderBy: { createdAt: "asc" },
+      include: {
+        trades: { orderBy: { openedAt: "desc" } },
+        history: { orderBy: { closedAt: "desc" }, take: 50 },
+        financials: { orderBy: { appliedAt: "desc" }, take: 50 },
+        user: { select: { name: true, email: true } },
+      },
+    });
+  }
 
   let symbols: any[] = [];
   try {
@@ -29,10 +53,15 @@ export async function GET(req: Request) {
   return NextResponse.json({
     ok: true,
     account: account ? {
-      login: account.login, currency: account.currency, leverage: account.leverage, locked: account.locked,
+      login: account.login, type: account.type, currency: account.currency, leverage: account.leverage, locked: account.locked,
+      name: account.name, email: account.email || account.user?.email || null, phone: account.phone || null, country: account.country || null,
+      ownerName: account.user?.name || account.name,
       deposit: Number(account.deposit), withdrawal: Number(account.withdrawal),
       credit: Number(account.credit), bonus: Number(account.bonus), pnl: Number(account.pnl),
     } : null,
+    financials: account ? account.financials.map((f) => ({
+      id: f.id.toString(), type: f.type, amount: Number(f.amount), description: f.description, appliedAt: f.appliedAt,
+    })) : [],
     positions: account ? account.trades.map((t) => ({
       id: t.id.toString(), ticket: t.ticket.toString(), symbol: t.symbol, type: t.type,
       lots: Number(t.lots), openPrice: Number(t.openPrice), sl: Number(t.sl), tp: Number(t.tp), openedAt: t.openedAt,
