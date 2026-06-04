@@ -7,6 +7,7 @@ import { assertCan } from "@/lib/perms";
 const schema = z.object({
   type: z.enum(["DEPOSIT", "WITHDRAWAL", "CREDIT_IN", "CREDIT_OUT", "BONUS", "INSURANCE"]),
   amount: z.number().positive(), description: z.string().optional(),
+  appliedAt: z.string().optional(), // ISO string for a back-dated (Manual Date & Time) entry
 });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -15,10 +16,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     await assertWritable(s);
-    const { type, amount, description } = schema.parse(await req.json());
+    const { type, amount, description, appliedAt } = schema.parse(await req.json());
     const balMap: Record<string, string> = { DEPOSIT: "processDeposits", WITHDRAWAL: "processWithdrawals", CREDIT_IN: "creditBonus", CREDIT_OUT: "creditBonus", BONUS: "creditBonus", INSURANCE: "creditBonus" };
     await assertCan(s, balMap[type] || "adjustBalance");
-    const account = await adjustBalance(s.tenantId!, id, type, amount, description || "", s.email);
+    const when = appliedAt ? new Date(appliedAt) : null;
+    const account = await adjustBalance(s.tenantId!, id, type, amount, description || "", s.email, when);
     return NextResponse.json({ ok: true, account });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

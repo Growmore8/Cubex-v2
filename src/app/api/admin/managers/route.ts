@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/guard";
+import { assertCan } from "@/lib/perms";
 import { listManagers, createManager } from "@/services/manager.service";
 
 export async function GET() {
@@ -21,6 +22,7 @@ export async function POST(req: Request) {
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
+    await assertCan(s, "manageManagers");
     const input = schema.parse(await req.json());
     const manager = await createManager(s.tenantId!, input);
     return NextResponse.json({ ok: true, manager });

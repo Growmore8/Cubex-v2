@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { readUpload, contentType } from "@/lib/upload";
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const s = await getSession();
   if (!s) return NextResponse.json({ ok: false }, { status: 401 });
@@ -15,6 +15,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ((s.role === "ADMIN" || s.role === "MANAGER") && acc.tenantId === s.tenantId) ||
     (s.role === "CLIENT" && acc.userId === s.sub);
   if (!allowed) return NextResponse.json({ ok: false }, { status: 403 });
-  const buf = await readUpload(doc.fileUrl);
-  return new Response(new Uint8Array(buf), { headers: { "Content-Type": contentType(doc.fileUrl) } });
+  const side = new URL(req.url).searchParams.get("side");
+  const key = side === "back" ? (doc.backUrl || doc.fileUrl) : doc.fileUrl;
+  const buf = await readUpload(key);
+  return new Response(new Uint8Array(buf), { headers: { "Content-Type": contentType(key) } });
 }

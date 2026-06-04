@@ -36,6 +36,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mInd, setMInd] = useState<string[]>([]);
   const [histTab, setHistTab] = useState<"trades" | "financial">("trades");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [trTab, setTrTab] = useState<"open" | "pending">("open");
   const [search, setSearch] = useState("");
   const [qcat, setQcat] = useState<string>("favs");
   const [modifyId, setModifyId] = useState<string | null>(null);
@@ -196,8 +197,8 @@ export default function ClientMobile({ t }: { t: any }) {
 
             {/* action buttons */}
             <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => alert("Deposit coming soon")} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-down" /><span className="text-[11px] font-semibold">Deposit</span></button>
-              <button onClick={() => alert("Withdraw coming soon")} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-up" /><span className="text-[11px] font-semibold">Withdraw</span></button>
+              <button onClick={() => { window.location.href = "/client/wallet?action=deposit"; }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-down" /><span className="text-[11px] font-semibold">Deposit</span></button>
+              <button onClick={() => { window.location.href = "/client/wallet?action=withdraw"; }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-up" /><span className="text-[11px] font-semibold">Withdraw</span></button>
               <button onClick={() => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BLUE }}><i className="fa-solid fa-right-left" /><span className="text-[11px] font-semibold">Transfer</span></button>
             </div>
 
@@ -259,12 +260,14 @@ export default function ClientMobile({ t }: { t: any }) {
                 const dd = dg(s.symbol); const p = prices[s.symbol]; const isFav = (favs || []).includes(s.symbol);
                 const sBid = p != null ? p * 0.9999 : null; const sAsk = p;
                 const spread = p != null ? Math.max(1, Math.round((p - sBid!) / Math.pow(10, -dd))) : 0;
+                const dr = dirs?.[s.symbol] || 0;
                 return (
-                  <div key={s.symbol} className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+                  <div key={s.symbol} className="rounded-xl border bg-[var(--card)] p-3" style={{ borderColor: dr > 0 ? BUY : dr < 0 ? SELL : "var(--border)", transition: "border-color 0.4s ease" }}>
                     <div className="mb-2 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <button onClick={() => toggleFav(s.symbol)} style={{ color: isFav ? GOLD : "var(--muted)" }}>★</button>
                         <button onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="text-sm font-bold underline-offset-2 active:underline">{s.display || s.symbol}</button>
+                        {dr !== 0 && <i className={"fa-solid " + (dr > 0 ? "fa-caret-up" : "fa-caret-down")} style={{ fontSize: 11, color: dr > 0 ? BUY : SELL }} />}
                       </div>
                       <span className="text-[10px] text-[var(--muted)]">Sprd: {spread} · <span style={{ color: "var(--accent,#5aa9ff)" }} onClick={() => { setSelSym(s.symbol); setTab("chart"); }}>chart</span></span>
                     </div>
@@ -328,7 +331,12 @@ export default function ClientMobile({ t }: { t: any }) {
           <div className="space-y-3 p-3">
             <button onClick={() => { setNoForm({ idx: 0, lots: vol || 0.01, trigger: "", sl: "", tp: "" }); setNoOpen(true); }} className="w-full rounded-xl py-3 text-sm font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus mr-1.5" /> New Order / Pending</button>
 
-            {(positions || []).length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No open positions.</div> : (positions || []).map((p: any) => {
+            <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1">
+              <button onClick={() => setTrTab("open")} className="flex-1 rounded-lg py-1.5 text-[12px] font-semibold" style={trTab === "open" ? { background: BLUE, color: "#fff" } : { color: "var(--muted)" }}>Open Positions {(positions || []).length ? "(" + positions.length + ")" : ""}</button>
+              <button onClick={() => setTrTab("pending")} className="flex-1 rounded-lg py-1.5 text-[12px] font-semibold" style={trTab === "pending" ? { background: BLUE, color: "#fff" } : { color: "var(--muted)" }}>Pending {(pending || []).length ? "(" + pending.length + ")" : ""}</button>
+            </div>
+
+            {trTab === "open" && ((positions || []).length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No open positions.</div> : (positions || []).map((p: any) => {
               const cur = prices[p.symbol] ?? p.openPrice; const plv = pnlOf(p, cur, csz(p.symbol)); const dd = dg(p.symbol);
               const open = expanded === p.id;
               return (
@@ -376,19 +384,33 @@ export default function ClientMobile({ t }: { t: any }) {
                   )}
                 </div>
               );
-            })}
+            }))}
 
-            {(pending || []).length > 0 && (
-              <div className="space-y-2 pt-2">
-                <div className="text-[10px] font-semibold text-[var(--muted)]">PENDING ORDERS</div>
-                {(pending || []).map((o: any) => (
-                  <div key={o.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
-                    <div className="text-[12px]">{o.symbol} <span style={{ color: o.side === "BUY" ? BLUE : SELL }}>{o.side}</span> {o.lots} @ {Number(o.price).toFixed(dg(o.symbol))}</div>
+            {trTab === "pending" && ((pending || []).length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No pending orders.</div> : (pending || []).map((o: any) => {
+              const dd = dg(o.symbol); const trig = Number(o.price); const cur = prices[o.symbol]; const dist = cur != null ? Math.abs(trig - cur) : null;
+              const c = o.side === "BUY" ? BLUE : SELL; const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : "Stop");
+              return (
+                <div key={o.id} className="rounded-xl border bg-[var(--card)] p-3" style={{ borderStyle: "dashed", borderColor: c, borderLeftWidth: 4, borderLeftStyle: "solid" }}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <i className="fa-regular fa-clock text-[var(--muted)]" />
+                      <div>
+                        <div className="text-sm font-bold">{o.symbol} <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: c + "22", color: c }}>{label}</span></div>
+                        <div className="text-[10px] text-[var(--muted)]">Waiting · {o.lots} lots</div>
+                      </div>
+                    </div>
                     <button onClick={() => cancelPending(o.id)} className="flex h-7 w-7 items-center justify-center rounded-full border" style={{ borderColor: SELL, color: SELL }}><i className="fa-solid fa-xmark" /></button>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                    <div><div className="text-[var(--muted)]">TRIGGER</div><div className="font-semibold">{trig.toFixed(dd)}</div></div>
+                    <div><div className="text-[var(--muted)]">CURRENT</div><div className="font-semibold">{cur != null ? cur.toFixed(dd) : "…"}</div></div>
+                    <div><div className="text-[var(--muted)]">DISTANCE</div><div className="font-semibold">{dist != null ? dist.toFixed(dd) : "—"}</div></div>
+                    <div><div className="text-[var(--muted)]">S/L</div><div className="font-semibold">{o.sl ? Number(o.sl).toFixed(dd) : "—"}</div></div>
+                    <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{o.tp ? Number(o.tp).toFixed(dd) : "—"}</div></div>
+                  </div>
+                </div>
+              );
+            }))}
           </div>
         )}
 

@@ -16,8 +16,18 @@ export function listTenantKyc(tenantId: string) {
   });
 }
 
-export function createKyc(accountId: string, docType: string, fileUrl: string) {
-  return prisma.kycDocument.create({ data: { accountId, docType, fileUrl } });
+export async function createKyc(accountId: string, docType: string, fileUrl: string, backUrl?: string, status?: any) {
+  const doc = await prisma.kycDocument.create({ data: { accountId, docType, fileUrl, backUrl: backUrl || null, status: (status as any) || "PENDING" } });
+  // staff uploads auto-approve -> reflect on the account immediately
+  if (status) await prisma.account.update({ where: { id: accountId }, data: { kycStatus: status as any } }).catch(() => {});
+  return doc;
+}
+
+// Keep account.kycStatus in sync with the client's most recent document so the
+// terminal/banner gating reflects the latest decision.
+export async function syncAccountKyc(accountId: string) {
+  const latest = await prisma.kycDocument.findFirst({ where: { accountId }, orderBy: { createdAt: "desc" } });
+  await prisma.account.update({ where: { id: accountId }, data: { kycStatus: (latest?.status as any) || null } }).catch(() => {});
 }
 
 export async function reviewKyc(tenantId: string, id: string, status: any, note?: string) {

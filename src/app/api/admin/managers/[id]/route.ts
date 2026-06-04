@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/guard";
+import { assertCan } from "@/lib/perms";
 import { updateManager, deleteManager } from "@/services/manager.service";
 
 const schema = z.object({
@@ -14,6 +15,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
+    await assertCan(s, "manageManagers");
     const data = schema.parse(await req.json());
     const manager = await updateManager(s.tenantId!, id, data);
     return NextResponse.json({ ok: true, manager });
@@ -27,6 +29,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
+    await assertCan(s, "manageManagers");
     await deleteManager(s.tenantId!, id);
     return NextResponse.json({ ok: true });
   } catch (e: any) {

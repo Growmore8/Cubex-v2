@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useDialog } from "@/components/ui/ConfirmDialog";
 
 export default function AdminSymbolsPage() {
+  const { confirm, node } = useDialog();
   const [symbols, setSymbols] = useState<any[]>([]);
   const [cat, setCat] = useState("forex");
   const [q, setQ] = useState("");
@@ -28,12 +30,13 @@ export default function AdminSymbolsPage() {
     else setMsg(d.error || "Add failed");
   }
   async function toggle(s: any) { await fetch("/api/admin/symbols/" + s.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: !s.enabled }) }); loadMine(); }
-  async function remove(id: string) { if (!confirm("Delete symbol?")) return; await fetch("/api/admin/symbols/" + id, { method: "DELETE" }); loadMine(); }
+  async function remove(id: string) { if (!(await confirm({ title: "Delete symbol", message: "Remove this symbol from your list?", danger: true }))) return; await fetch("/api/admin/symbols/" + id, { method: "DELETE" }); loadMine(); }
 
   const input = "rounded-md border px-3 py-2 text-sm";
 
   return (
     <div className="space-y-5">
+      {node}
       <h1 className="text-2xl font-bold">Symbols</h1>
 
       <div className="rounded-lg border bg-white p-4">

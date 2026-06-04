@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { BUY, SELL, GOLD } from "@/config/theme";
+import { useDialog } from "@/components/ui/ConfirmDialog";
 
 export default function PaymentsPanel() {
+  const { confirm, node } = useDialog();
   const [list, setList] = useState<any[]>([]);
   const [status, setStatus] = useState("ALL");
   const [kindF, setKindF] = useState("ALL");
@@ -44,10 +46,10 @@ export default function PaymentsPanel() {
     if (!r.ok) { setErr(r.error || "Delete failed (the payments route may need a delete action)"); return false; }
     return true;
   }
-  async function delOne(id: string) { if (!confirm("Delete this request?")) return; if (await del(id)) load(); }
+  async function delOne(id: string) { if (!(await confirm({ title: "Delete request", message: "Delete this payment request?", danger: true }))) return; if (await del(id)) load(); }
   async function bulkDelete() {
     const ids = Object.keys(sel).filter((k) => sel[k]);
-    if (!ids.length || !confirm("Delete " + ids.length + " request(s)?")) return;
+    if (!ids.length || !(await confirm({ title: "Delete requests", message: "Delete " + ids.length + " request(s)?", danger: true }))) return;
     for (const id of ids) { await del(id); }
     setSel({}); load();
   }
@@ -67,6 +69,7 @@ export default function PaymentsPanel() {
 
   return (
     <div className="flex h-full flex-col text-[10px]">
+      {node}
       <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-1 py-1">
         {tabs.map((t) => <button key={t} onClick={() => setStatus(t)} className={chip(status === t)} style={status === t ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)" }}>{t[0] + t.slice(1).toLowerCase()}</button>)}
         <select value={kindF} onChange={(e) => setKindF(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All Kinds</option><option value="IN">In</option><option value="OUT">Out</option></select>

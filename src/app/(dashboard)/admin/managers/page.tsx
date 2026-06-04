@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useDialog } from "@/components/ui/ConfirmDialog";
 
 interface Manager {
   id: string; name: string; email: string; status: string;
@@ -15,6 +16,7 @@ export default function AdminManagersPage() {
   const [err, setErr] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<any>({ ...empty });
+  const { confirm, node } = useDialog();
 
   async function load() {
     setLoading(true);
@@ -51,7 +53,7 @@ export default function AdminManagersPage() {
   }
 
   async function remove(m: Manager) {
-    if (!confirm("Delete manager " + m.email + "?")) return;
+    if (!(await confirm({ title: "Delete manager", message: m.email + " will be removed.", danger: true }))) return;
     await fetch("/api/admin/managers/" + m.id, { method: "DELETE" });
     load();
   }
@@ -60,6 +62,7 @@ export default function AdminManagersPage() {
 
   return (
     <div className="space-y-6">
+      {node}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Managers</h1>

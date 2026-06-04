@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import LWChart from "@/components/LWChart";
 import PriceCell from "@/components/PriceCell";
+import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds";
 import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
 import instruments from "@/config/instruments";
@@ -61,6 +62,8 @@ export default function AdminDeskPage() {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [toasts, setToasts] = useState<any[]>([]);
+  const [confirmBox, setConfirmBox] = useState<{ msg: string; danger?: boolean; onYes: () => void } | null>(null);
+  function askConfirm(msg: string, onYes: () => void, danger = true) { setConfirmBox({ msg, danger, onYes }); }
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [navW, setNavW] = useState(248);
   const [mwW, setMwW] = useState(278);
@@ -86,7 +89,15 @@ export default function AdminDeskPage() {
   const [cliStatus, setCliStatus] = useState("ALL");
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
   const [navSearch, setNavSearch] = useState("");
+  const [mwSearch, setMwSearch] = useState("");
   const [showOC, setShowOC] = useState(true); // chart buy/sell strip visibility
+  const [soundMuted, setSoundMuted] = useState(false);
+  useEffect(() => { setSoundMuted(isMuted()); }, []);
+  const [role, setRole] = useState("");
+  const roleRef = useRef("");
+  const isManager = role === "MANAGER";
+  const [perms, setPerms] = useState<Record<string, boolean>>({});
+  const can = (k: string) => perms[k] !== false; // default allow until /me resolves
   const [fundPnlOnly, setFundPnlOnly] = useState(false);
   useEffect(() => { fetch("/api/admin/fund-settings").then((r) => r.json()).then((d) => { if (d.ok) setFundPnlOnly(!!d.pnlOnly); }).catch(() => {}); }, []);
   async function toggleFundPnlOnly() {
@@ -119,6 +130,7 @@ export default function AdminDeskPage() {
   const [kycUploadFor, setKycUploadFor] = useState<any>(null);
   const [kycUploadType, setKycUploadType] = useState("PASSPORT");
   const [kycUploadFile, setKycUploadFile] = useState<File | null>(null);
+  const [kycBackFile, setKycBackFile] = useState<File | null>(null);
   const [kycUpMsg, setKycUpMsg] = useState("");
   const [hfPreset, setHfPreset] = useState("ALL");
   const [hfFrom, setHfFrom] = useState("");
@@ -149,12 +161,13 @@ export default function AdminDeskPage() {
   function csz(sym: string) { return contractFor(catMap[sym] || "forex", sym); }
 
   async function loadAll() {
+    const isMgr = roleRef.current === "MANAGER";
     const [c, sy, o, h, a, mg, gr] = await Promise.all([
       fetch("/api/admin/clients").then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/symbols").then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/desk/trades").then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/desk/history").then((r) => r.json()).catch(() => ({ ok: false })),
-      fetch("/api/admin/audit").then((r) => r.json()).catch(() => ({ ok: false })),
+      fetch(isMgr ? "/api/manager/audit" : "/api/admin/audit").then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/admin/managers").then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/admin/groups").then((r) => r.json()).catch(() => ({ ok: false })),
     ]);
@@ -166,11 +179,35 @@ export default function AdminDeskPage() {
     if (mg.ok) setManagers(mg.managers || []);
     if (gr.ok) setTradeGroups(gr.groups || []);
   }
-  useEffect(() => { loadAll(); }, []);
-  async function loadNotifs() { try { const d = await fetch("/api/notifications").then((r) => r.json()); if (d.ok) { setNotifs(d.items || []); setNotifUnread(d.unread || 0); } } catch {} }
+  useEffect(() => {
+    fetch("/api/auth/me").then((r) => r.json()).then((d) => {
+      if (d.ok && d.user) { roleRef.current = d.user.role; setRole(d.user.role); setPerms(d.perms || {}); }
+    }).catch(() => {}).finally(() => loadAll());
+  }, []);
+  const notifSeen = useRef<Set<string>>(new Set());
+  const notifPrimed = useRef(false);
+  async function loadNotifs() {
+    try {
+      const d = await fetch("/api/notifications").then((r) => r.json());
+      if (!d.ok) return;
+      const items = d.items || [];
+      if (notifPrimed.current) {
+        for (const n of items) { const id = String(n.id); if (!notifSeen.current.has(id)) { playSound(soundForNotification(n)); pushNotifToast(n); } }
+      }
+      items.forEach((n: any) => notifSeen.current.add(String(n.id)));
+      notifPrimed.current = true;
+      setNotifs(items); setNotifUnread(d.unread || 0);
+    } catch {}
+  }
   useEffect(() => { loadNotifs(); const t = setInterval(loadNotifs, 20000); return () => clearInterval(t); }, []);
   async function openNotifs() { setNotifOpen((v) => !v); if (!notifOpen && notifUnread > 0) { try { await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch {} setNotifUnread(0); } }
   function toast(msg: string, kind: string) { const id = Date.now() + Math.random(); setToasts((t) => [...t, { id, msg, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500); }
+  function pushNotifToast(n: any) {
+    const st = soundForNotification(n);
+    const id = Date.now() + Math.random();
+    setToasts((t) => [...t.slice(-4), { id, notif: true, st, title: n.title, body: n.body }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
+  }
   useEffect(() => { if (ok) toast(ok, "ok"); }, [ok]);
   useEffect(() => { if (symbols.length && openCharts.length === 0) { const init = symbols.slice(0, 4).map((s) => s.symbol); setOpenCharts(init); setSelSym(init[0]); } }, [symbols]);
 
@@ -225,26 +262,58 @@ export default function AdminDeskPage() {
     setTicket(null); loadAll();
   }
   async function close(id: string) { const r = await fetch("/api/desk/trades/" + id + "/close", { method: "POST" }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Close failed"); return; } loadAll(); }
-  async function delClient(acc: any) { setMenu(null); if (!confirm("Delete " + acc.login + " - " + acc.name + "?")) return; const r = await fetch("/api/admin/clients/" + acc.id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
+  async function delTrade(id: string) { const r = await fetch("/api/desk/trades/" + id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Delete failed"); return; } loadAll(); }
+  async function delTradesBulk(ids: string[]) { for (const id of ids) { await fetch("/api/desk/trades/" + id, { method: "DELETE" }); } setTradeSel({}); loadAll(); }
+  function delClient(acc: any) { setMenu(null); askConfirm(`Delete ${acc.login} - ${acc.name}? This cannot be undone.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }); }
 
   function openAct(kind: string, acc: any, finType?: string, label?: string) { setMenu(null); setMenuSub(""); setErr(""); setAform({}); setAct({ kind, acc, finType, label }); }
-  function actTitle() { if (!act) return ""; const m: any = { money: act.label, manualpnl: "Manual P/L", transfer: "Transfer Between Accounts", rename: "Edit Details", accountid: "Change Account ID", password: "Change Password", assignmgr: "Assign Manager", settings: "Account Settings", subaccount: "Create Sub-Account", assigngroup: "Assign Group", leverage: "Change Leverage", mclevel: "Set Margin Call Level" }; return m[act.kind] || "Action"; }
+  function actTitle() { if (!act) return ""; const m: any = { money: act.label, manualpnl: "Manual P/L", transfer: "Transfer Between Accounts", rename: "Client Details", accountid: "Change Account ID", password: "Change Password", assignmgr: "Assign Manager", assign: "Assign Manager & Group", settings: "Account Settings", subaccount: "Create Sub-Account", assigngroup: "Assign Group", leverage: "Change Leverage", mclevel: "Margin Call Level" }; return m[act.kind] || "Action"; }
+  function actIcon() { if (!act) return "fa-circle"; const m: any = { money: "fa-dollar-sign", manualpnl: "fa-chart-line", transfer: "fa-right-left", rename: "fa-user-pen", accountid: "fa-id-card", password: "fa-key", assignmgr: "fa-user-tie", assign: "fa-user-tie", settings: "fa-sliders", subaccount: "fa-sitemap", assigngroup: "fa-layer-group", leverage: "fa-gauge-high", mclevel: "fa-triangle-exclamation" }; return m[act.kind] || "fa-circle"; }
+  function actPrimary() {
+    if (!act) return { label: "Confirm", color: BUY, fg: "#04140e" };
+    const m: any = {
+      money: { label: "Apply", color: "#2563eb", fg: "#fff" }, transfer: { label: "Confirm Transfer", color: "#2563eb", fg: "#fff" },
+      rename: { label: "Save Changes", color: "#2563eb", fg: "#fff" }, accountid: { label: "Change", color: "#2563eb", fg: "#fff" },
+      subaccount: { label: "Create", color: "#2563eb", fg: "#fff" }, mclevel: { label: "Save", color: SELL, fg: "#fff" },
+    };
+    return m[act.kind] || { label: "Confirm", color: BUY, fg: "#04140e" };
+  }
+  const acctBal = (c: any) => c ? (Number(c.deposit || 0) - Number(c.withdrawal || 0) + Number(c.credit || 0) + Number(c.bonus || 0) + Number(c.pnl || 0)) : 0;
   const af = (k: string, v: any) => setAform((o: any) => ({ ...o, [k]: v }));
   async function submitAct() {
     if (!act) return; setErr("");
     const id = act.acc.id; let url = ""; let body: any = {};
-    if (act.kind === "money") { const amt = Number(aform.amount); if (!amt || amt <= 0) { setErr("Enter an amount"); return; } url = "/api/admin/clients/" + id + "/balance"; body = { type: act.finType, amount: amt, description: aform.note || ("Desk " + (act.label || act.finType)) }; }
+    if (act.kind === "money") {
+      const amt = Number(aform.amount); if (!amt || amt <= 0) { setErr("Enter an amount"); return; }
+      let ref = (aform.ref || "").trim();
+      let desc = (aform.desc ?? act.label ?? act.finType) as string; if (ref) desc = desc + " (ref: " + ref + ")";
+      let appliedAt: string | undefined;
+      if (aform.dateMode === "manual") { if (!aform.appliedAt) { setErr("Pick a date & time"); return; } appliedAt = new Date(aform.appliedAt).toISOString(); }
+      url = "/api/admin/clients/" + id + "/balance"; body = { type: act.finType, amount: amt, description: desc, appliedAt };
+    }
     else if (act.kind === "manualpnl") { const amt = Number(aform.amount); if (!amt) { setErr("Enter an amount (use - for a loss)"); return; } url = "/api/admin/clients/" + id + "/manage"; body = { action: "manualPnl", amount: amt, description: aform.note || "Manual P/L" }; }
-    else if (act.kind === "transfer") { const amt = Number(aform.amount); if (!amt || amt <= 0) { setErr("Enter an amount"); return; } if (!aform.toLogin) { setErr("Enter the destination account ID"); return; } url = "/api/admin/clients/" + id + "/manage"; body = { action: "transfer", amount: amt, toLogin: aform.toLogin }; }
-    else if (act.kind === "rename") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "rename", name: aform.name ?? act.acc.name, email: aform.email ?? act.acc.email, phone: aform.phone ?? act.acc.phone, country: aform.country ?? act.acc.country }; }
+    else if (act.kind === "transfer") {
+      const amt = Number(aform.amount); if (!amt || amt <= 0) { setErr("Enter an amount"); return; }
+      const fromId = aform.fromId || act.acc.id;
+      const toAcc = clients.find((c: any) => c.id === aform.toId);
+      if (!toAcc) { setErr("Choose a destination account"); return; }
+      if (toAcc.id === fromId) { setErr("Source and destination must differ"); return; }
+      url = "/api/admin/clients/" + fromId + "/manage"; body = { action: "transfer", amount: amt, toLogin: toAcc.login, note: aform.note };
+    }
+    else if (act.kind === "rename") {
+      // optional inline password change
+      if (aform.password) { if (String(aform.password).length < 6) { setErr("Password must be at least 6 characters"); return; } const pr = await fetch("/api/admin/clients/" + id + "/password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: aform.password }) }); const pd = await pr.json(); if (!pd.ok) { setErr(pd.error || "Password change failed"); return; } }
+      url = "/api/admin/clients/" + id + "/manage"; body = { action: "rename", name: aform.name ?? act.acc.name, email: aform.email ?? act.acc.email, phone: aform.phone ?? act.acc.phone, country: aform.country ?? act.acc.country };
+    }
     else if (act.kind === "accountid") { const login = String(aform.login ?? act.acc.login).trim(); if (!login) { setErr("Enter an account ID"); return; } url = "/api/admin/clients/" + id + "/manage"; body = { action: "accountId", login }; }
     else if (act.kind === "password") { const pw = aform.password || ""; if (pw.length < 6) { setErr("Min 6 characters"); return; } url = "/api/admin/clients/" + id + "/password"; body = { password: pw }; }
     else if (act.kind === "assignmgr") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assignManager", managerId: aform.managerId || null }; }
     else if (act.kind === "settings") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", leverage: Number(aform.leverage ?? act.acc.leverage), mcLevel: Number(aform.mcLevel ?? act.acc.mcLevel), doNotLiquidate: aform.doNotLiquidate ?? act.acc.doNotLiquidate, currency: aform.currency ?? act.acc.currency }; }
-    else if (act.kind === "subaccount") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "subAccount", name: aform.name || "" }; }
+    else if (act.kind === "subaccount") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "subAccount", name: aform.name || "", type: aform.subType || "LIVE", leverage: Number(aform.subLev) || act.acc.leverage, currency: aform.subCcy || act.acc.currency, deposit: Number(aform.subDep) || 0 }; }
     else if (act.kind === "assigngroup") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assignGroup", groupId: aform.groupId || null }; }
+    else if (act.kind === "assign") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assign", managerId: (aform.managerId ?? act.acc.managerId) || null, groupId: (aform.groupId ?? act.acc.groupId) || null }; }
     else if (act.kind === "leverage") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", leverage: Number(aform.leverage ?? act.acc.leverage) }; }
-    else if (act.kind === "mclevel") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", mcLevel: Number(aform.mcLevel ?? act.acc.mcLevel) }; }
+    else if (act.kind === "mclevel") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", mcLevel: Number(aform.mcLevel ?? act.acc.mcLevel), doNotLiquidate: aform.doNotLiquidate ?? act.acc.doNotLiquidate }; }
     else return;
     const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
@@ -253,11 +322,11 @@ export default function AdminDeskPage() {
   async function doStatus(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "status", locked: !acc.locked }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   async function doDeactivate(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deactivated: !acc.deactivated }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   async function doDNL(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "settings", doNotLiquidate: !acc.doNotLiquidate }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
-  async function doClearPin(acc: any) { setMenu(null); if (!confirm("Reset (clear) the PIN for " + acc.login + "? They can set a new one next login.")) return; const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "clearPin" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else setOk("PIN reset"); }
+  function doClearPin(acc: any) { setMenu(null); askConfirm(`Reset (clear) the PIN for ${acc.login}? They can set a new one next login.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "clearPin" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else setOk("PIN reset"); }, false); }
   async function doPool(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "pool", promote: !acc.isPool }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   async function doDeactivateManage(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deactivate", deactivated: !acc.deactivated }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   async function modifyTrade(id: string, fields: any) { const r = await fetch("/api/desk/trades/" + id + "/modify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Modify failed"); return; } setInlineEdit((e) => { const n = { ...e }; delete n[id]; return n; }); loadAll(); }
-  async function uploadKyc() { setErr(""); setKycUpMsg(""); if (!kycUploadFor || !kycUploadFile) { setErr("No file selected"); return; } const fd = new FormData(); fd.append("login", kycUploadFor.login); fd.append("docType", kycUploadType); fd.append("file", kycUploadFile); const r = await fetch("/api/admin/kyc/upload", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); if (!r.ok) { setErr(r.error || "Upload failed"); return; } setKycUpMsg("Uploaded successfully"); setKycUploadFile(null); setTimeout(() => { setKycUploadFor(null); setKycUpMsg(""); }, 1500); loadAll(); }
+  async function uploadKyc() { setErr(""); setKycUpMsg(""); if (!kycUploadFor || !kycUploadFile) { setErr("Select the front side"); return; } if (!kycBackFile) { setErr("Select the back side — both front and back are required"); return; } const fd = new FormData(); fd.append("login", kycUploadFor.login); fd.append("docType", kycUploadType); fd.append("file", kycUploadFile); fd.append("back", kycBackFile); const r = await fetch("/api/admin/kyc/upload", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); if (!r.ok) { setErr(r.error || "Upload failed"); return; } setKycUpMsg("Uploaded successfully"); setKycUploadFile(null); setKycBackFile(null); setTimeout(() => { setKycUploadFor(null); setKycUpMsg(""); }, 1500); loadAll(); }
 
   function openPos(kind: string, t: any) { setPosMenu(null); setErr(""); setPform(kind === "modify" ? { sl: t.sl || 0, tp: t.tp || 0 } : { lots: Number((Number(t.lots) / 2).toFixed(2)) || 0.01 }); setPos({ kind, t }); }
   async function submitPos() {
@@ -272,18 +341,39 @@ export default function AdminDeskPage() {
   function openModal(kind: any) { setTopMenu(""); setErr(""); setOk(""); setForm({ type: "LIVE", leverage: 100, currency: "USD" }); setModal(kind); }
   async function submit(url: string, body: any, label: string) { setErr(""); setOk(""); const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; } setOk(label + " created"); setModal(""); loadAll(); }
   const f = (k: string, v: any) => setForm((o: any) => ({ ...o, [k]: v }));
-  async function delHist(h: any) {
-    if (!confirm("Delete this history row? Balance will be reversed.")) return;
-    const r = await fetch("/api/desk/history/" + h.id, { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false }));
-    if (!r.ok) { setErr(r.error || "Delete failed"); return; }
+  async function saveGroup() {
+    setErr(""); setOk("");
+    if (!form.name) { setErr("Group name required"); return; }
+    const body = { name: form.name, spread: Number(form.spread) || 0, managerId: form.managerId || null };
+    const url = form.editId ? "/api/admin/groups/" + form.editId : "/api/admin/groups";
+    const r = await fetch(url, { method: form.editId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
+    setOk(form.editId ? "Group updated" : "Group created");
+    setForm({ type: "LIVE", leverage: 100, currency: "USD" }); // reset form, keep modal open to manage more
     loadAll();
   }
-  async function delHistBulk() {
+  function editGroup(g: any) { setForm((o: any) => ({ ...o, editId: g.id, name: g.name, spread: g.spread, managerId: g.managerId || "" })); }
+  function delGroup(g: any) {
+    askConfirm(`Delete group "${g.name}"? Clients in it will be ungrouped.`, async () => {
+      const r = await fetch("/api/admin/groups/" + g.id, { method: "DELETE" }); const d = await r.json();
+      if (!d.ok) setErr(d.error || "Failed"); else { setOk("Group deleted"); setForm((o: any) => (o.editId === g.id ? { type: "LIVE", leverage: 100, currency: "USD" } : o)); loadAll(); }
+    });
+  }
+  function delHist(h: any) {
+    askConfirm("Delete this history row? Balance will be reversed.", async () => {
+      const r = await fetch("/api/desk/history/" + h.id, { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false }));
+      if (!r.ok) { setErr(r.error || "Delete failed"); return; }
+      loadAll();
+    });
+  }
+  function delHistBulk() {
     const ids = Object.keys(histSel).filter((k) => histSel[k]);
-    if (!ids.length || !confirm("Delete " + ids.length + " row(s)? Balances will be reversed.")) return;
-    const r = await fetch("/api/desk/history/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) }).then((x) => x.json()).catch(() => ({ ok: false }));
-    if (!r.ok) { setErr(r.error || "Bulk delete failed"); return; }
-    setHistSel({}); loadAll();
+    if (!ids.length) return;
+    askConfirm(`Delete ${ids.length} row(s)? Balances will be reversed.`, async () => {
+      const r = await fetch("/api/desk/history/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+      if (!r.ok) { setErr(r.error || "Bulk delete failed"); return; }
+      setHistSel({}); loadAll();
+    });
   }
   function openHEdit(h: any) { setHEdit({ ...h, amt: Math.abs(Number(h.pnl) || 0) }); }
   async function submitHEdit() {
@@ -345,7 +435,10 @@ export default function AdminDeskPage() {
   const liveAccs = clients.filter((c) => !String(c.login).toUpperCase().startsWith("DEMO"));
   const demoAccs = clients.filter((c) => String(c.login).toUpperCase().startsWith("DEMO"));
   const groups: Record<string, any[]> = {};
-  symbols.forEach((s) => { const cat = s.category || "other"; (groups[cat] || (groups[cat] = [])).push(s); });
+  const mwQ = mwSearch.trim().toLowerCase();
+  symbols
+    .filter((s) => !mwQ || (s.symbol + " " + (s.display || "")).toLowerCase().includes(mwQ))
+    .forEach((s) => { const cat = s.category || "other"; (groups[cat] || (groups[cat] = [])).push(s); });
   // Market watch category order: Crypto, Forex, Indices, then the rest
   const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "agriculture", "other"];
   const orderedGroups = Object.entries(groups).sort((a, b) => {
@@ -358,6 +451,7 @@ export default function AdminDeskPage() {
   const dot = (c: string) => (<span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: c }} />);
   const inp = "mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--text)]";
   const lab = "text-[10px] text-[var(--muted)]";
+  const flab = "mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]";
   const mi = "flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)] transition-colors";
   const subi = "flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)] transition-colors";
   const mIco = (icon: string, color?: string) => <i className={"fa-solid " + icon} style={{ width: 13, fontSize: 11, textAlign: "center", color: color || "var(--muted)" }} />;
@@ -445,11 +539,11 @@ export default function AdminDeskPage() {
                     {dItem(() => openTicket(selSym), "fa-bolt", "New Order", "var(--accent)")}
                     {dDivider}
                     {dHead("Create")}
-                    {dItem(() => openModal("client"), "fa-user-plus", "New Client", BUY)}
-                    {dItem(() => openModal("manager"), "fa-user-tie", "New Manager")}
-                    {dItem(() => openModal("group"), "fa-layer-group", "New Group")}
+                    {can("createClients") && dItem(() => openModal("client"), "fa-user-plus", "New Client", BUY)}
+                    {!isManager && can("manageManagers") && dItem(() => openModal("manager"), "fa-user-tie", "New Manager")}
+                    {!isManager && dItem(() => openModal("group"), "fa-layer-group", "Groups")}
                     {dDivider}
-                    {dItem(() => openModal("notify"), "fa-paper-plane", "Send Notification", GOLD)}
+                    {can("sendNotifications") && dItem(() => openModal("notify"), "fa-paper-plane", "Send Notification", GOLD)}
                   </div></>)}
               </div>
 
@@ -501,6 +595,7 @@ export default function AdminDeskPage() {
           })()}
 
           <span className="flex-1" />
+          <button onClick={() => { const m = !soundMuted; setMuted(m); setSoundMuted(m); if (!m) playSound("notice"); }} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]" title={soundMuted ? "Unmute alerts" : "Mute alerts"}><i className={"fa-solid " + (soundMuted ? "fa-volume-xmark" : "fa-volume-high")} /></button>
           <button onClick={toggleTheme} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]" title={theme === "dark" ? "Light mode" : "Dark mode"}><i className={"fa-solid " + (theme === "dark" ? "fa-sun" : "fa-moon")} /></button>
           <div className="relative">
             <button onClick={openNotifs} className="relative rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]" title="Notifications">
@@ -540,7 +635,69 @@ export default function AdminDeskPage() {
               {(() => {
                 const base = navTab === "live" ? liveAccs : demoAccs;
                 const list = navSearch ? base.filter((c: any) => (c.login + " " + c.name + " " + (c.user?.email || c.email || "")).toLowerCase().includes(navSearch.toLowerCase())) : base;
-                return <div className="flex flex-col gap-0.5">{list.length ? list.map(acctRow) : <div className="px-2 py-3 text-center text-[var(--muted)]">No {navTab} accounts.</div>}</div>;
+                if (!list.length) return <div className="px-2 py-3 text-center text-[var(--muted)]">No {navTab} accounts.</div>;
+                // 3-level hierarchy: manager > group > client.
+                // - direct: no manager AND no group -> top-level "Accounts"
+                // - admin-level groups (no manager) -> top-level group sections
+                // - each manager -> its owned groups (nested) + its clients with no group
+                const direct = list.filter((c: any) => !c.manager && !c.group);
+                const grpOwner: Record<string, string | null> = {}; // groupId -> managerId|null
+                tradeGroups.forEach((g: any) => { grpOwner[g.id] = g.managerId || null; });
+                const grpRows: Record<string, any[]> = {};
+                const mgrDirect: Record<string, any[]> = {}; // manager clients with no group
+                list.forEach((c: any) => {
+                  if (c.group) { (grpRows[c.group.id] || (grpRows[c.group.id] = [])).push(c); }
+                  else if (c.manager) { (mgrDirect[c.manager.id] || (mgrDirect[c.manager.id] = [])).push(c); }
+                });
+                const grpName = (gid: string) => (tradeGroups.find((g: any) => g.id === gid)?.name) || (grpRows[gid]?.[0]?.group?.name) || "Group";
+                const mgrName: Record<string, string> = {};
+                list.forEach((c: any) => { if (c.manager) mgrName[c.manager.id] = c.manager.name; });
+                managers.forEach((m: any) => { if (!mgrName[m.id]) mgrName[m.id] = m.name; });
+                const groupIdsWithRows = Object.keys(grpRows);
+                const adminGroups = groupIdsWithRows.filter((gid) => !grpOwner[gid]);
+                const mgrGroups: Record<string, string[]> = {};
+                groupIdsWithRows.forEach((gid) => { const mid = grpOwner[gid]; if (mid) (mgrGroups[mid] || (mgrGroups[mid] = [])).push(gid); });
+                const managerIds = Array.from(new Set([...Object.keys(mgrDirect), ...Object.keys(mgrGroups)]));
+
+                const header = (key: string, label: string, icon: string, color: string, count: number, pad = "") => (
+                  <button onClick={() => toggleCat(key)} className={"flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-[10px] font-semibold " + pad} style={{ color }}>
+                    <i className={"fa-solid " + (collapsed[key] ? "fa-chevron-right" : "fa-chevron-down")} style={{ fontSize: 8 }} />
+                    <i className={"fa-solid " + icon} style={{ fontSize: 10 }} />
+                    <span className="flex-1 truncate text-left">{label}</span>
+                    <span className="rounded px-1.5" style={{ background: color + "22" }}>{count}</span>
+                  </button>
+                );
+                const groupSection = (gid: string, nested = false) => (
+                  <div key={"grp-" + gid} className={nested ? "" : "mt-0.5"}>
+                    {header("grp-" + gid, grpName(gid), "fa-folder", "var(--accent)", grpRows[gid].length)}
+                    {!collapsed["grp-" + gid] && <div className="flex flex-col gap-0.5 pl-2">{grpRows[gid].map(acctRow)}</div>}
+                  </div>
+                );
+                return (
+                  <div className="flex flex-col gap-0.5">
+                    {direct.length > 0 && (<>
+                      <div className="px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{navTab === "live" ? "Live" : "Demo"} Accounts</div>
+                      {direct.map(acctRow)}
+                    </>)}
+                    {adminGroups.map((gid) => groupSection(gid))}
+                    {managerIds.map((mid) => {
+                      const groups = mgrGroups[mid] || [];
+                      const loose = mgrDirect[mid] || [];
+                      const count = groups.reduce((n, gid) => n + grpRows[gid].length, 0) + loose.length;
+                      return (
+                        <div key={"mgr-" + mid} className="mt-0.5">
+                          {header("mgr-" + mid, mgrName[mid] || "Manager", "fa-user-tie", GOLD, count)}
+                          {!collapsed["mgr-" + mid] && (
+                            <div className="flex flex-col gap-0.5 pl-2">
+                              {groups.map((gid) => groupSection(gid, true))}
+                              {loose.map(acctRow)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
               })()}
             </div>
           </aside>
@@ -579,6 +736,13 @@ export default function AdminDeskPage() {
           <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
             <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide">x</button></div>
+            <div className="border-b border-[var(--border)] px-1.5 py-1">
+              <div className="relative">
+                <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-[var(--muted)]" />
+                <input value={mwSearch} onChange={(e) => setMwSearch(e.target.value)} placeholder="Search symbol…" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] py-1 pl-6 pr-6 text-[10px] text-[var(--text)]" />
+                {mwSearch && <button onClick={() => setMwSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--text)]" aria-label="clear">{"×"}</button>}
+              </div>
+            </div>
             <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]">
               <div className="sticky top-0 z-10 grid grid-cols-[1fr_72px_72px] bg-[var(--panel)] px-2 py-1 text-[10px] text-[var(--muted)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span></div>
               {orderedGroups.map(([cat, list]) => (
@@ -593,6 +757,7 @@ export default function AdminDeskPage() {
                     </div>); })}
                 </div>
               ))}
+              {orderedGroups.length === 0 && <div className="px-2 py-3 text-center text-[var(--muted)]">No symbols match &ldquo;{mwSearch}&rdquo;.</div>}
             </div>
           </aside>
         </>)}
@@ -613,7 +778,7 @@ export default function AdminDeskPage() {
         <div className="flex shrink-0 flex-col" style={{ height: tbH }}>
           <div className="flex items-center gap-1 border-b border-[var(--border)] px-2">
             <div className="flex flex-1 gap-1 overflow-auto">
-              {TABS.filter(([k]) => tabState[k]).map(([k, lbl]) => (
+              {TABS.filter(([k]) => tabState[k] && (k !== "audit" || can("viewAudit"))).map(([k, lbl]) => (
                 <span key={k} className="flex items-center">
                   <button onClick={() => setTab(k)} className="px-3 py-1.5 text-xs" style={tab === k ? { color: "var(--accent)" } : { color: "var(--muted)" }}>{lbl}{k === "trade" ? " (" + accOpen.length + (accPending.length ? " + " + accPending.length + "p" : "") + ")" : ""}</button>
                   <button onClick={() => setTabState((s) => ({ ...s, [k]: false }))} className="text-[var(--muted)]">{"\u00D7"}</button>
@@ -639,7 +804,10 @@ export default function AdminDeskPage() {
                     <th className={thc + " text-right"}>Current</th><th className={thc + " text-right"}>PnL</th><th className={thc + " text-right"}>Action</th>
                   </tr></thead>
                   <tbody>
-                    {tSelIds.length > 0 && (<tr><td colSpan={12} className="px-2 py-1"><button onClick={() => { if (confirm("Close " + tSelIds.length + " trade(s)?")) { tSelIds.forEach((id) => close(id)); setTradeSel({}); } }} className="rounded px-2 py-0.5 text-[9px] font-medium" style={{ background: SELL, color: "#fff" }}>Close Selected ({tSelIds.length})</button></td></tr>)}
+                    {tSelIds.length > 0 && (<tr><td colSpan={12} className="px-2 py-1 space-x-1">
+                      <button onClick={() => askConfirm("Close " + tSelIds.length + " trade(s)?", () => { tSelIds.forEach((id) => close(id)); setTradeSel({}); })} className="rounded px-2 py-0.5 text-[9px] font-medium" style={{ background: SELL, color: "#fff" }}>Close Selected ({tSelIds.length})</button>
+                      {can("deleteTrades") && <button onClick={() => askConfirm("Delete " + tSelIds.length + " open trade(s)? This removes them entirely (no P/L realized).", () => delTradesBulk(tSelIds))} className="rounded px-2 py-0.5 text-[9px] font-medium" style={{ background: "var(--soft)", color: SELL, border: "1px solid rgba(224,82,96,0.4)" }}>Delete Selected ({tSelIds.length})</button>}
+                    </td></tr>)}
                     {accOpen.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No open trades.</td></tr> : accOpen.map((p) => {
                       const cur = prices[p.symbol] ?? p.openPrice;
                       const pl = pnlOf(p, cur, csz(p.symbol));
@@ -649,7 +817,7 @@ export default function AdminDeskPage() {
                       const setIe = (f: string, v: any) => setInlineEdit((e) => ({ ...e, [p.id]: { ...(e[p.id] || {}), [f]: v } }));
                       const tInp = "rounded border bg-[var(--soft)] border-[var(--border)] text-[var(--text)] text-right px-1 py-0.5 text-[9px] w-16 outline-none";
                       return (
-                        <tr key={p.id} className={"border-b border-[var(--border)] " + (isEditing ? "bg-[var(--soft)]" : "hover:bg-[var(--soft)]")} onContextMenu={(e) => { e.preventDefault(); setPosMenu({ x: e.clientX, y: e.clientY, t: p }); }}>
+                        <tr key={p.id} className={"border-b border-[var(--border)] " + (isEditing ? "bg-[var(--soft)]" : "hover:bg-[var(--soft)]")}>
                           <td className="px-2 py-1"><input type="checkbox" checked={!!tradeSel[p.id]} onChange={() => setTradeSel((s) => ({ ...s, [p.id]: !s[p.id] }))} /></td>
                           <td className="px-2 py-1 text-[var(--muted)]">
                             {isEditing ? <input type="datetime-local" className="rounded border bg-[var(--soft)] border-[var(--border)] text-[var(--text)] px-1 py-0.5 text-[9px] w-32" value={ei("openedAt", new Date(p.openedAt || p.createdAt).toISOString().slice(0,16))} onChange={(e) => setIe("openedAt", e.target.value)} /> : odt(p)}
@@ -683,9 +851,10 @@ export default function AdminDeskPage() {
                                 <i className="fa-solid fa-pen" style={{ fontSize: 8 }} />
                               </button>
                             )}
-                            <button onClick={() => close(p.id)} className="rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "rgba(224,82,96,0.15)", color: SELL, border: "1px solid rgba(224,82,96,0.3)" }}>
+                            <button onClick={() => askConfirm("Close " + p.symbol + " " + p.type + " " + p.lots + "L at market?", () => close(p.id), false)} className="mr-1 rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "rgba(224,82,96,0.15)", color: SELL, border: "1px solid rgba(224,82,96,0.3)" }}>
                               Close ×
                             </button>
+                            {can("deleteTrades") && <button onClick={() => askConfirm("Delete this open trade entirely? No P/L is realized.", () => delTrade(p.id))} title="Delete trade" className="rounded px-1.5 py-0.5 text-[9px]" style={{ background: "var(--soft)", color: SELL }}><i className="fa-solid fa-trash" style={{ fontSize: 8 }} /></button>}
                           </td>
                         </tr>);
                     })}
@@ -838,7 +1007,7 @@ export default function AdminDeskPage() {
                                 <button title={c.isPool ? "Demote from Pool" : "Promote to Pool"} onClick={() => doPool(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "#a78bfa" }}><i className={"fa-solid " + (c.isPool ? "fa-circle-minus" : "fa-circle-plus")} /></button>
                                 <button title="Change ID" onClick={() => openAct("accountid", c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--muted)" }}><i className="fa-solid fa-id-card" /></button>
                                 <button title="Upload KYC" onClick={() => { setKycUploadFor(c); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); }} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "#38bdf8" }}><i className="fa-solid fa-id-card-clip" /></button>
-                                <button title="Delete" onClick={() => delClient(c)} className="rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
+                                {can("deleteClients") && <button title="Delete" onClick={() => delClient(c)} className="rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>}
                               </td>
                             </tr>
                           );
@@ -866,18 +1035,18 @@ export default function AdminDeskPage() {
               <div className="truncate text-[9px] text-[var(--muted)]">{menu.acc.name}</div>
             </div>
           </div>
-          <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-coins", GOLD)}<span className="flex-1">Money</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "money" ? "fa-chevron-down" : "fa-chevron-right")} /></button>
+          {(can("processDeposits") || can("processWithdrawals") || can("creditBonus") || can("editFinancial") || can("transferFunds")) && <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-coins", GOLD)}<span className="flex-1">Money</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "money" ? "fa-chevron-down" : "fa-chevron-right")} /></button>}
           {menuSub === "money" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
-            <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>{mIco("fa-arrow-down-to-bracket", BUY)}Deposit</button>
-            <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>{mIco("fa-arrow-up-from-bracket", GOLD)}Withdrawal</button>
-            <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-plus", BUY)}Credit In</button>
-            <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-minus", GOLD)}Credit Out</button>
-            <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus")} className={subi} style={{ color: BUY }}>{mIco("fa-gift", BUY)}Bonus</button>
-            <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>{mIco("fa-shield-halved")}Insurance</button>
-            <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>{mIco("fa-chart-line")}Manual P/L</button>
-            <button onClick={() => openAct("transfer", menu.acc)} className={subi}>{mIco("fa-right-left")}Transfer Between Accounts</button>
+            {can("processDeposits") && <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>{mIco("fa-arrow-down-to-bracket", BUY)}Deposit</button>}
+            {can("processWithdrawals") && <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>{mIco("fa-arrow-up-from-bracket", GOLD)}Withdrawal</button>}
+            {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-plus", BUY)}Credit In</button>}
+            {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-minus", GOLD)}Credit Out</button>}
+            {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus")} className={subi} style={{ color: BUY }}>{mIco("fa-gift", BUY)}Bonus</button>}
+            {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>{mIco("fa-shield-halved")}Insurance</button>}
+            {can("editFinancial") && <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>{mIco("fa-chart-line")}Manual P/L</button>}
+            {can("transferFunds") && <button onClick={() => openAct("transfer", menu.acc)} className={subi}>{mIco("fa-right-left")}Transfer Between Accounts</button>}
           </div>)}
-          <button onClick={() => openMT(menu.acc)} className={mi}>{mIco("fa-bolt", "var(--accent)")}Manual Trade</button>
+          {can("manualTrade") && <button onClick={() => openMT(menu.acc)} className={mi}>{mIco("fa-bolt", "var(--accent)")}Manual Trade</button>}
           <button onClick={() => openAct("subaccount", menu.acc)} className={mi}>{mIco("fa-sitemap")}Create Sub-Account</button>
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
           <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-pen-to-square")}<span className="flex-1">Edit Client</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "edit" ? "fa-chevron-down" : "fa-chevron-right")} /></button>
@@ -885,12 +1054,20 @@ export default function AdminDeskPage() {
             <button onClick={() => openAct("rename", menu.acc)} className={subi}>{mIco("fa-user-pen")}Edit Details</button>
             <button onClick={() => openAct("accountid", menu.acc)} className={subi}>{mIco("fa-id-card")}Change Account ID</button>
             <button onClick={() => openAct("password", menu.acc)} className={subi}>{mIco("fa-key")}Change Password</button>
-            <button onClick={() => openAct("assignmgr", menu.acc)} className={subi}>{mIco("fa-user-tie")}Assign Manager</button>
-            <button onClick={() => openAct("assigngroup", menu.acc)} className={subi}>{mIco("fa-layer-group")}Assign Group</button>
+            <button onClick={() => openAct("assign", menu.acc)} className={subi}>{mIco("fa-user-tie")}Assign Manager &amp; Group</button>
             <button onClick={() => doClearPin(menu.acc)} className={subi}>{mIco("fa-unlock-keyhole")}Reset PIN</button>
           </div>)}
-          <button onClick={() => { setTab("kyc"); setTabState((s) => ({ ...s, kyc: true })); setMenu(null); }} className={mi}>{mIco("fa-id-card-clip")}View KYC</button>
-          <button onClick={() => { setKycUploadFor(menu.acc); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); setMenu(null); }} className={mi}>{mIco("fa-cloud-arrow-up", "#38bdf8")}Upload KYC Document</button>
+          {menu.acc.kycStatus ? (
+            <button onClick={() => { setTab("kyc"); setTabState((s) => ({ ...s, kyc: true })); setMenu(null); }} className={mi}>
+              {mIco("fa-id-card-clip", menu.acc.kycStatus === "APPROVED" ? BUY : menu.acc.kycStatus === "PENDING" ? GOLD : SELL)}
+              View KYC
+              <span className="ml-auto rounded px-1.5 py-0.5 text-[8px] font-semibold" style={{ background: (menu.acc.kycStatus === "APPROVED" ? BUY : menu.acc.kycStatus === "PENDING" ? GOLD : SELL) + "22", color: menu.acc.kycStatus === "APPROVED" ? BUY : menu.acc.kycStatus === "PENDING" ? GOLD : SELL }}>
+                {menu.acc.kycStatus === "APPROVED" ? "✓ Verified" : menu.acc.kycStatus === "PENDING" ? "Pending" : "Rejected"}
+              </span>
+            </button>
+          ) : (
+            <button onClick={() => { setKycUploadFor(menu.acc); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); setMenu(null); }} className={mi}>{mIco("fa-cloud-arrow-up", "#38bdf8")}Upload KYC</button>
+          )}
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
           <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-gear")}<span className="flex-1">Settings</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "settings" ? "fa-chevron-down" : "fa-chevron-right")} /></button>
           {menuSub === "settings" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
@@ -906,7 +1083,7 @@ export default function AdminDeskPage() {
             <button onClick={() => doDNL(menu.acc)} className={subi}>{mIco("fa-hand", menu.acc.doNotLiquidate ? GOLD : undefined)}{menu.acc.doNotLiquidate ? "Disable DNL" : "Enable DNL"}</button>
           </div>)}
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
-          <button onClick={() => delClient(menu.acc)} className={mi} style={{ color: SELL }}>{mIco("fa-trash", SELL)}Delete Client</button>
+          {can("deleteClients") && <button onClick={() => delClient(menu.acc)} className={mi} style={{ color: SELL }}>{mIco("fa-trash", SELL)}Delete Client</button>}
         </div>
       </>)}
 
@@ -960,56 +1137,125 @@ export default function AdminDeskPage() {
           </div>
         </div>
       )}
-      {act && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setAct(null)}>
-          <div className="w-[320px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="text-sm font-semibold">{actTitle()}</div>
-            <div className="mb-2 text-[10px] text-[var(--muted)]">{act.acc.login} - {act.acc.name}</div>
-            {(act.kind === "money" || act.kind === "manualpnl") && (<>
-              <div className={lab}>Amount (USD){act.kind === "manualpnl" ? " - use - for a loss" : ""}</div>
-              <input type="number" className={inp} value={aform.amount || ""} onChange={(e) => af("amount", e.target.value)} autoFocus />
-              <div className={lab + " mt-2"}>Note (optional)</div>
-              <input className={inp} value={aform.note || ""} onChange={(e) => af("note", e.target.value)} />
+      {act && (() => {
+        const pr = actPrimary();
+        const linked = clients.filter((c: any) => act.acc.user?.email && c.user?.email === act.acc.user?.email);
+        const LEVS = [50, 100, 200, 300, 500, 1000];
+        return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setAct(null)}>
+          <div className="w-[470px] max-w-[95vw] max-h-[90vh] overflow-auto rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent2)" }}><i className={"fa-solid " + actIcon()} /></span>
+              <div className="min-w-0 flex-1"><div className="text-sm font-semibold">{actTitle()}</div><div className="truncate text-[11px] text-[var(--muted)]">{act.acc.login} - {act.acc.name}</div></div>
+              <button onClick={() => setAct(null)} className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <div className="space-y-3 px-4 py-3 text-xs">
+            {act.kind === "money" && (<>
+              <div className="flex gap-1 rounded-lg border p-1" style={{ borderColor: "var(--border)" }}>
+                {[["rt", "fa-bolt", "Real-Time (Instant)"], ["manual", "fa-calendar-days", "Manual Date & Time"]].map(([v, ic, l]) => (
+                  <button key={v} onClick={() => af("dateMode", v)} className="flex-1 rounded-md py-1.5 text-[11px] font-medium" style={(aform.dateMode || "rt") === v ? { background: "#2563eb", color: "#fff" } : { color: "var(--muted)" }}><i className={"fa-solid " + ic + " mr-1"} />{l}</button>
+                ))}
+              </div>
+              {aform.dateMode === "manual" && (<div className="grid grid-cols-2 gap-2">
+                <div><div className={flab}>Custom Date & Time</div><input type="datetime-local" className={inp} value={aform.appliedAt || ""} onChange={(e) => af("appliedAt", e.target.value)} /></div>
+                <div><div className={flab}>Reference / Note</div><input className={inp} value={aform.ref || ""} onChange={(e) => af("ref", e.target.value)} placeholder="Custom reference" /></div>
+              </div>)}
+              <div className="grid grid-cols-2 gap-2">
+                <div><div className={flab}>Amount</div><input type="number" step="0.01" className={inp} value={aform.amount || ""} onChange={(e) => af("amount", e.target.value)} placeholder="0.00" autoFocus /></div>
+                <div><div className={flab}>Description</div><input className={inp} value={aform.desc ?? (act.label || "")} onChange={(e) => af("desc", e.target.value)} /></div>
+              </div>
+            </>)}
+            {act.kind === "manualpnl" && (<>
+              <div><div className={flab}>Amount (use - for a loss)</div><input type="number" className={inp} value={aform.amount || ""} onChange={(e) => af("amount", e.target.value)} autoFocus /></div>
+              <div><div className={flab}>Note</div><input className={inp} value={aform.note || ""} onChange={(e) => af("note", e.target.value)} /></div>
             </>)}
             {act.kind === "transfer" && (<>
-              <div className={lab}>Amount (USD)</div>
-              <input type="number" className={inp} value={aform.amount || ""} onChange={(e) => af("amount", e.target.value)} autoFocus />
-              <div className={lab + " mt-2"}>To account ID</div>
-              <input className={inp} value={aform.toLogin || ""} onChange={(e) => af("toLogin", e.target.value)} placeholder="e.g. 800140" />
+              <div><div className={flab}>From Account</div><select className={inp} value={aform.fromId || act.acc.id} onChange={(e) => af("fromId", e.target.value)}>{clients.map((c: any) => <option key={c.id} value={c.id}>{c.login} — {c.name} (${acctBal(c).toFixed(2)})</option>)}</select></div>
+              <div><div className={flab}>To Account</div><select className={inp} value={aform.toId || ""} onChange={(e) => af("toId", e.target.value)}><option value="">- select -</option>{clients.map((c: any) => <option key={c.id} value={c.id}>{c.login} — {c.name} (${acctBal(c).toFixed(2)})</option>)}</select></div>
+              <div><div className={flab}>Amount (USD)</div><input type="number" step="0.01" className={inp} value={aform.amount || ""} onChange={(e) => af("amount", e.target.value)} placeholder="0.00" /></div>
+              <div><div className={flab}>Note (optional)</div><input className={inp} value={aform.note || ""} onChange={(e) => af("note", e.target.value)} placeholder="e.g. balance adjustment" /></div>
+              <div className="rounded-lg p-2 text-[10px] leading-snug" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)", color: "var(--muted)" }}><i className="fa-solid fa-circle-info mr-1" />Transfer logs to financial history (one row each side) and the audit log. Closed balance only — floating P/L stays at risk on the source.</div>
             </>)}
             {act.kind === "rename" && (<>
-              <div className={lab}>Client name</div><input className={inp} value={aform.name ?? act.acc.name} onChange={(e) => af("name", e.target.value)} autoFocus />
-              <div className={lab + " mt-2"}>Email</div><input className={inp} value={aform.email ?? (act.acc.email || "")} onChange={(e) => af("email", e.target.value)} />
-              <div className={lab + " mt-2"}>Phone</div><input className={inp} value={aform.phone ?? (act.acc.phone || "")} onChange={(e) => af("phone", e.target.value)} />
-              <div className={lab + " mt-2"}>Country</div><input className={inp} value={aform.country ?? (act.acc.country || "")} onChange={(e) => af("country", e.target.value)} />
+              <div className="text-[10px] text-[var(--muted)]">Selected: {act.acc.login} · {linked.length} linked account{linked.length === 1 ? "" : "s"}</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><div className={flab}>Full Name</div><input className={inp} value={aform.name ?? act.acc.name} onChange={(e) => af("name", e.target.value)} /></div>
+                <div><div className={flab}>Email</div><input className={inp} value={aform.email ?? (act.acc.email || act.acc.user?.email || "")} onChange={(e) => af("email", e.target.value)} /></div>
+                <div><div className={flab}>Phone</div><input className={inp} value={aform.phone ?? (act.acc.phone || "")} onChange={(e) => af("phone", e.target.value)} /></div>
+                <div><div className={flab}>Country</div><input className={inp} value={aform.country ?? (act.acc.country || "")} onChange={(e) => af("country", e.target.value)} /></div>
+                <div><div className={flab}>New Password (blank = keep)</div><input type="password" className={inp} value={aform.password || ""} onChange={(e) => af("password", e.target.value)} placeholder="Enter new password" /></div>
+                <div><div className={flab}>Account Type</div><input className={inp} value={act.acc.type} disabled /></div>
+                <div><div className={flab}>Leverage</div><input className={inp} value={"1:" + act.acc.leverage} disabled /></div>
+                <div><div className={flab}>Manager / Group</div><input className={inp} value={(act.acc.manager?.name || "Unassigned") + (act.acc.group?.name ? " / " + act.acc.group.name : "")} disabled /></div>
+              </div>
+              {linked.length > 0 && (<div className="rounded-lg border" style={{ borderColor: "var(--border)" }}>
+                <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold text-[var(--muted)]"><span><i className="fa-solid fa-link mr-1" />LINKED ACCOUNTS ({linked.length})</span><span>TOTAL: ${linked.reduce((s: number, c: any) => s + acctBal(c), 0).toFixed(2)}</span></div>
+                {linked.map((c: any) => (<div key={c.id} className="flex items-center justify-between border-t px-2 py-1 text-[11px]" style={{ borderColor: "var(--border)", background: c.id === act.acc.id ? "var(--soft)" : undefined }}><span style={{ color: "var(--accent2)" }}>#{c.login} <span className="rounded px-1 text-[8px]" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)" }}>{c.type}</span>{c.id === act.acc.id ? " · current" : ""}</span><span className="font-medium">${acctBal(c).toFixed(2)}</span></div>))}
+              </div>)}
+              <div className="grid grid-cols-3 gap-2 rounded-lg border p-2 text-[10px]" style={{ borderColor: "var(--border)" }}>
+                <div><div className="text-[var(--muted)]">Deposit</div><div className="font-semibold" style={{ color: BUY }}>+{Number(act.acc.deposit || 0).toFixed(2)}</div></div>
+                <div><div className="text-[var(--muted)]">Withdrawal</div><div className="font-semibold" style={{ color: SELL }}>-{Number(act.acc.withdrawal || 0).toFixed(2)}</div></div>
+                <div><div className="text-[var(--muted)]">Closed P/L</div><div className="font-semibold">{Number(act.acc.pnl || 0).toFixed(2)}</div></div>
+                <div><div className="text-[var(--muted)]">Credit</div><div className="font-semibold">{Number(act.acc.credit || 0).toFixed(2)}</div></div>
+                <div><div className="text-[var(--muted)]">Balance</div><div className="font-semibold">{acctBal(act.acc).toFixed(2)}</div></div>
+                <div><div className="text-[var(--muted)]">MC Level</div><div className="font-semibold">{Number(act.acc.mcLevel || 0).toFixed(2)}%</div></div>
+              </div>
             </>)}
-            {act.kind === "accountid" && (<><div className={lab}>New account ID</div><input className={inp} value={aform.login ?? act.acc.login} onChange={(e) => af("login", e.target.value)} autoFocus /></>)}
-            {act.kind === "password" && (<><div className={lab}>New password (min 6)</div><input className={inp} value={aform.password || ""} onChange={(e) => af("password", e.target.value)} autoFocus /></>)}
-            {act.kind === "assignmgr" && (<><div className={lab}>Manager</div><select className={inp} value={aform.managerId ?? (act.acc.managerId || "")} onChange={(e) => af("managerId", e.target.value)}><option value="">- none -</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></>)}
-            {act.kind === "subaccount" && (<><div className={lab}>Sub-account name (optional)</div><input className={inp} value={aform.name || ""} onChange={(e) => af("name", e.target.value)} placeholder={act.acc.name + " sub"} autoFocus /></>)}
-            {act.kind === "assigngroup" && (<><div className={lab}>Group</div><select className={inp} value={aform.groupId ?? (act.acc.groupId || "")} onChange={(e) => af("groupId", e.target.value)}><option value="">- none -</option>{tradeGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></>)}
-            {act.kind === "leverage" && (<><div className={lab}>Leverage</div><input type="number" className={inp} value={aform.leverage ?? act.acc.leverage} onChange={(e) => af("leverage", e.target.value)} autoFocus /></>)}
-            {act.kind === "mclevel" && (<><div className={lab}>Margin Call Level %</div><input type="number" className={inp} value={aform.mcLevel ?? act.acc.mcLevel} onChange={(e) => af("mcLevel", e.target.value)} autoFocus /></>)}
+            {act.kind === "accountid" && (<>
+              <div className="text-[11px] text-[var(--muted)]">Current ID: <span className="font-semibold text-[var(--text)]">{act.acc.login}</span> — {act.acc.name}</div>
+              <div><div className={flab}>Enter new Account ID</div><input className={inp} value={aform.login ?? act.acc.login} onChange={(e) => af("login", e.target.value)} autoFocus /></div>
+            </>)}
+            {act.kind === "password" && (<div><div className={flab}>New Password (min 6)</div><input type="password" className={inp} value={aform.password || ""} onChange={(e) => af("password", e.target.value)} autoFocus /></div>)}
+            {act.kind === "assignmgr" && (<div><div className={flab}>Manager</div><select className={inp} value={aform.managerId ?? (act.acc.managerId || "")} onChange={(e) => af("managerId", e.target.value)}><option value="">- none -</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>)}
+            {act.kind === "subaccount" && (<>
+              <div className="text-[11px] text-[var(--muted)]">Under client: <span className="font-semibold text-[var(--text)]">{act.acc.name}</span></div>
+              <div><div className={flab}>Sub-account name (optional)</div><input className={inp} value={aform.name || ""} onChange={(e) => af("name", e.target.value)} placeholder={act.acc.name + " sub"} /></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><div className={flab}>Account Type</div><select className={inp} value={aform.subType || "LIVE"} onChange={(e) => af("subType", e.target.value)}><option value="LIVE">Live</option><option value="DEMO">Demo</option></select></div>
+                <div><div className={flab}>Leverage</div><select className={inp} value={aform.subLev || act.acc.leverage} onChange={(e) => af("subLev", e.target.value)}>{LEVS.map((l) => <option key={l} value={l}>1:{l}</option>)}</select></div>
+                <div><div className={flab}>Currency</div><select className={inp} value={aform.subCcy || act.acc.currency} onChange={(e) => af("subCcy", e.target.value)}><option>USD</option><option>EUR</option><option>GBP</option></select></div>
+                <div><div className={flab}>Initial Deposit (USD)</div><input type="number" className={inp} value={aform.subDep || ""} onChange={(e) => af("subDep", e.target.value)} placeholder="0.00 (0 for Live)" /></div>
+              </div>
+            </>)}
+            {act.kind === "assigngroup" && (<div><div className={flab}>Group</div><select className={inp} value={aform.groupId ?? (act.acc.groupId || "")} onChange={(e) => af("groupId", e.target.value)}><option value="">- none -</option>{tradeGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>)}
+            {act.kind === "assign" && (() => {
+              const selMgr = (aform.managerId ?? (act.acc.managerId || "")) as string;
+              const selGrp = (aform.groupId ?? (act.acc.groupId || "")) as string;
+              const avail = tradeGroups.filter((g) => (g.managerId || "") === selMgr);
+              return (<>
+                <div><div className={flab}>Manager</div><select className={inp} value={selMgr} onChange={(e) => setAform((o: any) => ({ ...o, managerId: e.target.value, groupId: "" }))}><option value="">Admin (no manager)</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
+                <div><div className={flab}>Group {selMgr ? "(under this manager)" : "(admin-level)"}</div><select className={inp} value={selGrp} onChange={(e) => af("groupId", e.target.value)}><option value="">- no group -</option>{avail.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>
+                <div className="text-[10px] leading-tight text-[var(--muted)]">{selMgr ? "Client sits under this manager" : "Client sits directly under admin"}{selGrp ? "" : ", with no group"}. Only groups owned by the chosen manager are listed.{avail.length === 0 && selMgr ? " This manager has no groups yet — create one from the Groups menu." : ""}</div>
+              </>);
+            })()}
+            {act.kind === "leverage" && (<div><div className={flab}>Leverage</div><select className={inp} value={aform.leverage ?? act.acc.leverage} onChange={(e) => af("leverage", e.target.value)}>{(LEVS.includes(Number(act.acc.leverage)) ? LEVS : [Number(act.acc.leverage), ...LEVS]).map((l) => <option key={l} value={l}>1:{l}</option>)}</select></div>)}
+            {act.kind === "mclevel" && (<>
+              <div><div className={flab}>MC Level % (0 = OFF)</div><input type="number" className={inp} value={aform.mcLevel ?? act.acc.mcLevel} onChange={(e) => af("mcLevel", e.target.value)} autoFocus /></div>
+              <label className="flex items-center gap-2 text-[11px]"><span className="text-[var(--muted)]">Do Not Liquidate:</span><input type="checkbox" checked={!!(aform.doNotLiquidate ?? act.acc.doNotLiquidate)} onChange={(e) => af("doNotLiquidate", e.target.checked)} /> Enable (account will NOT be liquidated)</label>
+            </>)}
             {act.kind === "settings" && (<>
               <div className="grid grid-cols-2 gap-2">
-                <div><div className={lab}>Leverage</div><input type="number" className={inp} value={aform.leverage ?? act.acc.leverage} onChange={(e) => af("leverage", e.target.value)} /></div>
-                <div><div className={lab}>MC Level %</div><input type="number" className={inp} value={aform.mcLevel ?? act.acc.mcLevel} onChange={(e) => af("mcLevel", e.target.value)} /></div>
+                <div><div className={flab}>Leverage</div><input type="number" className={inp} value={aform.leverage ?? act.acc.leverage} onChange={(e) => af("leverage", e.target.value)} /></div>
+                <div><div className={flab}>MC Level %</div><input type="number" className={inp} value={aform.mcLevel ?? act.acc.mcLevel} onChange={(e) => af("mcLevel", e.target.value)} /></div>
               </div>
-              <div className={lab + " mt-2"}>Currency</div>
-              <select className={inp} value={aform.currency ?? act.acc.currency} onChange={(e) => af("currency", e.target.value)}><option>USD</option><option>EUR</option><option>GBP</option></select>
-              <label className="mt-2 flex items-center gap-2 text-[11px]"><input type="checkbox" checked={!!(aform.doNotLiquidate ?? act.acc.doNotLiquidate)} onChange={(e) => af("doNotLiquidate", e.target.checked)} /> Do not liquidate (disable stop-out)</label>
+              <div><div className={flab}>Currency</div><select className={inp} value={aform.currency ?? act.acc.currency} onChange={(e) => af("currency", e.target.value)}><option>USD</option><option>EUR</option><option>GBP</option></select></div>
+              <label className="flex items-center gap-2 text-[11px]"><input type="checkbox" checked={!!(aform.doNotLiquidate ?? act.acc.doNotLiquidate)} onChange={(e) => af("doNotLiquidate", e.target.checked)} /> Do not liquidate (disable stop-out)</label>
             </>)}
-            {err && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
-            <button onClick={submitAct} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Confirm</button>
-            <button onClick={() => setAct(null)} className="mt-2 w-full rounded border border-[var(--border)] py-1.5 text-xs">Cancel</button>
+            {err && <div className="text-[11px]" style={{ color: SELL }}>{err}</div>}
+            </div>
+            <div className="flex gap-2 border-t px-4 py-3" style={{ borderColor: "var(--border)" }}>
+              <button onClick={() => setAct(null)} className="flex-1 rounded-lg border py-2 text-xs font-medium" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
+              <button onClick={submitAct} className="flex-1 rounded-lg py-2 text-xs font-semibold" style={{ background: pr.color, color: pr.fg }}>{pr.label}</button>
+            </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setModal("")}>
           <div className="w-[330px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 text-sm font-semibold">{modal === "client" && "New Client"}{modal === "manager" && "New Manager"}{modal === "group" && "New Group"}{modal === "notify" && "Send Notification"}</div>
+            <div className="mb-2 text-sm font-semibold">{modal === "client" && "New Client"}{modal === "manager" && "New Manager"}{modal === "group" && "Manage Groups"}{modal === "notify" && "Send Notification"}</div>
             {modal === "client" && (<>
               <div className="flex gap-1">
                 <button onClick={() => f("type", "LIVE")} className="flex-1 rounded py-1.5 text-xs" style={form.type === "LIVE" ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Live</button>
@@ -1036,9 +1282,25 @@ export default function AdminDeskPage() {
               <button onClick={() => submit("/api/admin/managers", { name: form.name, email: form.email, password: form.password }, "Manager")} className="mt-3 w-full rounded py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Create Manager</button>
             </>)}
             {modal === "group" && (<>
-              <div className={lab + " mt-1"}>Group name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
+              {tradeGroups.length > 0 && (<div className="mb-2 max-h-40 overflow-auto rounded border border-[var(--border)]">
+                {tradeGroups.map((g: any) => { const mgr = managers.find((m) => m.id === g.managerId); return (
+                  <div key={g.id} className="flex items-center gap-1 border-b border-[var(--border)] px-2 py-1 text-[11px] last:border-0" style={form.editId === g.id ? { background: "var(--soft)" } : undefined}>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{g.name}</div>
+                      <div className="truncate text-[9px] text-[var(--muted)]">spread {Number(g.spread) || 0} · {mgr ? mgr.name : "Admin-level"}</div>
+                    </div>
+                    <button title="Edit" onClick={() => editGroup(g)} className="rounded px-1.5 py-0.5" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen" /></button>
+                    <button title="Delete" onClick={() => delGroup(g)} className="rounded px-1.5 py-0.5" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
+                  </div>); })}
+              </div>)}
+              <div className={lab + " mt-1"}>{form.editId ? "Edit group name" : "New group name"}</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
               <div className={lab + " mt-2"}>Spread (points)</div><input type="number" className={inp} value={form.spread || ""} onChange={(e) => f("spread", Number(e.target.value))} />
-              <button onClick={() => submit("/api/admin/groups", { name: form.name, spread: Number(form.spread) || 0 }, "Group")} className="mt-3 w-full rounded py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Create Group</button>
+              <div className={lab + " mt-2"}>Manager (owns this group)</div>
+              <select className={inp} value={form.managerId || ""} onChange={(e) => f("managerId", e.target.value || null)}><option value="">Admin-level (no manager)</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+              <div className="mt-3 flex gap-2">
+                <button onClick={saveGroup} className="flex-1 rounded py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>{form.editId ? "Save Changes" : "Create Group"}</button>
+                {form.editId && <button onClick={() => setForm({ type: "LIVE", leverage: 100, currency: "USD" })} className="rounded border border-[var(--border)] px-3 py-2 text-xs">New</button>}
+              </div>
             </>)}
             {modal === "notify" && (<>
               <div className={lab + " mt-1"}>Template</div>
@@ -1057,28 +1319,56 @@ export default function AdminDeskPage() {
           </div>
         </div>
       )}
-      {symOv && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setSymOv(null)}>
-          <div className="flex max-h-[80vh] w-[360px] flex-col rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="text-sm font-semibold">Disable Symbols</div>
-            <div className="mb-2 text-[10px] text-[var(--muted)]">{symOv.acc.login} - {symOv.acc.name} - ticked = disabled for this client</div>
-            <input value={symOv.q || ""} onChange={(e) => setSymOv((o: any) => ({ ...o, q: e.target.value }))} placeholder="Search symbol" className={inp} />
-            <div className="mt-2 flex-1 overflow-auto">
-              {symbols.filter((s) => s.symbol.toLowerCase().includes((symOv.q || "").toLowerCase())).map((s) => (
-                <label key={s.symbol} className="flex items-center gap-2 border-b border-[var(--border)] py-1 text-[11px]">
-                  <input type="checkbox" checked={!!symOv.disabled[s.symbol]} onChange={async (e) => {
-                    const dis = e.target.checked;
-                    setSymOv((o: any) => ({ ...o, disabled: { ...o.disabled, [s.symbol]: dis } }));
-                    await fetch("/api/admin/clients/" + symOv.acc.id + "/symbols", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: s.symbol, disabled: dis }) });
-                  }} />
-                  <span>{s.symbol}</span><span className="text-[var(--muted)]">{s.display}</span>
-                </label>
-              ))}
+      {symOv && (() => {
+        const setDis = async (syms: string[], dis: boolean) => {
+          setSymOv((o: any) => { const d = { ...o.disabled }; syms.forEach((s) => (d[s] = dis)); return { ...o, disabled: d }; });
+          await Promise.all(syms.map((s) => fetch("/api/admin/clients/" + symOv.acc.id + "/symbols", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: s, disabled: dis }) })));
+        };
+        const q = (symOv.q || "").toLowerCase();
+        const grouped: Record<string, any[]> = {};
+        symbols.filter((s) => !q || (s.symbol + " " + (s.display || "")).toLowerCase().includes(q)).forEach((s) => { const c = s.category || "other"; (grouped[c] || (grouped[c] = [])).push(s); });
+        const cats = Object.entries(grouped).sort((a, b) => (CAT_ORDER.indexOf(a[0]) === -1 ? 99 : CAT_ORDER.indexOf(a[0])) - (CAT_ORDER.indexOf(b[0]) === -1 ? 99 : CAT_ORDER.indexOf(b[0])));
+        const catName = (c: string) => c === "metals" ? "PREC. METALS" : c.toUpperCase();
+        return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setSymOv(null)}>
+          <div className="flex max-h-[88vh] w-[580px] max-w-[95vw] flex-col rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--red) 16%, transparent)", color: "#e05260" }}><i className="fa-solid fa-ban" /></span>
+              <div className="min-w-0 flex-1"><div className="text-sm font-semibold">Disable Symbols For Client</div><div className="truncate text-[11px] text-[var(--muted)]">{symOv.acc.name} • ID: {symOv.acc.login}</div></div>
+              <button onClick={() => setSymOv(null)} className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
             </div>
-            <button onClick={() => setSymOv(null)} className="mt-3 w-full rounded border border-[var(--border)] py-1.5 text-xs">Done</button>
+            <div className="border-b px-4 py-2" style={{ borderColor: "var(--border)" }}>
+              <input value={symOv.q || ""} onChange={(e) => setSymOv((o: any) => ({ ...o, q: e.target.value }))} placeholder="Search symbols…" className={inp + " mt-0"} />
+              <div className="mt-1 text-[10px] text-[var(--muted)]">Turning a symbol <span style={{ color: "#e05260" }}>off</span> here hides it from <b>this client only</b>. Other clients are unaffected.</div>
+            </div>
+            <div className="flex-1 overflow-auto px-4 py-2">
+              {cats.map(([cat, list]) => {
+                const enabledCount = list.filter((s) => !symOv.disabled[s.symbol]).length;
+                const allOn = enabledCount === list.length;
+                return (<div key={cat} className="mb-3">
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <span className="text-[10px] font-semibold text-[var(--muted)]">{catName(cat)}</span>
+                    <span className="rounded px-1.5 text-[9px]" style={{ background: "var(--soft)", color: "var(--muted)" }}>{enabledCount}/{list.length}</span>
+                    <button onClick={() => setDis(list.map((s) => s.symbol), allOn)} className="ml-auto rounded px-2 py-0.5 text-[10px]" style={{ background: "color-mix(in srgb, var(--red) 14%, transparent)", color: "#e05260" }}>{allOn ? "Disable All" : "Enable All"}</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                    {list.map((s) => { const on = !symOv.disabled[s.symbol]; return (
+                      <button key={s.symbol} onClick={() => setDis([s.symbol], on)} className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-[11px]" style={{ borderColor: on ? "var(--border)" : "color-mix(in srgb, var(--red) 40%, var(--border))", background: "var(--bg)", opacity: on ? 1 : 0.7 }}>
+                        <span className="truncate">{s.display || s.symbol}</span>
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: on ? "#16c784" : "#e05260" }} />
+                      </button>); })}
+                  </div>
+                </div>);
+              })}
+              {cats.length === 0 && <div className="py-6 text-center text-[var(--muted)]">No symbols match.</div>}
+            </div>
+            <div className="border-t px-4 py-3" style={{ borderColor: "var(--border)" }}>
+              <button onClick={() => setSymOv(null)} className="w-full rounded-lg py-2 text-xs font-semibold" style={{ background: "#2563eb", color: "#fff" }}>Done</button>
+            </div>
           </div>
         </div>
-      )}
+        );
+      })()}
       {mt && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setMt(null)}>
           <div className="w-[420px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
@@ -1130,9 +1420,31 @@ export default function AdminDeskPage() {
           </div>
         </div>
       ); })()}
+      {confirmBox && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setConfirmBox(null)}>
+          <div className="w-[340px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 flex items-center gap-2 text-sm font-semibold" style={{ color: confirmBox.danger ? SELL : "var(--text)" }}>
+              <i className={"fa-solid " + (confirmBox.danger ? "fa-triangle-exclamation" : "fa-circle-question")} /> Please confirm
+            </div>
+            <div className="mb-4 text-[12px] text-[var(--muted)]">{confirmBox.msg}</div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmBox(null)} className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs">Cancel</button>
+              <button onClick={() => { const fn = confirmBox.onYes; setConfirmBox(null); fn(); }} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: confirmBox.danger ? SELL : "var(--accent)" }}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toasts.length > 0 && (
         <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
-          {toasts.map((t) => (<div key={t.id} className="rounded-md border px-3 py-2 text-[11px] shadow-lg" style={{ background: "var(--panel)", borderColor: t.kind === "err" ? SELL : BUY, color: "var(--text)", minWidth: 180 }}><span style={{ color: t.kind === "err" ? SELL : BUY }}>{t.kind === "err" ? "Error" : "Success"}</span> {t.msg}</div>))}
+          {toasts.map((t) => t.notif ? (
+            <div key={t.id} className="flex items-start gap-2 rounded-lg border px-3 py-2 text-[11px] shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", minWidth: 230, maxWidth: 300, borderLeft: `3px solid ${t.st === "trade" ? "#2f81f7" : t.st === "funds" ? GOLD : t.st === "login" ? "#a78bfa" : BUY}` }}>
+              <i className={"fa-solid mt-0.5 " + (t.st === "trade" ? "fa-chart-line" : t.st === "funds" ? "fa-money-bill" : t.st === "login" ? "fa-right-to-bracket" : "fa-bell")} style={{ color: t.st === "trade" ? "#2f81f7" : t.st === "funds" ? GOLD : t.st === "login" ? "#a78bfa" : BUY, fontSize: 12 }} />
+              <div className="min-w-0"><div className="font-semibold">{t.title}</div>{t.body && <div className="mt-0.5 text-[10px] text-[var(--muted)]">{t.body}</div>}</div>
+            </div>
+          ) : (
+            <div key={t.id} className="rounded-md border px-3 py-2 text-[11px] shadow-lg" style={{ background: "var(--panel)", borderColor: t.kind === "err" ? SELL : BUY, color: "var(--text)", minWidth: 180 }}><span style={{ color: t.kind === "err" ? SELL : BUY }}>{t.kind === "err" ? "Error" : "Success"}</span> {t.msg}</div>
+          ))}
         </div>
       )}
 
@@ -1184,9 +1496,14 @@ export default function AdminDeskPage() {
                 </select>
               </div>
               <div>
-                <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>File</div>
+                <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Front side <span style={{ color: SELL }}>*</span></div>
                 <input type="file" accept="image/*,.pdf" onChange={(e) => setKycUploadFile(e.target.files?.[0] || null)} className="w-full text-[10px]" style={{ color: "var(--text)" }} />
               </div>
+              <div>
+                <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Back side <span style={{ color: SELL }}>*</span></div>
+                <input type="file" accept="image/*,.pdf" onChange={(e) => setKycBackFile(e.target.files?.[0] || null)} className="w-full text-[10px]" style={{ color: "var(--text)" }} />
+              </div>
+              <div className="text-[9px]" style={{ color: "var(--muted)" }}>Both sides required — documents without a back side cannot be verified.</div>
             </div>
             {err && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{err}</div>}
             {kycUpMsg && <div className="mt-2 text-[10px]" style={{ color: BUY }}>{kycUpMsg}</div>}

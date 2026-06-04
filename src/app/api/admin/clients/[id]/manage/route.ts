@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
 import { assertCan } from "@/lib/perms";
+import { notify } from "@/services/notification.service";
 
-const MANAGER_ALLOWED = ["status", "deactivate", "rename", "pool", "clearPin"];
+const MANAGER_ALLOWED = ["status", "deactivate", "rename", "pool", "clearPin", "assign"];
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -85,6 +86,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           prisma.financialHistory.create({ data: { accountId: dest.id, type: "TRANSFER_IN" as any, amount: new Prisma.Decimal(amt), description: "Transfer from " + acc.login, reference: ref, mode: "MANUAL", createdBy: actor } }),
         ]);
         await audit(tenantId, "client.transfer", acc.login + " -> " + dest.login + " " + amt, actor);
+        // Notify both clients of the funds movement (transfer is a fund event)
+        try {
+          if (acc.userId) await notify(tenantId, acc.userId, "Transfer out", `-${amt} transferred to ${dest.login}`, "FUNDS");
+          if (dest.userId) await notify(tenantId, dest.userId, "Transfer in", `+${amt} received from ${acc.login}`, "FUNDS");
+        } catch {}
         break;
       }
       case "subAccount": {
@@ -92,13 +98,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         let max = 800100;
         for (const a of accs) { const n = parseInt(a.login, 10); if (!isNaN(n) && String(n) === a.login && n > max) max = n; }
         const login = String(max + 1);
-        await prisma.account.create({ data: { tenantId, login, name: b.name || (acc.name + " sub"), type: acc.type, leverage: acc.leverage, currency: acc.currency, managerId: acc.managerId, parentId: acc.id } });
+        const subType = b.type === "DEMO" ? "DEMO" : (b.type === "LIVE" ? "LIVE" : acc.type);
+        const subDep = Number(b.deposit) > 0 ? new Prisma.Decimal(Number(b.deposit)) : new Prisma.Decimal(0);
+        const sub = await prisma.account.create({ data: { tenantId, login, name: b.name || (acc.name + " sub"), type: subType, leverage: Number(b.leverage) || acc.leverage, currency: b.currency || acc.currency, managerId: acc.managerId, groupId: acc.groupId, parentId: acc.id, userId: acc.userId, deposit: subDep } });
+        if (Number(b.deposit) > 0) await prisma.financialHistory.create({ data: { accountId: sub.id, type: "DEPOSIT" as any, amount: subDep, description: "Initial deposit", mode: "MANUAL", createdBy: actor } });
         await audit(tenantId, "client.subAccount", "parent " + acc.login + " -> " + login, actor);
         break;
       }
       case "assignGroup": {
         await prisma.account.update({ where: { id: acc.id }, data: { groupId: b.groupId || null } });
         await audit(tenantId, "client.assignGroup", acc.login + " group=" + (b.groupId || "none"), actor);
+        break;
+      }
+      case "assign": {
+        // Combined manager + group assignment. Group must belong to the chosen
+        // manager (or be an admin-level group when no manager is chosen).
+        const managerId = b.managerId || null;
+        let groupId = b.groupId || null;
+        if (groupId) {
+          const g = await prisma.tradeGroup.findFirst({ where: { id: groupId, tenantId } });
+          if (!g) throw new Error("Group not found");
+          if ((g.managerId || null) !== managerId) throw new Error("That group does not belong to the selected manager");
+        }
+        // a manager can only (re)assign within their own clients
+        if (s.role === "MANAGER" && (acc.managerId || null) !== s.sub) throw new Error("Not your client");
+        await prisma.account.update({ where: { id: acc.id }, data: { managerId, groupId } });
+        await audit(tenantId, "client.assign", acc.login + " manager=" + (managerId || "admin") + " group=" + (groupId || "none"), actor);
         break;
       }
       case "clearPin": {

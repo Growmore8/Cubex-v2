@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { PACKAGES, PLAN_KEYS } from "@/config/packages";
+import { useDialog } from "@/components/ui/ConfirmDialog";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "sab-amber", PAID: "sab-green", OVERDUE: "sab-red", CANCELLED: "sab-red",
@@ -16,6 +17,7 @@ export default function SABillingPage() {
   const [filterTenant, setFilterTenant] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [printInv, setPrintInv] = useState<any>(null);
+  const { confirm, node } = useDialog();
 
   const now = new Date();
   const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -72,6 +74,7 @@ export default function SABillingPage() {
 
   return (
     <div className="space-y-5">
+      {node}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Billing & Invoicing</h1>
@@ -184,7 +187,7 @@ export default function SABillingPage() {
                     <button onClick={() => setPrintInv(inv)} className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#f1f5f9", color: "#475569" }}>
                       <i className="fa-solid fa-print text-xs" />
                     </button>
-                    <button onClick={() => { if (confirm("Delete invoice " + inv.number + "?")) act(inv.id, "delete"); }} className="rounded px-2 py-1 text-xs" style={{ background: "#fff1f2", color: "#dc2626" }}>
+                    <button onClick={async () => { if (await confirm({ title: "Delete invoice", message: "Delete invoice " + inv.number + "?", danger: true })) act(inv.id, "delete"); }} className="rounded px-2 py-1 text-xs" style={{ background: "#fff1f2", color: "#dc2626" }}>
                       <i className="fa-solid fa-trash text-xs" />
                     </button>
                   </td>

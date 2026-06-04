@@ -4,7 +4,9 @@ import { ROLE_RANK, type Role } from "@/config/roles";
 
 const PROTECTED: { prefix: string; role: Role }[] = [
   { prefix: "/superadmin", role: "SUPERADMIN" },
-  { prefix: "/admin", role: "ADMIN" },
+  // Admin + Manager share the /admin platform (manager rank 2). Finer limits
+  // are enforced per-API (requireAdmin / assertCan) and in the UI.
+  { prefix: "/admin", role: "MANAGER" },
   { prefix: "/manager", role: "MANAGER" },
   { prefix: "/client", role: "CLIENT" },
 ];

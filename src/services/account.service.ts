@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 import { audit } from "@/lib/audit";
+import { notify, notifyStaff } from "@/services/notification.service";
 
 export function listClients(tenantId: string, managerId?: string | null) {
   return prisma.account.findMany({
@@ -10,6 +11,7 @@ export function listClients(tenantId: string, managerId?: string | null) {
     include: {
       user: { select: { email: true, status: true, lastLoginIp: true, lastLoginAt: true } },
       manager: { select: { id: true, name: true } },
+      group: { select: { id: true, name: true } },
     },
   });
 }
@@ -78,7 +80,7 @@ export async function updateClient(tenantId: string, id: string, data: any, acto
   return updated;
 }
 
-export async function adjustBalance(tenantId: string, id: string, type: string, amount: number, description: string, by: string) {
+export async function adjustBalance(tenantId: string, id: string, type: string, amount: number, description: string, by: string, appliedAt?: Date | null) {
   const acc = await prisma.account.findFirst({ where: { tenantId, id } });
   if (!acc) throw new Error("Account not found");
   const amt = new Prisma.Decimal(amount);
@@ -90,12 +92,23 @@ export async function adjustBalance(tenantId: string, id: string, type: string, 
   else if (type === "BONUS") data = { bonus: { increment: amt } };
   else if (type === "INSURANCE") data = { insurance: { increment: amt } };
   else throw new Error("Invalid type");
+  const backdated = appliedAt && !isNaN(appliedAt.getTime());
   const res = await prisma.$transaction(async (tx) => {
     await tx.account.update({ where: { id }, data });
-    await tx.financialHistory.create({ data: { accountId: id, type: type as any, amount: amt, description, mode: "MANUAL", createdBy: by } });
+    // appliedAt lets staff back-date a manual entry (Manual Date & Time mode)
+    const fh: any = { accountId: id, type: type as any, amount: amt, description, mode: backdated ? "MANUAL" : "REALTIME", createdBy: by };
+    if (backdated) fh.appliedAt = appliedAt;
+    await tx.financialHistory.create({ data: fh });
     return tx.account.findUnique({ where: { id } });
   });
   await audit(tenantId, "balance." + type, acc.login + " " + amount, by);
+  // Notify the client (funds sound) + their manager
+  try {
+    const verb: Record<string, string> = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", CREDIT_IN: "Credit added", CREDIT_OUT: "Credit removed", BONUS: "Bonus", INSURANCE: "Insurance" };
+    const label = (verb[type] || type) + " " + amount + (description ? " — " + description : "");
+    if (acc.userId) await notify(tenantId, acc.userId, verb[type] || type, label, "FUNDS");
+    await notifyStaff(tenantId, { type: "FUNDS", title: (verb[type] || type), body: acc.login + " " + amount }, acc.managerId);
+  } catch {}
   return res;
 }
 

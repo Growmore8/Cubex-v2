@@ -39,3 +39,33 @@ export async function can(s: any, key: string): Promise<boolean> {
 export async function assertCan(s: any, key: string) {
   if (!(await can(s, key))) throw new Error("Permission denied for this action");
 }
+
+// Master list of permission keys (kept in sync with the SuperAdmin tenant
+// permissions UI). Used to compute an effective permission map for the client.
+export const PERM_KEYS = [
+  "createClients", "deleteClients", "manageManagers",
+  "processDeposits", "processWithdrawals", "creditBonus", "transferFunds", "editFinancial", "deleteFinancial",
+  "manualTrade", "closeTrades", "editTrades", "deleteTrades",
+  "viewAudit", "exportPdf", "sendNotifications",
+] as const;
+
+// Resolve every permission key to a final boolean for this session, applying the
+// tenant-level gate and (for managers) the per-manager gate. Default is allow.
+export async function effectivePerms(s: any): Promise<Record<string, boolean>> {
+  const out: Record<string, boolean> = {};
+  if (!s) { for (const k of PERM_KEYS) out[k] = false; return out; }
+  if (s.role === "SUPERADMIN") { for (const k of PERM_KEYS) out[k] = true; return out; }
+  let tp: any = {}, up: any = {};
+  try {
+    if (s.tenantId) {
+      const t = await prisma.tenant.findUnique({ where: { id: s.tenantId }, select: { permissions: true } });
+      tp = (t && t.permissions) || {};
+    }
+    if (s.role === "MANAGER") {
+      const u = await prisma.user.findUnique({ where: { id: s.sub }, select: { perms: true } });
+      up = (u && u.perms) || {};
+    }
+  } catch (e) {}
+  for (const k of PERM_KEYS) out[k] = tp[k] !== false && up[k] !== false;
+  return out;
+}

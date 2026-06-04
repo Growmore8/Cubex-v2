@@ -4,6 +4,8 @@ import { getPrice } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
 import { marginFor, pnlFor, validateSlTp } from "@/lib/trademath";
+import { notifyStaff } from "@/services/notification.service";
+import { audit } from "@/lib/audit";
 
 export async function placeOrder(tenantId: string, userId: string, input: any) {
   const account = input.accountId
@@ -43,6 +45,9 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
       sl: new Prisma.Decimal(input.sl || 0), tp: new Prisma.Decimal(input.tp || 0),
     },
   });
+  const label = `${account.login} ${input.side} ${input.symbol} ${input.lots}L @ ${price}`;
+  audit(tenantId, "trade.open", label, account.login, "CLIENT" as any);
+  notifyStaff(tenantId, { type: "TRADE", title: "Trade opened", body: label }, account.managerId).catch(() => {});
   return {
     id: trade.id.toString(), ticket: trade.ticket.toString(), symbol: trade.symbol, type: trade.type,
     lots: Number(trade.lots), openPrice: Number(trade.openPrice), sl: Number(trade.sl), tp: Number(trade.tp),
@@ -70,5 +75,8 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
     await tx.account.update({ where: { id: trade.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnl) } } });
     await tx.trade.delete({ where: { id: trade.id } });
   });
+  const label = `${trade.account.login} ${trade.symbol} closed @ ${price} | PnL ${pnl.toFixed(2)}`;
+  audit(tenantId, "trade.close", label, trade.account.login, "CLIENT" as any);
+  notifyStaff(tenantId, { type: "TRADE", title: "Trade closed", body: label }, trade.account.managerId).catch(() => {});
   return { pnl };
 }

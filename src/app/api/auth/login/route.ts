@@ -4,6 +4,9 @@ import { headers } from "next/headers";
 import { authenticate } from "@/services/auth.service";
 import { signSession, SESSION_COOKIE } from "@/lib/jwt";
 import { ROLE_HOME } from "@/config/roles";
+import { audit } from "@/lib/audit";
+import { notifyStaff } from "@/services/notification.service";
+import { prisma } from "@/lib/prisma";
 
 const schema = z.object({ email: z.string().email(), password: z.string().min(1) });
 
@@ -14,6 +17,14 @@ export async function POST(req: Request) {
     const host = h.get("host");
     const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || undefined;
     const session = await authenticate(host, email, password, ip);
+    audit(session.tenantId, "auth.login", `${session.role} "${session.name}" logged in` + (ip ? ` (${ip})` : ""), session.email, session.role as any);
+    // Notify staff when a client logs in (drives the login sound on admin/manager side)
+    if (session.role === "CLIENT" && session.tenantId) {
+      try {
+        const acc = await prisma.account.findFirst({ where: { tenantId: session.tenantId, userId: session.sub }, select: { managerId: true, login: true } });
+        notifyStaff(session.tenantId, { type: "LOGIN", title: "Client login", body: `${session.name} (${acc?.login || ""}) signed in` }, acc?.managerId).catch(() => {});
+      } catch {}
+    }
     const token = await signSession(session);
     const res = NextResponse.json({
       ok: true,

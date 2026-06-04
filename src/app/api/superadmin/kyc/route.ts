@@ -14,7 +14,7 @@ export async function GET() {
     accountId: d.account ? d.account.login : "—",
     name: d.account ? (d.account.name || (d.account.user ? d.account.user.name : "")) : "",
     email: d.account && d.account.user ? d.account.user.email : "",
-    docType: d.docType, fileUrl: d.fileUrl, status: d.status,
+    docType: d.docType, fileUrl: d.fileUrl, hasBack: !!d.backUrl, note: d.note || "", status: d.status,
   }));
   return NextResponse.json({ ok: true, items });
 }

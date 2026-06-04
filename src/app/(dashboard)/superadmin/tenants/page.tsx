@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useDialog } from "@/components/ui/ConfirmDialog";
 
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
   { sec: "Users", items: [["createClients", "Create Clients"], ["deleteClients", "Delete Clients"], ["manageManagers", "Manage Managers"]] },
@@ -28,6 +29,7 @@ export default function SATenantsPage() {
   const [subForm, setSubForm] = useState<any>({});
   const [editFor, setEditFor] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const { confirm, prompt, node } = useDialog();
 
   async function load() {
     try {
@@ -108,6 +110,7 @@ export default function SATenantsPage() {
 
   return (
     <div className="space-y-4">
+      {node}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Tenant Management</h1>
@@ -194,7 +197,7 @@ export default function SATenantsPage() {
                     title="Reset admin password"
                     className="mx-0.5 rounded px-2 py-1"
                     style={{ background: "color-mix(in srgb, var(--amber) 16%, transparent)", color: "#b45309" }}
-                    onClick={() => { const p = prompt("New password for " + (t.brandName || t.name) + " admin"); if (p) act(t.id, "resetPassword", { password: p }); }}
+                    onClick={async () => { const p = await prompt({ title: "Reset admin password", message: "New password for " + (t.brandName || t.name) + " admin", password: true, placeholder: "New password", confirmLabel: "Reset" }); if (p) act(t.id, "resetPassword", { password: p }); }}
                   >
                     <i className="fa-solid fa-key"></i>
                   </button>
@@ -202,7 +205,7 @@ export default function SATenantsPage() {
                     title="Delete tenant"
                     className="mx-0.5 rounded px-2 py-1"
                     style={{ background: "color-mix(in srgb, var(--red) 16%, transparent)", color: "#b91c1c" }}
-                    onClick={() => { if (confirm("Delete tenant " + t.name + " and ALL its data? This cannot be undone.")) act(t.id, "delete", {}); }}
+                    onClick={async () => { if (await confirm({ title: "Delete tenant", message: "Delete " + t.name + " and ALL its data? This cannot be undone.", danger: true })) act(t.id, "delete", {}); }}
                   >
                     <i className="fa-solid fa-trash"></i>
                   </button>

@@ -4,6 +4,8 @@ import { getPrice } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
 import { pnlFor } from "@/lib/trademath";
+import { audit } from "@/lib/audit";
+import { notifyStaff } from "@/services/notification.service";
 
 function accountWhere(s: any) {
   if (s.role === "ADMIN" || s.role === "SUPERADMIN") return { tenantId: s.tenantId };
@@ -96,7 +98,23 @@ export async function manualTrade(s: any, input: any) {
       sl: new Prisma.Decimal(input.sl || 0), tp: new Prisma.Decimal(input.tp || 0),
       ...(openedAt ? { openedAt } : {}) },
   });
+  const label = `${acc.login} ${input.type} ${input.symbol} ${input.lots}L @ ${openPrice} (manual)`;
+  audit(acc.tenantId, "trade.manual", label, s.email || "staff", s.role);
+  notifyStaff(acc.tenantId, { type: "TRADE", title: "Manual trade", body: label }, acc.managerId).catch(() => {});
   return { id: t.id.toString(), ticket: t.ticket.toString(), openPrice };
+}
+
+// Delete an OPEN position outright (as if it never happened). Floating P/L is
+// not realized into the balance, so removing it needs no balance change — the
+// client's open positions / equity simply update. No client notification.
+export async function deleteOpen(s: any, tradeId: string) {
+  const trade = await prisma.trade.findFirst({ where: { id: BigInt(tradeId), account: accountWhere(s) }, include: { account: { select: { login: true, tenantId: true, managerId: true } } } });
+  if (!trade) throw new Error("Position not found");
+  await prisma.trade.delete({ where: { id: trade.id } });
+  const label = `${trade.account.login} ${trade.symbol} ${trade.type} ${Number(trade.lots)}L deleted (by staff)`;
+  audit(trade.account.tenantId, "trade.delete", label, s.email || "staff", s.role);
+  notifyStaff(trade.account.tenantId, { type: "TRADE", title: "Trade deleted", body: label }, trade.account.managerId).catch(() => {});
+  return { tenantId: trade.account.tenantId };
 }
 
 export async function forceClose(s: any, tradeId: string) {
@@ -112,5 +130,8 @@ export async function forceClose(s: any, tradeId: string) {
     await tx.account.update({ where: { id: trade.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnl) } } });
     await tx.trade.delete({ where: { id: trade.id } });
   });
+  const label = `${trade.account.login} ${trade.symbol} closed @ ${price} | PnL ${pnl.toFixed(2)} (by staff)`;
+  audit(trade.account.tenantId, "trade.close", label, s.email || "staff", s.role);
+  notifyStaff(trade.account.tenantId, { type: "TRADE", title: "Trade closed", body: label }, trade.account.managerId).catch(() => {});
   return { pnl, userId: trade.account.userId, tenantId: trade.account.tenantId };
 }

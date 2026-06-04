@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useDialog } from "@/components/ui/ConfirmDialog";
 
 interface Client {
   id: string; login: string; name: string; type: string; leverage: number; currency: string;
@@ -16,9 +17,11 @@ export default function AdminClientsPage() {
   const [managers, setManagers] = useState<Manager[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<any>({ ...emptyForm });
   const [manage, setManage] = useState<any>(null);
+  const { confirm, node } = useDialog();
 
   async function load() {
     setLoading(true);
@@ -59,10 +62,10 @@ export default function AdminClientsPage() {
   }
   async function applyPassword() {
     const r = await fetch("/api/admin/clients/" + manage.id + "/password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: manage._pw }) });
-    const d = await r.json(); if (!d.ok) { setErr(d.error); return; } setManage({ ...manage, _pw: "" }); alert("Password reset");
+    const d = await r.json(); if (!d.ok) { setErr(d.error); return; } setManage({ ...manage, _pw: "" }); setMsg("Password reset"); setTimeout(() => setMsg(""), 2000);
   }
   async function remove(c: Client) {
-    if (!confirm("Delete client " + c.login + "?")) return;
+    if (!(await confirm({ title: "Delete client", message: c.login + " — " + c.name + " will be removed.", danger: true }))) return;
     await fetch("/api/admin/clients/" + c.id, { method: "DELETE" }); load();
   }
 
@@ -70,6 +73,8 @@ export default function AdminClientsPage() {
 
   return (
     <div className="space-y-6">
+      {node}
+      {msg && <p className="text-sm text-green-600">{msg}</p>}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Clients</h1>
         <button onClick={() => setShowCreate((v) => !v)} style={{ backgroundColor: "var(--brand-primary)" }} className="rounded-md px-4 py-2 text-sm font-medium text-white">{showCreate ? "Close" : "New client"}</button>

@@ -1,15 +1,20 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useDialog } from "@/components/ui/ConfirmDialog";
 
 export default function SAKyc() {
   const [items, setItems] = useState<any[]>([]);
   const [tab, setTab] = useState("All"); const [q, setQ] = useState(""); const [img, setImg] = useState<string | null>(null); const [err, setErr] = useState("");
+  const { confirm, prompt, node } = useDialog();
   async function load() { try { const d = await fetch("/api/superadmin/kyc").then((r) => r.json()); if (d.ok) setItems(d.items); } catch (e) {} }
   useEffect(() => { load(); }, []);
-  async function act(id: string, action: string) { setErr(""); const r = await fetch("/api/superadmin/kyc/" + id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; } load(); }
+  async function act(id: string, action: string, note?: string) { setErr(""); const r = await fetch("/api/superadmin/kyc/" + id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, note }) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; } load(); }
+  async function doReject(id: string) { const reason = await prompt({ title: "Reject KYC", message: "Reason for rejection (shown to the client)", placeholder: "e.g. document blurry / expired", confirmLabel: "Reject" }); if (reason) act(id, "reject", reason); }
+  async function doReverse(id: string) { if (await confirm({ title: "Reverse decision", message: "Send this back to PENDING? The client will be asked to upload again.", confirmLabel: "Reverse" })) act(id, "reverse"); }
   const filtered = items.filter((i: any) => (tab === "All" || i.status === tab) && (!q || (i.accountId + i.name + i.email).toLowerCase().includes(q.toLowerCase())));
   const inp = "rounded-md border px-2 py-1.5 text-sm";
   return (<div className="space-y-4">
+    {node}
     <div><h1 className="text-2xl font-bold">KYC</h1><p className="text-sm text-gray-500">All KYC submissions across every outsource</p></div>
     {err && <div className="text-sm text-red-600">{err}</div>}
     <div className="rounded-lg border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
@@ -27,9 +32,13 @@ export default function SAKyc() {
               <td className="px-2 py-2">{i.name}</td>
               <td className="px-2 py-2 text-xs text-gray-500">{i.email}</td>
               <td className="px-2 py-2">{i.docType}</td>
-              <td className="px-2 py-2">{i.fileUrl ? <button title="View document" className="mx-0.5 rounded px-2 py-1" style={{ background: "var(--accent2)", color: "#fff" }} onClick={() => setImg(i.fileUrl)}><i className="fa-solid fa-eye"></i></button> : "—"}</td>
-              <td className="px-2 py-2"><span className={"sab " + (i.status === "APPROVED" ? "sab-green" : i.status === "PENDING" ? "sab-amber" : "sab-red")}>{i.status}</span></td>
-              <td className="px-2 py-2 text-right">{i.status === "PENDING" ? (<span className="space-x-1"><button title="Approve" className="mx-0.5 rounded px-2 py-1" style={{ background: "var(--green)", color: "#fff" }} onClick={() => act(i.id, "approve")}><i className="fa-solid fa-check"></i></button><button title="Reject" className="mx-0.5 rounded px-2 py-1" style={{ background: "var(--red)", color: "#fff" }} onClick={() => act(i.id, "reject")}><i className="fa-solid fa-xmark"></i></button></span>) : <span className="text-xs text-gray-400">—</span>}</td>
+              <td className="px-2 py-2 whitespace-nowrap">
+                <button title="View front" className="mx-0.5 rounded px-2 py-1" style={{ background: "var(--accent2)", color: "#fff" }} onClick={() => setImg("/api/files/kyc/" + i.id)}><i className="fa-solid fa-eye"></i> F</button>
+                {i.hasBack && <button title="View back" className="mx-0.5 rounded px-2 py-1" style={{ background: "var(--accent2)", color: "#fff" }} onClick={() => setImg("/api/files/kyc/" + i.id + "?side=back")}><i className="fa-solid fa-eye"></i> B</button>}
+                {!i.hasBack && <span className="ml-1 text-[10px] text-amber-600" title="No back side — cannot verify">no back</span>}
+              </td>
+              <td className="px-2 py-2"><span className={"sab " + (i.status === "APPROVED" ? "sab-green" : i.status === "PENDING" ? "sab-amber" : "sab-red")}>{i.status}</span>{i.status === "REJECTED" && i.note && <div className="text-[10px] text-red-500" title="Rejection reason">{i.note}</div>}</td>
+              <td className="px-2 py-2 text-right whitespace-nowrap">{i.status === "PENDING" ? (<span className="space-x-1"><button title="Approve" className="mx-0.5 rounded px-2 py-1" style={{ background: "var(--green)", color: "#fff" }} onClick={() => act(i.id, "approve")}><i className="fa-solid fa-check"></i></button><button title="Reject" className="mx-0.5 rounded px-2 py-1" style={{ background: "var(--red)", color: "#fff" }} onClick={() => doReject(i.id)}><i className="fa-solid fa-xmark"></i></button></span>) : <button title="Reverse to pending" className="mx-0.5 rounded px-2 py-1" style={{ background: "var(--bg2)", color: "var(--text2)", border: "1px solid var(--border)" }} onClick={() => doReverse(i.id)}><i className="fa-solid fa-rotate-left"></i> Reverse</button>}</td>
             </tr>))}
             {filtered.length === 0 && <tr><td className="px-2 py-4 text-gray-400" colSpan={8}>No submissions.</td></tr>}
           </tbody>

@@ -10,7 +10,7 @@ export type Role = keyof typeof ROLES;
 export const ROLE_HOME: Record<Role, string> = {
   SUPERADMIN: "/superadmin",
   ADMIN: "/admin/platform",
-  MANAGER: "/manager",
+  MANAGER: "/admin/platform",
   CLIENT: "/client",
 };
 

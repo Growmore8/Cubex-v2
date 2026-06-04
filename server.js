@@ -57,15 +57,14 @@ const DERIVED_SET = new Set(Object.keys(DERIVED));
 const derivedByDep = {};
 for (const ds in DERIVED) for (const dep of DERIVED[ds].d) (derivedByDep[dep] = derivedByDep[dep] || []).push(ds);
 
+// A derived symbol's computed value becomes its TARGET; microTick walks the
+// displayed price toward it one point at a time, just like base symbols, so
+// metal crosses / grams crawl smoothly instead of snapping to each recompute.
 function applyDerived(sym, price) {
   const st = state[sym]; if (!st || !price || !isFinite(price) || price <= 0) return;
-  const d = (meta[sym] && meta[sym].digits) || 2, p = r(price, d), now = Date.now(), b = bucketStart(now);
-  let candle = st.candles[st.candles.length - 1];
-  if (!candle || b !== st.bucket) { candle = { time: Math.floor(b / 1000), open: p, high: p, low: p, close: p }; st.candles.push(candle); if (st.candles.length > HISTORY) st.candles.shift(); st.bucket = b; }
-  else { candle.high = Math.max(candle.high, p); candle.low = Math.min(candle.low, p); candle.close = p; }
-  st.price = p;
-  redis.set("price:" + sym, String(p));
-  if (global.__io) global.__io.emit("tick", { symbol: sym, price: p, candle });
+  const p = r(price, (meta[sym] && meta[sym].digits) || 2);
+  st.target = p;
+  if (st.price == null) commitPrice(sym, p); // first value: show at once
 }
 function recomputeDerived(base) {
   const list = derivedByDep[base]; if (!list) return;
@@ -106,7 +105,7 @@ async function loadCatalog() {
     const td = toTD(x.symbol, x.category);
     // Finnhub fallback feed (skip derived/calculated symbols)
     const fh = x.feed || (DERIVED_SET.has(x.symbol) ? null : toFinnhub(x.symbol, x.category));
-    meta[x.symbol] = { digits: x.digits || 5, contract: contractFor(x.category, x.symbol), feed: fh, td };
+    meta[x.symbol] = { digits: x.digits || 5, contract: contractFor(x.category, x.symbol), feed: fh, td, cat: x.category };
     state[x.symbol] = { price: null, candles: [], bucket: 0 };
     if (fh) feedToSym[fh] = x.symbol;
     tdToSym[td] = x.symbol;
@@ -114,13 +113,26 @@ async function loadCatalog() {
   console.log("[feed] catalog loaded:", symbols.length, "symbols");
 }
 
+// Real-feed entry point. Instead of snapping the display straight to the true
+// price (which makes the last digits jump by several points at once), we record
+// the true price as a TARGET. microTick() then walks the displayed price toward
+// it one point at a time, so every symbol's last decimal crawls smoothly.
 function applyPrice(sym, price, source) {
   if (!state[sym] || !price || isNaN(price) || price <= 0) return;
   if (DERIVED_SET.has(sym)) return; // derived symbols are computed, never fed externally
   // TwelveData is primary; Finnhub is a fallback only when TD hasn't priced recently.
   if (source === "FH" && fhLast["__td_" + sym] && Date.now() - fhLast["__td_" + sym] < 12000) return;
   if (source === "TD") fhLast["__td_" + sym] = Date.now();
-  const d = meta[sym].digits, p = r(price, d), st = state[sym], now = Date.now(), b = bucketStart(now);
+  const d = meta[sym].digits, p = r(price, d), st = state[sym];
+  st.target = p;
+  if (st.price == null) commitPrice(sym, p); // first price for this symbol: show at once
+}
+
+// Commit an actual DISPLAY price: update the forming candle, cache it, broadcast
+// the tick, and recompute any derived symbols that depend on this one.
+function commitPrice(sym, p) {
+  const st = state[sym]; if (!st) return;
+  const now = Date.now(), b = bucketStart(now);
   let candle = st.candles[st.candles.length - 1];
   if (!candle || b !== st.bucket) {
     candle = { time: Math.floor(b / 1000), open: p, high: p, low: p, close: p };
@@ -149,6 +161,70 @@ function connectTD() {
   tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) applyPrice(s, parseFloat(m.price), "TD"); } } catch (e) {} });
   tdWs.on("close", () => { setTimeout(connectTD, 5000); });
   tdWs.on("error", (e) => console.error("[TD]", e.message));
+}
+
+// Micro-tick simulation: between real feed updates, move each symbol's price by
+// EXACTLY ONE point (the last decimal) every MICRO_MS, so the last digit crawls
+// smoothly like MT5 (e.g. 63961.50 -> 63961.51 -> 63961.52) instead of jumping
+// several digits at once. Each symbol keeps a "drift" direction with momentum so
+// it trends for a while, then occasionally reverses or pauses. Real feed updates
+// (TD/FH) still override these whenever they arrive.
+// Resume last-known prices from Redis on boot so symbols animate immediately
+// (and survive restarts) instead of waiting for the first live tick.
+async function seedFromRedis() {
+  for (const sym of symbols) {
+    if (DERIVED_SET.has(sym)) continue;
+    const st = state[sym]; if (!st || st.price != null) continue;
+    try { const v = await redis.get("price:" + sym); const p = v != null ? parseFloat(v) : NaN; if (p > 0) { commitPrice(sym, r(p, meta[sym].digits)); st.target = st.price; } } catch (e) {}
+  }
+}
+// A plausible starting price by category, so symbols the data feed can't supply
+// still tick instead of sitting frozen at "...". Real feed/target overrides it.
+function seedPriceFor(sym) {
+  const cat = (meta[sym] && meta[sym].cat) || "forex";
+  const s = sym.toUpperCase();
+  if (cat === "metals" || /^XAU/.test(s)) return /^XAG/.test(s) ? 28 : 2350;
+  if (cat === "crypto") return s.startsWith("BTC") ? 64000 : s.startsWith("ETH") ? 3400 : 100;
+  if (cat === "indices") return 15000;
+  if (cat === "stocks") return 150;
+  if (/JPY$/.test(s)) return 150; // forex JPY pairs
+  return 1.1; // generic forex
+}
+// After the feeds have had a chance to connect, give anything still unpriced a
+// synthetic seed so every symbol moves.
+function ensureSeeded() {
+  for (const sym of symbols) {
+    if (DERIVED_SET.has(sym)) continue;
+    const st = state[sym]; if (!st || st.price != null) continue;
+    commitPrice(sym, r(seedPriceFor(sym), meta[sym].digits));
+  }
+}
+
+function microTick() {
+  for (const sym of symbols) {
+    const st = state[sym];
+    if (!st || st.price == null) continue;
+    const d = (meta[sym] && meta[sym].digits) || 2;
+    const step = Math.pow(10, -d);
+    let np;
+    if (st.target != null && st.target !== st.price) {
+      // Walk toward the latest true (or computed) price one point at a time. Only
+      // a very large gap (a genuine fast move) is allowed to snap, to bound lag.
+      const gapPts = Math.round((st.target - st.price) / step);
+      np = Math.abs(gapPts) > 200 ? st.target : r(st.price + Math.sign(gapPts) * step, d);
+    } else if (!DERIVED_SET.has(sym)) {
+      // Base symbol caught up to its real price: idle jitter with momentum so the
+      // last digit keeps ticking instead of freezing.
+      if (st.drift == null) st.drift = Math.random() < 0.5 ? -1 : 1;
+      const rr = Math.random();
+      if (rr < 0.12) st.drift = -st.drift; // reverse direction
+      else if (rr < 0.30) continue;        // pause this tick (no change)
+      np = r(st.price + st.drift * step, d);
+    } else {
+      continue; // derived symbol caught up: hold until a base moves it again
+    }
+    if (np > 0) commitPrice(sym, np);
+  }
 }
 
 // Shared P&L: $1/pip/lot for forex (USD quote); USD-base converted via rate;
@@ -263,10 +339,13 @@ app.prepare().then(async () => {
   sub.subscribe("cubex:refresh").catch(() => {});
   sub.on("message", (ch, msg) => { if (ch === "cubex:refresh" && global.__io) { try { global.__io.emit("refresh", JSON.parse(msg)); } catch (e) { global.__io.emit("refresh", {}); } } });
   io.on("connection", (socket) => { const h = {}; for (const s of symbols) h[s] = state[s].candles; socket.emit("history", h); });
+  await seedFromRedis();        // resume last-known prices (survives restarts)
   connectFinnhub();
   connectTD();
   pollPrices();
+  setTimeout(ensureSeeded, 8000); // after feeds connect, seed anything still unpriced
   setInterval(pollPrices, 5000);
+  setInterval(microTick, 140);
   setInterval(() => monitor(io), MONITOR_MS);
   setInterval(() => checkPending(io), 2000);
   server.listen(port, () => console.log("> Ready on http://localhost:" + port));

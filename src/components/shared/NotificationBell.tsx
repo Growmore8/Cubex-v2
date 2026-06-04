@@ -1,16 +1,25 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { playSound, soundForNotification } from "@/lib/sounds";
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [unread, setUnread] = useState(0);
+  const seen = useRef<Set<string>>(new Set());
+  const primed = useRef(false);
 
   async function load() {
     const d = await fetch("/api/notifications").then((r) => r.json());
-    if (d.ok) { setItems(d.items); setUnread(d.unread); }
+    if (!d.ok) return;
+    if (primed.current) {
+      for (const n of d.items) { const id = String(n.id); if (!seen.current.has(id)) playSound(soundForNotification(n)); }
+    }
+    d.items.forEach((n: any) => seen.current.add(String(n.id)));
+    primed.current = true;
+    setItems(d.items); setUnread(d.unread);
   }
-  useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, []);
+  useEffect(() => { load(); const t = setInterval(load, 12000); return () => clearInterval(t); }, []);
 
   async function openAndRead() {
     setOpen((v) => !v);

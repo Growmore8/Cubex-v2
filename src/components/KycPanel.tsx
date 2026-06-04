@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { BUY, SELL, GOLD } from "@/config/theme";
+import { useDialog } from "@/components/ui/ConfirmDialog";
 
 export default function KycPanel() {
   const [list, setList] = useState<any[]>([]);
@@ -9,6 +10,7 @@ export default function KycPanel() {
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [view, setView] = useState("");
+  const { prompt, node } = useDialog();
 
   async function load() {
     const r = await fetch("/api/admin/kyc").then((x) => x.json()).catch(() => ({ ok: false }));
@@ -27,13 +29,14 @@ export default function KycPanel() {
   function when(p: any) { const v = g(p, ["createdAt", "date", "submittedAt", "created"], null); return v ? new Date(v).toLocaleString() : ""; }
   function reviewed(p: any) { const v = g(p, ["reviewedAt", "updatedAt"], null); return v ? new Date(v).toLocaleDateString() : ""; }
 
-  async function act(p: any, action: string) {
+  async function act(p: any, action: string, note?: string) {
     setBusy(p.id + action); setErr("");
-    const r = await fetch("/api/admin/kyc/" + p.id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+    const r = await fetch("/api/admin/kyc/" + p.id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, note }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     setBusy("");
     if (!r.ok) { setErr(r.error || "Failed"); return; }
     load();
   }
+  async function doReject(p: any) { const reason = await prompt({ title: "Reject KYC", message: "Reason for rejection (shown to the client)", placeholder: "e.g. document blurry / expired", confirmLabel: "Reject" }); if (reason) act(p, "reject", reason); }
 
   const tabs = ["PENDING", "APPROVED", "REJECTED", "ALL"];
   const rows = list.filter((p) => (status === "ALL" || st(p) === status)).filter((p) => (name(p) + " " + login(p) + " " + email(p)).toLowerCase().includes(q.toLowerCase()));
@@ -45,6 +48,7 @@ export default function KycPanel() {
 
   return (
     <div className="flex h-full flex-col text-[10px]">
+      {node}
       <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-1 py-1">
         {tabs.map((t) => <button key={t} onClick={() => setStatus(t)} className={chip(status === t)} style={status === t ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)" }}>{t[0] + t.slice(1).toLowerCase()}</button>)}
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / email / account" className="ml-auto w-44 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
@@ -67,14 +71,14 @@ export default function KycPanel() {
                 <td className={td}>{name(p)}</td>
                 <td className={td + " text-[var(--muted)]"}>{email(p)}</td>
                 <td className={td}>{docType(p)}</td>
-                <td className={td}>{front(p) ? <button onClick={() => setView(front(p))} className={eye}>View</button> : <span className="text-[var(--muted)]">-</span>}</td>
-                <td className={td}>{back(p) ? <button onClick={() => setView(back(p))} className={eye}>View</button> : <span className="text-[var(--muted)]">-</span>}</td>
+                <td className={td}>{front(p) ? <button onClick={() => setView("/api/files/kyc/" + p.id)} className={eye}>View</button> : <span className="text-[var(--muted)]">-</span>}</td>
+                <td className={td}>{back(p) ? <button onClick={() => setView("/api/files/kyc/" + p.id + "?side=back")} className={eye}>View</button> : <span className="text-amber-600">no back</span>}</td>
                 <td className={td}><span className="rounded px-1.5 py-0.5 text-[9px]" style={badge(st(p))}>{st(p)}</span></td>
                 <td className={td}>
                   <div className="flex items-center justify-end gap-1">
                     {st(p) === "PENDING" ? (<>
                       <button disabled={!!busy} onClick={() => act(p, "approve")} className="rounded px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
-                      <button disabled={!!busy} onClick={() => act(p, "reject")} className="rounded px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
+                      <button disabled={!!busy} onClick={() => doReject(p)} className="rounded px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
                     </>) : <span className="text-[var(--muted)]">{reviewed(p)}</span>}
                   </div>
                 </td>

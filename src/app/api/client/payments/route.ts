@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { clientAccount } from "@/services/kyc.service";
 import { listClientPayments, createPayment } from "@/services/payment.service";
-import { notifyTenantAdmins } from "@/services/notification.service";
+import { notifyStaff } from "@/services/notification.service";
 import { saveUpload } from "@/lib/upload";
 import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     const file = form.get("file") as File | null;
     if (file && file.size > 0) slipUrl = await saveUpload(file, "slips/" + account.id);
     await createPayment(s.tenantId!, account.id, kind, amount, method, slipUrl, note);
-    await notifyTenantAdmins(s.tenantId!, kind + " request", account.login + " requested " + amount);
+    await notifyStaff(s.tenantId!, { type: "FUNDS", title: kind === "DEPOSIT" ? "Deposit request" : "Withdrawal request", body: account.login + " requested " + amount }, (account as any).managerId);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Request failed" }, { status: 400 });

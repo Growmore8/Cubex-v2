@@ -2,7 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import LWChart from "@/components/LWChart";
+import { playSound, soundForNotification } from "@/lib/sounds";
 import PriceCell from "@/components/PriceCell";
+import WalletPanel from "@/components/WalletPanel";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
 import ClientMobile from "@/components/ClientMobile";
@@ -48,9 +50,21 @@ export default function ClientTerminal() {
   const [symbols, setSymbols] = useState<any[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
+  const notifSeen = useRef<Set<string>>(new Set());
+  const notifPrimed = useRef(false);
+  const [cToasts, setCToasts] = useState<any[]>([]);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [topUpAmt, setTopUpAmt] = useState("10000");
+  function pushToast(n: any) {
+    const st = soundForNotification(n);
+    const id = Date.now() + Math.random();
+    setCToasts((t) => [...t.slice(-4), { id, st, title: n.title, body: n.body }]);
+    setTimeout(() => setCToasts((t) => t.filter((x) => x.id !== id)), 5000);
+  }
   const [selSym, setSelSym] = useState("");
   const [tf, setTf] = useState("1M");
   const [orderType, setOrderType] = useState<"MARKET" | "PENDING">("MARKET");
+  const [walletModal, setWalletModal] = useState<null | "deposit" | "withdraw" | "kyc">(null);
   const [vol, setVol] = useState(0.1);
   const [sl, setSl] = useState("");
   const [tp, setTp] = useState("");
@@ -107,7 +121,7 @@ export default function ClientTerminal() {
     (d.symbols || []).forEach((s: any) => { DIGITS[s.symbol] = s.digits; });
     if (!selSymRef.current && d.symbols.length) setSelSym(d.symbols[0].symbol);
     fetch("/api/client/accounts").then((r) => r.json()).then((ad) => { if (ad.ok) { setAccts(ad.accounts || []); if (!accIdRef.current && ad.accounts && ad.accounts.length) { accIdRef.current = ad.accounts[0].id; setAccId(ad.accounts[0].id); } } }).catch(() => {});
-    fetch("/api/client/notifications").then((r) => r.json()).then((nd) => { if (nd.ok) setNotis(nd.items || []); }).catch(() => {});
+    fetch("/api/client/notifications").then((r) => r.json()).then((nd) => { if (!nd.ok) return; const items = nd.items || []; if (notifPrimed.current) { for (const n of items) { const id = String(n.id); if (!notifSeen.current.has(id)) { playSound(soundForNotification(n)); if (!isMobile) pushToast(n); } } } items.forEach((n: any) => notifSeen.current.add(String(n.id))); notifPrimed.current = true; setNotis(items); }).catch(() => {});
     fetch("/api/client/pending?accountId=" + (accIdRef.current || "")).then((r) => r.json()).then((pd) => { if (pd.ok) setPending(pd.pending || []); }).catch(() => {});
   }
   useEffect(() => { load(); }, []);
@@ -185,7 +199,7 @@ export default function ClientTerminal() {
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(keyRes.publicKey) });
       const j: any = sub.toJSON();
       await fetch("/api/client/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: j.endpoint, keys: j.keys }) });
-      alert("Push alerts enabled");
+      pushToast({ title: "Push alerts enabled", type: "NOTICE" });
     } catch (e) { setErr("Failed to enable alerts"); }
   }
   async function addPasskey() {
@@ -196,7 +210,7 @@ export default function ClientTerminal() {
       const attResp = await mod.startRegistration(optRes.options);
       const vr = await fetch("/api/client/webauthn/register/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(attResp) }).then((r) => r.json());
       if (!vr.ok) { setErr(vr.error || "Verification failed"); return; }
-      alert("Passkey added");
+      pushToast({ title: "Passkey / Face ID added", type: "NOTICE" });
     } catch (e: any) { setErr((e && e.message) || "Passkey failed"); }
   }
   async function unlockPasskey() {
@@ -246,10 +260,11 @@ export default function ClientTerminal() {
     if (r.account) { accIdRef.current = r.account.id; setAccId(r.account.id); }
     load();
   }
-  async function topUp() {
-    const amt = prompt("Top-up amount for this demo account:", "10000");
-    if (!amt) return;
-    const r = await fetch("/api/client/topup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accIdRef.current, amount: Number(amt) }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+  function topUp() { setTopUpOpen(true); }
+  async function doTopUp(amt: number) {
+    setTopUpOpen(false);
+    if (!amt || amt <= 0) return;
+    const r = await fetch("/api/client/topup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accIdRef.current, amount: amt }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { setErr(r.error || "Top-up failed"); return; }
     load();
   }
@@ -316,15 +331,15 @@ export default function ClientTerminal() {
               return (<><div className="fixed inset-0 z-[80]" onClick={close} />
                 <div className="absolute right-0 z-[90] mt-1 w-56 overflow-hidden rounded-lg border py-1 text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
                   {head("Funds")}
-                  {mItem(() => { window.location.href = "/client/wallet"; }, "fa-arrow-down-to-bracket", "Deposit", BUY, readOnly)}
-                  {mItem(() => { window.location.href = "/client/wallet"; }, "fa-arrow-up-from-bracket", "Withdraw", GOLD, readOnly)}
+                  {mItem(() => { close(); setWalletModal("deposit"); }, "fa-arrow-down-to-bracket", "Deposit", BUY, readOnly)}
+                  {mItem(() => { close(); setWalletModal("withdraw"); }, "fa-arrow-up-from-bracket", "Withdraw", GOLD, readOnly)}
                   {accts.length >= 2 && mItem(() => { setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); }, "fa-right-left", "Transfer", undefined, readOnly)}
                   {curAcct?.type === "DEMO" && mItem(topUp, "fa-coins", "Top up Demo", GOLD, readOnly)}
                   {div}
                   {head("Accounts")}
                   {mItem(() => openAccount("DEMO"), "fa-vial", "Open Demo Account", undefined, readOnly)}
                   {mItem(() => openAccount("LIVE"), "fa-bolt", "Open Live Account", BUY, readOnly)}
-                  {mItem(() => { window.location.href = "/client/kyc"; }, "fa-id-card", "KYC Verification")}
+                  {mItem(() => { close(); setWalletModal("kyc"); }, "fa-id-card", "KYC Verification")}
                   {div}
                   {head("Security")}
                   {mItem(() => { setPinErr(""); setPinForm({}); setPinModal(true); }, "fa-shield-halved", pinHasPin ? "Change PIN" : "Set PIN")}
@@ -345,6 +360,31 @@ export default function ClientTerminal() {
       {readOnly && (
         <div className="flex items-center justify-center gap-2 py-1.5 text-[11px] font-semibold" style={{ background: "rgba(224,82,96,0.16)", color: SELL, borderBottom: "1px solid rgba(224,82,96,0.35)" }}>
           <i className="fa-solid fa-lock" /> READ ONLY ACCESS — You can view everything, but all actions are disabled.
+        </div>
+      )}
+
+      {topUpOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setTopUpOpen(false)}>
+          <div className="w-[320px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 text-sm font-semibold">Top up Demo Account</div>
+            <div className="mb-1 text-[10px] text-[var(--muted)]">Amount (USD)</div>
+            <input type="number" value={topUpAmt} onChange={(e) => setTopUpAmt(e.target.value)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]" autoFocus />
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setTopUpOpen(false)} className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs">Cancel</button>
+              <button onClick={() => doTopUp(Number(topUpAmt))} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: GOLD, color: "#1a1300" }}>Top up</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cToasts.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-[120] flex flex-col gap-2">
+          {cToasts.map((t) => (
+            <div key={t.id} className="flex items-start gap-2 rounded-lg border px-3 py-2 text-[11px] shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", minWidth: 230, maxWidth: 300, borderLeft: `3px solid ${t.st === "trade" ? "#2f81f7" : t.st === "funds" ? GOLD : t.st === "login" ? "#a78bfa" : BUY}` }}>
+              <i className={"fa-solid mt-0.5 " + (t.st === "trade" ? "fa-chart-line" : t.st === "funds" ? "fa-money-bill" : "fa-bell")} style={{ color: t.st === "trade" ? "#2f81f7" : t.st === "funds" ? GOLD : BUY, fontSize: 12 }} />
+              <div className="min-w-0"><div className="font-semibold">{t.title}</div>{t.body && <div className="mt-0.5 text-[10px] text-[var(--muted)]">{t.body}</div>}</div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -479,7 +519,8 @@ export default function ClientTerminal() {
 
       <div className="flex shrink-0 flex-col" style={{ height: tbH }}>
         <div className="flex gap-1 border-b border-[var(--border)] px-2">
-          <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length}{pending.length ? " + " + pending.length + " pending" : ""}</button>
+          <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length}</button>
+          <button onClick={() => setBotTab("pending")} className={tab(botTab === "pending")} style={botTab === "pending" ? { color: "#5aa9ff" } : undefined}>Orders {pending.length ? <span className="ml-0.5 rounded-full px-1.5 text-[9px]" style={{ background: "rgba(90,169,255,0.2)", color: "#5aa9ff" }}>{pending.length}</span> : ""}</button>
           <button onClick={() => setBotTab("history")} className={tab(botTab === "history")} style={botTab === "history" ? { color: BUY } : undefined}>History</button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
@@ -492,13 +533,14 @@ export default function ClientTerminal() {
           )}
           {botTab === "positions" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Name</th><th className="px-2 py-1 font-normal">Date</th><th className="px-2 py-1 font-normal text-right">Qty</th><th className="px-2 py-1 font-normal text-right">Open</th><th className="px-2 py-1 font-normal text-right">TP</th><th className="px-2 py-1 font-normal text-right">SL</th><th className="px-2 py-1 font-normal text-right">Swap</th><th className="px-2 py-1 font-normal text-right">Gross P/L</th><th className="px-2 py-1 font-normal text-right">Net P/L</th><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Name</th><th className="px-2 py-1 font-normal">Date</th><th className="px-2 py-1 font-normal text-right">Qty</th><th className="px-2 py-1 font-normal text-right">Open</th><th className="px-2 py-1 font-normal text-right">Current</th><th className="px-2 py-1 font-normal text-right">TP</th><th className="px-2 py-1 font-normal text-right">SL</th><th className="px-2 py-1 font-normal text-right">Swap</th><th className="px-2 py-1 font-normal text-right">Gross P/L</th><th className="px-2 py-1 font-normal text-right">Net P/L</th><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
               <tbody>
-                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={10}>No open positions.</td></tr> : positions.map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); return (
+                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={11}>No open positions.</td></tr> : positions.map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
                   <tr key={p.id} className="border-t border-[var(--border)]">
                     <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span></td>
                     <td className="px-2 py-1 text-[var(--muted)]">{new Date(p.openedAt).toLocaleDateString()}</td>
                     <td className="px-2 py-1 text-right">{p.lots}</td><td className="px-2 py-1 text-right">{p.openPrice.toFixed(dg(p.symbol))}</td>
+                    <td className="px-2 py-1 text-right tabular-nums" style={{ color: cdir > 0 ? "#16c784" : cdir < 0 ? "#e05260" : "var(--text)", transition: "color 0.3s ease" }}>{cur.toFixed(dg(p.symbol))}</td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">{p.tp || "-"}</td><td className="px-2 py-1 text-right text-[var(--muted)]">{p.sl || "-"}</td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">0.00</td>
                     <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
@@ -508,18 +550,26 @@ export default function ClientTerminal() {
               </tbody>
             </table>
           )}
-          {botTab === "positions" && pending.length > 0 && (
+          {botTab === "pending" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal" colSpan={6}><span style={{ color: "var(--accent, #5aa9ff)" }}>⏳ Pending Orders ({pending.length})</span></th></tr></thead>
-              <tbody>{pending.map((o: any) => (
-                <tr key={o.id} className="border-t border-[var(--border)]" style={{ background: "rgba(90,169,255,0.06)" }}>
-                  <td className="px-2 py-1">{o.symbol} <span style={{ color: o.side === "BUY" ? BUY : SELL }}>{o.side} {o.kind}</span></td>
-                  <td className="px-2 py-1 text-[var(--muted)]">pending</td>
-                  <td className="px-2 py-1 text-right">{o.lots}</td>
-                  <td className="px-2 py-1 text-right" title="Trigger">{Number(o.price).toFixed(dg(o.symbol))}</td>
-                  <td className="px-2 py-1 text-right text-[var(--muted)]">{o.tp ? "TP " + o.tp : ""} {o.sl ? "SL " + o.sl : ""}</td>
-                  <td className="px-2 py-1 text-right"><button style={{ color: SELL }} onClick={() => cancelPending(o.id)}>X</button></td>
-                </tr>))}</tbody>
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Order</th><th className="px-2 py-1 font-normal">Type</th><th className="px-2 py-1 font-normal text-right">Lots</th><th className="px-2 py-1 font-normal text-right">Trigger</th><th className="px-2 py-1 font-normal text-right">Current</th><th className="px-2 py-1 font-normal text-right">Distance</th><th className="px-2 py-1 font-normal text-right">SL</th><th className="px-2 py-1 font-normal text-right">TP</th><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
+              <tbody>
+                {pending.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={9}>No pending orders.</td></tr> : pending.map((o: any) => {
+                  const d = dg(o.symbol); const trig = Number(o.price); const cur = prices[o.symbol]; const dist = cur != null ? Math.abs(trig - cur) : null;
+                  const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : "Stop"); const c = o.side === "BUY" ? "#5aa9ff" : SELL;
+                  return (
+                  <tr key={o.id} className="border-t border-[var(--border)]" style={{ background: "rgba(90,169,255,0.05)" }}>
+                    <td className="px-2 py-1"><i className="fa-regular fa-clock mr-1 text-[var(--muted)]" />{o.symbol}</td>
+                    <td className="px-2 py-1"><span className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: c + "22", color: c }}>{label}</span></td>
+                    <td className="px-2 py-1 text-right">{o.lots}</td>
+                    <td className="px-2 py-1 text-right font-semibold">{trig.toFixed(d)}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{cur != null ? cur.toFixed(d) : "…"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{dist != null ? dist.toFixed(d) : "—"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{o.sl ? Number(o.sl).toFixed(d) : "-"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{o.tp ? Number(o.tp).toFixed(d) : "-"}</td>
+                    <td className="px-2 py-1 text-right"><button title="Cancel order" style={{ color: SELL }} onClick={() => cancelPending(o.id)}><i className="fa-solid fa-xmark" /></button></td>
+                  </tr>); })}
+              </tbody>
             </table>
           )}
           {botTab === "history" && (
@@ -540,6 +590,13 @@ export default function ClientTerminal() {
         </div>
       </div>
 
+      {walletModal && (
+        <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-auto p-4 sm:items-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setWalletModal(null)}>
+          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <WalletPanel key={walletModal} initialTab={walletModal} onClose={() => setWalletModal(null)} />
+          </div>
+        </div>
+      )}
       {pinModal && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setPinModal(false)}>
           <div className="w-[300px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>

@@ -10,7 +10,10 @@ const INTERVAL: Record<string, string> = {
 
 // Map an internal symbol (e.g. "XAUUSD", "GBPUSD", "BTCUSD") to a Twelve Data symbol.
 function tdSymbol(sym: string, feed?: string | null): string {
-  if (feed) return feed; // explicit feed from catalog wins
+  // Only honor `feed` if it is actually a TwelveData symbol (e.g. "XAU/USD").
+  // The catalog stores Finnhub feeds here (e.g. "OANDA:XAU_USD"), which TD
+  // rejects — those must be ignored so we fall back to the derived mapping.
+  if (feed && feed.includes("/") && !feed.includes(":")) return feed;
   const s = sym.toUpperCase();
   if (/^[A-Z]{6}$/.test(s)) return s.slice(0, 3) + "/" + s.slice(3); // FX / metals pair
   if (/^(XAU|XAG|XPT|XPD)/.test(s) && s.length >= 6) return s.slice(0, 3) + "/" + s.slice(3);
