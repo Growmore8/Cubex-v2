@@ -51,6 +51,13 @@ export default function LoginPage() {
         className="w-full rounded-md py-2 text-sm font-medium text-white disabled:opacity-50">
         {loading ? "Signing in..." : "Sign in"}
       </button>
+
+      <p className="text-center text-sm text-gray-500">
+        Don&apos;t have an account?{" "}
+        <a href="/register" className="font-medium hover:underline" style={{ color: "var(--brand-primary)" }}>
+          Open a Live or Demo account
+        </a>
+      </p>
     </form>
   );
 }
