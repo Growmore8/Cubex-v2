@@ -24,12 +24,14 @@ export async function effectiveSeatsForPlan(client: any, plan?: string): Promise
   }
 }
 
-// Throws if the tenant has reached its plan's account limit (live, from the package).
-export async function assertSeatAvailable(client: any, tenantId: string) {
+// Throws if the tenant has reached its plan's account limit. Only LIVE accounts
+// count against the limit — demo accounts are unlimited practice accounts.
+export async function assertSeatAvailable(client: any, tenantId: string, type: string = "LIVE") {
+  if (type !== "LIVE") return; // demos don't consume a seat
   const sub = await client.subscription.findUnique({ where: { tenantId } });
   const limit = await effectiveSeatsForPlan(client, sub?.plan);
-  const used = await client.account.count({ where: { tenantId } });
-  if (used >= limit) throw new Error(`Account limit reached (${used}/${limit} on the ${sub?.plan || "current"} plan). Upgrade your package or contact sales.`);
+  const used = await client.account.count({ where: { tenantId, type: "LIVE" } });
+  if (used >= limit) throw new Error(`Account limit reached (${used}/${limit} live accounts on the ${sub?.plan || "current"} plan). Upgrade your package or contact sales.`);
 }
 
 export function listTenants() {

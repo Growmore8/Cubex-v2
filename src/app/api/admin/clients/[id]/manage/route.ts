@@ -95,7 +95,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         break;
       }
       case "subAccount": {
-        await assertSeatAvailable(prisma, tenantId); // enforce the plan's account limit
+        const subType0 = b.type === "DEMO" ? "DEMO" : (b.type === "LIVE" ? "LIVE" : acc.type);
+        await assertSeatAvailable(prisma, tenantId, subType0); // enforce the plan's account limit (live only)
         const accs = await prisma.account.findMany({ where: { tenantId }, select: { login: true } });
         let max = 900000;
         for (const a of accs) { const n = parseInt(a.login, 10); if (!isNaN(n) && String(n) === a.login && n > max) max = n; }

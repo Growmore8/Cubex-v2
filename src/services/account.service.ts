@@ -30,7 +30,7 @@ export async function nextLogin(tx: any, tenantId: string, type: string) {
 export async function createClient(tenantId: string, input: any, actor = "admin") {
   const type = input.type || "LIVE";
   const acc = await prisma.$transaction(async (tx) => {
-    await assertSeatAvailable(tx, tenantId); // enforce the plan's account limit
+    await assertSeatAvailable(tx, tenantId, type); // enforce the plan's account limit (live only)
     const email = input.email.toLowerCase();
     let user = await tx.user.findFirst({ where: { tenantId, email } });
     if (!user) {

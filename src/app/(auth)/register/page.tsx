@@ -55,7 +55,6 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const tenantSlug = searchParams.get("tenant") ?? undefined;
 
-  const [type, setType] = useState<"DEMO" | "LIVE">("DEMO");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [dialCode, setDialCode] = useState("LK");
@@ -78,7 +77,6 @@ function RegisterForm() {
         name, email, password,
         phone: fullPhone,
         country: country || undefined,
-        type,
         tenantSlug,
       }),
     });
@@ -92,23 +90,10 @@ function RegisterForm() {
     <form onSubmit={submit} className="space-y-4">
       <h1 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>Create account</h1>
 
-      <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
-        {(["DEMO", "LIVE"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setType(t)}
-            className="flex-1 py-2 text-sm font-medium transition-colors"
-            style={
-              type === t
-                ? { backgroundColor: "var(--brand-primary)", color: "#fff" }
-                : { background: "var(--card)", color: "var(--muted-foreground)" }
-            }
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <p className="rounded-md border px-3 py-2 text-xs" style={{ borderColor: "var(--border)", color: "var(--muted-foreground)" }}>
+        You&apos;ll get a <b>Demo</b> account to practise instantly, plus a <b>Live</b> account.
+        Complete KYC to unlock live trading.
+      </p>
 
       {err && <p className="text-sm text-red-500">{err}</p>}
 
