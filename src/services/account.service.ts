@@ -3,6 +3,7 @@ import { hashPassword } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 import { audit } from "@/lib/audit";
 import { notify, notifyStaff } from "@/services/notification.service";
+import { assertSeatAvailable } from "@/services/tenant.service";
 
 export function listClients(tenantId: string, managerId?: string | null) {
   return prisma.account.findMany({
@@ -29,6 +30,7 @@ export async function nextLogin(tx: any, tenantId: string, type: string) {
 export async function createClient(tenantId: string, input: any, actor = "admin") {
   const type = input.type || "LIVE";
   const acc = await prisma.$transaction(async (tx) => {
+    await assertSeatAvailable(tx, tenantId); // enforce the plan's account limit
     const email = input.email.toLowerCase();
     let user = await tx.user.findFirst({ where: { tenantId, email } });
     if (!user) {

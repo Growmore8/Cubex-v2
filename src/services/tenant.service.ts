@@ -1,5 +1,19 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
+import { PACKAGES } from "@/config/packages";
+
+// The account limit for a plan comes from its package definition.
+export function seatsForPlan(plan?: string): number {
+  return (PACKAGES as any)[plan || "STARTER"]?.seats ?? 5;
+}
+
+// Throws if the tenant has reached its plan's account limit.
+export async function assertSeatAvailable(client: any, tenantId: string) {
+  const sub = await client.subscription.findUnique({ where: { tenantId } });
+  const limit = sub?.seats ?? 5;
+  const used = await client.account.count({ where: { tenantId } });
+  if (used >= limit) throw new Error(`Account limit reached (${used}/${limit} on the ${sub?.plan || "current"} plan). Upgrade your package or contact sales.`);
+}
 
 export function listTenants() {
   return prisma.tenant.findMany({
@@ -29,7 +43,7 @@ export async function createTenant(input: {
       logoUrl: input.logoUrl || null,
       ...(input.slogan ? { slogan: input.slogan } as any : {}),
       ...(input.companyInfo ? { companyInfo: input.companyInfo } as any : {}),
-      subscription: { create: { plan: input.plan || "STARTER", status: "ACTIVE", seats: input.seats || 5 } },
+      subscription: { create: { plan: input.plan || "STARTER", status: "ACTIVE", seats: seatsForPlan(input.plan) } },
       users: { create: { email: input.adminEmail.toLowerCase(), name: input.adminName, passwordHash, role: "ADMIN" } },
     },
     include: { subscription: true },

@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
 import { assertCan } from "@/lib/perms";
 import { notify } from "@/services/notification.service";
+import { assertSeatAvailable } from "@/services/tenant.service";
 
 const MANAGER_ALLOWED = ["status", "deactivate", "rename", "pool", "clearPin", "assign"];
 
@@ -94,8 +95,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         break;
       }
       case "subAccount": {
+        await assertSeatAvailable(prisma, tenantId); // enforce the plan's account limit
         const accs = await prisma.account.findMany({ where: { tenantId }, select: { login: true } });
-        let max = 800100;
+        let max = 900000;
         for (const a of accs) { const n = parseInt(a.login, 10); if (!isNaN(n) && String(n) === a.login && n > max) max = n; }
         const login = String(max + 1);
         const subType = b.type === "DEMO" ? "DEMO" : (b.type === "LIVE" ? "LIVE" : acc.type);

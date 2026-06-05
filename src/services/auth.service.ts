@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword, hashPassword } from "@/lib/auth";
 import { resolveTenant } from "@/lib/tenant";
 import { nextLogin } from "@/services/account.service";
+import { assertSeatAvailable } from "@/services/tenant.service";
 import { Prisma } from "@prisma/client";
 import type { SessionPayload } from "@/types";
 import type { Role } from "@/config/roles";
@@ -68,6 +69,7 @@ export async function registerClient(
     const lowerEmail = email.toLowerCase();
     const exists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail } });
     if (exists) throw new Error("Email already registered");
+    await assertSeatAvailable(tx, tenant!.id); // enforce the plan's account limit
 
     const user = await tx.user.create({
       data: { tenantId: tenant!.id, email: lowerEmail, name, passwordHash, role: "CLIENT" },

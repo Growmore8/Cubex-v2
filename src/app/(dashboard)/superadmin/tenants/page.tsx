@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useDialog } from "@/components/ui/ConfirmDialog";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { PACKAGES, PLAN_KEYS } from "@/config/packages";
 
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
   { sec: "Users", items: [["createClients", "Create Clients"], ["deleteClients", "Delete Clients"], ["manageManagers", "Manage Managers"]] },
@@ -57,7 +58,7 @@ export default function SATenantsPage() {
     const r = await fetch("/api/platform/tenants", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, subdomain: (form.subdomain || "").toLowerCase(), seats: Number(form.seats) }),
+      body: JSON.stringify({ ...form, subdomain: (form.subdomain || "").toLowerCase() }),
     });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Create failed"); return; }
@@ -249,7 +250,8 @@ export default function SATenantsPage() {
             <div className="mb-3 font-semibold">New Tenant</div>
             <div className="grid grid-cols-2 gap-2">
               <input className={inp} placeholder="Company name *" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <input className={inp} placeholder="subdomain *" value={form.subdomain || ""} onChange={(e) => setForm({ ...form, subdomain: e.target.value })} />
+              <input className={inp} placeholder="subdomain — e.g. infinity *" value={form.subdomain || ""} onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} />
+              <p className="col-span-2 -mt-1 text-[11px] text-gray-400">Short ID only (letters, numbers, hyphens) — used for <b>infinity.{typeof window !== "undefined" ? window.location.host.replace(/^[^.]+\./, "") : "yourplatform.com"}</b>. The broker&apos;s own domain (e.g. trade.infinity.com) is set later in <b>Edit Tenant → Custom Domain</b>.</p>
               <input className={inp + " col-span-2"} placeholder="Brand name (shown on portal)" value={form.brandName || ""} onChange={(e) => setForm({ ...form, brandName: e.target.value })} />
               <input className={inp} placeholder="Admin name *" value={form.adminName || ""} onChange={(e) => setForm({ ...form, adminName: e.target.value })} />
               <input className={inp} placeholder="Admin email *" value={form.adminEmail || ""} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} />
@@ -257,17 +259,12 @@ export default function SATenantsPage() {
               <div className="col-span-2"><label className="text-xs text-gray-500 mb-1 block">Logo</label><LogoField value={form.logoUrl} which="create" /></div>
               <input className={inp + " col-span-2"} placeholder="Slogan / Tagline" value={form.slogan || ""} onChange={(e) => setForm({ ...form, slogan: e.target.value })} />
               <input className={inp + " col-span-2"} placeholder="Company / Brokerage Info (footer)" value={form.companyInfo || ""} onChange={(e) => setForm({ ...form, companyInfo: e.target.value })} />
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Plan</label>
-                <select className={inp} value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })}>
-                  <option value="STARTER">Starter</option>
-                  <option value="PRO">Pro</option>
-                  <option value="ENTERPRISE">Enterprise</option>
+              <div className="col-span-2">
+                <label className="text-xs text-gray-500 mb-1 block">Plan (sets the account limit)</label>
+                <select className={inp + " w-full"} value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })}>
+                  {PLAN_KEYS.map((k) => <option key={k} value={k}>{PACKAGES[k].name} — up to {PACKAGES[k].seats} accounts (${PACKAGES[k].price}/mo)</option>)}
                 </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Seats</label>
-                <input type="number" className={inp} min="1" value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} />
+                <p className="mt-1 text-[11px] text-gray-400">The tenant can create up to <b>{PACKAGES[(form.plan || "STARTER") as keyof typeof PACKAGES].seats} accounts</b> on this plan. Manage plans in Packages &amp; Pricing.</p>
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Primary Color</label>
@@ -293,11 +290,9 @@ export default function SATenantsPage() {
             <div className="mb-3 font-semibold">Subscription — {subFor.brandName || subFor.name}</div>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Plan</label>
-                <select className={inp} value={subForm.plan} onChange={(e) => setSubForm({ ...subForm, plan: e.target.value })}>
-                  <option value="STARTER">Starter</option>
-                  <option value="PRO">Pro</option>
-                  <option value="ENTERPRISE">Enterprise</option>
+                <label className="text-xs text-gray-500 block mb-1">Plan (sets the account limit)</label>
+                <select className={inp} value={subForm.plan} onChange={(e) => setSubForm({ ...subForm, plan: e.target.value, seats: PACKAGES[e.target.value as keyof typeof PACKAGES]?.seats ?? subForm.seats })}>
+                  {PLAN_KEYS.map((k) => <option key={k} value={k}>{PACKAGES[k].name} — up to {PACKAGES[k].seats} accounts (${PACKAGES[k].price}/mo)</option>)}
                 </select>
               </div>
               <div>
@@ -310,8 +305,8 @@ export default function SATenantsPage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Seats</label>
-                <input type="number" className={inp} min="1" value={subForm.seats} onChange={(e) => setSubForm({ ...subForm, seats: e.target.value })} />
+                <label className="text-xs text-gray-500 block mb-1">Account limit</label>
+                <div className={inp + " bg-gray-50 text-gray-700"}>{subForm.seats} accounts <span className="text-gray-400">(from {PACKAGES[(subForm.plan || "STARTER") as keyof typeof PACKAGES]?.name} plan)</span></div>
               </div>
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Expiry Date (leave blank = no expiry)</label>
