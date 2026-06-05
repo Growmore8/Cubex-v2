@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Geist } from "next/font/google";
@@ -22,6 +22,23 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "Cubex Platform",
   description: "Cubex is a modern trading platform built for fast, secure, and intelligent market trading.",
+  // Run fullscreen like a native app when added to the home screen (iOS).
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Trade" },
+  formatDetection: { telephone: false },
+};
+
+// App-like viewport: fill the screen, respect notches (safe areas), lock zoom so
+// the trading UI behaves like a native app rather than a scrollable web page.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#131722" },
+  ],
 };
 
 export default function RootLayout({

@@ -27,7 +27,7 @@ export default function ClientMobile({ t }: { t: any }) {
     selSym, vol, sl, tp, err,
     balance, equity, floating, free, used, level, price, bid, ask, tf, TFS,
     setSelSym, setVol, setSl, setTp, setTf,
-    place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr,
+    place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr,
     toggleTheme, enablePush, addPasskey, openPin, favs, toggleFav, avatarUrl, uploadAvatar,
     fmt, csz, pnlOf, dg, logout, pin,
   } = t;
@@ -127,7 +127,7 @@ export default function ClientMobile({ t }: { t: any }) {
   );
 
   return (
-    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", height: "100dvh", paddingTop: "env(safe-area-inset-top)" }} className="flex flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarRef} onChange={uploadAvatar} />
 
       {/* TOP HEADER */}
@@ -199,12 +199,25 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="text-[9px] text-[var(--muted)]">← swipe to switch account →</div>
             </div>
 
-            {/* action buttons */}
-            <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => { window.location.href = "/client/wallet?action=deposit"; }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-down" /><span className="text-[11px] font-semibold">Deposit</span></button>
-              <button onClick={() => { window.location.href = "/client/wallet?action=withdraw"; }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-up" /><span className="text-[11px] font-semibold">Withdraw</span></button>
-              <button onClick={() => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BLUE }}><i className="fa-solid fa-right-left" /><span className="text-[11px] font-semibold">Transfer</span></button>
-            </div>
+            {/* action buttons — LIVE: deposit/withdraw/transfer · DEMO: top-up only */}
+            {account?.type === "LIVE" ? (
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => { window.location.href = "/client/wallet?action=deposit"; }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-down" /><span className="text-[11px] font-semibold">Deposit</span></button>
+                <button onClick={() => { window.location.href = "/client/wallet?action=withdraw"; }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-up" /><span className="text-[11px] font-semibold">Withdraw</span></button>
+                <button onClick={() => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BLUE }}><i className="fa-solid fa-right-left" /><span className="text-[11px] font-semibold">Transfer</span></button>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-1.5 text-[10px] font-semibold text-[var(--muted)]">Top up your demo balance</div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[1000, 5000, 10000].map((amt) => (
+                    <button key={amt} onClick={() => doTopUp(amt)} className="flex flex-col items-center gap-0.5 rounded-xl py-3 font-semibold" style={{ background: "rgba(240,180,41,0.14)", color: GOLD, border: "1px solid rgba(240,180,41,0.4)" }}>
+                      <i className="fa-solid fa-coins" /><span className="text-[12px]">${amt.toLocaleString()}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* market movers */}
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-3">
@@ -595,10 +608,11 @@ export default function ClientMobile({ t }: { t: any }) {
                   {a.id === accId && <i className="fa-solid fa-circle-check" style={{ color: BUY }} />}
                 </button>
               ))}
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button onClick={() => openAccount("DEMO")} className="rounded-lg py-2 text-[12px] font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus mr-1" /> Create</button>
-                <button onClick={topUp} className="rounded-lg py-2 text-[12px] font-semibold" style={{ background: "var(--soft)", color: GOLD }}>Top-up</button>
-              </div>
+              {/* One demo per client: hide "Create" once a demo exists. Top-up lives on
+                  the dashboard (demo account), not here. */}
+              {demoAccts.length === 0 && (
+                <button onClick={() => openAccount("DEMO")} className="mt-2 w-full rounded-lg py-2 text-[12px] font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus mr-1" /> Create Demo Account</button>
+              )}
             </div>
 
             {/* security */}
@@ -708,7 +722,7 @@ export default function ClientMobile({ t }: { t: any }) {
       )}
 
       {/* BOTTOM NAV */}
-      <div className="flex border-t border-[var(--border)] bg-[var(--panel)]">
+      <div className="flex border-t border-[var(--border)] bg-[var(--panel)]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {navItems.map(([k, icon, label]) => {
           const active = tab === k;
           return (

@@ -320,7 +320,7 @@ export default function ClientTerminal() {
   const histShown = history.filter((h: any) => { if (histRange === "all") return true; const t = new Date(h.closedAt).getTime(); const now = Date.now(); const day = 86400000; if (histRange === "today") return t >= now - day; if (histRange === "week") return t >= now - 7 * day; return t >= now - 30 * day; });
   const tab = (active: boolean) => "px-3 py-1.5 text-[11px] " + (active ? "" : "text-[var(--muted)]");
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, logout: async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, pinForm, setPinForm, savePin } }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, logout: async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, pinForm, setPinForm, savePin } }} />;
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {needKyc && (
@@ -362,13 +362,16 @@ export default function ClientTerminal() {
               return (<><div className="fixed inset-0 z-[80]" onClick={close} />
                 <div className="absolute right-0 z-[90] mt-1 w-56 overflow-hidden rounded-lg border py-1 text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
                   {head("Funds")}
-                  {mItem(() => { close(); setWalletModal("deposit"); }, "fa-arrow-down-to-bracket", "Deposit", BUY, readOnly)}
-                  {mItem(() => { close(); setWalletModal("withdraw"); }, "fa-arrow-up-from-bracket", "Withdraw", GOLD, readOnly)}
-                  {accts.length >= 2 && mItem(() => { setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); }, "fa-right-left", "Transfer", undefined, readOnly)}
-                  {curAcct?.type === "DEMO" && mItem(topUp, "fa-coins", "Top up Demo", GOLD, readOnly)}
+                  {curAcct?.type === "LIVE" ? (<>
+                    {mItem(() => { close(); setWalletModal("deposit"); }, "fa-arrow-down-to-bracket", "Deposit", BUY, readOnly)}
+                    {mItem(() => { close(); setWalletModal("withdraw"); }, "fa-arrow-up-from-bracket", "Withdraw", GOLD, readOnly)}
+                    {accts.length >= 2 && mItem(() => { setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); }, "fa-right-left", "Transfer", undefined, readOnly)}
+                  </>) : (
+                    mItem(topUp, "fa-coins", "Top up Demo", GOLD, readOnly)
+                  )}
                   {div}
                   {head("Accounts")}
-                  {mItem(() => openAccount("DEMO"), "fa-vial", "Open Demo Account", undefined, readOnly)}
+                  {!accts.some((a: any) => a.type === "DEMO") && mItem(() => openAccount("DEMO"), "fa-vial", "Open Demo Account", undefined, readOnly)}
                   {mItem(() => openAccount("LIVE"), "fa-bolt", "Open Live Account", BUY, readOnly)}
                   {mItem(() => { close(); setWalletModal("kyc"); }, "fa-id-card", "KYC Verification")}
                   {div}
@@ -428,6 +431,17 @@ export default function ClientTerminal() {
         <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[320px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 text-sm font-semibold">Top up Demo Account</div>
+            <div className="mb-1.5 grid grid-cols-3 gap-2">
+              {[1000, 5000, 10000].map((amt) => (
+                <button key={amt} type="button" onClick={() => setTopUpAmt(String(amt))}
+                  className="rounded-lg border py-2 text-xs font-semibold transition-colors"
+                  style={Number(topUpAmt) === amt
+                    ? { borderColor: GOLD, background: "rgba(240,180,41,0.12)", color: GOLD }
+                    : { borderColor: "var(--border)", color: "var(--text)" }}>
+                  ${amt.toLocaleString()}
+                </button>
+              ))}
+            </div>
             <div className="mb-1 text-[10px] text-[var(--muted)]">Amount (USD)</div>
             <input type="number" value={topUpAmt} onChange={(e) => setTopUpAmt(e.target.value)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]" autoFocus />
             <div className="mt-4 flex justify-end gap-2">
