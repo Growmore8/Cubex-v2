@@ -4,6 +4,7 @@ import { io, Socket } from "socket.io-client";
 import LWChart from "@/components/LWChart";
 import { playSound, soundForNotification } from "@/lib/sounds";
 import PriceCell from "@/components/PriceCell";
+import toast from "react-hot-toast";
 import WalletPanel from "@/components/WalletPanel";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
@@ -263,9 +264,11 @@ export default function ClientTerminal() {
   }
   async function openAccount(type: "DEMO" | "LIVE") {
     setErr("");
-    if (account?.locked) { setErr("Your account is read-only. Cannot create new accounts."); return; }
+    if (account?.locked) { toast.error("Your account is read-only. Cannot create new accounts."); return; }
+    const tid = toast.loading(`Opening ${type === "LIVE" ? "live" : "demo"} account…`);
     const r = await fetch("/api/client/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }) }).then((x) => x.json()).catch(() => ({ ok: false }));
-    if (!r.ok) { setErr(r.error || "Failed"); return; }
+    if (!r.ok) { toast.error(r.error || "Failed to open account", { id: tid }); setErr(r.error || "Failed"); return; }
+    toast.success(`${type === "LIVE" ? "Live" : "Demo"} account ${r.account?.login || ""} created`, { id: tid });
     if (r.account) { accIdRef.current = r.account.id; setAccId(r.account.id); }
     load();
   }

@@ -30,14 +30,9 @@ export async function POST(req: Request) {
       const demoCount = await prisma.account.count({ where: { userId: s.sub, type: "DEMO" } });
       if (demoCount >= 1) throw new Error("You can only have one demo account");
     }
-    if (type === "LIVE") {
-      // live accounts are unlimited, but the first one needs approved KYC
-      const liveCount = await prisma.account.count({ where: { userId: s.sub, type: "LIVE" } });
-      if (liveCount === 0) {
-        const approved = await prisma.kycDocument.findFirst({ where: { account: { userId: s.sub }, status: "APPROVED" } });
-        if (!approved) throw new Error("KYC approval is required before opening your first live account");
-      }
-    }
+    // Note: a client opens their first live account WITHOUT prior KYC. The live
+    // account is then locked to Profile + KYC (per-client gate) until verified —
+    // so we must NOT block creation on KYC here, or it's a chicken-and-egg lock.
     const acc = await createClient(s.tenantId!, { email: user.email, name: user.name, type, leverage: Number(b.leverage) || 100, currency: b.currency || "USD" }, "client-self");
     return NextResponse.json({ ok: true, account: { id: acc.id, login: acc.login, type: acc.type } });
   } catch (e: any) {
