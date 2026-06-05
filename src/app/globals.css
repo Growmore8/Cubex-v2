@@ -10,6 +10,57 @@
   }
 }
 
+/* ---- Auth (login / register) premium polish ---- */
+@keyframes auth-pop {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes auth-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes auth-glow {
+  0%, 100% { transform: translate(-8%, -6%) scale(1); }
+  50%      { transform: translate(8%, 6%) scale(1.15); }
+}
+.auth-card { animation: auth-pop 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* staggered entrance for fields */
+.auth-stagger > * { animation: auth-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.auth-stagger > *:nth-child(1) { animation-delay: 0.06s; }
+.auth-stagger > *:nth-child(2) { animation-delay: 0.12s; }
+.auth-stagger > *:nth-child(3) { animation-delay: 0.18s; }
+.auth-stagger > *:nth-child(4) { animation-delay: 0.24s; }
+.auth-stagger > *:nth-child(5) { animation-delay: 0.30s; }
+.auth-stagger > *:nth-child(6) { animation-delay: 0.36s; }
+.auth-stagger > *:nth-child(7) { animation-delay: 0.42s; }
+.auth-stagger > *:nth-child(8) { animation-delay: 0.48s; }
+/* animated brand glows behind the card */
+.auth-glow { animation: auth-glow 9s ease-in-out infinite; will-change: transform; }
+/* inputs */
+.auth-field {
+  transition: border-color 0.18s ease, box-shadow 0.2s ease, background 0.18s ease;
+}
+.auth-field:focus, .auth-field:focus-within {
+  border-color: var(--brand-primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 22%, transparent);
+  outline: none;
+}
+/* primary button */
+.auth-btn {
+  transition: transform 0.12s ease, box-shadow 0.25s ease, filter 0.2s ease;
+  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--brand-primary) 70%, transparent);
+}
+.auth-btn:hover { filter: brightness(1.06); box-shadow: 0 12px 28px -8px color-mix(in srgb, var(--brand-primary) 75%, transparent); }
+.auth-btn:active { transform: translateY(1px) scale(0.99); }
+.auth-btn:disabled { filter: saturate(0.7) brightness(0.95); box-shadow: none; }
+/* secondary / social button */
+.auth-ghost { transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease; }
+.auth-ghost:hover { background: var(--secondary); }
+.auth-ghost:active { transform: translateY(1px) scale(0.99); }
+@media (prefers-reduced-motion: reduce) {
+  .auth-card, .auth-stagger > *, .auth-glow { animation: none !important; }
+}
+
 /* no-scrollbar-global */
 * { scrollbar-width: none; -ms-overflow-style: none; }
 *::-webkit-scrollbar { width: 0; height: 0; display: none; }

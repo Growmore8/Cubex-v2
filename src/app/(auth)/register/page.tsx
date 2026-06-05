@@ -88,89 +88,69 @@ function RegisterForm() {
     window.location.href = d.redirect;
   }
 
-  return (
-    <form onSubmit={submit} className="space-y-4">
-      <h1 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>Create account</h1>
+  const fieldCls = "w-full rounded-xl border px-3 py-2.5 text-sm auth-field";
 
-      <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
+  return (
+    <form onSubmit={submit} className="auth-stagger space-y-4">
+      <div>
+        <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Create account</h1>
+        <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Choose an account type to get started</p>
+      </div>
+
+      {/* Segmented Demo / Live toggle with a sliding highlight */}
+      <div className="relative grid grid-cols-2 rounded-xl border p-1" style={{ borderColor: "var(--border)", background: "var(--secondary)" }}>
+        <div
+          className="absolute inset-y-1 w-[calc(50%-0.25rem)] rounded-lg transition-transform duration-300 ease-out"
+          style={{
+            background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))`,
+            transform: type === "LIVE" ? "translateX(calc(100% + 0.5rem))" : "translateX(0)",
+            boxShadow: "0 4px 12px -4px rgba(0,0,0,0.3)",
+          }}
+        />
         {(["DEMO", "LIVE"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setType(t)}
-            className="flex-1 py-2 text-sm font-medium transition-colors"
-            style={
-              type === t
-                ? { backgroundColor: "var(--brand-primary)", color: "#fff" }
-                : { background: "var(--card)", color: "var(--muted-foreground)" }
-            }
-          >
-            {t}
+          <button key={t} type="button" onClick={() => setType(t)}
+            className="relative z-10 py-1.5 text-sm font-semibold transition-colors"
+            style={{ color: type === t ? "#fff" : "var(--muted-foreground)" }}>
+            {t === "DEMO" ? "Demo" : "Live"}
           </button>
         ))}
       </div>
 
-      {err && <p className="text-sm text-red-500">{err}</p>}
+      {err && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</p>}
 
-      <input
-        required
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="w-full rounded-md border px-3 py-2 text-sm"
-        style={inputStyle}
-        placeholder="Full name"
-      />
+      <div className="relative">
+        <i className="fa-solid fa-user pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }} />
+        <input required value={name} onChange={(e) => setName(e.target.value)} className={fieldCls + " pl-10"} style={inputStyle} placeholder="Full name" />
+      </div>
 
-      <input
-        type="email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="w-full rounded-md border px-3 py-2 text-sm"
-        style={inputStyle}
-        placeholder="you@example.com"
-      />
+      <div className="relative">
+        <i className="fa-solid fa-envelope pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }} />
+        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={fieldCls + " pl-10"} style={inputStyle} placeholder="you@example.com" />
+      </div>
 
       <div className="flex gap-2">
-        <select
-          value={dialCode}
-          onChange={(e) => setDialCode(e.target.value)}
-          className="rounded-md border px-2 py-2 text-sm shrink-0"
-          style={inputStyle}
-        >
+        <select value={dialCode} onChange={(e) => setDialCode(e.target.value)} className="shrink-0 rounded-xl border px-2 py-2.5 text-sm auth-field" style={inputStyle}>
           {DIAL_CODES.map((d) => (
             <option key={d.code} value={d.code}>{d.code} {d.dial}</option>
           ))}
         </select>
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="flex-1 rounded-md border px-3 py-2 text-sm min-w-0"
-          style={inputStyle}
-          placeholder="Phone number"
-        />
+        <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={fieldCls + " min-w-0 flex-1"} style={inputStyle} placeholder="Phone number" />
       </div>
 
-      <CountrySelect value={country} onChange={setCountry} className="w-full rounded-md border px-3 py-2 text-sm" style={inputStyle} />
+      <CountrySelect value={country} onChange={setCountry} className={fieldCls} style={inputStyle} />
 
-      <PasswordInput
-        required
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="rounded-md border px-3 py-2 text-sm"
-        style={inputStyle}
-        placeholder="Password (min 6)"
-      />
+      <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)} className={fieldCls} style={inputStyle} placeholder="Password (min 6)" />
 
-      <button
-        type="submit"
-        disabled={loading}
-        style={{ backgroundColor: "var(--brand-primary)" }}
-        className="w-full rounded-md py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {loading ? "Creating..." : "Create account"}
+      <button type="submit" disabled={loading}
+        style={{ background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))` }}
+        className="auth-btn flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+        {loading ? <><i className="fa-solid fa-circle-notch fa-spin" /> Creating…</> : <>Create {type === "LIVE" ? "Live" : "Demo"} account <i className="fa-solid fa-arrow-right text-xs" /></>}
       </button>
+
+      <p className="text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+        Already have an account?{" "}
+        <a href="/login" className="font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}>Sign in</a>
+      </p>
     </form>
   );
 }

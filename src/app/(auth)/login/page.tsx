@@ -31,30 +31,45 @@ export default function LoginPage() {
     window.location.href = d.redirect;
   }
 
+  const base = "w-full rounded-xl border bg-transparent py-2.5 pl-10 text-sm text-[var(--foreground)] auth-field";
+
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <h1 className="text-xl font-semibold text-zinc-500">Sign in</h1>
-      {notice && <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{notice}</p>}
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      <div className="space-y-1">
-        <label className="text-sm text-gray-600">Email</label>
-        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-md border px-3 py-2 text-sm text-gray-800" placeholder="you@example.com" />
+    <form onSubmit={submit} className="auth-stagger space-y-4">
+      <div>
+        <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Welcome back</h1>
+        <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Sign in to your account to continue</p>
       </div>
-      <div className="space-y-1">
-        <label className="text-sm text-gray-600">Password</label>
-        <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)}
-          className="text-gray-800 rounded-md border px-3 py-2 text-sm" placeholder="********" />
+
+      {notice && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{notice}</p>}
+      {err && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</p>}
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>Email</label>
+        <div className="relative">
+          <i className="fa-solid fa-envelope pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }} />
+          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+            className={base + " pr-3"} style={{ borderColor: "var(--border)" }} placeholder="you@example.com" />
+        </div>
       </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>Password</label>
+        <div className="relative">
+          <i className="fa-solid fa-lock pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }} />
+          <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)}
+            className={base} style={{ borderColor: "var(--border)" }} placeholder="••••••••" />
+        </div>
+      </div>
+
       <button type="submit" disabled={loading}
-        style={{ backgroundColor: "var(--brand-primary)" }}
-        className="w-full rounded-md py-2 text-sm font-medium text-white disabled:opacity-50">
-        {loading ? "Signing in..." : "Sign in"}
+        style={{ background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))` }}
+        className="auth-btn flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+        {loading ? <><i className="fa-solid fa-circle-notch fa-spin" /> Signing in…</> : <>Sign in <i className="fa-solid fa-arrow-right text-xs" /></>}
       </button>
 
-      <p className="text-center text-sm text-gray-500">
+      <p className="text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
         Don&apos;t have an account?{" "}
-        <a href="/register" className="font-medium hover:underline" style={{ color: "var(--brand-primary)" }}>
+        <a href="/register" className="font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}>
           Open a Live or Demo account
         </a>
       </p>
