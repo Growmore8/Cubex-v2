@@ -1,31 +1,50 @@
-# CubeX V2 — Caddy reverse proxy with on-demand TLS for white-label custom domains.
+# CubeX V2 — Caddy reverse proxy.
 #
-# How white-label SSL works here:
-#  - A trader visits https://trade.theirbroker.com (DNS pointed at this server).
-#  - Caddy sees an unknown SNI, pauses the handshake, and asks the app
-#    (/api/internal/tls-check?domain=...) whether that domain is a real tenant.
-#  - If approved, Caddy obtains a Let's Encrypt cert for THAT domain on the spot and
-#    caches it. Random domains pointed at the server are refused (no cert = no abuse).
+# Routing:
+#   cubexenterprises.com, www.*   -> static landing page (served from /srv/landing)
+#   trade.cubexenterprises.com    -> the platform (app)
+#   db.* / files.*                -> Adminer / Filebrowser
+#   <any broker custom domain>    -> the platform (on-demand TLS, gated by the app)
 #
-# Env (from .env): ACME_EMAIL, DOMAIN (your platform domain, e.g. cubexenterprises.com)
+# TLS: every site uses on-demand certs, gated by /api/internal/tls-check, so nothing
+# is provisioned until a host is actually requested (and only for approved hosts).
+#
+# Env (from .env): ACME_EMAIL, DOMAIN (platform domain, e.g. cubexenterprises.com)
+# The landing repo (https://github.com/Growmore8/landing-page) is cloned on the host
+# into ./landing and mounted read-only at /srv/landing (see docker-compose.prod.yml).
 
 {
 	email {$ACME_EMAIL}
 	on_demand_tls {
-		# Caddy calls this before issuing a cert for any host. 2xx = allow.
 		ask http://app:3000/api/internal/tls-check
 	}
 }
 
-# Database UI (Adminer) on db.<your-domain>
+# --- Landing page (static) on the apex + www ---
+{$DOMAIN}, www.{$DOMAIN} {
+	tls {
+		on_demand
+	}
+	root * /srv/landing
+	file_server
+	encode gzip
+}
+
+# --- Platform ---
+trade.{$DOMAIN} {
+	tls {
+		on_demand
+	}
+	reverse_proxy app:3000
+}
+
+# --- Admin tools ---
 db.{$DOMAIN} {
 	tls {
 		on_demand
 	}
 	reverse_proxy adminer:8080
 }
-
-# File manager (Filebrowser) on files.<your-domain>
 files.{$DOMAIN} {
 	tls {
 		on_demand
@@ -33,8 +52,7 @@ files.{$DOMAIN} {
 	reverse_proxy filebrowser:80
 }
 
-# Catch-all: the platform domain + every tenant subdomain and custom domain.
-# on_demand issues a per-host Let's Encrypt cert on first hit (after the ask check).
+# --- Every broker custom domain -> platform (cert issued per host on first hit) ---
 :443 {
 	tls {
 		on_demand
@@ -42,7 +60,7 @@ files.{$DOMAIN} {
 	reverse_proxy app:3000
 }
 
-# Send all plain HTTP to HTTPS (cert issuance itself uses TLS-ALPN-01 on :443).
+# Send plain HTTP to HTTPS for every host.
 :80 {
 	redir https://{host}{uri} permanent
 }

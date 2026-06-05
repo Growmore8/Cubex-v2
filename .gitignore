@@ -42,3 +42,6 @@ next-env.d.ts
 
 # user uploads (runtime data)
 /uploads
+
+# landing page (separate repo, cloned on the server, mounted into Caddy)
+/landing
