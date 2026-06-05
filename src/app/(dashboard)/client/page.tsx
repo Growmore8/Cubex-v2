@@ -70,7 +70,7 @@ export default function ClientTerminal() {
   const [entryTab, setEntryTab] = useState<"trade" | "pending">("trade");
   const [ordIdx, setOrdIdx] = useState(0); // selected order kind (app-style grid)
   const [walletModal, setWalletModal] = useState<null | "deposit" | "withdraw" | "kyc">(null);
-  const [vol, setVol] = useState(0.1);
+  const [vol, setVol] = useState(0.01);
   const [sl, setSl] = useState("");
   const [tp, setTp] = useState("");
   const [trail, setTrail] = useState("");
