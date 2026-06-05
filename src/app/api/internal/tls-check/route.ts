@@ -11,8 +11,11 @@ export async function GET(req: Request) {
   const domain = (new URL(req.url).searchParams.get("domain") || "").toLowerCase().trim();
   if (!domain) return new NextResponse("missing domain", { status: 400 });
 
+  // Allow SUBDOMAINS of the platform domain (trade., db., files., tenant subdomains)
+  // but NOT the bare apex — the apex is your separately-hosted landing site and must
+  // never be served (or get a cert) from this server.
   const root = (process.env.ROOT_DOMAIN || process.env.DOMAIN || "").toLowerCase().trim();
-  if (root && (domain === root || domain.endsWith("." + root))) {
+  if (root && domain.endsWith("." + root)) {
     return new NextResponse("ok", { status: 200 });
   }
 
