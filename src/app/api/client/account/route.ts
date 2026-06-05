@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
+import { getDisabledSetFor } from "@/services/symbolPerms.service";
 
 export async function GET(req: Request) {
   const s = await requireClient();
@@ -46,6 +47,9 @@ export async function GET(req: Request) {
   // the client's own additional accounts) inherit it.
   const kycVerified = !!(await prisma.kycDocument.findFirst({ where: { account: { userId: s.sub }, status: "APPROVED" }, select: { id: true } }));
 
+  // Same global catalog as every other area, minus the symbols this client's tenant
+  // admin / assigned managers have switched off (so an admin/manager "off" reflects
+  // to the client). Identical filtering to /api/symbols.
   let symbols: any[] = [];
   try {
     symbols = await prisma.globalSymbol.findMany({
@@ -53,6 +57,8 @@ export async function GET(req: Request) {
       orderBy: { symbol: "asc" },
       select: { symbol: true, display: true, category: true, digits: true },
     });
+    const hidden = await getDisabledSetFor(s);
+    if (hidden.size) symbols = symbols.filter((x: any) => !hidden.has(x.symbol));
   } catch { symbols = []; }
 
   // tenant branding for the app header (never "CubeX")
