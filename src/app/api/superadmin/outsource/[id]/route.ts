@@ -3,6 +3,7 @@ import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import { effectiveSeatsForPlan } from "@/services/tenant.service";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,6 +27,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (b.primaryColor) data.primaryColor = b.primaryColor;
       if (b.accentColor) data.accentColor = b.accentColor;
       await prisma.tenant.update({ where: { id: t.id }, data });
+      // Plan can also be changed here; seats follow the (live) package limit.
+      if (b.plan) {
+        const seats = await effectiveSeatsForPlan(prisma, b.plan);
+        await prisma.subscription.upsert({
+          where: { tenantId: t.id },
+          create: { tenantId: t.id, plan: b.plan, status: "ACTIVE", seats },
+          update: { plan: b.plan, seats },
+        });
+      }
     } else if (b.action === "perms") {
       await prisma.tenant.update({ where: { id: t.id }, data: { permissions: b.perms || {} } });
     } else if (b.action === "open" || b.action === "activate") {

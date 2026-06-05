@@ -28,6 +28,8 @@ const createSchema = z.object({
   logoUrl: z.string().optional(),
   slogan: z.string().optional(),
   companyInfo: z.string().optional(),
+  customDomain: z.string().optional(),
+  supportEmail: z.string().email().or(z.literal("")).optional(),
 });
 
 export async function POST(req: Request) {

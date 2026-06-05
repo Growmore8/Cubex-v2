@@ -31,6 +31,10 @@ export default function SATenantsPage() {
   const [subForm, setSubForm] = useState<any>({});
   const [editFor, setEditFor] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
+  // Live package definitions (defaults merged with super-admin overrides) so the plan
+  // dropdowns show the real account limit set in Packages & Pricing.
+  const [pkgs, setPkgs] = useState<any>(PACKAGES);
+  const seatsOf = (k: string) => Number(pkgs?.[k]?.seats) || PACKAGES[k as keyof typeof PACKAGES]?.seats || 5;
   const { confirm, prompt, node } = useDialog();
 
   async function load() {
@@ -40,6 +44,7 @@ export default function SATenantsPage() {
     } catch (e) {}
   }
   useEffect(() => { load(); }, []);
+  useEffect(() => { fetch("/api/superadmin/packages").then((r) => r.json()).then((d) => { if (d.ok && d.packages) setPkgs(d.packages); }).catch(() => {}); }, []);
 
   async function act(id: string, action: string, extra: any) {
     setErr("");
@@ -94,6 +99,7 @@ export default function SATenantsPage() {
       customDomain: t.customDomain || "", supportEmail: t.supportEmail || "",
       slogan: t.slogan || "", companyInfo: t.companyInfo || "", logoUrl: t.logoUrl || "",
       primaryColor: t.primaryColor || "#2563eb", accentColor: t.accentColor || "#22c55e",
+      plan: t.subscription?.plan || "STARTER",
     });
     setEditFor(t);
   }
@@ -251,7 +257,10 @@ export default function SATenantsPage() {
             <div className="grid grid-cols-2 gap-2">
               <input className={inp} placeholder="Company name *" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               <input className={inp} placeholder="subdomain — e.g. infinity *" value={form.subdomain || ""} onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} />
-              <p className="col-span-2 -mt-1 text-[11px] text-gray-400">Short ID only (letters, numbers, hyphens) — used for <b>infinity.{typeof window !== "undefined" ? window.location.host.replace(/^[^.]+\./, "") : "yourplatform.com"}</b>. The broker&apos;s own domain (e.g. trade.infinity.com) is set later in <b>Edit Tenant → Custom Domain</b>.</p>
+              <p className="col-span-2 -mt-1 text-[11px] text-gray-400">Short ID only (letters, numbers, hyphens) — used for <b>infinity.{typeof window !== "undefined" ? window.location.host.replace(/^[^.]+\./, "") : "yourplatform.com"}</b>.</p>
+              <input className={inp + " col-span-2"} placeholder="Custom domain — e.g. trade.infinity.com (optional)" value={form.customDomain || ""} onChange={(e) => setForm({ ...form, customDomain: e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\s/g, "") })} />
+              <p className="col-span-2 -mt-1 text-[11px] text-gray-400">The broker&apos;s own domain their traders use. Leave blank now and set it later — point its DNS at this server, HTTPS is automatic.</p>
+              <input className={inp + " col-span-2"} placeholder="Support email (optional)" value={form.supportEmail || ""} onChange={(e) => setForm({ ...form, supportEmail: e.target.value })} />
               <input className={inp + " col-span-2"} placeholder="Brand name (shown on portal)" value={form.brandName || ""} onChange={(e) => setForm({ ...form, brandName: e.target.value })} />
               <input className={inp} placeholder="Admin name *" value={form.adminName || ""} onChange={(e) => setForm({ ...form, adminName: e.target.value })} />
               <input className={inp} placeholder="Admin email *" value={form.adminEmail || ""} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} />
@@ -262,9 +271,9 @@ export default function SATenantsPage() {
               <div className="col-span-2">
                 <label className="text-xs text-gray-500 mb-1 block">Plan (sets the account limit)</label>
                 <select className={inp + " w-full"} value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })}>
-                  {PLAN_KEYS.map((k) => <option key={k} value={k}>{PACKAGES[k].name} — up to {PACKAGES[k].seats} accounts (${PACKAGES[k].price}/mo)</option>)}
+                  {PLAN_KEYS.map((k) => <option key={k} value={k}>{pkgs[k]?.name || PACKAGES[k].name} — up to {seatsOf(k)} accounts (${pkgs[k]?.price ?? PACKAGES[k].price}/mo)</option>)}
                 </select>
-                <p className="mt-1 text-[11px] text-gray-400">The tenant can create up to <b>{PACKAGES[(form.plan || "STARTER") as keyof typeof PACKAGES].seats} accounts</b> on this plan. Manage plans in Packages &amp; Pricing.</p>
+                <p className="mt-1 text-[11px] text-gray-400">The tenant can create up to <b>{seatsOf(form.plan || "STARTER")} accounts</b> on this plan. Manage plans in Packages &amp; Pricing.</p>
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Primary Color</label>
@@ -291,8 +300,8 @@ export default function SATenantsPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Plan (sets the account limit)</label>
-                <select className={inp} value={subForm.plan} onChange={(e) => setSubForm({ ...subForm, plan: e.target.value, seats: PACKAGES[e.target.value as keyof typeof PACKAGES]?.seats ?? subForm.seats })}>
-                  {PLAN_KEYS.map((k) => <option key={k} value={k}>{PACKAGES[k].name} — up to {PACKAGES[k].seats} accounts (${PACKAGES[k].price}/mo)</option>)}
+                <select className={inp} value={subForm.plan} onChange={(e) => setSubForm({ ...subForm, plan: e.target.value, seats: seatsOf(e.target.value) })}>
+                  {PLAN_KEYS.map((k) => <option key={k} value={k}>{pkgs[k]?.name || PACKAGES[k].name} — up to {seatsOf(k)} accounts (${pkgs[k]?.price ?? PACKAGES[k].price}/mo)</option>)}
                 </select>
               </div>
               <div>
@@ -306,7 +315,7 @@ export default function SATenantsPage() {
               </div>
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Account limit</label>
-                <div className={inp + " bg-gray-50 text-gray-700"}>{subForm.seats} accounts <span className="text-gray-400">(from {PACKAGES[(subForm.plan || "STARTER") as keyof typeof PACKAGES]?.name} plan)</span></div>
+                <div className={inp + " bg-gray-50 text-gray-700"}>{seatsOf(subForm.plan || "STARTER")} accounts <span className="text-gray-400">(from {pkgs[subForm.plan || "STARTER"]?.name || PACKAGES[(subForm.plan || "STARTER") as keyof typeof PACKAGES]?.name} plan)</span></div>
               </div>
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Expiry Date (leave blank = no expiry)</label>
@@ -330,7 +339,8 @@ export default function SATenantsPage() {
               <div><label className="text-xs text-gray-500 block mb-1">Company Name *</label><input className={inp} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
               <div><label className="text-xs text-gray-500 block mb-1">Brand Name</label><input className={inp} value={editForm.brandName} onChange={(e) => setEditForm({ ...editForm, brandName: e.target.value })} /></div>
               <div><label className="text-xs text-gray-500 block mb-1">Subdomain *</label><input className={inp} value={editForm.subdomain} onChange={(e) => setEditForm({ ...editForm, subdomain: e.target.value })} /></div>
-              <div><label className="text-xs text-gray-500 block mb-1">Custom Domain</label><input className={inp} placeholder="e.g. portal.acme.com" value={editForm.customDomain} onChange={(e) => setEditForm({ ...editForm, customDomain: e.target.value })} /></div>
+              <div><label className="text-xs text-gray-500 block mb-1">Custom Domain</label><input className={inp} placeholder="e.g. trade.acme.com" value={editForm.customDomain} onChange={(e) => setEditForm({ ...editForm, customDomain: e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\s/g, "") })} /></div>
+              <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Plan (sets the account limit)</label><select className={inp} value={editForm.plan} onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}>{PLAN_KEYS.map((k) => <option key={k} value={k}>{pkgs[k]?.name || PACKAGES[k].name} — up to {seatsOf(k)} accounts (${pkgs[k]?.price ?? PACKAGES[k].price}/mo)</option>)}</select></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Support Email</label><input className={inp} type="email" value={editForm.supportEmail} onChange={(e) => setEditForm({ ...editForm, supportEmail: e.target.value })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Logo</label><LogoField value={editForm.logoUrl} which="edit" /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Slogan / Tagline</label><input className={inp} placeholder="Trade smarter" value={editForm.slogan} onChange={(e) => setEditForm({ ...editForm, slogan: e.target.value })} /></div>

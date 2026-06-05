@@ -40,6 +40,14 @@ export async function POST(req: Request) {
       create: { key: SETTING_KEY, value: b.packages },
       update: { value: b.packages },
     });
+    // Reflect any seat-count change onto every tenant currently on that plan, so the
+    // limit + displayed seats update across all tenants immediately.
+    for (const [plan, def] of Object.entries(b.packages as Record<string, any>)) {
+      const seats = Number(def?.seats);
+      if (Number.isFinite(seats) && seats > 0) {
+        await prisma.subscription.updateMany({ where: { plan: plan as any }, data: { seats } });
+      }
+    }
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
