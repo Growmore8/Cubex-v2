@@ -38,6 +38,8 @@ export default function ClientMobile({ t }: { t: any }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [qcat, setQcat] = useState<string>("Crypto"); // quotes open on Crypto by default
+  const [symPickerOpen, setSymPickerOpen] = useState(false);
+  const [symSearch, setSymSearch] = useState("");
   const [modifyId, setModifyId] = useState<string | null>(null);
   const [mSl, setMSl] = useState("");
   const [mTp, setMTp] = useState("");
@@ -317,10 +319,12 @@ export default function ClientMobile({ t }: { t: any }) {
         {tab === "chart" && (
           <div className="flex h-full flex-col">
             <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2">
-              {/* Symbol selector above the chart — switch instrument without leaving the chart */}
-              <select value={selSym || ""} onChange={(e) => setSelSym(e.target.value)} className="max-w-[150px] rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-sm font-bold text-[var(--text)]">
-                {(symbols || []).map((x: any) => <option key={x.symbol} value={x.symbol}>{x.display || x.symbol}</option>)}
-              </select>
+              {/* Symbol picker — opens a searchable list of all symbols */}
+              <button onClick={() => { setSymSearch(""); setSymPickerOpen(true); }} className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1 text-sm font-bold text-[var(--text)]">
+                <i className="fa-solid fa-magnifying-glass text-[10px] opacity-60" />
+                <span className="truncate">{selSym || "Select symbol"}</span>
+                <i className="fa-solid fa-chevron-down text-[9px] opacity-60" />
+              </button>
               <span className="text-[12px] font-semibold" style={{ color: BUY }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</span>
               <div className="ml-auto flex items-center gap-1.5">
                 <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-1 text-[11px] text-[var(--text)]">
@@ -366,15 +370,15 @@ export default function ClientMobile({ t }: { t: any }) {
               const open = expanded === p.id;
               return (
                 <div key={p.id} className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]" style={{ borderLeft: `4px solid ${p.type === "BUY" ? BLUE : SELL}` }}>
-                  <div className="flex items-center justify-between p-3">
+                  {/* Tap the row to open/close trade details (no separate arrow) */}
+                  <div onClick={() => setExpanded(open ? null : p.id)} className="flex cursor-pointer select-none items-center justify-between p-3 active:bg-[var(--soft)]">
                     <div>
                       <div className="text-sm font-bold">{p.symbol} <span className="text-[12px] font-semibold" style={{ color: p.type === "BUY" ? BLUE : SELL }}>{p.type} {p.lots}</span></div>
                       <div className="text-[10px] text-[var(--muted)]">{Number(p.openPrice).toFixed(dd)} → {cur.toFixed(dd)}</div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <div className="text-right text-sm font-bold" style={{ color: plv >= 0 ? BUY : SELL }}>{(plv >= 0 ? "+" : "") + fmt(plv)}</div>
-                      <button onClick={() => close(p.id)} className="flex h-7 w-7 items-center justify-center rounded-full border" style={{ borderColor: SELL, color: SELL }}><i className="fa-solid fa-xmark" /></button>
-                      <button onClick={() => setExpanded(open ? null : p.id)} className="text-[var(--muted)]"><i className={`fa-solid fa-chevron-${open ? "up" : "down"}`} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); close(p.id); }} className="flex h-7 w-7 items-center justify-center rounded-full border" style={{ borderColor: SELL, color: SELL }}><i className="fa-solid fa-xmark" /></button>
                     </div>
                   </div>
                   {open && (
@@ -773,6 +777,37 @@ export default function ClientMobile({ t }: { t: any }) {
       )}
 
       {/* PIN change modal */}
+      {/* SYMBOL SEARCH PICKER (chart) */}
+      {symPickerOpen && (
+        <div className="fixed inset-0 z-[115] flex flex-col" style={{ background: "var(--bg)", paddingTop: "env(safe-area-inset-top)" }}>
+          <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
+            <div className="relative flex-1">
+              <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+              <input autoFocus value={symSearch} onChange={(e) => setSymSearch(e.target.value)} placeholder="Search symbols" className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)]" />
+            </div>
+            <button onClick={() => setSymPickerOpen(false)} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted)]"><i className="fa-solid fa-xmark text-lg" /></button>
+          </div>
+          <div className="flex-1 overflow-auto">
+            {(symbols || []).filter((x: any) => { const q = symSearch.trim().toLowerCase(); if (!q) return true; return `${x.display || x.symbol}`.toLowerCase().includes(q) || `${x.symbol}`.toLowerCase().includes(q); }).map((x: any) => {
+              const pr = prices[x.symbol];
+              return (
+                <button key={x.symbol} onClick={() => { setSelSym(x.symbol); setSymPickerOpen(false); }} className="flex w-full items-center justify-between border-b border-[var(--border)] px-4 py-3 text-left active:bg-[var(--soft)]" style={x.symbol === selSym ? { background: "var(--soft)" } : undefined}>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{x.display || x.symbol}</div>
+                    <div className="text-[10px] uppercase text-[var(--muted)]">{x.category || "other"}</div>
+                  </div>
+                  <div className="ml-2 flex shrink-0 items-center gap-2">
+                    <span className="text-[12px] font-semibold tabular-nums text-[var(--muted)]">{pr != null ? pr.toFixed(dg(x.symbol)) : "…"}</span>
+                    {x.symbol === selSym && <i className="fa-solid fa-check" style={{ color: BUY }} />}
+                  </div>
+                </button>
+              );
+            })}
+            <div className="h-16" />
+          </div>
+        </div>
+      )}
+
       {pin?.pinModal && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-full max-w-[320px] rounded-2xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
