@@ -171,31 +171,42 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── DASHBOARD ───────── */}
         {tab === "dashboard" && (
           <div className="space-y-4 p-3">
-            {/* account card */}
-            <div className="relative overflow-hidden rounded-2xl p-4" style={{
-              background: "linear-gradient(135deg,#10141d 0%,#1a2230 100%)",
-              border: `1px solid ${account?.type === "LIVE" ? "rgba(22,163,74,.4)" : "rgba(227,168,85,.4)"}`,
-              boxShadow: `0 0 30px ${account?.type === "LIVE" ? "rgba(22,163,74,.12)" : "rgba(227,168,85,.12)"}`,
+            {/* premium account card (Visa/Mastercard style) */}
+            <div className="relative overflow-hidden rounded-[18px] p-5 text-white" style={{
+              background: account?.type === "LIVE"
+                ? `linear-gradient(135deg, ${brand?.primaryColor || "#1e3a8a"} 0%, #0b1220 78%)`
+                : `linear-gradient(135deg, #5b4410 0%, #0d0f16 78%)`,
+              boxShadow: "0 16px 34px -14px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08)",
             }}>
-              <div className="flex items-start justify-between">
-                <div className="text-[11px] font-bold tracking-widest text-white/80">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
-                <div className="flex gap-1.5">
-                  <span className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: account?.type === "LIVE" ? "rgba(22,163,74,.25)" : "rgba(227,168,85,.25)", color: account?.type === "LIVE" ? "#4ade80" : GOLD }}>{account?.type}</span>
-                  <span className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: "rgba(22,163,74,.2)", color: "#4ade80" }}>● ACTIVE</span>
-                </div>
+              {/* gloss + animated sheen */}
+              <div className="card-sheen pointer-events-none absolute inset-0" />
+              <div className="pointer-events-none absolute -right-14 -top-20 h-56 w-56 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%)" }} />
+              {/* network mark (overlapping circles in brand colours) */}
+              <div className="absolute right-5 top-5 flex items-center">
+                <span className="h-7 w-7 rounded-full" style={{ background: brand?.primaryColor || "#eb001b", opacity: 0.95 }} />
+                <span className="-ml-3 h-7 w-7 rounded-full" style={{ background: brand?.accentColor || "#f79e1b", opacity: 0.85, mixBlendMode: "screen" }} />
               </div>
-              <div className="mt-4 flex items-center gap-2 text-white/70">
-                <i className="fa-solid fa-microchip" /><i className="fa-solid fa-wifi text-[11px]" />
+
+              <div className="relative flex items-center gap-2">
+                <div className="text-[11px] font-bold tracking-[0.2em] text-white/85">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
+                <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(255,255,255,0.16)", color: "#fff" }}>{account?.type}</span>
               </div>
-              <div className="mt-2 font-mono text-lg tracking-[0.3em] text-white">{fmtLogin(account?.login)}</div>
-              <div className="mt-4 flex items-end justify-between">
+
+              {/* EMV chip */}
+              <div className="relative mt-5 flex h-8 w-11 flex-col justify-center gap-[3px] rounded-md px-1" style={{ background: "linear-gradient(135deg, #f4df8e 0%, #c8a64a 50%, #b8923a 100%)", boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.25)" }}>
+                <div className="h-[2px] w-full rounded bg-black/20" /><div className="h-[2px] w-full rounded bg-black/20" /><div className="h-[2px] w-full rounded bg-black/20" />
+              </div>
+
+              <div className="relative mt-3 font-mono text-xl tracking-[0.26em] text-white" style={{ textShadow: "0 1px 2px rgba(0,0,0,0.45)" }}>{fmtLogin(account?.login)}</div>
+
+              <div className="relative mt-4 flex items-end justify-between">
                 <div>
-                  <div className="text-[8px] tracking-widest text-white/40">CARDHOLDER</div>
-                  <div className="text-[11px] font-semibold uppercase text-white/90">{account?.ownerName || account?.name}</div>
+                  <div className="text-[8px] tracking-[0.2em] text-white/45">CARDHOLDER</div>
+                  <div className="text-[12px] font-semibold uppercase tracking-wide text-white/95">{account?.ownerName || account?.name}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[8px] tracking-widest text-white/40">BALANCE</div>
-                  <div className="text-sm font-bold text-white">${fmt(balance)}</div>
+                  <div className="text-[8px] tracking-[0.2em] text-white/45">BALANCE</div>
+                  <div className="text-base font-bold text-white">${fmt(balance)}</div>
                 </div>
               </div>
             </div>
@@ -737,14 +748,17 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
       )}
 
-      {/* BOTTOM NAV */}
-      <div className="flex border-t border-[var(--border)] bg-[var(--panel)]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {/* BOTTOM NAV — Windows 11 / Fluent glass */}
+      <div className="glass relative flex border-t" style={{ borderColor: "var(--border)", background: theme === "dark" ? "rgba(20,24,34,0.72)" : "rgba(255,255,255,0.72)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+        {/* sliding active indicator */}
+        <span className="nav11-indicator pointer-events-none absolute top-0 h-0.5 rounded-full" style={{ background: BLUE, width: `${50 / navItems.length}%`, left: `${(navItems.findIndex(([k]) => k === tab) + 0.25) * (100 / navItems.length)}%` }} />
         {navItems.map(([k, icon, label]) => {
           const active = tab === k;
           return (
-            <button key={k} onClick={() => setTab(k as any)} className="relative flex flex-1 flex-col items-center gap-0.5 py-2" style={{ color: active ? BLUE : "var(--muted)" }}>
-              {active && <span className="absolute left-1/4 top-0 h-0.5 w-1/2 rounded-full" style={{ background: BLUE }} />}
-              <i className={`fa-solid ${icon} text-[15px]`} />
+            <button key={k} onClick={() => setTab(k as any)} className="nav11-item relative flex flex-1 flex-col items-center gap-0.5 py-2.5" style={{ color: active ? BLUE : "var(--muted)" }}>
+              <span className="flex h-7 w-12 items-center justify-center rounded-full transition-colors" style={{ background: active ? (theme === "dark" ? "rgba(47,129,247,0.16)" : "rgba(47,129,247,0.12)") : "transparent" }}>
+                <i className={`fa-solid ${icon} text-[15px]`} />
+              </span>
               <span className="text-[9px] font-semibold">{label}</span>
             </button>
           );

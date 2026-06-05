@@ -42,6 +42,29 @@
 .auth-pan  { animation: auth-pan 40s linear infinite;  will-change: transform; }
 .auth-pan2 { animation: auth-pan2 60s linear infinite; will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .auth-pan, .auth-pan2 { animation: none !important; } }
+
+/* ---- Premium account card sheen ---- */
+@keyframes card-sheen {
+  0%   { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+  18%  { opacity: 0.5; }
+  40%  { transform: translateX(220%) skewX(-18deg); opacity: 0; }
+  100% { transform: translateX(220%) skewX(-18deg); opacity: 0; }
+}
+.card-sheen::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  animation: card-sheen 6s ease-in-out infinite;
+}
+
+/* ---- Windows 11 / Fluent glass surfaces + nav ---- */
+.glass {
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+.nav11-item { transition: color .2s ease, transform .15s ease; }
+.nav11-item:active { transform: scale(0.92); }
+.nav11-indicator { transition: left .28s cubic-bezier(.2,.9,.2,1), width .28s cubic-bezier(.2,.9,.2,1); }
+@media (prefers-reduced-motion: reduce) { .card-sheen::before { animation: none; opacity: 0; } }
 /* inputs */
 .auth-field {
   transition: border-color 0.18s ease, box-shadow 0.2s ease, background 0.18s ease;
