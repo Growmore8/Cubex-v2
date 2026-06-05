@@ -15,7 +15,7 @@ services:
       DOMAIN: ${DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./landing:/srv/landing:ro   # static landing page (git clone of landing-page repo)
+      - ../landing-page:/srv/landing:ro   # separate landing repo, cloned OUTSIDE this project (e.g. /opt/landing-page)
       - caddy-data:/data      # cached certs + ACME account (persist this!)
       - caddy-config:/config
     depends_on: [app]

@@ -11,7 +11,8 @@
 #
 # Env (from .env): ACME_EMAIL, DOMAIN (platform domain, e.g. cubexenterprises.com)
 # The landing repo (https://github.com/Growmore8/landing-page) is cloned on the host
-# into ./landing and mounted read-only at /srv/landing (see docker-compose.prod.yml).
+# OUTSIDE this project (e.g. /opt/landing-page) and mounted read-only at /srv/landing
+# (see docker-compose.prod.yml). It is never part of the platform project/git.
 
 {
 	email {$ACME_EMAIL}
