@@ -6,8 +6,10 @@
 #   db.* / files.*                -> Adminer / Filebrowser
 #   <any broker custom domain>    -> the platform (on-demand TLS, gated by the app)
 #
-# TLS: every site uses on-demand certs, gated by /api/internal/tls-check, so nothing
-# is provisioned until a host is actually requested (and only for approved hosts).
+# TLS:
+#   - Named hosts (apex, www, trade.) use normal AUTOMATIC TLS (provisioned by Caddy).
+#   - db./files. + the broker catch-all use ON-DEMAND TLS, gated by
+#     /api/internal/tls-check, so nothing is issued for an unknown/abusive host.
 #
 # Env (from .env): ACME_EMAIL, DOMAIN (platform domain, e.g. cubexenterprises.com)
 # The landing repo (https://github.com/Growmore8/landing-page) is cloned on the host
@@ -21,25 +23,19 @@
 	}
 }
 
-# --- Landing page (static) on the apex + www ---
+# --- Landing page (static) on the apex + www ; automatic TLS ---
 {$DOMAIN}, www.{$DOMAIN} {
-	tls {
-		on_demand
-	}
 	root * /srv/landing
 	file_server
 	encode gzip
 }
 
-# --- Platform ---
+# --- Platform ; automatic TLS ---
 trade.{$DOMAIN} {
-	tls {
-		on_demand
-	}
 	reverse_proxy app:3000
 }
 
-# --- Admin tools ---
+# --- Admin tools ; on-demand (their DNS may not be set yet) ---
 db.{$DOMAIN} {
 	tls {
 		on_demand
