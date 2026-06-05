@@ -161,7 +161,7 @@ export default function SAPackagesPage() {
 
       {/* Edit Modal */}
       {editing && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setEditing(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
           <div className="w-[500px] max-h-[90vh] overflow-auto rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2 text-lg font-semibold">
               <div className="h-3 w-3 rounded-full" style={{ background: PLAN_COLORS[editing] }} />

@@ -656,7 +656,7 @@ export default function ClientMobile({ t }: { t: any }) {
         const inp = "w-full rounded-lg border px-3 py-2 text-sm tabular-nums";
         const ist = { borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" };
         return (
-          <div className="fixed inset-0 z-[95] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setNoOpen(false)}>
+          <div className="fixed inset-0 z-[95] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
             <div className="w-full rounded-t-2xl p-4" style={{ background: "var(--card)", borderTop: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
               <div className="mb-3 flex items-center justify-between">
                 <div className="font-bold">New Order — {selSym}</div>
@@ -726,7 +726,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
       {/* TRANSFER MODAL */}
       {xferModal && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setXferModal(false)}>
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.6)" }}>
           <div className="w-full max-w-[340px] rounded-2xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 text-sm font-bold">Transfer Funds</div>
             <label className="text-[10px] text-[var(--muted)]">From</label>
@@ -751,7 +751,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
       {/* PIN change modal */}
       {pin?.pinModal && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => pin.setPinModal(false)}>
+        <div className="fixed inset-0 z-[95] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-full max-w-[320px] rounded-2xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">{pin.pinHasPin ? "Change PIN" : "Set PIN"}</div>
             {pin.pinHasPin && (<><div className="text-[10px] text-[var(--muted)]">Current PIN</div><input type="password" inputMode="numeric" value={pin.pinForm.current || ""} onChange={(e) => pin.setPinForm({ ...pin.pinForm, current: e.target.value })} className="mb-2 mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-center text-[var(--text)]" /></>)}

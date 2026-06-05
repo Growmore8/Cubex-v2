@@ -131,8 +131,9 @@ export default function PaymentsPanel() {
         </table>
       </div>
       {view && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.8)" }} onClick={() => setView("")}>
-          <img src={view} alt="slip" className="max-h-full max-w-full rounded" onClick={(e) => e.stopPropagation()} />
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.8)" }}>
+          <button onClick={() => setView("")} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-lg text-white hover:bg-white/30">✕</button>
+          <img src={view} alt="slip" className="max-h-full max-w-full rounded" />
         </div>
       )}
     </div>

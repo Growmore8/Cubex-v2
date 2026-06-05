@@ -1089,7 +1089,7 @@ export default function AdminDeskPage() {
       </>)}
 
       {ticket && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setTicket(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[300px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">Order - {ticket}</div>
             <div className={lab}>Type</div>
@@ -1121,7 +1121,7 @@ export default function AdminDeskPage() {
         </div>
       </>)}
       {pos && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setPos(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[300px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold">{pos.kind === "modify" ? "Modify S/L - T/P" : "Partial Close"}</div>
             <div className="mb-2 text-[10px] text-[var(--muted)]">{pos.t.symbol} {pos.t.type} {pos.t.lots} @ {pos.t.openPrice}</div>
@@ -1143,7 +1143,7 @@ export default function AdminDeskPage() {
         const linked = clients.filter((c: any) => act.acc.user?.email && c.user?.email === act.acc.user?.email);
         const LEVS = [50, 100, 200, 300, 500, 1000];
         return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setAct(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="w-[470px] max-w-[95vw] max-h-[90vh] overflow-auto rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent2)" }}><i className={"fa-solid " + actIcon()} /></span>
@@ -1257,7 +1257,7 @@ export default function AdminDeskPage() {
       })()}
 
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setModal("")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[330px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">{modal === "client" && "New Client"}{modal === "manager" && "New Manager"}{modal === "group" && "Manage Groups"}{modal === "notify" && "Send Notification"}</div>
             {modal === "client" && (<>
@@ -1334,7 +1334,7 @@ export default function AdminDeskPage() {
         const cats = Object.entries(grouped).sort((a, b) => (CAT_ORDER.indexOf(a[0]) === -1 ? 99 : CAT_ORDER.indexOf(a[0])) - (CAT_ORDER.indexOf(b[0]) === -1 ? 99 : CAT_ORDER.indexOf(b[0])));
         const catName = (c: string) => c === "metals" ? "PREC. METALS" : c.toUpperCase();
         return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setSymOv(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="flex max-h-[88vh] w-[580px] max-w-[95vw] flex-col rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--red) 16%, transparent)", color: "#e05260" }}><i className="fa-solid fa-ban" /></span>
@@ -1374,7 +1374,7 @@ export default function AdminDeskPage() {
         );
       })()}
       {mt && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setMt(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[420px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">Manual Trade - <span style={{ color: "var(--accent)" }}>{mt.acc.login} - {mt.acc.name}</span></div>
             <div className={lab}>Symbol</div>
@@ -1408,7 +1408,7 @@ export default function AdminDeskPage() {
         </div>
       )}
       {hEdit && (() => { const isFin = String(hEdit.id).startsWith("F"); return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setHEdit(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[360px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">Edit {isFin ? "Transaction" : "Trade"} {hEdit.ticket}</div>
             {isFin ? (<>
@@ -1425,7 +1425,7 @@ export default function AdminDeskPage() {
         </div>
       ); })()}
       {confirmBox && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setConfirmBox(null)}>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="w-[340px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2 text-sm font-semibold" style={{ color: confirmBox.danger ? SELL : "var(--text)" }}>
               <i className={"fa-solid " + (confirmBox.danger ? "fa-triangle-exclamation" : "fa-circle-question")} /> Please confirm
@@ -1454,7 +1454,7 @@ export default function AdminDeskPage() {
 
       {/* Symbol Access Modal */}
       {symPerm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setSymPerm(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="flex max-h-[82vh] w-[420px] flex-col rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold">Symbol Access</div>
             <div className="mb-2 text-[10px]" style={{ color: "var(--muted)" }}>
@@ -1483,7 +1483,7 @@ export default function AdminDeskPage() {
 
       {/* KYC Upload Modal */}
       {kycUploadFor && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setKycUploadFor(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="w-[360px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 text-sm font-semibold">Upload KYC Document</div>
             <div className="mb-3 text-[10px]" style={{ color: "var(--muted)" }}>{kycUploadFor.login} — {kycUploadFor.name}</div>

@@ -387,7 +387,7 @@ export default function ClientTerminal() {
       )}
 
       {topUpOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setTopUpOpen(false)}>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[320px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 text-sm font-semibold">Top up Demo Account</div>
             <div className="mb-1 text-[10px] text-[var(--muted)]">Amount (USD)</div>
@@ -625,14 +625,14 @@ export default function ClientTerminal() {
       </div>
 
       {walletModal && (
-        <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-auto p-4 sm:items-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setWalletModal(null)}>
+        <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-auto p-4 sm:items-center" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <WalletPanel key={walletModal} initialTab={walletModal} onClose={() => setWalletModal(null)} />
           </div>
         </div>
       )}
       {pinModal && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setPinModal(false)}>
+        <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[300px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">{pinHasPin ? "Change PIN" : "Set PIN"}</div>
             {pinHasPin && (<><div className="text-[10px] text-[var(--muted)]">Current PIN</div><input type="password" inputMode="numeric" value={pinForm.current || ""} onChange={(e) => setPinForm({ ...pinForm, current: e.target.value })} className="mb-2 mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[var(--text)]" /></>)}
@@ -656,7 +656,7 @@ export default function ClientTerminal() {
         </div>
       )}
       {xferModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center" style={{ background: "rgba(5,9,16,0.7)" }} onClick={() => setXferModal(false)}>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center" style={{ background: "rgba(5,9,16,0.7)" }}>
           <div className="w-[320px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 text-sm font-semibold">Transfer Between Accounts</div>
             <div className="text-[10px] text-[var(--muted)]">From</div>

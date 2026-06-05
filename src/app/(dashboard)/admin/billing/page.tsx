@@ -131,7 +131,7 @@ export default function TenantBillingPage() {
 
       {/* Print Invoice */}
       {printInv && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4" onClick={() => setPrintInv(null)}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
           <div className="w-[600px] rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b px-6 py-4 print:hidden" style={{ borderColor: "#e2e8f0" }}>
               <div className="font-semibold text-gray-800">Invoice {printInv.number}</div>

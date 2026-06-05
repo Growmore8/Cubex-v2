@@ -104,7 +104,7 @@ export default function SAPayments() {
     </div>
 
     {/* Edit modal */}
-    {edit && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setEdit(null)}>
+    {edit && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
       <div className="w-[420px] rounded-lg bg-white p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 text-sm font-semibold">{edit.id ? "Edit" : "Add"} {edit.type === "CRYPTO" ? "Crypto Wallet" : edit.type === "UPI" ? "UPI" : "Local Link"} — {scopeName}</div>
         <div className="space-y-2">
@@ -129,7 +129,7 @@ export default function SAPayments() {
     </div>)}
 
     {/* Delete confirm */}
-    {confirmDel && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setConfirmDel(null)}>
+    {confirmDel && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
       <div className="w-[360px] rounded-lg bg-white p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-1 text-sm font-semibold">Delete method?</div>
         <div className="mb-3 text-xs text-gray-500">{confirmDel.label || confirmDel.address || confirmDel.url}</div>

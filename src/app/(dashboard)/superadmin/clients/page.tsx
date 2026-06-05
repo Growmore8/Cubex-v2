@@ -310,7 +310,7 @@ export default function SAClientsPage() {
 
       {/* ── EDIT MODAL ── */}
       {editRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setEditRow(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
           <div className="w-[540px] max-h-[90vh] overflow-auto rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-0.5 text-lg font-semibold">Edit Client</div>
             <div className="mb-4 text-xs text-gray-400">Account ID: <span className="font-mono font-semibold text-gray-700">{editRow.login}</span></div>
@@ -366,7 +366,7 @@ export default function SAClientsPage() {
 
       {/* ── PASSWORD MODAL ── */}
       {pwRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40" onClick={() => setPwRow(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
           <div className="w-[360px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Reset Password</div>
             <div className="mb-3 text-xs text-gray-500">{pwRow.login} — {pwRow.name}</div>
@@ -387,7 +387,7 @@ export default function SAClientsPage() {
 
       {/* ── CHANGE ID MODAL ── */}
       {idRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40" onClick={() => setIdRow(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
           <div className="w-[360px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Change Login ID</div>
             <div className="mb-3 text-xs text-gray-500">Current: <span className="font-mono font-medium">{idRow.login}</span></div>
@@ -403,7 +403,7 @@ export default function SAClientsPage() {
 
       {/* ── ASSIGN MANAGER MODAL ── */}
       {mgrRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40" onClick={() => setMgrRow(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
           <div className="w-[360px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Assign Manager</div>
             <div className="mb-3 text-xs text-gray-500">{mgrRow.login} — {mgrRow.name}</div>
@@ -423,7 +423,7 @@ export default function SAClientsPage() {
 
       {/* ── DELETE CONFIRM ── */}
       {delRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40" onClick={() => setDelRow(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
           <div className="w-[400px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold text-red-600">Delete Client</div>
             <p className="mb-4 text-sm text-gray-600">

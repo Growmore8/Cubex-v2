@@ -186,7 +186,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── CREATE MODAL ── */}
       {createOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setCreateOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="w-[400px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 font-semibold text-lg">{newLabel}</div>
             <div className="space-y-3">
@@ -212,7 +212,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── EDIT MODAL ── */}
       {editRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setEditRow(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="w-[440px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold text-lg">Edit {role === "ADMIN" ? "Admin" : "Manager"}</div>
             <div className="mb-4 text-xs text-gray-400">{editRow.email}</div>
@@ -239,7 +239,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── PASSWORD MODAL ── */}
       {pwRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setPwRow(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="w-[360px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Reset Password</div>
             <div className="mb-3 text-xs text-gray-500">{pwRow.name} — {pwRow.email}</div>
@@ -260,7 +260,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── PERMISSIONS MODAL ── */}
       {permFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setPermFor(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="max-h-[80vh] w-[500px] overflow-auto rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-0.5 font-semibold text-lg">Permissions — {permFor.name}</div>
             <div className="mb-4 text-xs text-gray-500">Personal permissions (still gated by the tenant-level permissions).</div>
@@ -288,7 +288,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── DELETE CONFIRM ── */}
       {delRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setDelRow(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="w-[380px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold text-red-600">Delete {role === "ADMIN" ? "Admin" : "Manager"}</div>
             <p className="mb-4 text-sm text-gray-600">Delete <span className="font-semibold">{delRow.name}</span> ({delRow.email})? This cannot be undone.</p>

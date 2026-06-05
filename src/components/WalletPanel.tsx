@@ -164,7 +164,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose }: { initi
       <div className="space-y-1">{reqs.map((p) => (<div key={p.id} className="flex items-center justify-between text-sm"><span>{p.kind} {Number(p.amount).toFixed(2)} <span className="text-xs text-gray-400">({p.method})</span></span><span className={badge(p.status)}>{p.status}</span></div>))}{reqs.length === 0 && <div className="text-sm text-gray-400">No requests yet.</div>}</div>
     </div>
 
-    {addOpen && (<div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-6" onClick={() => setAddOpen(false)}>
+    {addOpen && (<div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-6">
       <div className="w-[400px] rounded-lg bg-white p-4 text-gray-800" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 text-sm font-semibold">Add withdrawal method</div>
         <div className="space-y-2">

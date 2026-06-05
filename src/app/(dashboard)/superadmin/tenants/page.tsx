@@ -222,7 +222,7 @@ export default function SATenantsPage() {
 
       {/* Create Tenant Modal */}
       {createOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setCreateOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="w-[480px] max-h-[90vh] overflow-auto rounded-lg bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 font-semibold">New Tenant</div>
             <div className="grid grid-cols-2 gap-2">
@@ -263,7 +263,7 @@ export default function SATenantsPage() {
 
       {/* Subscription Modal */}
       {subFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setSubFor(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="w-[360px] rounded-lg bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 font-semibold">Subscription — {subFor.brandName || subFor.name}</div>
             <div className="space-y-3">
@@ -303,7 +303,7 @@ export default function SATenantsPage() {
 
       {/* Edit Tenant Modal */}
       {editFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setEditFor(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="w-[500px] max-h-[90vh] overflow-auto rounded-lg bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 font-semibold text-lg">Edit Tenant — {editFor.name}</div>
             <div className="grid grid-cols-2 gap-3">
@@ -328,7 +328,7 @@ export default function SATenantsPage() {
 
       {/* Permissions Modal */}
       {permFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setPermFor(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="max-h-[80vh] w-[520px] overflow-auto rounded-lg bg-white p-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Tenant Permissions — {permFor.brandName || permFor.name}</div>
             <div className="mb-3 text-xs text-gray-500">If a permission is OFF, no one under this tenant can use it regardless of personal settings.</div>

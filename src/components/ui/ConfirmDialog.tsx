@@ -34,7 +34,7 @@ export function useDialog() {
   }
 
   const node = state ? (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-6" onClick={() => close(state.kind === "prompt" ? null : false)}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-6">
       <div className="w-[380px] rounded-lg bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
         {state.opts.title && <div className="mb-1 text-sm font-semibold">{state.opts.title}</div>}
         {state.opts.message && <div className="mb-3 text-xs text-gray-500 whitespace-pre-line">{state.opts.message}</div>}
