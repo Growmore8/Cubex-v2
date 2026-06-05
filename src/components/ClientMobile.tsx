@@ -140,8 +140,8 @@ export default function ClientMobile({ t }: { t: any }) {
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", height: "100dvh", paddingTop: "env(safe-area-inset-top)" }} className="flex flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarRef} onChange={uploadAvatar} />
 
-      {/* TOP HEADER */}
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
+      {/* TOP HEADER — iOS glass */}
+      <div className="glass sticky top-0 z-20 flex items-center justify-between border-b px-3 py-2.5" style={{ borderColor: "var(--border)", background: theme === "dark" ? "rgba(20,24,34,0.6)" : "rgba(255,255,255,0.6)" }}>
         <div className="flex items-center gap-2.5">
           <Avatar size={38} />
           <div className="leading-tight">
@@ -731,7 +731,7 @@ export default function ClientMobile({ t }: { t: any }) {
       })()}
 
       {/* PERSISTENT BALANCE BAR */}
-      <button onClick={() => setBalOpen((v: boolean) => !v)} className="flex w-full items-center justify-between border-t border-[var(--border)] bg-[var(--panel)] px-4 py-1.5">
+      <button onClick={() => setBalOpen((v: boolean) => !v)} className="glass flex w-full items-center justify-between border-t px-4 py-1.5" style={{ borderColor: "var(--border)", background: theme === "dark" ? "rgba(20,24,34,0.55)" : "rgba(255,255,255,0.55)" }}>
         <span className="text-[11px] text-[var(--muted)]">💼 Balance {balOpen ? "⌄" : "⌃"}</span>
         <span className="text-base font-bold tabular-nums" style={{ color: balance >= 0 ? BUY : SELL }}>${fmt(balance)}</span>
       </button>
@@ -748,21 +748,21 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
       )}
 
-      {/* BOTTOM NAV — Windows 11 / Fluent glass */}
-      <div className="glass relative flex border-t" style={{ borderColor: "var(--border)", background: theme === "dark" ? "rgba(20,24,34,0.72)" : "rgba(255,255,255,0.72)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-        {/* sliding active indicator */}
-        <span className="nav11-indicator pointer-events-none absolute top-0 h-0.5 rounded-full" style={{ background: BLUE, width: `${50 / navItems.length}%`, left: `${(navItems.findIndex(([k]) => k === tab) + 0.25) * (100 / navItems.length)}%` }} />
-        {navItems.map(([k, icon, label]) => {
-          const active = tab === k;
-          return (
-            <button key={k} onClick={() => setTab(k as any)} className="nav11-item relative flex flex-1 flex-col items-center gap-0.5 py-2.5" style={{ color: active ? BLUE : "var(--muted)" }}>
-              <span className="flex h-7 w-12 items-center justify-center rounded-full transition-colors" style={{ background: active ? (theme === "dark" ? "rgba(47,129,247,0.16)" : "rgba(47,129,247,0.12)") : "transparent" }}>
-                <i className={`fa-solid ${icon} text-[15px]`} />
-              </span>
-              <span className="text-[9px] font-semibold">{label}</span>
-            </button>
-          );
-        })}
+      {/* BOTTOM NAV — iOS Liquid Glass floating bar */}
+      <div className="px-3 pt-1.5" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
+        <div className="glass glass-edge relative flex overflow-hidden rounded-[22px]" style={{ background: theme === "dark" ? "rgba(28,30,38,0.55)" : "rgba(255,255,255,0.58)" }}>
+          {/* springy active capsule */}
+          <span className="nav-ios-pill pointer-events-none absolute bottom-1.5 top-1.5 rounded-[15px]" style={{ width: `calc(${100 / navItems.length}% - 8px)`, left: `calc(${Math.max(0, navItems.findIndex(([k]) => k === tab)) * (100 / navItems.length)}% + 4px)`, background: theme === "dark" ? "rgba(47,129,247,0.22)" : "rgba(47,129,247,0.14)" }} />
+          {navItems.map(([k, icon, label]) => {
+            const active = tab === k;
+            return (
+              <button key={k} onClick={() => setTab(k as any)} className="nav-ios-item relative z-10 flex flex-1 flex-col items-center gap-0.5 py-2.5" style={{ color: active ? BLUE : "var(--muted)" }}>
+                <i className={`fa-solid ${icon} text-[16px]`} />
+                <span className="text-[9px] font-semibold tracking-tight">{label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* TRANSFER MODAL */}
