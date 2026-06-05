@@ -1,9 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
+import { emitRefresh } from "@/lib/realtime";
+
+// Real-time in-app delivery: ping the socket bridge so recipients' open apps reload
+// and the bell/notifications update immediately (in addition to web-push + DB).
+function ping(userIds: string[]) {
+  try { emitRefresh({ kind: "notification", users: userIds }); } catch {}
+}
 
 export async function notify(tenantId: string, userId: string, title: string, body?: string, type?: string) {
   const n = await prisma.notification.create({ data: { tenantId, userId, title, body, type: type || "NOTICE" } }).catch(() => null);
   sendPushToUser(userId, { title, body, url: "/client" }).catch(() => {});
+  ping([userId]);
   return n;
 }
 
@@ -12,6 +20,7 @@ export async function notifyTenantAdmins(tenantId: string, title: string, body?:
   if (!admins.length) return null;
   const r = await prisma.notification.createMany({ data: admins.map((a) => ({ tenantId, userId: a.id, title, body })) });
   await Promise.all(admins.map((a) => sendPushToUser(a.id, { title, body, url: "/client" }))).catch(() => {});
+  ping(admins.map((a) => a.id));
   return r;
 }
 
@@ -20,6 +29,7 @@ export async function notifyTenantClients(tenantId: string, title: string, body?
   if (!users.length) return null;
   const r = await prisma.notification.createMany({ data: users.map((u) => ({ tenantId, userId: u.id, title, body })) });
   await Promise.all(users.map((u) => sendPushToUser(u.id, { title, body, url: "/client" }))).catch(() => {});
+  ping(users.map((u) => u.id));
   return r;
 }
 
@@ -38,6 +48,7 @@ export async function notifyStaff(
     data: recipients.map((u) => ({ tenantId, userId: u.id, title: opts.title, body: opts.body || null, type: opts.type || "NOTICE" })),
   }).catch(() => {});
   await Promise.all(recipients.map((u) => sendPushToUser(u.id, { title: opts.title, body: opts.body }))).catch(() => {});
+  ping(recipients.map((u) => u.id));
   return recipients.length;
 }
 
