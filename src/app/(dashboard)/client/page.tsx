@@ -688,7 +688,10 @@ export default function ClientTerminal() {
       {pinModal && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[300px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 text-sm font-semibold">{pinHasPin ? "Change PIN" : "Set PIN"}</div>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold">{pinHasPin ? "Change PIN" : "Set PIN"}</div>
+              <button onClick={() => setPinModal(false)} aria-label="Close" className="-mr-1 flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
             {pinHasPin && (<><div className="text-[10px] text-[var(--muted)]">Current PIN</div><input type="password" inputMode="numeric" value={pinForm.current || ""} onChange={(e) => setPinForm({ ...pinForm, current: e.target.value })} className="mb-2 mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[var(--text)]" /></>)}
             <div className="text-[10px] text-[var(--muted)]">New PIN (4-6 digits)</div>
             <input type="password" inputMode="numeric" value={pinForm.pin || ""} onChange={(e) => setPinForm({ ...pinForm, pin: e.target.value })} className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[var(--text)]" />

@@ -764,7 +764,10 @@ export default function ClientMobile({ t }: { t: any }) {
       {pin?.pinModal && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-full max-w-[320px] rounded-2xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 text-sm font-semibold">{pin.pinHasPin ? "Change PIN" : "Set PIN"}</div>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold">{pin.pinHasPin ? "Change PIN" : "Set PIN"}</div>
+              <button onClick={() => pin.setPinModal(false)} aria-label="Close" className="-mr-1 flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
             {pin.pinHasPin && (<><div className="text-[10px] text-[var(--muted)]">Current PIN</div><input type="password" inputMode="numeric" value={pin.pinForm.current || ""} onChange={(e) => pin.setPinForm({ ...pin.pinForm, current: e.target.value })} className="mb-2 mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-center text-[var(--text)]" /></>)}
             <div className="text-[10px] text-[var(--muted)]">New PIN (4-6 digits)</div>
             <input type="password" inputMode="numeric" value={pin.pinForm.pin || ""} onChange={(e) => pin.setPinForm({ ...pin.pinForm, pin: e.target.value })} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-center text-[var(--text)]" />

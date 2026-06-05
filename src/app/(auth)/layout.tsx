@@ -4,8 +4,11 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
   const brand = await getBrand();
   return (
     <div
-      className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10"
+      className="relative flex items-center justify-center overflow-hidden px-4 py-6"
       style={{
+        minHeight: "100dvh",
+        paddingTop: "max(1.5rem, env(safe-area-inset-top))",
+        paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
         background: "var(--background)",
         ["--brand-primary" as any]: brand.primaryColor,
         ["--brand-accent" as any]: brand.accentColor,

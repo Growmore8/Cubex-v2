@@ -5,6 +5,7 @@ import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "next-themes";
+import { getBrand } from "@/lib/brand";
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -19,13 +20,21 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
-export const metadata: Metadata = {
-  title: "Cubex Platform",
-  description: "Cubex is a modern trading platform built for fast, secure, and intelligent market trading.",
-  // Run fullscreen like a native app when added to the home screen (iOS).
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Trade" },
-  formatDetection: { telephone: false },
-};
+// Title / favicon / home-screen name follow the tenant's brand (set in Super Admin),
+// so a broker's traders never see "Cubex" anywhere.
+export async function generateMetadata(): Promise<Metadata> {
+  const brand = await getBrand();
+  const name = brand.name || "Trading Platform";
+  const icon = brand.logoUrl || undefined;
+  return {
+    title: name,
+    description: `${name} — trade global markets, fast and secure.`,
+    icons: icon ? { icon, shortcut: icon, apple: icon } : undefined,
+    manifest: "/api/manifest",
+    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: name },
+    formatDetection: { telephone: false },
+  };
+}
 
 // App-like viewport: fill the screen, respect notches (safe areas), lock zoom so
 // the trading UI behaves like a native app rather than a scrollable web page.
