@@ -265,8 +265,22 @@ async function monitor(io) {
       const { acc, list } = byAcc[id]; const mc = Number(acc.mcLevel);
       if (!(mc > 0) || acc.doNotLiquidate) continue;
       const balance = Number(acc.deposit) - Number(acc.withdrawal) + Number(acc.credit) + Number(acc.bonus) + Number(acc.pnl);
-      let floating = 0, used = 0;
-      for (const t of list) { const m = meta[t.symbol]; if (!m) continue; const price = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice); floating += calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots)); let mg = (Number(t.lots) * m.contract * price) / acc.leverage; if (/JPY$/i.test(t.symbol)) mg = mg / 100; used += mg; }
+      let floating = 0;
+      const net = {};
+      for (const t of list) {
+        const m = meta[t.symbol]; if (!m) continue;
+        const price = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
+        floating += calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
+        net[t.symbol] = (net[t.symbol] || 0) + (t.type === "BUY" ? 1 : -1) * Number(t.lots); // hedged net lots
+      }
+      // used margin charged on |net| volume per symbol (full hedge => 0)
+      let used = 0;
+      for (const sym in net) {
+        const nl = Math.abs(net[sym]); if (nl < 1e-9) continue;
+        const m = meta[sym]; if (!m) continue;
+        const price = state[sym] && state[sym].price ? state[sym].price : Number((list.find((t) => t.symbol === sym) || {}).openPrice || 0);
+        let mg = (nl * m.contract * price) / acc.leverage; if (/JPY$/i.test(sym)) mg = mg / 100; used += mg;
+      }
       if (used <= 0) continue;
       if (((balance + floating) / used) * 100 <= mc) await liquidate(acc, list, io);
     }

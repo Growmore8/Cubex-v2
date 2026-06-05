@@ -25,6 +25,9 @@ const createSchema = z.object({
   brandName: z.string().optional(),
   primaryColor: z.string().optional(),
   accentColor: z.string().optional(),
+  logoUrl: z.string().optional(),
+  slogan: z.string().optional(),
+  companyInfo: z.string().optional(),
 });
 
 export async function POST(req: Request) {

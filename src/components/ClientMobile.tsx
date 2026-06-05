@@ -23,7 +23,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [noForm, setNoForm] = useState<any>({ idx: 0, lots: 0.01, trigger: "", sl: "", tp: "" });
   const [balOpen, setBalOpen] = useState(false);
   const {
-    theme, account, accts, accId, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
+    theme, brand, account, accts, accId, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
     selSym, vol, sl, tp, err,
     balance, equity, floating, free, used, level, price, bid, ask, tf, TFS,
     setSelSym, setVol, setSl, setTp, setTf,
@@ -36,7 +36,6 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mInd, setMInd] = useState<string[]>([]);
   const [histTab, setHistTab] = useState<"trades" | "financial">("trades");
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [trTab, setTrTab] = useState<"open" | "pending">("open");
   const [search, setSearch] = useState("");
   const [qcat, setQcat] = useState<string>("favs");
   const [modifyId, setModifyId] = useState<string | null>(null);
@@ -141,7 +140,7 @@ export default function ClientMobile({ t }: { t: any }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: "var(--soft)", color: GOLD }}><i className="fa-solid fa-cube" /> CubeX</span>
+          <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: "var(--soft)", color: GOLD }}>{brand?.logoUrl ? <img src={brand.logoUrl} alt="" className="h-3.5 w-3.5 rounded object-contain" /> : <i className="fa-solid fa-cube" />} {brand?.name || ""}</span>
           <button className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[var(--soft)]">
             <i className="fa-solid fa-bell text-[var(--muted)]" />
             {unread > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full" style={{ background: SELL }} />}
@@ -169,7 +168,7 @@ export default function ClientMobile({ t }: { t: any }) {
               boxShadow: `0 0 30px ${account?.type === "LIVE" ? "rgba(22,163,74,.12)" : "rgba(227,168,85,.12)"}`,
             }}>
               <div className="flex items-start justify-between">
-                <div className="text-[11px] font-bold tracking-widest text-white/80">CubeX TRADING</div>
+                <div className="text-[11px] font-bold tracking-widest text-white/80">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
                 <div className="flex gap-1.5">
                   <span className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: account?.type === "LIVE" ? "rgba(22,163,74,.25)" : "rgba(227,168,85,.25)", color: account?.type === "LIVE" ? "#4ade80" : GOLD }}>{account?.type}</span>
                   <span className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: "rgba(22,163,74,.2)", color: "#4ade80" }}>● ACTIVE</span>
@@ -336,12 +335,8 @@ export default function ClientMobile({ t }: { t: any }) {
           <div className="space-y-3 p-3">
             <button onClick={() => { setNoForm({ idx: 0, lots: vol || 0.01, trigger: "", sl: "", tp: "" }); setNoOpen(true); }} className="w-full rounded-xl py-3 text-sm font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus mr-1.5" /> New Order / Pending</button>
 
-            <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1">
-              <button onClick={() => setTrTab("open")} className="flex-1 rounded-lg py-1.5 text-[12px] font-semibold" style={trTab === "open" ? { background: BLUE, color: "#fff" } : { color: "var(--muted)" }}>Open Positions {(positions || []).length ? "(" + positions.length + ")" : ""}</button>
-              <button onClick={() => setTrTab("pending")} className="flex-1 rounded-lg py-1.5 text-[12px] font-semibold" style={trTab === "pending" ? { background: BLUE, color: "#fff" } : { color: "var(--muted)" }}>Pending {(pending || []).length ? "(" + pending.length + ")" : ""}</button>
-            </div>
-
-            {trTab === "open" && ((positions || []).length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No open positions.</div> : (positions || []).map((p: any) => {
+            <div className="text-[11px] font-semibold text-[var(--muted)]">Open Positions {(positions || []).length ? "(" + positions.length + ")" : ""}</div>
+            {(positions || []).length === 0 ? <div className="py-4 text-center text-[12px] text-[var(--muted)]">No open positions.</div> : (positions || []).map((p: any) => {
               const cur = prices[p.symbol] ?? p.openPrice; const plv = pnlOf(p, cur, csz(p.symbol)); const dd = dg(p.symbol);
               const open = expanded === p.id;
               return (
@@ -389,9 +384,11 @@ export default function ClientMobile({ t }: { t: any }) {
                   )}
                 </div>
               );
-            }))}
+            })}
 
-            {trTab === "pending" && ((pending || []).length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No pending orders.</div> : (pending || []).map((o: any) => {
+            {(pending || []).length > 0 && (<>
+            <div className="mt-3 text-[11px] font-semibold" style={{ color: BLUE }}><i className="fa-regular fa-clock mr-1" />Pending Orders ({pending.length})</div>
+            {(pending || []).map((o: any) => {
               const dd = dg(o.symbol); const trig = Number(o.price); const cur = prices[o.symbol]; const dist = cur != null ? Math.abs(trig - cur) : null;
               const c = o.side === "BUY" ? BLUE : SELL; const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : "Stop");
               return (
@@ -415,7 +412,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   </div>
                 </div>
               );
-            }))}
+            })}</>)}
           </div>
         )}
 

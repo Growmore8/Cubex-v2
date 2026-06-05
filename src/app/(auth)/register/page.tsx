@@ -1,6 +1,8 @@
 "use client";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import PasswordInput from "@/components/ui/PasswordInput";
+import CountrySelect from "@/components/ui/CountrySelect";
 
 const DIAL_CODES = [
   { code: "LK", dial: "+94" },
@@ -150,24 +152,13 @@ function RegisterForm() {
         />
       </div>
 
-      <select
-        value={country}
-        onChange={(e) => setCountry(e.target.value)}
-        className="w-full rounded-md border px-3 py-2 text-sm"
-        style={inputStyle}
-      >
-        <option value="">Select country</option>
-        {COUNTRIES.map((c) => (
-          <option key={c} value={c}>{c}</option>
-        ))}
-      </select>
+      <CountrySelect value={country} onChange={setCountry} className="w-full rounded-md border px-3 py-2 text-sm" style={inputStyle} />
 
-      <input
-        type="password"
+      <PasswordInput
         required
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-md border px-3 py-2 text-sm"
+        className="rounded-md border px-3 py-2 text-sm"
         style={inputStyle}
         placeholder="Password (min 6)"
       />

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useDialog } from "@/components/ui/ConfirmDialog";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 interface Manager {
   id: string; name: string; email: string; status: string;
@@ -83,7 +84,7 @@ export default function AdminManagersPage() {
               onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <input className={input} type="email" placeholder="Email" required value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            <input className={input} type="password" placeholder="Password (min 6)" required value={form.password}
+            <PasswordInput className={input} placeholder="Password (min 6)" required value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })} />
           </div>
           <div className="flex flex-wrap gap-4 text-sm">

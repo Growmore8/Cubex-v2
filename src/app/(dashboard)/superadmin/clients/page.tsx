@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import CountrySelect from "@/components/ui/CountrySelect";
 
 export default function SAClientsPage() {
   const [rows, setRows] = useState<any[]>([]);
@@ -342,7 +343,7 @@ export default function SAClientsPage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">COUNTRY</label>
-                <input className={inp} value={ef.country} onChange={(e) => setEf({ ...ef, country: e.target.value })} />
+                <CountrySelect className={inp} value={ef.country} onChange={(v) => setEf({ ...ef, country: v })} />
               </div>
             </div>
             <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "#bfdbfe", background: "#eff6ff" }}>

@@ -3,7 +3,7 @@ import { assertTradingOpen } from "@/lib/perms";
 import { getPrice } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
-import { marginFor, pnlFor, validateSlTp } from "@/lib/trademath";
+import { pnlFor, validateSlTp, usedMargin } from "@/lib/trademath";
 import { notifyStaff } from "@/services/notification.service";
 import { audit } from "@/lib/audit";
 
@@ -22,20 +22,20 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   const slErr = validateSlTp(input.side, price, input.sl, input.tp);
   if (slErr) throw new Error(slErr);
 
-  // Free-margin check — must have enough free margin to open this trade
+  // Free-margin check using HEDGED (net) margin — opening an opposite position
+  // reduces net exposure, so a hedge needs no extra (or less) margin.
   const lev = account.leverage || 100;
   const existing = await prisma.trade.findMany({ where: { accountId: account.id } });
-  let floating = 0, usedMargin = 0;
-  for (const t of existing) {
-    const cur = (await getPrice(t.symbol)) ?? Number(t.openPrice);
-    floating += pnlFor(t.symbol, t.type as any, Number(t.openPrice), cur, Number(t.lots));
-    usedMargin += marginFor(t.symbol, Number(t.lots), cur, lev);
-  }
+  const priceMap: Record<string, number> = { [input.symbol]: price };
+  for (const t of existing) if (priceMap[t.symbol] == null) priceMap[t.symbol] = (await getPrice(t.symbol)) ?? Number(t.openPrice);
+  let floating = 0;
+  for (const t of existing) floating += pnlFor(t.symbol, t.type as any, Number(t.openPrice), priceMap[t.symbol], Number(t.lots));
   const balance = Number(account.deposit) - Number(account.withdrawal) + Number(account.credit) + Number(account.bonus) + Number(account.pnl);
   const equity = balance + floating;
-  const freeMargin = equity - usedMargin;
-  const requiredMargin = marginFor(input.symbol, Number(input.lots), price, lev);
-  if (freeMargin <= 0 || freeMargin < requiredMargin) throw new Error("Not enough money");
+  // net margin AFTER adding this trade
+  const after = [...existing.map((t) => ({ symbol: t.symbol, type: t.type as "BUY" | "SELL", lots: Number(t.lots) })), { symbol: input.symbol, type: input.side, lots: Number(input.lots) }];
+  const usedAfter = usedMargin(after, lev, (s) => priceMap[s] ?? price);
+  if (usedAfter > equity + 1e-6) throw new Error("Not enough money");
 
   const ticket = BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
   const trade = await prisma.trade.create({

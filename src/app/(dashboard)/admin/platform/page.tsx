@@ -6,6 +6,8 @@ import PriceCell from "@/components/PriceCell";
 import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds";
 import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
+import PasswordInput from "@/components/ui/PasswordInput";
+import CountrySelect from "@/components/ui/CountrySelect";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
 import { DARK, LIGHT, BUY, SELL, GOLD } from "@/config/theme";
@@ -97,6 +99,7 @@ export default function AdminDeskPage() {
   const roleRef = useRef("");
   const isManager = role === "MANAGER";
   const [perms, setPerms] = useState<Record<string, boolean>>({});
+  const [brand, setBrand] = useState<{ name: string; logoUrl: string | null }>({ name: "", logoUrl: null });
   const can = (k: string) => perms[k] !== false; // default allow until /me resolves
   const [fundPnlOnly, setFundPnlOnly] = useState(false);
   useEffect(() => { fetch("/api/admin/fund-settings").then((r) => r.json()).then((d) => { if (d.ok) setFundPnlOnly(!!d.pnlOnly); }).catch(() => {}); }, []);
@@ -181,7 +184,7 @@ export default function AdminDeskPage() {
   }
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((d) => {
-      if (d.ok && d.user) { roleRef.current = d.user.role; setRole(d.user.role); setPerms(d.perms || {}); }
+      if (d.ok && d.user) { roleRef.current = d.user.role; setRole(d.user.role); setPerms(d.perms || {}); if (d.brand) setBrand(d.brand); }
     }).catch(() => {}).finally(() => loadAll());
   }, []);
   const notifSeen = useRef<Set<string>>(new Set());
@@ -429,7 +432,14 @@ export default function AdminDeskPage() {
   const floating = accOpen.reduce((s, p) => s + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
   const balance = balOfFn(selAcc);
   const equity = balance + floating;
-  const used = selAcc ? accOpen.reduce((m, p) => { const cs = csz(p.symbol); const pr = prices[p.symbol] ?? p.openPrice; let mg = (p.lots * cs * pr) / (selAcc.leverage || 100); if (/JPY$/i.test(p.symbol)) mg = mg / 100; return m + mg; }, 0) : 0;
+  const used = selAcc ? (() => {
+    // hedged (net) margin: net BUY−SELL lots per symbol, charge margin on |net| only
+    const net: Record<string, number> = {};
+    for (const p of accOpen) net[p.symbol] = (net[p.symbol] || 0) + (p.type === "BUY" ? 1 : -1) * Number(p.lots);
+    let m = 0;
+    for (const s in net) { const nl = Math.abs(net[s]); if (nl < 1e-9) continue; const pr = prices[s] ?? (accOpen.find((p) => p.symbol === s)?.openPrice ?? 0); let mg = (nl * csz(s) * pr) / (selAcc.leverage || 100); if (/JPY$/i.test(s)) mg = mg / 100; m += mg; }
+    return m;
+  })() : 0;
   const free = equity - used;
   const level = used > 0 ? (equity / used) * 100 : 0;
 
@@ -509,7 +519,7 @@ export default function AdminDeskPage() {
     <div style={theme === "dark" ? DARK : LIGHT} className="relative flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <div className="flex items-stretch border-b border-[var(--border)] bg-[var(--panel)] text-[11px]">
         <div className="flex items-center gap-2 border-r border-[var(--border)] px-3 py-1.5" style={{ width: panels.nav ? navW + 1 : undefined }}>
-          <span className="inline-block h-4 w-4 rounded" style={{ background: "var(--accent)" }} /><b className="font-medium">Platform</b>
+          {brand.logoUrl ? <img src={brand.logoUrl} alt="" className="h-4 w-4 rounded object-contain" /> : <span className="inline-block h-4 w-4 rounded" style={{ background: "var(--accent)" }} />}<b className="font-medium">{brand.name || "Platform"}</b>
         </div>
         <div className="flex flex-1 items-center gap-0.5 px-2 py-1">
           {(() => {
@@ -816,7 +826,7 @@ export default function AdminDeskPage() {
                       const isEditing = !!inlineEdit[p.id];
                       const ei = (f: string, def: any) => ie[f] !== undefined ? ie[f] : def;
                       const setIe = (f: string, v: any) => setInlineEdit((e) => ({ ...e, [p.id]: { ...(e[p.id] || {}), [f]: v } }));
-                      const tInp = "rounded border bg-[var(--soft)] border-[var(--border)] text-[var(--text)] text-right px-1 py-0.5 text-[9px] w-16 outline-none";
+                      const tInp = "rounded border-0 bg-transparent text-[var(--text)] text-right px-1 py-0.5 text-[9px] w-16 outline-none focus:bg-[var(--soft)]";
                       return (
                         <tr key={p.id} className={"border-b border-[var(--border)] " + (isEditing ? "bg-[var(--soft)]" : "hover:bg-[var(--soft)]")}>
                           <td className="px-2 py-1"><input type="checkbox" checked={!!tradeSel[p.id]} onChange={() => setTradeSel((s) => ({ ...s, [p.id]: !s[p.id] }))} /></td>
@@ -1183,8 +1193,8 @@ export default function AdminDeskPage() {
                 <div><div className={flab}>Full Name</div><input className={inp} value={aform.name ?? act.acc.name} onChange={(e) => af("name", e.target.value)} /></div>
                 <div><div className={flab}>Email</div><input className={inp} value={aform.email ?? (act.acc.email || act.acc.user?.email || "")} onChange={(e) => af("email", e.target.value)} /></div>
                 <div><div className={flab}>Phone</div><input className={inp} value={aform.phone ?? (act.acc.phone || "")} onChange={(e) => af("phone", e.target.value)} /></div>
-                <div><div className={flab}>Country</div><input className={inp} value={aform.country ?? (act.acc.country || "")} onChange={(e) => af("country", e.target.value)} /></div>
-                <div><div className={flab}>New Password (blank = keep)</div><input type="password" className={inp} value={aform.password || ""} onChange={(e) => af("password", e.target.value)} placeholder="Enter new password" /></div>
+                <div><div className={flab}>Country</div><CountrySelect className={inp} value={aform.country ?? (act.acc.country || "")} onChange={(v) => af("country", v)} /></div>
+                <div><div className={flab}>New Password (blank = keep)</div><PasswordInput className={inp} value={aform.password || ""} onChange={(e) => af("password", e.target.value)} placeholder="Enter new password" /></div>
                 <div><div className={flab}>Account Type</div><input className={inp} value={act.acc.type} disabled /></div>
                 <div><div className={flab}>Leverage</div><input className={inp} value={"1:" + act.acc.leverage} disabled /></div>
                 <div><div className={flab}>Manager / Group</div><input className={inp} value={(act.acc.manager?.name || "Unassigned") + (act.acc.group?.name ? " / " + act.acc.group.name : "")} disabled /></div>
@@ -1209,7 +1219,7 @@ export default function AdminDeskPage() {
               <div className="text-[11px] text-[var(--muted)]">Current ID: <span className="font-semibold text-[var(--text)]">{act.acc.login}</span> — {act.acc.name}</div>
               <div><div className={flab}>Enter new Account ID</div><input className={inp} value={aform.login ?? act.acc.login} onChange={(e) => af("login", e.target.value)} autoFocus /></div>
             </>)}
-            {act.kind === "password" && (<div><div className={flab}>New Password (min 6)</div><input type="password" className={inp} value={aform.password || ""} onChange={(e) => af("password", e.target.value)} autoFocus /></div>)}
+            {act.kind === "password" && (<div><div className={flab}>New Password (min 6)</div><PasswordInput className={inp} value={aform.password || ""} onChange={(e) => af("password", e.target.value)} autoFocus /></div>)}
             {act.kind === "assignmgr" && (<div><div className={flab}>Manager</div><select className={inp} value={aform.managerId ?? (act.acc.managerId || "")} onChange={(e) => af("managerId", e.target.value)}><option value="">- none -</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>)}
             {act.kind === "subaccount" && (<>
               <div className="text-[11px] text-[var(--muted)]">Under client: <span className="font-semibold text-[var(--text)]">{act.acc.name}</span></div>
@@ -1267,7 +1277,7 @@ export default function AdminDeskPage() {
               </div>
               <div className={lab + " mt-2"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
               <div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} onChange={(e) => f("email", e.target.value)} />
-              <div className={lab + " mt-2"}>Password</div><input className={inp} value={form.password || ""} onChange={(e) => f("password", e.target.value)} />
+              <div className={lab + " mt-2"}>Password</div><PasswordInput className={inp} value={form.password || ""} onChange={(e) => f("password", e.target.value)} />
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div><div className={lab}>Leverage</div><input type="number" className={inp} value={form.leverage} onChange={(e) => f("leverage", Number(e.target.value))} /></div>
                 <div><div className={lab}>Currency</div><select className={inp} value={form.currency} onChange={(e) => f("currency", e.target.value)}><option>USD</option><option>EUR</option><option>GBP</option></select></div>
@@ -1275,14 +1285,14 @@ export default function AdminDeskPage() {
               <div className={lab + " mt-2"}>Manager (optional)</div>
               <select className={inp} value={form.managerId || ""} onChange={(e) => f("managerId", e.target.value || null)}><option value="">- none -</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
               <div className={lab + " mt-2"}>Phone</div><input className={inp} value={form.phone || ""} onChange={(e) => f("phone", e.target.value)} />
-              <div className={lab + " mt-2"}>Country</div><input className={inp} value={form.country || ""} onChange={(e) => f("country", e.target.value)} />
+              <div className={lab + " mt-2"}>Country</div><CountrySelect className={inp} value={form.country || ""} onChange={(v) => f("country", v)} />
               <label className="mt-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--muted)" }}><input type="checkbox" checked={!!form.isPool} onChange={(e) => f("isPool", e.target.checked)} /> Pool account</label>
               <button onClick={() => submit("/api/admin/clients", { name: form.name, email: form.email, password: form.password, type: form.type, leverage: Number(form.leverage) || 100, currency: form.currency, managerId: form.managerId || null, phone: form.phone, country: form.country, isPool: !!form.isPool }, "Client")} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Create {form.type} Client</button>
             </>)}
             {modal === "manager" && (<>
               <div className={lab + " mt-1"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
               <div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} onChange={(e) => f("email", e.target.value)} />
-              <div className={lab + " mt-2"}>Password</div><input className={inp} value={form.password || ""} onChange={(e) => f("password", e.target.value)} />
+              <div className={lab + " mt-2"}>Password</div><PasswordInput className={inp} value={form.password || ""} onChange={(e) => f("password", e.target.value)} />
               <button onClick={() => submit("/api/admin/managers", { name: form.name, email: form.email, password: form.password }, "Manager")} className="mt-3 w-full rounded py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Create Manager</button>
             </>)}
             {modal === "group" && (<>

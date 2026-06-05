@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useDialog } from "@/components/ui/ConfirmDialog";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
   { sec: "Users", items: [["createClients", "Create Clients"], ["deleteClients", "Delete Clients"], ["manageManagers", "Manage Managers"]] },
@@ -63,6 +64,27 @@ export default function SATenantsPage() {
     setCreateOpen(false);
     setForm({ plan: "STARTER", seats: 5, primaryColor: "#2563eb", accentColor: "#22c55e" });
     load();
+  }
+
+  async function uploadLogo(file: File | null, which: "create" | "edit") {
+    if (!file) return;
+    setErr("");
+    const fd = new FormData(); fd.set("file", file);
+    const r = await fetch("/api/superadmin/tenants/logo", { method: "POST", body: fd });
+    const d = await r.json();
+    if (!d.ok) { setErr(d.error || "Logo upload failed"); return; }
+    if (which === "create") setForm((f: any) => ({ ...f, logoUrl: d.url })); else setEditForm((f: any) => ({ ...f, logoUrl: d.url }));
+  }
+  function LogoField({ value, which }: { value?: string; which: "create" | "edit" }) {
+    return (
+      <div className="flex items-center gap-3">
+        {value ? <img src={value} alt="logo" className="h-12 w-12 rounded border object-contain bg-white" /> : <div className="flex h-12 w-12 items-center justify-center rounded border bg-gray-50 text-gray-300"><i className="fa-solid fa-image" /></div>}
+        <div>
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => uploadLogo(e.target.files?.[0] || null, which)} className="text-xs" />
+          {value && <button type="button" onClick={() => which === "create" ? setForm((f: any) => ({ ...f, logoUrl: "" })) : setEditForm((f: any) => ({ ...f, logoUrl: "" }))} className="ml-2 text-xs text-red-600">Remove</button>}
+        </div>
+      </div>
+    );
   }
 
   function openEdit(t: any) {
@@ -231,7 +253,10 @@ export default function SATenantsPage() {
               <input className={inp + " col-span-2"} placeholder="Brand name (shown on portal)" value={form.brandName || ""} onChange={(e) => setForm({ ...form, brandName: e.target.value })} />
               <input className={inp} placeholder="Admin name *" value={form.adminName || ""} onChange={(e) => setForm({ ...form, adminName: e.target.value })} />
               <input className={inp} placeholder="Admin email *" value={form.adminEmail || ""} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} />
-              <input className={inp + " col-span-2"} type="password" placeholder="Admin password (min 6) *" value={form.adminPassword || ""} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} />
+              <PasswordInput wrap="relative col-span-2" className={inp} placeholder="Admin password (min 6) *" value={form.adminPassword || ""} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} />
+              <div className="col-span-2"><label className="text-xs text-gray-500 mb-1 block">Logo</label><LogoField value={form.logoUrl} which="create" /></div>
+              <input className={inp + " col-span-2"} placeholder="Slogan / Tagline" value={form.slogan || ""} onChange={(e) => setForm({ ...form, slogan: e.target.value })} />
+              <input className={inp + " col-span-2"} placeholder="Company / Brokerage Info (footer)" value={form.companyInfo || ""} onChange={(e) => setForm({ ...form, companyInfo: e.target.value })} />
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Plan</label>
                 <select className={inp} value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })}>
@@ -312,7 +337,7 @@ export default function SATenantsPage() {
               <div><label className="text-xs text-gray-500 block mb-1">Subdomain *</label><input className={inp} value={editForm.subdomain} onChange={(e) => setEditForm({ ...editForm, subdomain: e.target.value })} /></div>
               <div><label className="text-xs text-gray-500 block mb-1">Custom Domain</label><input className={inp} placeholder="e.g. portal.acme.com" value={editForm.customDomain} onChange={(e) => setEditForm({ ...editForm, customDomain: e.target.value })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Support Email</label><input className={inp} type="email" value={editForm.supportEmail} onChange={(e) => setEditForm({ ...editForm, supportEmail: e.target.value })} /></div>
-              <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Logo URL</label><input className={inp} placeholder="https://…/logo.png" value={editForm.logoUrl} onChange={(e) => setEditForm({ ...editForm, logoUrl: e.target.value })} /></div>
+              <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Logo</label><LogoField value={editForm.logoUrl} which="edit" /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Slogan / Tagline</label><input className={inp} placeholder="Trade smarter" value={editForm.slogan} onChange={(e) => setEditForm({ ...editForm, slogan: e.target.value })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Company / Brokerage Info (footer)</label><input className={inp} placeholder="Acme Markets Ltd · Reg# 12345 · London" value={editForm.companyInfo} onChange={(e) => setEditForm({ ...editForm, companyInfo: e.target.value })} /></div>
               <div><label className="text-xs text-gray-500 block mb-1">Primary Color</label><div className="flex gap-2"><input type="color" className="rounded border h-9 w-12 cursor-pointer" value={editForm.primaryColor} onChange={(e) => setEditForm({ ...editForm, primaryColor: e.target.value })} /><input className={inp} value={editForm.primaryColor} onChange={(e) => setEditForm({ ...editForm, primaryColor: e.target.value })} /></div></div>

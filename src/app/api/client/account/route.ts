@@ -55,9 +55,17 @@ export async function GET(req: Request) {
     });
   } catch { symbols = []; }
 
+  // tenant branding for the app header (never "CubeX")
+  let brand: { name: string; logoUrl: string | null } = { name: "", logoUrl: null };
+  try {
+    const t = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { name: true, brandName: true, logoUrl: true } });
+    if (t) brand = { name: t.brandName || t.name, logoUrl: t.logoUrl };
+  } catch {}
+
   return NextResponse.json({
     ok: true,
     kycVerified,
+    brand,
     account: account ? {
       login: account.login, type: account.type, currency: account.currency, leverage: account.leverage, locked: account.locked,
       name: account.name, email: account.email || account.user?.email || null, phone: account.phone || null, country: account.country || null,

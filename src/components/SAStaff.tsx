@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
   { sec: "Users", items: [["createClients", "Create Clients"], ["deleteClients", "Delete Clients"], ["manageManagers", "Manage Managers"]] },
@@ -192,7 +193,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
             <div className="space-y-3">
               <div><label className="text-xs font-medium text-gray-500 block mb-1">FULL NAME</label><input className={inp} placeholder="Full name" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div><label className="text-xs font-medium text-gray-500 block mb-1">EMAIL</label><input className={inp} type="email" placeholder="Email address" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div><label className="text-xs font-medium text-gray-500 block mb-1">PASSWORD</label><input className={inp} type="password" placeholder="Min 6 characters" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
+              <div><label className="text-xs font-medium text-gray-500 block mb-1">PASSWORD</label><PasswordInput className={inp} placeholder="Min 6 characters" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">ASSIGN TO TENANT</label>
                 <select className={inp} value={form.tenantId || ""} onChange={(e) => setForm({ ...form, tenantId: e.target.value })}>

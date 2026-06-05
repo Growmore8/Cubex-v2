@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useDialog } from "@/components/ui/ConfirmDialog";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 interface Client {
   id: string; login: string; name: string; type: string; leverage: number; currency: string;
@@ -85,7 +86,7 @@ export default function AdminClientsPage() {
         <form onSubmit={create} className="grid grid-cols-3 gap-3 rounded-lg border bg-white p-4">
           <input className={input} placeholder="Full name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <input className={input} type="email" placeholder="Email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <input className={input} type="password" placeholder="Password (min 6)" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <PasswordInput className={input} placeholder="Password (min 6)" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
           <select className={input} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}><option value="LIVE">LIVE</option><option value="DEMO">DEMO</option></select>
           <input className={input} type="number" placeholder="Leverage" value={form.leverage} onChange={(e) => setForm({ ...form, leverage: Number(e.target.value) })} />
           <select className={input} value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}><option>USD</option><option>EUR</option><option>GBP</option></select>

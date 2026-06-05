@@ -14,6 +14,29 @@ export function marginFor(symbol: string, lots: number, price: number, leverage:
   return m;
 }
 
+// Hedged (net) used margin: positions are netted per symbol (BUY lots − SELL lots),
+// and margin is charged only on the absolute NET volume of each symbol. A fully
+// hedged symbol (equal buy/sell) requires 0 margin; a partial hedge charges the
+// remaining net exposure.
+export function usedMargin(
+  positions: { symbol: string; type: "BUY" | "SELL"; lots: number | string }[],
+  leverage: number,
+  priceOf: (symbol: string) => number | undefined | null,
+  categoryOf?: (symbol: string) => string | undefined,
+): number {
+  const net: Record<string, number> = {};
+  for (const p of positions) net[p.symbol] = (net[p.symbol] || 0) + (p.type === "BUY" ? 1 : -1) * Number(p.lots);
+  let total = 0;
+  for (const sym in net) {
+    const nl = Math.abs(net[sym]);
+    if (nl < 1e-9) continue;
+    const price = priceOf(sym);
+    if (!price) continue;
+    total += marginFor(sym, nl, price, leverage, categoryOf?.(sym));
+  }
+  return total;
+}
+
 export function isForex(symbol: string): boolean {
   const s = symbol.toUpperCase();
   if (/^(XAU|XAG|XPT|XPD)/.test(s)) return false; // metals

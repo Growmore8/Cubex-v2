@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -42,8 +43,8 @@ export default function LoginPage() {
       </div>
       <div className="space-y-1">
         <label className="text-sm text-gray-600">Password</label>
-        <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-          className="w-full text-gray-800 rounded-md border px-3 py-2 text-sm" placeholder="********" />
+        <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)}
+          className="text-gray-800 rounded-md border px-3 py-2 text-sm" placeholder="********" />
       </div>
       <button type="submit" disabled={loading}
         style={{ backgroundColor: "var(--brand-primary)" }}

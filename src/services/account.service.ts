@@ -18,7 +18,7 @@ export function listClients(tenantId: string, managerId?: string | null) {
 
 export async function nextLogin(tx: any, tenantId: string, type: string) {
   const name = type === "DEMO" ? "demo" : "live";
-  const start = type === "DEMO" ? 100100 : 800100;
+  const start = type === "DEMO" ? 100100 : 900000;
   let c = await tx.counter.findUnique({ where: { tenantId_name: { tenantId, name } } });
   if (!c) c = await tx.counter.create({ data: { tenantId, name, nextVal: BigInt(start) } });
   const val = c.nextVal;
