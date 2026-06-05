@@ -68,32 +68,27 @@ export async function registerClient(
   const session = await prisma.$transaction(async (tx) => {
     const lowerEmail = email.toLowerCase();
     const exists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail } });
-    if (exists) throw new Error("Email already registered. Please log in to open more accounts.");
-    // One registration = one LIVE (parent) account + one DEMO practice account.
-    // Only the live account consumes a plan seat.
-    await assertSeatAvailable(tx, tenant!.id, "LIVE");
+    if (exists) throw new Error("Email already registered");
+    // The client chooses Live or Demo at registration. Only live consumes a seat.
+    await assertSeatAvailable(tx, tenant!.id, type);
 
     const user = await tx.user.create({
       data: { tenantId: tenant!.id, email: lowerEmail, name, passwordHash, role: "CLIENT" },
     });
-    const common = {
-      tenantId: tenant!.id,
-      userId: user.id,
-      name,
-      leverage: 100,
-      currency: "USD" as const,
-      phone: phone || null,
-      country: country || null,
-    };
-    // LIVE = the client's primary/parent account. KYC required before full access.
-    const liveLogin = await nextLogin(tx, tenant!.id, "LIVE");
+    const login = await nextLogin(tx, tenant!.id, type);
     await tx.account.create({
-      data: { ...common, login: liveLogin, type: "LIVE", deposit: new Prisma.Decimal(0) },
-    });
-    // DEMO = instant practice, funded with virtual balance.
-    const demoLogin = await nextLogin(tx, tenant!.id, "DEMO");
-    await tx.account.create({
-      data: { ...common, login: demoLogin, type: "DEMO", deposit: new Prisma.Decimal(10000) },
+      data: {
+        tenantId: tenant!.id,
+        login,
+        userId: user.id,
+        name,
+        type,
+        leverage: 100,
+        currency: "USD",
+        phone: phone || null,
+        country: country || null,
+        deposit: type === "DEMO" ? new Prisma.Decimal(10000) : new Prisma.Decimal(0),
+      },
     });
     return { sub: user.id, role: "CLIENT" as Role, tenantId: tenant!.id, email: lowerEmail, name };
   });
