@@ -12,20 +12,27 @@ export interface Brand {
   tenantId: string | null;
 }
 
+const DEFAULT_BRAND: Brand = { name: process.env.APP_NAME || "Cubex", slogan: null, companyInfo: null, supportEmail: null, primaryColor: "#2563eb", accentColor: "#22c55e", logoUrl: null, tenantId: null };
+
 export async function getBrand(): Promise<Brand> {
-  const host = (await headers()).get("host");
-  const tenant = await resolveTenant(host);
-  if (!tenant) {
-    return { name: process.env.APP_NAME || "Cubex", slogan: null, companyInfo: null, supportEmail: null, primaryColor: "#2563eb", accentColor: "#22c55e", logoUrl: null, tenantId: null };
+  // Branding must never crash a page: if the DB is unreachable or not yet migrated,
+  // fall back to the default brand so login/register still render.
+  try {
+    const host = (await headers()).get("host");
+    const tenant = await resolveTenant(host);
+    if (!tenant) return DEFAULT_BRAND;
+    return {
+      name: tenant.brandName || tenant.name,
+      slogan: (tenant as any).slogan || null,
+      companyInfo: (tenant as any).companyInfo || null,
+      supportEmail: tenant.supportEmail || null,
+      primaryColor: tenant.primaryColor || "#2563eb",
+      accentColor: tenant.accentColor || "#22c55e",
+      logoUrl: tenant.logoUrl,
+      tenantId: tenant.id,
+    };
+  } catch (e) {
+    console.error("[brand] failed to resolve tenant brand:", (e as any)?.message);
+    return DEFAULT_BRAND;
   }
-  return {
-    name: tenant.brandName || tenant.name,
-    slogan: (tenant as any).slogan || null,
-    companyInfo: (tenant as any).companyInfo || null,
-    supportEmail: tenant.supportEmail || null,
-    primaryColor: tenant.primaryColor || "#2563eb",
-    accentColor: tenant.accentColor || "#22c55e",
-    logoUrl: tenant.logoUrl,
-    tenantId: tenant.id,
-  };
 }
