@@ -357,7 +357,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 ]}
                 onClose={(id: string) => { if (id.startsWith("pnd-")) { t.cancelPending && t.cancelPending(id.slice(4)); } else close(id); }} />
             </div>
-            <div className="flex items-stretch gap-2 border-t border-[var(--border)] bg-[var(--panel)] p-2.5">
+            <div className="glass flex items-stretch gap-2 border-t border-[var(--border)] p-2.5" style={{ background: theme === "dark" ? "rgba(20,24,34,0.6)" : "rgba(255,255,255,0.6)" }}>
               <button onClick={() => quickTrade(selSym, "SELL", vol)} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: SELL }}>
                 <div className="text-[10px] opacity-80">SELL</div><div className="text-base font-bold tabular-nums">{price != null ? bid.toFixed(dg(selSym)) : "…"}</div>
               </button>
@@ -695,7 +695,7 @@ export default function ClientMobile({ t }: { t: any }) {
         const ist = { borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" };
         return (
           <div className="fixed inset-0 z-[95] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-            <div className="w-full rounded-t-2xl p-4" style={{ background: "var(--card)", borderTop: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="glass glass-edge w-full rounded-t-[26px] p-4" style={{ background: theme === "dark" ? "rgba(28,30,38,0.82)" : "rgba(255,255,255,0.82)", borderTop: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
               <div className="mb-3 flex items-center justify-between">
                 <div className="font-bold">New Order — {selSym}</div>
                 <button onClick={() => setNoOpen(false)} className="text-[var(--muted)]"><i className="fa-solid fa-xmark" /></button>
@@ -768,7 +768,7 @@ export default function ClientMobile({ t }: { t: any }) {
       {/* TRANSFER MODAL */}
       {xferModal && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.6)" }}>
-          <div className="w-full max-w-[340px] rounded-2xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="glass glass-edge w-full max-w-[340px] rounded-[22px] border p-4" style={{ background: theme === "dark" ? "rgba(28,30,38,0.85)" : "rgba(255,255,255,0.85)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 text-sm font-bold">Transfer Funds</div>
             <label className="text-[10px] text-[var(--muted)]">From</label>
             <select value={xfer?.fromId || ""} onChange={(e) => setXfer({ ...(xfer || {}), fromId: e.target.value })} className="mb-2 mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]">
@@ -824,7 +824,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
       {pin?.pinModal && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="w-full max-w-[320px] rounded-2xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="glass glass-edge w-full max-w-[320px] rounded-[22px] border p-4" style={{ background: theme === "dark" ? "rgba(28,30,38,0.85)" : "rgba(255,255,255,0.85)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-sm font-semibold">{pin.pinHasPin ? "Change PIN" : "Set PIN"}</div>
               <button onClick={() => pin.setPinModal(false)} aria-label="Close" className="-mr-1 flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button>
