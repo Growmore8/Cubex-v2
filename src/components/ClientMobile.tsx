@@ -280,13 +280,14 @@ export default function ClientMobile({ t }: { t: any }) {
                 const dr = dirs?.[s.symbol] || 0;
                 return (
                   <div key={s.symbol} className="rounded-xl border bg-[var(--card)] p-3" style={{ borderColor: dr > 0 ? BUY : dr < 0 ? SELL : "var(--border)", transition: "border-color 0.4s ease" }}>
-                    <div className="mb-2 flex items-center justify-between">
+                    {/* Double-tap the info row to open this symbol's chart */}
+                    <div className="mb-2 flex select-none items-center justify-between" onDoubleClick={() => { setSelSym(s.symbol); setTab("chart"); }}>
                       <div className="flex items-center gap-2">
                         <button onClick={() => toggleFav(s.symbol)} style={{ color: isFav ? GOLD : "var(--muted)" }}>★</button>
                         <button onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="text-sm font-bold underline-offset-2 active:underline">{s.display || s.symbol}</button>
                         {dr !== 0 && <i className={"fa-solid " + (dr > 0 ? "fa-caret-up" : "fa-caret-down")} style={{ fontSize: 11, color: dr > 0 ? BUY : SELL }} />}
                       </div>
-                      <span className="text-[10px] text-[var(--muted)]">Sprd: {spread} · <span style={{ color: "var(--accent,#5aa9ff)" }} onClick={() => { setSelSym(s.symbol); setTab("chart"); }}>chart</span></span>
+                      <span className="text-[10px] text-[var(--muted)]">Sprd: {spread} · double-tap for chart</span>
                     </div>
                     <div className="grid grid-cols-3 items-center gap-2">
                       <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "SELL"); }} className="rounded-lg py-2 text-center text-white" style={{ background: SELL }}>
@@ -308,7 +309,10 @@ export default function ClientMobile({ t }: { t: any }) {
         {tab === "chart" && (
           <div className="flex h-full flex-col">
             <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2">
-              <button onClick={() => setTab("quotes")} className="text-sm font-bold underline">{selSym || "--"}</button>
+              {/* Symbol selector above the chart — switch instrument without leaving the chart */}
+              <select value={selSym || ""} onChange={(e) => setSelSym(e.target.value)} className="max-w-[150px] rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-sm font-bold text-[var(--text)]">
+                {(symbols || []).map((x: any) => <option key={x.symbol} value={x.symbol}>{x.display || x.symbol}</option>)}
+              </select>
               <span className="text-[12px] font-semibold" style={{ color: BUY }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</span>
               <div className="ml-auto flex items-center gap-1.5">
                 <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-1 text-[11px] text-[var(--text)]">
