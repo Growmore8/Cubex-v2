@@ -394,6 +394,36 @@ export default function ClientTerminal() {
         </div>
       )}
 
+      {/* Live account is locked to Profile + KYC until the client's KYC is approved.
+          Demo accounts are unaffected (switch below to practise). */}
+      {needKyc && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-auto p-4" style={{ background: "var(--bg)" }}>
+          <div className="w-full max-w-md rounded-2xl border p-6 text-center" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+            {brand.logoUrl && <img src={brand.logoUrl} alt="" className="mx-auto mb-2 h-10 object-contain" />}
+            <div className="text-lg font-bold">{brand.name}</div>
+            <div className="mx-auto my-4 flex h-14 w-14 items-center justify-center rounded-full" style={{ background: "rgba(240,180,41,0.15)", color: GOLD }}>
+              <i className="fa-solid fa-id-card text-2xl" />
+            </div>
+            <div className="text-base font-semibold">Verify your identity</div>
+            <p className="mx-auto mt-1 max-w-xs text-[12px] text-[var(--muted)]">Complete KYC to unlock live trading on <b>{curAcct?.login}</b>. Until it&apos;s approved, only your profile is available.</p>
+            <div className="mt-4 rounded-lg border px-3 py-2 text-left text-[12px]" style={{ borderColor: "var(--border)" }}>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--muted)]">Name</span><span>{account?.ownerName || account?.name}</span></div>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--muted)]">Email</span><span className="truncate pl-2">{account?.email}</span></div>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--muted)]">Live account</span><span>{curAcct?.login}</span></div>
+            </div>
+            <button onClick={() => setWalletModal("kyc")} className="mt-4 w-full rounded-lg py-2.5 text-sm font-semibold" style={{ background: GOLD, color: "#1a1300" }}>
+              <i className="fa-solid fa-upload mr-2" />Upload KYC documents
+            </button>
+            {accts.some((a: any) => a.type === "DEMO") && (
+              <button onClick={() => { const dm = accts.find((a: any) => a.type === "DEMO"); if (dm) switchAcc(dm.id); }} className="mt-2 w-full rounded-lg border py-2.5 text-sm font-medium" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+                <i className="fa-solid fa-vial mr-2" style={{ color: GOLD }} />Practise on your Demo account
+              </button>
+            )}
+            <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="mt-2 w-full rounded-lg py-2 text-[12px] text-[var(--muted)] hover:bg-[var(--soft)]">Log out</button>
+          </div>
+        </div>
+      )}
+
       {topUpOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[320px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
