@@ -3,6 +3,23 @@ import { requireAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { notify } from "@/services/notification.service";
+import { syncAccountKyc } from "@/services/kyc.service";
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const s = await requireAdmin();
+  if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  try {
+    const rec = await prisma.kycDocument.findUnique({ where: { id }, include: { account: true } });
+    if (!rec || rec.account.tenantId !== s.tenantId) throw new Error("KYC document not found");
+    await prisma.kycDocument.delete({ where: { id } });
+    await syncAccountKyc(rec.accountId); // reflect the latest remaining doc (or clear)
+    await audit(s.tenantId as string, "kyc.delete", rec.account.login + " " + rec.docType, s.email || "admin");
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
+  }
+}
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

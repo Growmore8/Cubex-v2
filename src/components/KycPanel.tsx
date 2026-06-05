@@ -10,7 +10,7 @@ export default function KycPanel() {
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [view, setView] = useState("");
-  const { prompt, node } = useDialog();
+  const { prompt, confirm, node } = useDialog();
 
   async function load() {
     const r = await fetch("/api/admin/kyc").then((x) => x.json()).catch(() => ({ ok: false }));
@@ -20,7 +20,7 @@ export default function KycPanel() {
 
   function g(p: any, keys: string[], d: any) { for (const k of keys) { if (p[k] != null && p[k] !== "") return p[k]; } return d; }
   function name(p: any) { return g(p, ["name", "clientName", "accountName"], (p.account && p.account.name) || "-"); }
-  function login(p: any) { return g(p, ["accountLogin", "login", "accountId"], (p.account && p.account.login) || ""); }
+  function login(p: any) { return (p.account && p.account.login) || g(p, ["accountLogin", "login"], ""); }
   function email(p: any) { return g(p, ["email"], (p.account && p.account.email) || ""); }
   function docType(p: any) { return g(p, ["docType", "type", "documentType"], "ID"); }
   function st(p: any) { return String(g(p, ["status", "state"], "PENDING")).toUpperCase(); }
@@ -37,6 +37,13 @@ export default function KycPanel() {
     load();
   }
   async function doReject(p: any) { const reason = await prompt({ title: "Reject KYC", message: "Reason for rejection (shown to the client)", placeholder: "e.g. document blurry / expired", confirmLabel: "Reject" }); if (reason) act(p, "reject", reason); }
+  async function doDelete(p: any) {
+    if (!(await confirm({ title: "Delete KYC", message: "Delete this KYC submission? The client can upload again.", danger: true }))) return;
+    setErr("");
+    const r = await fetch("/api/admin/kyc/" + p.id, { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false }));
+    if (!r.ok) { setErr(r.error || "Delete failed"); return; }
+    load();
+  }
 
   const tabs = ["PENDING", "APPROVED", "REJECTED", "ALL"];
   const rows = list.filter((p) => (status === "ALL" || st(p) === status)).filter((p) => (name(p) + " " + login(p) + " " + email(p)).toLowerCase().includes(q.toLowerCase()));
@@ -80,6 +87,7 @@ export default function KycPanel() {
                       <button disabled={!!busy} onClick={() => act(p, "approve")} className="rounded px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
                       <button disabled={!!busy} onClick={() => doReject(p)} className="rounded px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
                     </>) : <span className="text-[var(--muted)]">{reviewed(p)}</span>}
+                    <button title="Delete" onClick={() => doDelete(p)} className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[9px]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
                   </div>
                 </td>
               </tr>

@@ -1,0 +1,89 @@
+# CubeX V2 — full production stack for a Hostinger VPS (Docker + Traefik).
+# Copy .env.production.example -> .env, fill it in, then:
+#   docker compose -f docker-compose.prod.yml up -d --build
+services:
+  traefik:
+    image: traefik:v3.1
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    ports: ["80:80", "443:443"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-le:/letsencrypt
+    networks: [web]
+
+  app:
+    build: .
+    image: cubex-app:latest
+    restart: unless-stopped
+    env_file: .env
+    depends_on: [postgres, redis]
+    volumes:
+      - cubex-uploads:/app/uploads
+    networks: [web]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.cubex.rule=Host(`trade.${DOMAIN}`)
+      - traefik.http.routers.cubex.entrypoints=websecure
+      - traefik.http.routers.cubex.tls.certresolver=le
+      - traefik.http.services.cubex.loadbalancer.server.port=3000
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - cubex-pg:/var/lib/postgresql/data
+    networks: [web]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [web]
+
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    networks: [web]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.adminer.rule=Host(`db.${DOMAIN}`)
+      - traefik.http.routers.adminer.entrypoints=websecure
+      - traefik.http.routers.adminer.tls.certresolver=le
+      - traefik.http.services.adminer.loadbalancer.server.port=8080
+
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    restart: unless-stopped
+    volumes:
+      - cubex-uploads:/srv/uploads
+      - fb-db:/database
+    networks: [web]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.files.rule=Host(`files.${DOMAIN}`)
+      - traefik.http.routers.files.entrypoints=websecure
+      - traefik.http.routers.files.tls.certresolver=le
+      - traefik.http.services.files.loadbalancer.server.port=80
+
+volumes:
+  traefik-le:
+  cubex-pg:
+  cubex-uploads:
+  fb-db:
+
+networks:
+  web:
