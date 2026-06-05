@@ -1,25 +1,23 @@
-# CubeX V2 — full production stack for a Hostinger VPS (Docker + Traefik).
+# CubeX V2 — full production stack for a Hostinger VPS (Docker + Caddy).
 # Copy .env.production.example -> .env, fill it in, then:
 #   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Caddy handles ALL TLS via on-demand certificates: it issues a Let's Encrypt cert
+# per hostname (platform domain + every tenant custom domain) on first visit, gated
+# by the app's /api/internal/tls-check endpoint. See Caddyfile.
 services:
-  traefik:
-    image: traefik:v3.6
+  caddy:
+    image: caddy:2
     restart: unless-stopped
-    command:
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
-      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
-      - --certificatesresolvers.le.acme.httpchallenge=true
-      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
     ports: ["80:80", "443:443"]
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      DOMAIN: ${DOMAIN}
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik-le:/letsencrypt
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data      # cached certs + ACME account (persist this!)
+      - caddy-config:/config
+    depends_on: [app]
     networks: [web]
 
   app:
@@ -31,17 +29,7 @@ services:
     volumes:
       - cubex-uploads:/app/uploads
     networks: [web]
-    labels:
-      - traefik.enable=true
-      # Catch-all router: serves your subdomains AND every tenant custom domain.
-      # Traefik auto-issues a Let's Encrypt cert for whatever host arrives (on first hit),
-      # as long as that domain's DNS points at this server. priority=1 so the specific
-      # db./files. routers below always win for their own hosts.
-      - traefik.http.routers.cubex.rule=HostRegexp(`.+`)
-      - traefik.http.routers.cubex.priority=1
-      - traefik.http.routers.cubex.entrypoints=websecure
-      - traefik.http.routers.cubex.tls.certresolver=le
-      - traefik.http.services.cubex.loadbalancer.server.port=3000
+    # No proxy labels needed — Caddy routes by the Caddyfile (reverse_proxy app:3000).
 
   postgres:
     image: postgres:16-alpine
@@ -62,14 +50,7 @@ services:
   adminer:
     image: adminer:latest
     restart: unless-stopped
-    networks: [web]
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.adminer.rule=Host(`db.${DOMAIN}`)
-      - traefik.http.routers.adminer.priority=100
-      - traefik.http.routers.adminer.entrypoints=websecure
-      - traefik.http.routers.adminer.tls.certresolver=le
-      - traefik.http.services.adminer.loadbalancer.server.port=8080
+    networks: [web]   # reachable by Caddy at db.${DOMAIN}
 
   filebrowser:
     image: filebrowser/filebrowser:latest
@@ -77,17 +58,11 @@ services:
     volumes:
       - cubex-uploads:/srv/uploads
       - fb-db:/database
-    networks: [web]
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.files.rule=Host(`files.${DOMAIN}`)
-      - traefik.http.routers.files.priority=100
-      - traefik.http.routers.files.entrypoints=websecure
-      - traefik.http.routers.files.tls.certresolver=le
-      - traefik.http.services.files.loadbalancer.server.port=80
+    networks: [web]   # reachable by Caddy at files.${DOMAIN}
 
 volumes:
-  traefik-le:
+  caddy-data:
+  caddy-config:
   cubex-pg:
   cubex-uploads:
   fb-db:

@@ -1,0 +1,48 @@
+# CubeX V2 — Caddy reverse proxy with on-demand TLS for white-label custom domains.
+#
+# How white-label SSL works here:
+#  - A trader visits https://trade.theirbroker.com (DNS pointed at this server).
+#  - Caddy sees an unknown SNI, pauses the handshake, and asks the app
+#    (/api/internal/tls-check?domain=...) whether that domain is a real tenant.
+#  - If approved, Caddy obtains a Let's Encrypt cert for THAT domain on the spot and
+#    caches it. Random domains pointed at the server are refused (no cert = no abuse).
+#
+# Env (from .env): ACME_EMAIL, DOMAIN (your platform domain, e.g. cubexenterprises.com)
+
+{
+	email {$ACME_EMAIL}
+	on_demand_tls {
+		# Caddy calls this before issuing a cert for any host. 2xx = allow.
+		ask http://app:3000/api/internal/tls-check
+	}
+}
+
+# Database UI (Adminer) on db.<your-domain>
+db.{$DOMAIN} {
+	tls {
+		on_demand
+	}
+	reverse_proxy adminer:8080
+}
+
+# File manager (Filebrowser) on files.<your-domain>
+files.{$DOMAIN} {
+	tls {
+		on_demand
+	}
+	reverse_proxy filebrowser:80
+}
+
+# Catch-all: the platform domain + every tenant subdomain and custom domain.
+# on_demand issues a per-host Let's Encrypt cert on first hit (after the ask check).
+:443 {
+	tls {
+		on_demand
+	}
+	reverse_proxy app:3000
+}
+
+# Send all plain HTTP to HTTPS (cert issuance itself uses TLS-ALPN-01 on :443).
+:80 {
+	redir https://{host}{uri} permanent
+}
