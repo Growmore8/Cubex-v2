@@ -135,9 +135,11 @@ export default function ClientTerminal() {
     const socket: Socket = io({ path: "/socket.io" });
     const pP: Record<string, number> = {};
     const pD: Record<string, number> = {};
-    let raf = 0;
+    // Coalesce all incoming ticks and apply them on a fixed ~12fps cadence. Without
+    // this the entire (monolithic) desk re-rendered on every animation frame, which
+    // caused the slow/glitchy feel. The chart and the Buy/Sell buttons both read this
+    // same `prices` state, so they now update in lockstep at the same speed.
     const flush = () => {
-      raf = 0;
       const px = pP; const dr = pD;
       if (Object.keys(px).length) { setPrices((pp) => ({ ...pp, ...px })); for (const k in px) delete px[k]; }
       if (Object.keys(dr).length) { setDirs((dd) => ({ ...dd, ...dr })); for (const k in dr) delete dr[k]; }
@@ -147,11 +149,11 @@ export default function ClientTerminal() {
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
-      if (!raf) raf = requestAnimationFrame(flush);
     });
+    const flushIv = setInterval(flush, 80);
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
     socket.on("refresh", () => load());
-    return () => { socket.disconnect(); clearInterval(clr); if (raf) cancelAnimationFrame(raf); };
+    return () => { socket.disconnect(); clearInterval(clr); clearInterval(flushIv); };
   }, []);
 
   async function place(type: "BUY" | "SELL") {

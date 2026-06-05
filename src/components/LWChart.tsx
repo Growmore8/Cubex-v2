@@ -211,27 +211,37 @@ export default function LWChart({
     return () => { alive = false; };
   }, [symbol, tf]);
 
-  // Live updates: build the forming bar from the live price stream
+  // Live updates: build the forming bar from the live price stream. Ticks are
+  // buffered and applied on a fixed ~80ms cadence (tracking the interval high/low so
+  // the candle stays accurate) — the same cadence the Buy/Sell buttons use, so the
+  // chart and the buttons move at the same speed.
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
+    let pClose: number | null = null, pHi = -Infinity, pLo = Infinity;
     socket.on("tick", ({ symbol: sym, price }: any) => {
-      if (sym !== symRef.current || price == null || !seriesRef.current) return;
+      if (sym !== symRef.current || price == null) return;
+      pClose = price; if (price > pHi) pHi = price; if (price < pLo) pLo = price;
+    });
+    const apply = () => {
+      if (pClose == null || !seriesRef.current) return;
+      const close = pClose, hi = pHi, lo = pLo; pClose = null; pHi = -Infinity; pLo = Infinity;
       const sec = TF_SECONDS[tfRef.current] || 60;
       const t = Math.floor(Date.now() / 1000 / sec) * sec;
       const bars = barsRef.current;
       const last = bars[bars.length - 1];
       try {
         if (last && last.time === t) {
-          last.high = Math.max(last.high, price); last.low = Math.min(last.low, price); last.close = price;
+          last.high = Math.max(last.high, hi); last.low = Math.min(last.low, lo); last.close = close;
           seriesRef.current.update(last);
         } else if (!last || t > last.time) {
-          const bar = { time: t, open: price, high: price, low: price, close: price };
+          const bar = { time: t, open: close, high: hi, low: lo, close };
           bars.push(bar);
           seriesRef.current.update(bar);
         }
       } catch { /* out-of-order tick during a reseed — ignore */ }
-    });
-    return () => { socket.disconnect(); };
+    };
+    const iv = setInterval(apply, 80);
+    return () => { socket.disconnect(); clearInterval(iv); };
   }, [symbol]);
 
   // Draw position / pending price lines (entry, SL, TP) — colored by order side
