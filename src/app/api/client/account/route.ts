@@ -41,6 +41,11 @@ export async function GET(req: Request) {
     });
   }
 
+  // User-level KYC: verified if any of the user's accounts has an approved document.
+  // Only the parent/primary needs KYC; all linked accounts (incl. sub-accounts and
+  // the client's own additional accounts) inherit it.
+  const kycVerified = !!(await prisma.kycDocument.findFirst({ where: { account: { userId: s.sub }, status: "APPROVED" }, select: { id: true } }));
+
   let symbols: any[] = [];
   try {
     symbols = await prisma.globalSymbol.findMany({
@@ -52,6 +57,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true,
+    kycVerified,
     account: account ? {
       login: account.login, type: account.type, currency: account.currency, leverage: account.leverage, locked: account.locked,
       name: account.name, email: account.email || account.user?.email || null, phone: account.phone || null, country: account.country || null,

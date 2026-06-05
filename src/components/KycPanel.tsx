@@ -14,7 +14,7 @@ export default function KycPanel() {
 
   async function load() {
     const r = await fetch("/api/admin/kyc").then((x) => x.json()).catch(() => ({ ok: false }));
-    if (r.ok) setList(r.documents || r.kyc || []);
+    if (r.ok) setList(r.docs || r.documents || r.kyc || []);
   }
   useEffect(() => { load(); }, []);
 

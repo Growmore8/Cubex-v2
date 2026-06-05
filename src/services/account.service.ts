@@ -40,9 +40,13 @@ export async function createClient(tenantId: string, input: any, actor = "admin"
       if (demoCount >= 1) throw new Error("Client already has a demo account");
     }
     const login = await nextLogin(tx, tenantId, type);
+    // Link every additional account to the client's primary (oldest) account, so
+    // all linked accounts inherit the primary's KYC. The first account is the primary.
+    const primary = await tx.account.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "asc" }, select: { id: true } });
+    const parentId = input.parentId || primary?.id || null;
     return tx.account.create({
       data: {
-        tenantId, login, userId: user.id, name: input.name, type,
+        tenantId, login, userId: user.id, name: input.name, type, parentId,
         leverage: input.leverage || 100, currency: input.currency || "USD",
         managerId: input.managerId || null, phone: input.phone || null, country: input.country || null,
         isPool: !!input.isPool,

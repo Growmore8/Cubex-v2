@@ -264,6 +264,7 @@ export default function AdminDeskPage() {
   async function close(id: string) { const r = await fetch("/api/desk/trades/" + id + "/close", { method: "POST" }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Close failed"); return; } loadAll(); }
   async function delTrade(id: string) { const r = await fetch("/api/desk/trades/" + id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Delete failed"); return; } loadAll(); }
   async function delTradesBulk(ids: string[]) { for (const id of ids) { await fetch("/api/desk/trades/" + id, { method: "DELETE" }); } setTradeSel({}); loadAll(); }
+  function unlinkSub(c: any) { askConfirm(`Unlink sub-account ${c.login} from its parent? It becomes a standalone account.`, async () => { const r = await fetch("/api/admin/clients/" + c.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "unlinkSub" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else { setOk("Sub-account unlinked"); loadAll(); } }, false); }
   function delClient(acc: any) { setMenu(null); askConfirm(`Delete ${acc.login} - ${acc.name}? This cannot be undone.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }); }
 
   function openAct(kind: string, acc: any, finType?: string, label?: string) { setMenu(null); setMenuSub(""); setErr(""); setAform({}); setAct({ kind, acc, finType, label }); }
@@ -588,7 +589,7 @@ export default function AdminDeskPage() {
                 {topMenu === "report" && (<><div className="fixed inset-0 z-40" onClick={closeTm} />
                   <div className={panel} style={panelStyle}>
                     {dHead("Account Reports")}
-                    {dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } window.open("/api/desk/reports?accountId=" + selAcc.id, "_blank"); }, "fa-file-pdf", "Export PDF Statement", "#ef4444")}
+                    {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } window.open("/api/desk/statement?accountId=" + selAcc.id, "_blank"); }, "fa-file-pdf", "Export PDF Statement", "#ef4444")}
                   </div></>)}
               </div>
             </>);
@@ -1190,7 +1191,10 @@ export default function AdminDeskPage() {
               </div>
               {linked.length > 0 && (<div className="rounded-lg border" style={{ borderColor: "var(--border)" }}>
                 <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold text-[var(--muted)]"><span><i className="fa-solid fa-link mr-1" />LINKED ACCOUNTS ({linked.length})</span><span>TOTAL: ${linked.reduce((s: number, c: any) => s + acctBal(c), 0).toFixed(2)}</span></div>
-                {linked.map((c: any) => (<div key={c.id} className="flex items-center justify-between border-t px-2 py-1 text-[11px]" style={{ borderColor: "var(--border)", background: c.id === act.acc.id ? "var(--soft)" : undefined }}><span style={{ color: "var(--accent2)" }}>#{c.login} <span className="rounded px-1 text-[8px]" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)" }}>{c.type}</span>{c.id === act.acc.id ? " · current" : ""}</span><span className="font-medium">${acctBal(c).toFixed(2)}</span></div>))}
+                {linked.map((c: any) => (<div key={c.id} className="flex items-center justify-between gap-2 border-t px-2 py-1 text-[11px]" style={{ borderColor: "var(--border)", background: c.id === act.acc.id ? "var(--soft)" : undefined }}>
+                  <span style={{ color: "var(--accent2)" }}>#{c.login} <span className="rounded px-1 text-[8px]" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)" }}>{c.type}</span>{c.parentId ? <span className="ml-1 rounded px-1 text-[8px] text-[var(--muted)]" style={{ background: "var(--soft)" }}>sub</span> : null}{c.id === act.acc.id ? " · current" : ""}</span>
+                  <span className="flex items-center gap-2"><span className="font-medium">${acctBal(c).toFixed(2)}</span>{c.parentId && !isManager && <button title="Unlink from parent" onClick={() => unlinkSub(c)} className="rounded px-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-link-slash" /></button>}</span>
+                </div>))}
               </div>)}
               <div className="grid grid-cols-3 gap-2 rounded-lg border p-2 text-[10px]" style={{ borderColor: "var(--border)" }}>
                 <div><div className="text-[var(--muted)]">Deposit</div><div className="font-semibold" style={{ color: BUY }}>+{Number(act.acc.deposit || 0).toFixed(2)}</div></div>

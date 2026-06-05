@@ -23,8 +23,8 @@ export async function POST(req: Request) {
     const docType = String(form.get("docType") || "document");
     const file = form.get("file") as File | null;
     const back = form.get("back") as File | null;
-    if (!file || file.size === 0) throw new Error("Front side is required");
-    if (!back || back.size === 0) throw new Error("Back side is required — both front and back must be uploaded");
+    if (!file || file.size === 0) throw new Error("Identity Document (front) is required");
+    if (!back || back.size === 0) throw new Error("Address Proof (back) is required — both documents must be uploaded");
     const key = await saveUpload(file, "kyc/" + account.id);
     const backKey = await saveUpload(back, "kyc/" + account.id);
     const doc = await createKyc(account.id, docType, key, backKey);

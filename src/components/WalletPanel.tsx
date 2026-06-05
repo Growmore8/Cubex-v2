@@ -17,7 +17,6 @@ export default function WalletPanel({ initialTab = "deposit", onClose }: { initi
   const [wAmount, setWAmount] = useState(""); const [selMethod, setSelMethod] = useState<string>("");
   const [addOpen, setAddOpen] = useState(false);
   const [newM, setNewM] = useState<any>({ type: "CRYPTO", network: "BEP20", asset: "USDT", address: "", label: "" });
-  const [docType, setDocType] = useState("national_id");
 
   async function load() {
     const [pm, p, k, wm] = await Promise.all([
@@ -72,10 +71,10 @@ export default function WalletPanel({ initialTab = "deposit", onClose }: { initi
   }
   async function uploadKyc(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setMsg("");
-    const fd = new FormData(e.target as HTMLFormElement); fd.set("docType", docType);
+    const fd = new FormData(e.target as HTMLFormElement); fd.set("docType", "Identity & Address");
     const r = await fetch("/api/client/kyc", { method: "POST", body: fd });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Upload failed"); return; }
-    (e.target as HTMLFormElement).reset(); setMsg("Document uploaded"); load();
+    (e.target as HTMLFormElement).reset(); setMsg("Submitted for review"); load();
   }
 
   const input = "rounded-md border px-3 py-2 text-sm";
@@ -141,18 +140,24 @@ export default function WalletPanel({ initialTab = "deposit", onClose }: { initi
       </form>
     </div>)}
 
-    {tab === "kyc" && (<div className="space-y-3 rounded-lg border bg-white p-4">
-      <form onSubmit={uploadKyc} className="space-y-2">
-        <select className={input + " w-full"} value={docType} onChange={(e) => setDocType(e.target.value)}><option value="national_id">National ID</option><option value="passport">Passport</option><option value="proof_of_address">Proof of Address</option></select>
-        <div className="grid grid-cols-2 gap-2">
-          <div><div className="text-xs text-gray-500">Front side <span className="text-red-500">*</span></div><input className={input + " w-full"} type="file" name="file" accept="image/*,application/pdf" required /></div>
-          <div><div className="text-xs text-gray-500">Back side <span className="text-red-500">*</span></div><input className={input + " w-full"} type="file" name="back" accept="image/*,application/pdf" required /></div>
-        </div>
-        <p className="text-xs text-gray-400">Both front and back are required — documents without a back side cannot be verified.</p>
-        <button className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white">Upload</button>
-      </form>
-      <div className="space-y-2">{docs.map((d) => (<div key={d.id} className="flex items-center justify-between text-sm"><span>{d.docType}</span><span className={badge(d.status)}>{d.status}</span></div>))}{docs.length === 0 && <div className="text-sm text-gray-400">No documents uploaded.</div>}</div>
-    </div>)}
+    {tab === "kyc" && (() => {
+      const latest = docs[0];
+      const st = latest?.status;
+      const canUpload = !latest || st === "REJECTED"; // can only (re)upload when none or after a rejection
+      return (<div className="space-y-3 rounded-lg border bg-white p-4">
+        {st === "APPROVED" && <div className="flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700"><i className="fa-solid fa-circle-check" /> Your identity is verified.</div>}
+        {st === "PENDING" && <div className="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700"><i className="fa-solid fa-clock" /> Your documents are under review. You&apos;ll be notified once a decision is made.</div>}
+        {st === "REJECTED" && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"><i className="fa-solid fa-circle-xmark mr-1" /> Your KYC was rejected{latest?.note ? ": " + latest.note : ""}. Please upload again.</div>}
+        {canUpload && (<form onSubmit={uploadKyc} className="space-y-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div><div className="mb-1 text-xs font-medium text-gray-600">Identity Document <span className="text-gray-400">(front)</span> <span className="text-red-500">*</span></div><input className={input + " w-full"} type="file" name="file" accept="image/*,application/pdf" required /></div>
+            <div><div className="mb-1 text-xs font-medium text-gray-600">Address Proof <span className="text-gray-400">(back)</span> <span className="text-red-500">*</span></div><input className={input + " w-full"} type="file" name="back" accept="image/*,application/pdf" required /></div>
+          </div>
+          <p className="text-xs text-gray-400">Upload a clear photo/scan of your identity document and a proof of address. Both are required for verification.</p>
+          <button className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white">Submit for review</button>
+        </form>)}
+      </div>);
+    })()}
 
     <div className="rounded-lg border bg-white p-4">
       <div className="mb-2 text-sm font-semibold">Recent requests</div>

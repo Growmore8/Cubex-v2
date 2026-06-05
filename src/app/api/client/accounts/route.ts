@@ -25,7 +25,13 @@ export async function POST(req: Request) {
     // If the client has been locked/deactivated by staff, block new account creation
     const restricted = await prisma.account.findFirst({ where: { userId: s.sub, OR: [{ locked: true }, { deactivated: true }] }, select: { id: true } });
     if (restricted) throw new Error("Your account is restricted. Please contact support.");
+    if (type === "DEMO") {
+      // a client may hold only one demo account
+      const demoCount = await prisma.account.count({ where: { userId: s.sub, type: "DEMO" } });
+      if (demoCount >= 1) throw new Error("You can only have one demo account");
+    }
     if (type === "LIVE") {
+      // live accounts are unlimited, but the first one needs approved KYC
       const liveCount = await prisma.account.count({ where: { userId: s.sub, type: "LIVE" } });
       if (liveCount === 0) {
         const approved = await prisma.kycDocument.findFirst({ where: { account: { userId: s.sub }, status: "APPROVED" } });

@@ -13,6 +13,8 @@ model Tenant {
   customDomain String?       @unique
   status       TenantStatus  @default(ACTIVE)
   brandName    String?
+  slogan       String? // tagline shown under the brand name on login/register
+  companyInfo  String? // brokerage/company footer line (e.g. legal entity, address)
   logoUrl      String?
   faviconUrl   String?
   primaryColor String?       @default("#2563eb")

@@ -20,6 +20,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (b.subdomain) data.subdomain = b.subdomain.toLowerCase();
       if (b.customDomain !== undefined) data.customDomain = b.customDomain || null;
       if (b.supportEmail !== undefined) data.supportEmail = b.supportEmail || null;
+      if (b.slogan !== undefined) data.slogan = b.slogan || null;
+      if (b.companyInfo !== undefined) data.companyInfo = b.companyInfo || null;
+      if (b.logoUrl !== undefined) data.logoUrl = b.logoUrl || null;
       if (b.primaryColor) data.primaryColor = b.primaryColor;
       if (b.accentColor) data.accentColor = b.accentColor;
       await prisma.tenant.update({ where: { id: t.id }, data });

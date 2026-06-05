@@ -110,6 +110,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         await audit(tenantId, "client.assignGroup", acc.login + " group=" + (b.groupId || "none"), actor);
         break;
       }
+      case "unlinkSub": {
+        // Detach a sub-account from its parent so it stands alone (no longer
+        // grouped under the parent in the client's linked-accounts list).
+        if (!acc.parentId) throw new Error("This account is not a sub-account");
+        await prisma.account.update({ where: { id: acc.id }, data: { parentId: null } });
+        await audit(tenantId, "client.unlinkSub", acc.login + " detached from parent", actor);
+        break;
+      }
       case "assign": {
         // Combined manager + group assignment. Group must belong to the chosen
         // manager (or be an admin-level group when no manager is chosen).

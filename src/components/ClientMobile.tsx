@@ -23,7 +23,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [noForm, setNoForm] = useState<any>({ idx: 0, lots: 0.01, trigger: "", sl: "", tp: "" });
   const [balOpen, setBalOpen] = useState(false);
   const {
-    theme, account, accts, accId, positions, pending, history, financials, notis, symbols, prices, dirs,
+    theme, account, accts, accId, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
     selSym, vol, sl, tp, err,
     balance, equity, floating, free, used, level, price, bid, ask, tf, TFS,
     setSelSym, setVol, setSl, setTp, setTf,
@@ -84,10 +84,15 @@ export default function ClientMobile({ t }: { t: any }) {
     </div>
   );
 
-  const navItems: [string, string, string][] = [
-    ["dashboard", "fa-house", "Dashboard"], ["quotes", "fa-chart-simple", "Quotes"], ["chart", "fa-chart-line", "Chart"],
-    ["trades", "fa-right-left", "Trades"], ["history", "fa-clock-rotate-left", "History"], ["profile", "fa-user", "Profile"],
-  ];
+  // Until the live account is KYC-verified, the client is restricted to the profile
+  // area only (demo accounts are exempt — switching to one lifts the restriction).
+  const navItems: [string, string, string][] = needKyc
+    ? [["profile", "fa-user", "Profile"]]
+    : [
+        ["dashboard", "fa-house", "Dashboard"], ["quotes", "fa-chart-simple", "Quotes"], ["chart", "fa-chart-line", "Chart"],
+        ["trades", "fa-right-left", "Trades"], ["history", "fa-clock-rotate-left", "History"], ["profile", "fa-user", "Profile"],
+      ];
+  useEffect(() => { if (needKyc) setTab("profile"); }, [needKyc]);
 
   const fmtLogin = (l: any) => String(l || "").split("").join(" ");
 
@@ -467,6 +472,14 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── PROFILE ───────── */}
         {tab === "profile" && (
           <div className="space-y-4 p-3">
+            {needKyc && (
+              <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(240,180,41,0.5)", background: "rgba(240,180,41,0.1)" }}>
+                <div className="flex items-center gap-2 text-[13px] font-bold" style={{ color: "#f0b829" }}><i className="fa-solid fa-id-card" /> Verify your identity</div>
+                <p className="mt-1 text-[12px] text-[var(--muted)]">Upload your Identity Document and Address Proof to unlock trading on your live account. Demo accounts work without KYC — switch below to trade demo now.</p>
+                <button onClick={() => { window.location.href = "/client/wallet?action=kyc"; }} className="mt-3 w-full rounded-xl py-2.5 text-sm font-semibold text-white" style={{ background: "#f0b829" }}>Upload KYC</button>
+                {demoAccts.length > 0 && <button onClick={() => { const d = demoAccts.find((a: any) => a.id !== accId) || demoAccts[0]; if (d) switchAcc(d.id); }} className="mt-2 w-full rounded-xl border py-2 text-[12px] font-semibold" style={{ borderColor: "var(--border)" }}>Switch to demo account</button>}
+              </div>
+            )}
             {/* header block */}
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
               <div className="flex items-center gap-3">
@@ -632,15 +645,16 @@ export default function ClientMobile({ t }: { t: any }) {
 
       {/* NEW ORDER / PENDING MODAL */}
       {noOpen && (() => {
-        const [kind, side] = ORDER_KINDS[noForm.idx];
-        const isPending = kind !== "MARKET";
-        const submit = async () => {
-          let ok = false;
-          if (!isPending) ok = await quickTrade(selSym, side, Number(noForm.lots));
-          else ok = await placePending(selSym, side, kind, Number(noForm.trigger), Number(noForm.lots), Number(noForm.sl) || 0, Number(noForm.tp) || 0);
+        const tab: "trade" | "pending" = noForm.tab || "trade";
+        const dd = dg(selSym);
+        const place = async (side: "BUY" | "SELL", kind: "MARKET" | "LIMIT" | "STOP") => {
+          const ok = kind === "MARKET"
+            ? await quickTrade(selSym, side, Number(noForm.lots))
+            : await placePending(selSym, side, kind, Number(noForm.trigger), Number(noForm.lots), Number(noForm.sl) || 0, Number(noForm.tp) || 0);
           if (ok) setNoOpen(false);
         };
-        const inp = "w-full rounded-lg border px-3 py-2 text-sm";
+        const inp = "w-full rounded-lg border px-3 py-2 text-sm tabular-nums";
+        const ist = { borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" };
         return (
           <div className="fixed inset-0 z-[95] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setNoOpen(false)}>
             <div className="w-full rounded-t-2xl p-4" style={{ background: "var(--card)", borderTop: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
@@ -648,21 +662,31 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="font-bold">New Order — {selSym}</div>
                 <button onClick={() => setNoOpen(false)} className="text-[var(--muted)]"><i className="fa-solid fa-xmark" /></button>
               </div>
-              <div className="mb-3 grid grid-cols-5 gap-1">
-                {ORDER_KINDS.map(([k, sd, lbl], i) => (
-                  <button key={lbl} onClick={() => setNoForm({ ...noForm, idx: i })} className="rounded-lg py-2 text-[10px] font-semibold" style={noForm.idx === i ? { background: sd === "SELL" ? SELL : BLUE, color: "#fff" } : { background: "var(--soft)", color: "var(--muted)" }}>{lbl}</button>
+              <div className="mb-3 flex gap-1 rounded-xl border border-[var(--border)] p-1">
+                {([["trade", "Trade"], ["pending", "Pending"]] as const).map(([k, lbl]) => (
+                  <button key={k} onClick={() => setNoForm({ ...noForm, tab: k })} className="flex-1 rounded-lg py-2 text-[12px] font-semibold" style={tab === k ? { background: BLUE, color: "#fff" } : { color: "var(--muted)" }}>{lbl}</button>
                 ))}
               </div>
-              <div className="mb-2"><div className="mb-1 text-[10px] text-[var(--muted)]">Lots</div><input type="number" step="0.01" className={inp} style={{ borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" }} value={noForm.lots} onChange={(e) => setNoForm({ ...noForm, lots: e.target.value })} /></div>
-              {isPending && <div className="mb-2"><div className="mb-1 text-[10px] text-[var(--muted)]">Trigger price ({side} {kind})</div><input type="number" className={inp} style={{ borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" }} placeholder={price ? price.toFixed(dg(selSym)) : "price"} value={noForm.trigger} onChange={(e) => setNoForm({ ...noForm, trigger: e.target.value })} /></div>}
+              <div className="mb-2"><div className="mb-1 text-[10px] text-[var(--muted)]">Lots</div><input type="number" step="0.01" className={inp} style={ist} value={noForm.lots} onChange={(e) => setNoForm({ ...noForm, lots: e.target.value })} /></div>
+              {tab === "pending" && <div className="mb-2"><div className="mb-1 text-[10px] text-[var(--muted)]">Trigger price</div><input type="number" className={inp} style={ist} placeholder={price ? price.toFixed(dd) : "price"} value={noForm.trigger} onChange={(e) => setNoForm({ ...noForm, trigger: e.target.value })} /></div>}
               <div className="mb-3 grid grid-cols-2 gap-2">
-                <div><div className="mb-1 text-[10px] text-[var(--muted)]">Stop Loss</div><input type="number" className={inp} style={{ borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" }} value={noForm.sl} onChange={(e) => setNoForm({ ...noForm, sl: e.target.value })} /></div>
-                <div><div className="mb-1 text-[10px] text-[var(--muted)]">Take Profit</div><input type="number" className={inp} style={{ borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" }} value={noForm.tp} onChange={(e) => setNoForm({ ...noForm, tp: e.target.value })} /></div>
+                <div><div className="mb-1 text-[10px] text-[var(--muted)]">Stop Loss</div><input type="number" className={inp} style={ist} value={noForm.sl} onChange={(e) => setNoForm({ ...noForm, sl: e.target.value })} /></div>
+                <div><div className="mb-1 text-[10px] text-[var(--muted)]">Take Profit</div><input type="number" className={inp} style={ist} value={noForm.tp} onChange={(e) => setNoForm({ ...noForm, tp: e.target.value })} /></div>
               </div>
-              {err && <div className="mb-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
-              <button onClick={submit} className="w-full rounded-xl py-3 text-sm font-bold text-white" style={{ background: side === "SELL" ? SELL : BUY }}>
-                {isPending ? `Place ${ORDER_KINDS[noForm.idx][2]}` : `${side} ${selSym} @ Market`}
-              </button>
+              {err && <div className="mb-2 text-center text-[11px]" style={{ color: SELL }}>{err}</div>}
+              {tab === "trade" ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => place("SELL", "MARKET")} className="flex flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white active:scale-[0.98]" style={{ background: SELL }}><span className="text-[11px] uppercase tracking-wide opacity-90">Sell</span><span className="text-[15px] tabular-nums">{price != null ? bid.toFixed(dd) : "…"}</span></button>
+                  <button onClick={() => place("BUY", "MARKET")} className="flex flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white active:scale-[0.98]" style={{ background: BLUE }}><span className="text-[11px] uppercase tracking-wide opacity-90">Buy</span><span className="text-[15px] tabular-nums">{price != null ? ask.toFixed(dd) : "…"}</span></button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {([["BUY", "LIMIT", "Buy Limit"], ["SELL", "LIMIT", "Sell Limit"], ["BUY", "STOP", "Buy Stop"], ["SELL", "STOP", "Sell Stop"]] as const).map(([side, kind, lbl]) => {
+                    const buy = side === "BUY";
+                    return (<button key={lbl} onClick={() => place(side, kind)} className="rounded-xl py-2.5 text-[12px] font-semibold active:scale-[0.98]" style={{ background: buy ? "rgba(47,129,247,0.15)" : "rgba(224,82,96,0.13)", color: buy ? "#6ab0ff" : SELL, border: "1px solid " + (buy ? "rgba(47,129,247,0.45)" : "rgba(224,82,96,0.45)") }}>{lbl}</button>);
+                  })}
+                </div>
+              )}
             </div>
           </div>
         );
