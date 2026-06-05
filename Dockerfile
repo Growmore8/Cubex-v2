@@ -33,4 +33,7 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/seed-symbols.mjs ./seed-symbols.mjs
 RUN mkdir -p /app/uploads
 EXPOSE 3000
-CMD ["node", "server.js"]
+# Sync the DB schema to match prisma/schema.prisma on every start (additive `db push`,
+# no migration files needed), then launch the server. This keeps production columns
+# (customDomain, supportEmail, slogan, …) in sync so the white-label features work.
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node server.js"]
