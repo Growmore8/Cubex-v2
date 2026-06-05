@@ -36,6 +36,12 @@
 .auth-stagger > *:nth-child(8) { animation-delay: 0.48s; }
 /* animated brand glows behind the card */
 .auth-glow { animation: auth-glow 9s ease-in-out infinite; will-change: transform; }
+/* slow-panning market lines in the login background */
+@keyframes auth-pan  { from { transform: translateX(0); }    to { transform: translateX(-50%); } }
+@keyframes auth-pan2 { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+.auth-pan  { animation: auth-pan 40s linear infinite;  will-change: transform; }
+.auth-pan2 { animation: auth-pan2 60s linear infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) { .auth-pan, .auth-pan2 { animation: none !important; } }
 /* inputs */
 .auth-field {
   transition: border-color 0.18s ease, box-shadow 0.2s ease, background 0.18s ease;

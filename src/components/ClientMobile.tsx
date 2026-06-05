@@ -37,7 +37,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [histTab, setHistTab] = useState<"trades" | "financial">("trades");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [qcat, setQcat] = useState<string>("favs");
+  const [qcat, setQcat] = useState<string>("Crypto"); // quotes open on Crypto by default
   const [modifyId, setModifyId] = useState<string | null>(null);
   const [mSl, setMSl] = useState("");
   const [mTp, setMTp] = useState("");
@@ -92,6 +92,14 @@ export default function ClientMobile({ t }: { t: any }) {
         ["trades", "fa-right-left", "Trades"], ["history", "fa-clock-rotate-left", "History"], ["profile", "fa-user", "Profile"],
       ];
   useEffect(() => { if (needKyc) setTab("profile"); }, [needKyc]);
+  // If a tenant has no Crypto category, fall back to the first available tab.
+  const catsKey = cats.join(",");
+  const didCatInit = useRef(false);
+  useEffect(() => {
+    if (didCatInit.current || !cats.length) return;
+    didCatInit.current = true;
+    if (qcat !== "favs" && !cats.includes(qcat)) setQcat(cats[0]);
+  }, [catsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fmtLogin = (l: any) => String(l || "").split("").join(" ");
 
@@ -646,7 +654,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
 
             {/* export */}
-            <button onClick={() => { try { window.open("/api/client/statement", "_blank"); } catch { window.print(); } }} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left">
+            <button onClick={() => { try { window.open("/api/client/statement?accountId=" + encodeURIComponent(accId || ""), "_blank"); } catch { window.print(); } }} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left">
               <i className="fa-solid fa-file-pdf" style={{ color: SELL }} />
               <div className="flex-1"><div className="text-[12px] font-semibold">Export PDF Statement</div><div className="text-[10px] text-[var(--muted)]">Download account history</div></div>
               <i className="fa-solid fa-chevron-right text-[var(--muted)]" />

@@ -14,7 +14,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         ["--brand-accent" as any]: brand.accentColor,
       }}
     >
-      {/* Ambient brand glows */}
+      {/* Ambient brand glows + animated market lines */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
           className="auth-glow absolute -left-32 -top-32 h-[28rem] w-[28rem] rounded-full opacity-[0.18] blur-3xl"
@@ -24,6 +24,15 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           className="auth-glow absolute -bottom-40 -right-24 h-[26rem] w-[26rem] rounded-full opacity-[0.16] blur-3xl"
           style={{ background: brand.accentColor, animationDelay: "1.5s" }}
         />
+        {/* slow-scrolling market chart lines */}
+        <svg className="auth-pan absolute inset-x-0 bottom-0 h-[40%] w-[200%] opacity-[0.10]" viewBox="0 0 1200 200" preserveAspectRatio="none">
+          <polyline fill="none" stroke={brand.primaryColor} strokeWidth="2"
+            points="0,160 60,120 120,140 180,80 240,110 300,60 360,90 420,40 480,80 540,30 600,70 660,50 720,100 780,60 840,120 900,70 960,110 1020,60 1080,100 1140,50 1200,90" />
+        </svg>
+        <svg className="auth-pan2 absolute inset-x-0 bottom-0 h-[55%] w-[200%] opacity-[0.07]" viewBox="0 0 1200 200" preserveAspectRatio="none">
+          <polyline fill="none" stroke={brand.accentColor} strokeWidth="2"
+            points="0,90 60,110 120,70 180,120 240,80 300,130 360,90 420,140 480,100 540,150 600,110 660,90 720,130 780,100 840,80 900,120 960,90 1020,130 1080,100 1140,140 1200,110" />
+        </svg>
       </div>
 
       <div className="auth-card relative w-full max-w-sm">
