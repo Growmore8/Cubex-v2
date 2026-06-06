@@ -5,7 +5,9 @@ import NotificationBell from "@/components/shared/NotificationBell";
 
 export default function Chrome({ brandName, primary, accent, name, role, children }: any) {
   const path = usePathname() || "";
-  const bare = path.startsWith("/client") || path.startsWith("/admin/desk") || path.startsWith("/admin/platform");
+  // These areas have their OWN header/sidebar (and notification bell), so don't add
+  // Chrome's header on top — that's what caused a duplicate notification badge.
+  const bare = path.startsWith("/client") || path.startsWith("/admin") || path.startsWith("/manager") || path.startsWith("/superadmin");
   const vars: any = { ["--brand-primary"]: primary, ["--brand-accent"]: accent };
   if (bare) return <div className="min-h-screen" style={vars}>{children}</div>;
   return (
