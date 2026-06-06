@@ -8,6 +8,7 @@ import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
 import PasswordInput from "@/components/ui/PasswordInput";
 import CountrySelect from "@/components/ui/CountrySelect";
+import { isOnline as presenceOnline } from "@/components/ui/Presence";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
 import { DARK, LIGHT, BUY, SELL, GOLD } from "@/config/theme";
@@ -484,6 +485,9 @@ export default function AdminDeskPage() {
       className="flex w-full items-center gap-1 rounded px-1.5 py-1 text-left" style={selAcc?.id === c.id ? { background: "var(--soft)", color: GOLD } : undefined}>
       {dot(c.deactivated ? "var(--muted)" : c.locked ? SELL : BUY)}<span className="flex-1 truncate">{c.login} - {c.name}</span>
       <span className="flex shrink-0 items-center gap-1.5">
+        {/* presence: online dot + login device */}
+        {presenceOnline(c.user?.lastSeenAt) && sIco("fa-circle", "#16a34a", "Online")}
+        {c.user?.lastDevice && sIco(String(c.user.lastDevice).toLowerCase() === "mobile" ? "fa-mobile-screen-button" : String(c.user.lastDevice).toLowerCase() === "tablet" ? "fa-tablet-screen-button" : "fa-laptop", "#8b97a8", c.user.lastDevice)}
         {/* Active / Deactivated */}
         {c.deactivated ? sIco("fa-ban", "#8b97a8", "Deactivated") : sIco("fa-circle-check", BUY, "Active")}
         {/* Locked */}
