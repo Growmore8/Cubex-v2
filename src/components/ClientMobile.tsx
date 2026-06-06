@@ -797,7 +797,7 @@ export default function ClientMobile({ t }: { t: any }) {
       {walletTab && (
         <div className="fixed inset-0 z-[125] flex items-start justify-center overflow-auto p-3" style={{ background: "rgba(0,0,0,0.55)", paddingTop: "max(12px, env(safe-area-inset-top))", paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
           <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <WalletPanel key={walletTab} initialTab={walletTab} onClose={() => setWalletTab(null)} />
+            <WalletPanel key={walletTab} initialTab={walletTab} tabs={walletTab === "kyc" ? ["kyc"] : ["deposit", "withdraw"]} onClose={() => setWalletTab(null)} />
           </div>
         </div>
       )}

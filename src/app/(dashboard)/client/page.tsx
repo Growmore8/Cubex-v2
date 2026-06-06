@@ -691,7 +691,7 @@ export default function ClientTerminal() {
       {walletModal && (
         <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-auto p-4 sm:items-center" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <WalletPanel key={walletModal} initialTab={walletModal} onClose={() => setWalletModal(null)} />
+            <WalletPanel key={walletModal} initialTab={walletModal} tabs={walletModal === "kyc" ? ["kyc"] : ["deposit", "withdraw"]} onClose={() => setWalletModal(null)} />
           </div>
         </div>
       )}

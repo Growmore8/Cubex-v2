@@ -200,10 +200,31 @@ function ensureSeeded() {
   }
 }
 
+// Is the symbol's market open right now? Crypto = 24/7; forex & metals close on the
+// weekend (Fri 21:00 UTC → Sun 21:00 UTC); stocks/indices trade weekday US hours.
+// When closed, prices are frozen (no jitter, no feed walk) so they don't drift.
+function isMarketOpen(sym, cat) {
+  const c = String(cat || "").toLowerCase();
+  if (c === "crypto" || /USDT?$/.test(sym) && /(BTC|ETH|BNB|SOL|XRP|ADA|DOGE|LTC|DOT|AVAX|TRX|LINK)/.test(sym)) return true; // 24/7
+  const now = new Date();
+  const day = now.getUTCDay();   // 0=Sun … 6=Sat
+  const h = now.getUTCHours();
+  if (c === "stocks" || c === "indices") {
+    if (day === 0 || day === 6) return false;
+    return h >= 13 && h < 21;     // ~US cash session in UTC (simplified)
+  }
+  // forex & metals (default): closed over the weekend
+  if (day === 6) return false;                 // Saturday
+  if (day === 0 && h < 21) return false;        // Sunday before 21:00 UTC
+  if (day === 5 && h >= 21) return false;        // Friday after 21:00 UTC
+  return true;
+}
+
 function microTick() {
   for (const sym of symbols) {
     const st = state[sym];
     if (!st || st.price == null) continue;
+    if (!isMarketOpen(sym, meta[sym] && meta[sym].cat)) continue; // market closed → freeze price
     const d = (meta[sym] && meta[sym].digits) || 2;
     const step = Math.pow(10, -d);
     let np;

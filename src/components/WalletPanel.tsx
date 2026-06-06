@@ -3,7 +3,11 @@ import { useEffect, useState } from "react";
 
 // Shared deposit / withdraw / KYC panel used by the full wallet page and the
 // in-app wallet modal on the client desktop terminal.
-export default function WalletPanel({ initialTab = "deposit", onClose }: { initialTab?: "deposit" | "withdraw" | "kyc"; onClose?: () => void }) {
+export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: { initialTab?: "deposit" | "withdraw" | "kyc"; onClose?: () => void; tabs?: ("deposit" | "withdraw" | "kyc")[] }) {
+  const shown: ("deposit" | "withdraw" | "kyc")[] = tabs && tabs.length ? tabs : ["deposit", "withdraw", "kyc"];
+  const panelTitle = shown.length === 1
+    ? (shown[0] === "kyc" ? "KYC Verification" : shown[0] === "deposit" ? "Deposit" : "Withdraw")
+    : "Wallet";
   const [tab, setTab] = useState<"deposit" | "withdraw" | "kyc">(initialTab);
   const [crypto, setCrypto] = useState<any[]>([]);
   const [upi, setUpi] = useState<any[]>([]);
@@ -83,15 +87,17 @@ export default function WalletPanel({ initialTab = "deposit", onClose }: { initi
 
   return (<div className="space-y-4 text-gray-800">
     <div className="flex items-center justify-between">
-      <h1 className="text-xl font-bold">Wallet</h1>
+      <h1 className="text-xl font-bold">{panelTitle}</h1>
       {onClose ? <button onClick={onClose} className="text-sm text-gray-400 hover:text-gray-700"><i className="fa-solid fa-xmark" /> Close</button> : <a href="/client" className="text-sm text-blue-600">&larr; Back to terminal</a>}
     </div>
     {err && <p className="text-sm text-red-600">{err}</p>}{msg && <p className="text-sm text-green-600">{msg}</p>}
-    <div className="flex gap-1 border-b">
-      <button className={tabBtn("deposit")} onClick={() => setTab("deposit")}>Deposit</button>
-      <button className={tabBtn("withdraw")} onClick={() => setTab("withdraw")}>Withdraw</button>
-      <button className={tabBtn("kyc")} onClick={() => setTab("kyc")}>KYC</button>
-    </div>
+    {shown.length > 1 && (
+      <div className="flex gap-1 border-b">
+        {shown.includes("deposit") && <button className={tabBtn("deposit")} onClick={() => setTab("deposit")}>Deposit</button>}
+        {shown.includes("withdraw") && <button className={tabBtn("withdraw")} onClick={() => setTab("withdraw")}>Withdraw</button>}
+        {shown.includes("kyc") && <button className={tabBtn("kyc")} onClick={() => setTab("kyc")}>KYC</button>}
+      </div>
+    )}
 
     {tab === "deposit" && (<div className="space-y-3 rounded-lg border bg-white p-4">
       {crypto.length === 0 && upi.length === 0 && links.length === 0 ? <p className="text-sm text-gray-500">No payment methods configured yet. Please contact support.</p> : (<>
