@@ -132,7 +132,7 @@ export default function ClientTerminal() {
   // Lightweight notifications-only refresh (used when a notification ping arrives, so
   // the bell updates live without reloading the whole account).
   function loadNotifs() {
-    fetch("/api/client/notifications").then((r) => r.json()).then((nd) => { if (!nd.ok) return; const items = nd.items || []; if (notifPrimed.current) { for (const n of items) { const id = String(n.id); if (!notifSeen.current.has(id)) { playSound(soundForNotification(n)); if (!isMobile) pushToast(n); } } } items.forEach((n: any) => notifSeen.current.add(String(n.id))); notifPrimed.current = true; setNotis(items); }).catch(() => {});
+    fetch("/api/client/notifications").then((r) => r.json()).then((nd) => { if (!nd.ok) return; const items = nd.items || []; if (notifPrimed.current) { for (const n of items) { const id = String(n.id); if (!notifSeen.current.has(id)) { playSound(soundForNotification(n)); pushToast(n); } } } items.forEach((n: any) => notifSeen.current.add(String(n.id))); notifPrimed.current = true; setNotis(items); }).catch(() => {});
   }
   useEffect(() => { load(); }, []);
   useEffect(() => { fetch("/api/client/pin").then((r) => r.json()).then((d) => { if (d.ok && d.hasPin) { setPinHasPin(true); if (sessionStorage.getItem("cubex-pin-ok") !== "1") setPinLock(true); } }).catch(() => {}); }, []);
@@ -187,13 +187,14 @@ export default function ClientTerminal() {
       const mkt = prices[selSym] ?? trig;
       const kind = type === "BUY" ? (trig < mkt ? "LIMIT" : "STOP") : (trig > mkt ? "LIMIT" : "STOP");
       const rp = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), price: trig, kind, sl: Number(sl) || 0, tp: Number(tp) || 0, accountId: accIdRef.current }) });
-      const dp = await rp.json(); if (!dp.ok) { setErr(dp.error || "Failed"); return; } setPendingPrice(""); load(); return;
+      const dp = await rp.json(); if (!dp.ok) { setErr(dp.error || "Failed"); return; }
+      pushToast({ title: `Pending ${type} ${selSym} placed`, type: "TRADE" }); setPendingPrice(""); load(); return;
     }
     const r = await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), sl: Number(sl) || 0, tp: Number(tp) || 0, accountId: accIdRef.current }) });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Order failed"); return; }
-    load();
+    pushToast({ title: `${type} ${selSym} ${vol}L opened`, type: "TRADE" }); load();
   }
   async function quickTrade(sym: string, side: "BUY" | "SELL", lots?: number) {
     setSelSym(sym); setErr("");
@@ -203,7 +204,7 @@ export default function ClientTerminal() {
       body: JSON.stringify({ symbol: sym, side, lots: Number(lots ?? vol), sl: 0, tp: 0, accountId: accIdRef.current }) });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Order failed"); return false; }
-    load(); return true;
+    pushToast({ title: `${side} ${sym} ${Number(lots ?? vol)}L opened`, type: "TRADE" }); load(); return true;
   }
   // Mobile/explicit pending order: kind = LIMIT | STOP
   async function placePending(sym: string, side: "BUY" | "SELL", kind: "LIMIT" | "STOP", trigger: number, lots: number, slv = 0, tpv = 0) {
@@ -215,9 +216,9 @@ export default function ClientTerminal() {
       body: JSON.stringify({ symbol: sym, side, kind, lots: Number(lots), price: trigger, sl: slv, tp: tpv, accountId: accIdRef.current }) });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Pending failed"); return false; }
-    load(); return true;
+    pushToast({ title: `Pending ${side} ${sym} placed`, type: "TRADE" }); load(); return true;
   }
-  async function cancelPending(id: string) { await fetch("/api/client/pending/" + id, { method: "DELETE" }); load(); }
+  async function cancelPending(id: string) { await fetch("/api/client/pending/" + id, { method: "DELETE" }); pushToast({ title: "Pending order cancelled", type: "TRADE" }); load(); }
   function urlB64ToUint8Array(base64String: string) { const padding = "=".repeat((4 - (base64String.length % 4)) % 4); const b = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/"); const raw = atob(b); const arr = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i); return arr; }
   async function enablePush() {
     try {
@@ -271,7 +272,8 @@ export default function ClientTerminal() {
   async function close(id: string) {
     if (account?.locked) { setErr("Your account is read-only. Closing is disabled."); return; }
     const r = await fetch("/api/client/orders/" + id + "/close", { method: "POST" });
-    const d = await r.json(); if (!d.ok) { setErr(d.error || "Close failed"); return; } load();
+    const d = await r.json(); if (!d.ok) { setErr(d.error || "Close failed"); return; }
+    pushToast({ title: "Trade closed" + (d.pnl != null ? ` · P/L $${Number(d.pnl).toFixed(2)}` : ""), type: "TRADE" }); load();
   }
   function switchAcc(id: string) { accIdRef.current = id; setAccId(id); load(); }
   async function doTransfer() {
@@ -279,7 +281,7 @@ export default function ClientTerminal() {
     const fromId = xfer.fromId || accId;
     const r = await fetch("/api/client/transfer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fromId, toId: xfer.toId, amount: Number(xfer.amount) }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { setXferErr(r.error || "Transfer failed"); return; }
-    setXferModal(false); setXfer({});
+    pushToast({ title: "Transfer completed", type: "FUNDS" }); setXferModal(false); setXfer({});
     fetch("/api/client/accounts").then((x) => x.json()).then((ad) => { if (ad.ok) setAccts(ad.accounts || []); }).catch(() => {});
     load();
   }
@@ -299,7 +301,7 @@ export default function ClientTerminal() {
     if (!amt || amt <= 0) return;
     const r = await fetch("/api/client/topup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accIdRef.current, amount: amt }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { setErr(r.error || "Top-up failed"); return; }
-    load();
+    pushToast({ title: `Demo balance topped up $${amt.toLocaleString()}`, type: "FUNDS" }); load();
   }
 
   function dragX(e: any, which: "mw" | "rt") { e.preventDefault(); setDragging(true); const sx = e.clientX; const sw = which === "mw" ? mwW : rtW; const mv = (ev: any) => { const dx = ev.clientX - sx; if (which === "mw") setMwW(Math.max(150, Math.min(380, sw + dx))); else setRtW(Math.max(200, Math.min(380, sw - dx))); }; const up = () => { setDragging(false); document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }; document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); }
@@ -346,7 +348,7 @@ export default function ClientTerminal() {
   const histShown = history.filter((h: any) => { if (histRange === "all") return true; const t = new Date(h.closedAt).getTime(); const now = Date.now(); const day = 86400000; if (histRange === "today") return t >= now - day; if (histRange === "week") return t >= now - 7 * day; return t >= now - 30 * day; });
   const tab = (active: boolean) => "px-3 py-1.5 text-[11px] " + (active ? "" : "text-[var(--muted)]");
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, logout: async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, pinForm, setPinForm, savePin } }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, logout: async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, pinForm, setPinForm, savePin }, cToasts, pushToast }} />;
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {needKyc && (

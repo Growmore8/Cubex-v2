@@ -59,6 +59,13 @@ export default function ClientMobile({ t }: { t: any }) {
   const [modifyId, setModifyId] = useState<string | null>(null);
   const [mSl, setMSl] = useState("");
   const [mTp, setMTp] = useState("");
+  const [notisOpen, setNotisOpen] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const { cToasts = [], pushToast } = t;
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    navigator.serviceWorker.ready.then((reg) => reg.pushManager.getSubscription().then((sub) => setPushEnabled(!!sub))).catch(() => {});
+  }, []);
   const avatarRef = useRef<HTMLInputElement>(null);
   const baselineRef = useRef<Record<string, number>>({});
 
@@ -184,9 +191,9 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: "var(--soft)", color: GOLD }}>{brand?.logoUrl ? <img src={brand.logoUrl} alt="" className="h-3.5 w-3.5 rounded object-contain" /> : <i className="fa-solid fa-cube" />} {brand?.name || ""}</span>
-          <button className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[var(--soft)]">
-            <i className="fa-solid fa-bell text-[var(--muted)]" />
-            {unread > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full" style={{ background: SELL }} />}
+          <button onClick={() => { setNotisOpen((o) => !o); if (!notisOpen && unread > 0) fetch("/api/client/notifications", { method: "POST" }).then(() => {}).catch(() => {}); }} className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[var(--soft)]">
+            <i className="fa-solid fa-bell" style={{ color: unread > 0 ? GOLD : "var(--muted)" }} />
+            {unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: SELL }}>{unread > 9 ? "9+" : unread}</span>}
           </button>
         </div>
       </div>
@@ -195,6 +202,49 @@ export default function ClientMobile({ t }: { t: any }) {
       {t.readOnly && (
         <div className="flex items-center justify-center gap-2 py-1.5 text-[11px] font-semibold" style={{ background: "rgba(220,38,38,0.16)", color: SELL }}>
           <i className="fa-solid fa-lock" /> READ ONLY ACCESS — all actions disabled
+        </div>
+      )}
+
+      {/* Notification panel — slides over content when bell is tapped */}
+      {notisOpen && (
+        <div className="absolute inset-x-0 top-0 z-50 flex flex-col rounded-b-2xl border-b shadow-2xl" style={{ background: "var(--panel)", borderColor: "var(--border)", maxHeight: "65vh" }}>
+          <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
+            <div className="text-[13px] font-bold">Notifications</div>
+            <button onClick={() => setNotisOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "var(--soft)" }}><i className="fa-solid fa-xmark text-[var(--muted)]" /></button>
+          </div>
+          <div className="overflow-auto">
+            {(notis || []).length === 0
+              ? <div className="py-10 text-center text-[12px] text-[var(--muted)]">No notifications</div>
+              : (notis || []).map((n: any, i: number) => (
+                <div key={i} className="flex gap-3 border-b px-4 py-3 last:border-0" style={{ borderColor: "var(--border)", background: !n.read ? "var(--soft)" : undefined }}>
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px]" style={{ background: "rgba(227,168,85,0.15)", color: GOLD }}>
+                    <i className="fa-solid fa-bell" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-semibold text-[var(--text)]">{n.title}</div>
+                    {n.body && <div className="mt-0.5 text-[11px] text-[var(--muted)]">{n.body}</div>}
+                    <div className="mt-1 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div>
+                  </div>
+                  {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: SELL }} />}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
+      {/* Toast overlay — bottom of screen, auto-dismiss */}
+      {cToasts.length > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4">
+          {cToasts.map((toast: any) => (
+            <div key={toast.id} className="flex w-full max-w-sm items-center gap-2.5 rounded-xl px-4 py-3 shadow-2xl" style={{ background: "var(--panel)", border: `1px solid var(--border)`, borderLeft: `4px solid ${toast.st === "trade" ? "#2f81f7" : toast.st === "funds" ? GOLD : toast.st === "login" ? "#a78bfa" : BUY}` }}>
+              <i className={"fa-solid text-sm " + (toast.st === "trade" ? "fa-chart-line" : toast.st === "funds" ? "fa-money-bill" : "fa-bell")} style={{ color: toast.st === "trade" ? "#2f81f7" : toast.st === "funds" ? GOLD : BUY }} />
+              <div className="min-w-0 flex-1">
+                <div className="text-[12px] font-semibold text-[var(--text)]">{toast.title}</div>
+                {toast.body && <div className="text-[10px] text-[var(--muted)]">{toast.body}</div>}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -391,11 +441,11 @@ export default function ClientMobile({ t }: { t: any }) {
                 onClose={(id: string) => { if (id.startsWith("pnd-")) { t.cancelPending && t.cancelPending(id.slice(4)); } else close(id); }} />
             </div>
             <div className="glass flex items-stretch gap-2 border-t border-[var(--border)] p-2.5" style={{ background: theme === "dark" ? "rgba(20,24,34,0.6)" : "rgba(255,255,255,0.6)" }}>
-              <button onClick={() => quickTrade(selSym, "SELL", vol)} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: SELL }}>
+              <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: SELL, touchAction: "manipulation" }}>
                 <div className="text-[10px] opacity-80">SELL</div><div className="text-base font-bold tabular-nums">{price != null ? bid.toFixed(dg(selSym)) : "…"}</div>
               </button>
               <div className="flex items-center"><Stepper /></div>
-              <button onClick={() => quickTrade(selSym, "BUY", vol)} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: BUY }}>
+              <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: BUY, touchAction: "manipulation" }}>
                 <div className="text-[10px] opacity-80">BUY</div><div className="text-base font-bold tabular-nums">{price != null ? ask.toFixed(dg(selSym)) : "…"}</div>
               </button>
             </div>
@@ -698,10 +748,12 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="flex-1"><div className="text-[12px] font-semibold">Face ID / Fingerprint</div><div className="text-[10px] text-[var(--muted)]">Tap to enable a passkey</div></div>
                 <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
               </button>
-              <button onClick={enablePush} className="flex w-full items-center gap-3 py-2.5 text-left">
-                <i className="fa-solid fa-bell text-[var(--muted)]" />
-                <div className="flex-1"><div className="text-[12px] font-semibold">Push Notifications</div><div className="text-[10px] text-[var(--muted)]">Tap to enable alerts</div></div>
-                <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
+              <button onClick={pushEnabled ? undefined : enablePush} className="flex w-full items-center gap-3 py-2.5 text-left">
+                <i className="fa-solid fa-bell" style={{ color: pushEnabled ? BUY : "var(--muted)" }} />
+                <div className="flex-1"><div className="text-[12px] font-semibold">Push Notifications</div><div className="text-[10px] text-[var(--muted)]">{pushEnabled ? "Alerts enabled" : "Tap to enable alerts"}</div></div>
+                {pushEnabled
+                  ? <span className="rounded px-1.5 py-0.5 text-[8px] font-bold" style={{ background: "rgba(22,163,74,.15)", color: BUY }}>ON</span>
+                  : <i className="fa-solid fa-chevron-right text-[var(--muted)]" />}
               </button>
               <button onClick={toggleTheme} className="flex w-full items-center gap-3 py-2.5 text-left">
                 <i className={`fa-solid fa-${theme === "dark" ? "sun" : "moon"} text-[var(--muted)]`} />

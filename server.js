@@ -279,17 +279,23 @@ function calcPnl(symbol, type, openPrice, price, lots) {
   return diff * lots * m.contract;
 }
 async function liquidate(acc, list, io) {
-  let total = 0;
-  for (const t of list) {
-    const price = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
-    const pnl = calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
-    total += pnl;
-    await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnl, closeReason: "MC", openedAt: t.openedAt } });
-    await prisma.trade.delete({ where: { id: t.id } });
-  }
-  await prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: total } } });
-  if (acc.userId) await prisma.notification.create({ data: { tenantId: acc.tenantId, userId: acc.userId, title: "Stop out", body: "Positions liquidated at margin call" } }).catch(() => {});
-  io.emit("liquidation", { accountId: acc.id, login: acc.login });
+  try {
+    let total = 0;
+    for (const t of list) {
+      const price = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
+      const pnl = calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
+      total += pnl;
+      await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnl, closeReason: "MC", openedAt: t.openedAt } });
+      await prisma.trade.delete({ where: { id: t.id } });
+    }
+    await prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: total } } });
+    const body = acc.login + " margin call — " + list.length + " trade(s) closed, P/L " + total.toFixed(2);
+    if (acc.userId) await prisma.notification.create({ data: { tenantId: acc.tenantId, userId: acc.userId, title: "Stop out", body: "Positions liquidated at margin call" } }).catch(() => {});
+    await prisma.auditLog.create({ data: { tenantId: acc.tenantId, action: "account.liquidated", detail: body, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
+    io.emit("liquidation", { accountId: acc.id, login: acc.login });
+    io.emit("refresh", {});
+    console.log("[MC] liquidated", acc.login, list.length, "trades, total P/L:", total.toFixed(2));
+  } catch (e) { console.error("[liquidate]", e); }
 }
 async function monitor(io) {
   try {
@@ -319,7 +325,7 @@ async function monitor(io) {
       if (used <= 0) continue;
       if (((balance + floating) / used) * 100 <= mc) await liquidate(acc, list, io);
     }
-  } catch (e) {}
+  } catch (e) { console.error("[monitor]", e); }
 }
 
 async function checkPending(io) {
