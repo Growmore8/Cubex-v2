@@ -42,3 +42,8 @@ next-env.d.ts
 
 # user uploads (runtime data)
 /uploads
+
+# editor / backup dump files
+*.bak*
+*.orig
+*~

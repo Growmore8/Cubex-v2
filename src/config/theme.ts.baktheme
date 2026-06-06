@@ -1,6 +1,0 @@
-// Global color code - imported by every area so all screens match exactly.
-export const DARK: Record<string, string> = { "--bg": "#0b1220", "--panel": "#0f1826", "--border": "#1f2a3a", "--text": "#e6edf6", "--muted": "#8b97a8", "--soft": "#16202e", "--up": "#0f2018", "--down": "#241016", "--accent": "#5aa9ff" };
-export const LIGHT: Record<string, string> = { "--bg": "#f4f6fa", "--panel": "#ffffff", "--border": "#e6eaf0", "--text": "#0f172a", "--muted": "#64748b", "--soft": "#eef2f8", "--up": "#e7f8f0", "--down": "#fdeceb", "--accent": "#2563eb" };
-export const BUY = "#16c784";
-export const SELL = "#e05260";
-export const GOLD = "#f1b53d";
