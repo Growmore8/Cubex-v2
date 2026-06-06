@@ -69,7 +69,6 @@ export default function ClientMobile({ t }: { t: any }) {
   const avatarRef = useRef<HTMLInputElement>(null);
   const baselineRef = useRef<Record<string, number>>({});
   const [chartFull, setChartFull] = useState(false);
-  const [lotPadOpen, setLotPadOpen] = useState(false);
 
   // capture a session baseline price for % change movers
   useEffect(() => {
@@ -167,81 +166,33 @@ export default function ClientMobile({ t }: { t: any }) {
     setModifyId(null); setExpanded(null);
   };
 
-  const LotPad = ({ onClose }: { onClose: () => void }) => {
-    const [disp, setDisp] = useState(Number(vol).toFixed(2));
-    const num = Math.max(0, parseFloat(disp) || 0);
-    const pipVal = +(num * 10).toFixed(2);
-    const press = (k: string) => setDisp(prev => {
-      if (k === "⌫") return prev.length > 1 ? prev.slice(0, -1) : "0";
-      if (k === "." && prev.includes(".")) return prev;
-      if (prev === "0" && k !== ".") return k;
-      if (prev.includes(".") && (prev.split(".")[1]?.length ?? 0) >= 2) return prev;
-      return prev + k;
-    });
-    const confirm = () => { const v = parseFloat(disp); setVol(isNaN(v) || v < 0.01 ? 0.01 : +v.toFixed(2)); onClose(); };
-    const isSel = (v: number) => Math.abs(num - v) < 0.001;
-    const btnBg = (active: boolean) => active ? `${GOLD}28` : "var(--soft)";
+  const Stepper = ({ small }: { small?: boolean }) => {
+    const [inp, setInp] = useState(Number(vol).toFixed(2));
+    useEffect(() => { setInp(Number(vol).toFixed(2)); }, []);
+    const commit = (raw: string) => { const v = parseFloat(raw); const n = isNaN(v) || v < 0.01 ? 0.01 : +v.toFixed(2); setVol(n); setInp(n.toFixed(2)); };
+    const stepDown = () => { const n = Math.max(0.01, +(parseFloat(inp || "0") - 0.01).toFixed(2)); setVol(n); setInp(n.toFixed(2)); };
+    const stepUp = () => { const n = +(parseFloat(inp || "0") + 0.01).toFixed(2); setVol(n); setInp(n.toFixed(2)); };
     return (
-      <div className="fixed inset-0 z-[92]" style={{ background: "rgba(0,0,0,0.55)" }} onClick={onClose}>
-        <div className="absolute bottom-0 left-0 right-0" style={{ borderRadius: "28px 28px 0 0", background: theme === "dark" ? "rgba(13,17,27,0.98)" : "rgba(255,255,255,0.98)", backdropFilter: "blur(28px)", borderTop: `1px solid ${GOLD}22` }} onClick={e => e.stopPropagation()}>
-          {/* Handle */}
-          <div className="flex justify-center pb-1 pt-3"><div className="h-1 w-10 rounded-full" style={{ background: "var(--border)" }} /></div>
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-2">
-            <span className="text-[14px] font-bold" style={{ color: "var(--text)" }}>Lot Size</span>
-            <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-xmark text-[11px]" /></button>
-          </div>
-          {/* Display */}
-          <div className="mx-4 mb-3 overflow-hidden rounded-2xl" style={{ background: "var(--soft)", border: `1px solid ${GOLD}33` }}>
-            <div className="flex items-center justify-between px-5 py-3.5">
-              <span className="text-[36px] font-black tabular-nums" style={{ color: GOLD, letterSpacing: 2 }}>{disp || "0"}</span>
-              <button onPointerDown={e => { e.preventDefault(); press("⌫"); }} className="flex h-11 w-11 items-center justify-center rounded-xl active:scale-90" style={{ background: "rgba(224,82,96,0.12)", color: SELL, transition: "transform 0.08s" }}>
-                <i className="fa-solid fa-delete-left text-lg" />
-              </button>
-            </div>
-            <div className="flex items-center justify-between border-t px-5 py-2 text-[10px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
-              <span>Pip value ≈ <span style={{ color: BUY, fontWeight: 600 }}>${pipVal}</span></span>
-              <span style={{ color: num >= 0.01 ? "#22c55e" : SELL }}>{num >= 0.01 ? `${num.toFixed(2)} lots` : "min 0.01"}</span>
-            </div>
-          </div>
-          {/* Presets */}
-          <div className="mb-3 flex gap-2 px-4">
-            {[0.01, 0.05, 0.10, 1.00].map(v => (
-              <button key={v} onPointerDown={e => { e.preventDefault(); setDisp(v.toFixed(2)); }} className="flex-1 rounded-xl py-2 text-[11px] font-bold transition-all active:scale-95" style={{ background: btnBg(isSel(v)), color: isSel(v) ? GOLD : "var(--muted)", border: `1px solid ${isSel(v) ? GOLD + "55" : "var(--border)"}` }}>
-                {v.toFixed(2)}
-              </button>
-            ))}
-          </div>
-          {/* Numpad */}
-          <div className="mb-3 grid grid-cols-3 gap-2 px-4">
-            {["1","2","3","4","5","6","7","8","9",".","0","⌫"].map(k => (
-              <button key={k} onPointerDown={e => { e.preventDefault(); press(k); }} className="flex items-center justify-center rounded-2xl text-[20px] font-semibold active:scale-90" style={{ height: 54, background: k === "⌫" ? "rgba(224,82,96,0.10)" : "var(--soft)", color: k === "⌫" ? SELL : "var(--text)", transition: "transform 0.08s", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
-                {k === "⌫" ? <i className="fa-solid fa-delete-left" /> : k}
-              </button>
-            ))}
-          </div>
-          {/* Actions */}
-          <div className="flex gap-3 px-4 pb-10">
-            <button onClick={onClose} className="flex-1 rounded-2xl py-4 text-[14px] font-semibold" style={{ background: "var(--soft)", color: "var(--muted)" }}>Cancel</button>
-            <button onPointerDown={e => { e.preventDefault(); confirm(); }} className="rounded-2xl py-4 text-[14px] font-bold text-white" style={{ flex: 2, background: `linear-gradient(135deg, ${GOLD}, #f59e0b)`, boxShadow: `0 6px 24px ${GOLD}44` }}>✓ Confirm</button>
-          </div>
+      <div className="flex flex-col items-center">
+        <div className="flex items-center gap-1.5">
+          <button onPointerDown={(e) => { e.preventDefault(); stepDown(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>−</button>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={inp}
+            onChange={e => setInp(e.target.value)}
+            onFocus={e => e.target.select()}
+            onBlur={e => commit(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } }}
+            className="rounded-lg border border-[var(--border)] bg-[var(--soft)] text-center font-semibold tabular-nums text-[var(--text)]"
+            style={{ width: small ? 54 : 62, height: small ? 30 : 34, fontSize: small ? 12 : 13 }}
+          />
+          <button onPointerDown={(e) => { e.preventDefault(); stepUp(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>+</button>
         </div>
+        <span className="mt-0.5 text-[9px] text-[var(--muted)]">Lots</span>
       </div>
     );
   };
-
-  const Stepper = ({ small }: { small?: boolean }) => (
-    <div className="flex flex-col items-center">
-      <div className="flex items-center gap-1.5">
-        <button onPointerDown={(e) => { e.preventDefault(); setVol((v: number) => Math.max(0.01, +(v - 0.01).toFixed(2))); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>−</button>
-        <button onPointerDown={(e) => { e.preventDefault(); setLotPadOpen(true); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] text-center font-semibold tabular-nums text-[var(--text)]" style={{ width: small ? 54 : 62, height: small ? 30 : 34, fontSize: small ? 12 : 13, touchAction: "manipulation", cursor: "pointer" }}>
-          {Number(vol).toFixed(2)}
-        </button>
-        <button onPointerDown={(e) => { e.preventDefault(); setVol((v: number) => +(v + 0.01).toFixed(2)); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>+</button>
-      </div>
-      <span className="mt-0.5 text-[9px] text-[var(--muted)]">Lots</span>
-    </div>
-  );
 
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", height: "100dvh", paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation" }} className="flex flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
@@ -602,9 +553,6 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
           </div>
         )}
-
-        {/* ───────── LOT PAD ───────── */}
-        {lotPadOpen && <LotPad onClose={() => setLotPadOpen(false)} />}
 
         {/* ───────── TRADES ───────── */}
         {tab === "trades" && (

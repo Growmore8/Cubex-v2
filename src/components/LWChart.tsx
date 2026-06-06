@@ -461,7 +461,6 @@ export default function LWChart({
               <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
             </button>
           )}
-          <div style={{ flex: 1 }} />
           <button style={{ ...tbV(sma), fontSize: 9, fontWeight: 700 }} onClick={() => setSma((v) => !v)} title="SMA 20">SMA</button>
           <button style={{ ...tbV(ema), fontSize: 9, fontWeight: 700 }} onClick={() => setEma((v) => !v)} title="EMA 20">EMA</button>
           <button style={{ ...tbV(bb), fontSize: 8, fontWeight: 700 }} onClick={() => setBb((v) => !v)} title="Bollinger Bands (20,2)">BB</button>
