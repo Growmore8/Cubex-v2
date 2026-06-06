@@ -500,12 +500,12 @@ export default function AdminDeskPage() {
         {c.locked ? sIco("fa-lock", SELL, "Locked") : null}
         {/* Do Not Liquidate */}
         {c.doNotLiquidate ? sIco("fa-hand", GOLD, "Do Not Liquidate (DNL)") : null}
-        {/* KYC status */}
-        {c.kycStatus === "APPROVED"
+        {/* KYC status — only relevant for live accounts */}
+        {c.type === "LIVE" && (c.kycStatus === "APPROVED"
           ? sIco("fa-id-card", BUY, "KYC Verified")
           : c.kycStatus === "PENDING"
           ? sIco("fa-id-card", GOLD, "KYC Pending")
-          : sIco("fa-id-card", "#6b7280", "KYC Not Verified")}
+          : sIco("fa-id-card", "#6b7280", "KYC Not Verified"))}
       </span>
     </button>
   );
