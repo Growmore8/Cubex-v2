@@ -242,11 +242,14 @@ export default function SAClientsPage() {
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-right font-medium">{m(r.balance)}</td>
-                  <td className="px-3 py-2.5 text-center">
-                    <span
-                      className={"inline-block h-2.5 w-2.5 rounded-full border-2 " + (r.isOnline ? "bg-green-400 border-green-200" : "bg-gray-300 border-gray-100")}
-                      title={r.isOnline ? "Online" : r.lastPing ? "Last: " + new Date(r.lastPing).toLocaleString() : "Offline"}
-                    />
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span
+                        className={"inline-block h-2.5 w-2.5 rounded-full border-2 " + (r.isOnline ? "bg-green-400 border-green-200" : "bg-gray-300 border-gray-100")}
+                        title={r.isOnline ? "Online" : r.lastPing ? "Last seen: " + new Date(r.lastPing).toLocaleString() : "Offline"}
+                      />
+                      {r.device && <i className={"fa-solid text-[10px] text-gray-400 " + (String(r.device).toLowerCase() === "mobile" ? "fa-mobile-screen-button" : String(r.device).toLowerCase() === "tablet" ? "fa-tablet-screen-button" : "fa-laptop")} title={r.device} />}
+                    </div>
                   </td>
                   <td className="px-3 py-2.5 text-xs font-mono text-gray-500">{r.lastLoginIp || <span className="text-gray-300">—</span>}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-500">{new Date(r.joined).toLocaleDateString()}</td>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
+import { isOnline } from "@/lib/presence";
 
 export async function GET() {
   const s = await requireSuperAdmin();
@@ -19,13 +20,15 @@ export async function GET() {
   // Fetch lastLoginIp via raw SQL to avoid Prisma hot-reload cache issues
   const userIds = accts.filter((a) => a.userId).map((a) => a.userId as string);
   const ipMap: Record<string, string | null> = {};
+  const seenMap: Record<string, Date | null> = {};
+  const devMap: Record<string, string | null> = {};
   if (userIds.length) {
     try {
-      const rows = await prisma.$queryRawUnsafe<{ id: string; lastLoginIp: string | null }[]>(
-        `SELECT id, "lastLoginIp" FROM "User" WHERE id = ANY($1::uuid[])`,
+      const rows = await prisma.$queryRawUnsafe<{ id: string; lastLoginIp: string | null; lastSeenAt: Date | null; lastDevice: string | null }[]>(
+        `SELECT id, "lastLoginIp", "lastSeenAt", "lastDevice" FROM "User" WHERE id = ANY($1::uuid[])`,
         userIds,
       );
-      rows.forEach((r) => { ipMap[r.id] = r.lastLoginIp; });
+      rows.forEach((r) => { ipMap[r.id] = r.lastLoginIp; seenMap[r.id] = r.lastSeenAt; devMap[r.id] = r.lastDevice; });
     } catch {}
   }
 
@@ -45,8 +48,9 @@ export async function GET() {
     locked: a.locked,
     deactivated: a.deactivated,
     isPool: a.isPool,
-    isOnline: a.isOnline,
-    lastPing: a.lastPing,
+    isOnline: a.userId ? isOnline(seenMap[a.userId]) : false,
+    lastPing: (a.userId ? seenMap[a.userId] : null) ?? a.lastPing,
+    device: a.userId ? (devMap[a.userId] ?? null) : null,
     lastLoginIp: a.userId ? (ipMap[a.userId] ?? null) : null,
     kyc: a.kyc[0] ? a.kyc[0].status : null,
     joined: a.createdAt,
