@@ -198,6 +198,12 @@ function ensureSeeded() {
     const st = state[sym]; if (!st || st.price != null) continue;
     commitPrice(sym, r(seedPriceFor(sym), meta[sym].digits));
   }
+  // Broadcast a full snapshot so clients connected before seeding pick up all prices at once.
+  if (global.__io) {
+    const px = {};
+    for (const s of symbols) { const st = state[s]; if (st && st.price != null) px[s] = st.price; }
+    global.__io.emit("prices", px);
+  }
 }
 
 // Is the symbol's market open right now? Crypto = 24/7; forex & metals close on the
@@ -392,7 +398,7 @@ app.prepare().then(async () => {
   connectFinnhub();
   connectTD();
   pollPrices();
-  setTimeout(ensureSeeded, 8000); // after feeds connect, seed anything still unpriced
+  setTimeout(ensureSeeded, 4000); // after feeds connect, seed anything still unpriced
   setInterval(pollPrices, 5000);
   setInterval(microTick, 140);
   setInterval(() => monitor(io), MONITOR_MS);

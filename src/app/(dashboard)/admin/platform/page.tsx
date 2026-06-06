@@ -237,6 +237,12 @@ export default function AdminDeskPage() {
       if (Object.keys(px).length) { setPrices((pp) => ({ ...pp, ...px })); for (const k in px) delete px[k]; }
       if (Object.keys(dr).length) { setDirs((dd) => ({ ...dd, ...dr })); for (const k in dr) delete dr[k]; }
     };
+    socket.on("prices", (snapshot: Record<string, number>) => {
+      // Initial (and post-seed) bulk snapshot — sets all known prices at once,
+      // including frozen/closed-market symbols that never emit tick events.
+      setPrices((pp) => ({ ...pp, ...snapshot }));
+      for (const k in snapshot) prevRef.current[k] = snapshot[k];
+    });
     socket.on("tick", ({ symbol, price }: any) => {
       const prev = prevRef.current[symbol];
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
