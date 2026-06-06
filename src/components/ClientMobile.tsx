@@ -68,6 +68,12 @@ export default function ClientMobile({ t }: { t: any }) {
   }, []);
   const avatarRef = useRef<HTMLInputElement>(null);
   const baselineRef = useRef<Record<string, number>>({});
+  const stepperInputRef = useRef<HTMLInputElement>(null);
+  // Keep uncontrolled lot-size input in sync with vol when changed by +/- buttons
+  useEffect(() => {
+    const el = stepperInputRef.current;
+    if (el && document.activeElement !== el) el.value = String(vol);
+  }, [vol]);
 
   // capture a session baseline price for % change movers
   useEffect(() => {
@@ -170,15 +176,14 @@ export default function ClientMobile({ t }: { t: any }) {
       <div className="flex items-center gap-1.5">
         <button onPointerDown={(e) => { e.preventDefault(); setVol((v: number) => Math.max(0.01, +(v - 0.01).toFixed(2))); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>−</button>
         <input
-          type="number"
+          ref={stepperInputRef}
+          type="text"
           inputMode="decimal"
-          min="0.01"
-          step="0.01"
-          value={vol}
-          onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) setVol(+v.toFixed(2)); }}
-          onBlur={(e) => { const v = parseFloat(e.target.value); setVol(isNaN(v) || v < 0.01 ? 0.01 : +v.toFixed(2)); }}
+          defaultValue={String(vol)}
+          onFocus={(e) => e.target.select()}
+          onBlur={(e) => { const v = parseFloat(e.target.value); const safe = isNaN(v) || v < 0.01 ? 0.01 : +v.toFixed(2); setVol(safe); if (stepperInputRef.current) stepperInputRef.current.value = String(safe); }}
           className="rounded-lg border border-[var(--border)] bg-[var(--soft)] text-center font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]"
-          style={{ width: small ? 54 : 62, height: small ? 30 : 34, fontSize: small ? 12 : 13 }}
+          style={{ width: small ? 54 : 62, height: small ? 30 : 34, fontSize: small ? 12 : 13, touchAction: "manipulation" }}
         />
         <button onPointerDown={(e) => { e.preventDefault(); setVol((v: number) => +(v + 0.01).toFixed(2)); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>+</button>
       </div>
@@ -238,7 +243,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {(notis || []).some((n: any) => !n.read) && (
+                {(notis || []).length > 0 && (
                   <button onClick={() => markAllNotifsRead && markAllNotifsRead()} className="rounded-full px-3 py-1 text-[11px] font-medium transition-opacity active:opacity-60" style={{ background: GOLD + "20", color: GOLD }}>
                     Mark all read
                   </button>

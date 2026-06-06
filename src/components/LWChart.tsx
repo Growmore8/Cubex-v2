@@ -179,32 +179,38 @@ export default function LWChart({
       if (rsiChartRef.current) { rsiChartRef.current.remove(); rsiChartRef.current = null; rsiSeriesRef.current = null; }
       return;
     }
-    if (!rsiWrapRef.current) return;
-    const dark = theme === "dark";
-    const chart = createChart(rsiWrapRef.current, {
-      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: dark ? "#9aa6bf" : "#475569", fontSize: 9 },
-      grid: { vertLines: { color: "transparent" }, horzLines: { color: dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.05)" } },
-      rightPriceScale: { borderColor: dark ? "#242a38" : "#e2e8f0", scaleMargins: { top: 0.1, bottom: 0.1 } },
-      timeScale: { visible: false },
-      autoSize: true,
-      handleScroll: false,
-      handleScale: false,
+    const el = rsiWrapRef.current;
+    if (!el) return;
+    let raf = 0;
+    let syncFn: ((r: any) => void) | null = null;
+    raf = requestAnimationFrame(() => {
+      if (!el.isConnected) return;
+      const dark = theme === "dark";
+      const chart = createChart(el, {
+        layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: dark ? "#9aa6bf" : "#475569", fontSize: 9 },
+        grid: { vertLines: { color: "transparent" }, horzLines: { color: dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.05)" } },
+        rightPriceScale: { borderColor: dark ? "#242a38" : "#e2e8f0", scaleMargins: { top: 0.1, bottom: 0.1 } },
+        timeScale: { visible: false },
+        autoSize: true,
+        handleScroll: false,
+        handleScale: false,
+      });
+      const series = chart.addSeries(LineSeries, {
+        color: "#a78bfa", lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
+        priceFormat: { type: "price", precision: 1, minMove: 0.1 },
+        autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
+      });
+      series.createPriceLine({ price: 30, color: "#e05260", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+      series.createPriceLine({ price: 70, color: "#26a69a", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+      rsiChartRef.current = chart; rsiSeriesRef.current = series;
+      if (barsRef.current.length) { try { series.setData(computeRSI(barsRef.current)); } catch {} }
+      syncFn = (range: any) => { if (range && rsiChartRef.current) { try { rsiChartRef.current.timeScale().setVisibleLogicalRange(range); } catch {} } };
+      if (chartRef.current) chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(syncFn);
     });
-    const series = chart.addSeries(LineSeries, {
-      color: "#a78bfa", lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
-      priceFormat: { type: "price", precision: 1, minMove: 0.1 },
-      autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
-    });
-    series.createPriceLine({ price: 30, color: "#e05260", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
-    series.createPriceLine({ price: 70, color: "#26a69a", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
-    rsiChartRef.current = chart; rsiSeriesRef.current = series;
-    if (barsRef.current.length) { try { series.setData(computeRSI(barsRef.current)); } catch {} }
-    // Sync visible range with main chart
-    const syncToRsi = (range: any) => { if (range && rsiChartRef.current) { try { rsiChartRef.current.timeScale().setVisibleLogicalRange(range); } catch {} } };
-    if (chartRef.current) chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(syncToRsi);
     return () => {
-      if (chartRef.current) { try { chartRef.current.timeScale().unsubscribeVisibleLogicalRangeChange(syncToRsi); } catch {} }
-      chart.remove(); rsiChartRef.current = null; rsiSeriesRef.current = null;
+      cancelAnimationFrame(raf);
+      if (syncFn && chartRef.current) { try { chartRef.current.timeScale().unsubscribeVisibleLogicalRangeChange(syncFn); } catch {} }
+      if (rsiChartRef.current) { rsiChartRef.current.remove(); rsiChartRef.current = null; rsiSeriesRef.current = null; }
     };
   }, [rsi, theme]);
 
@@ -331,35 +337,56 @@ export default function LWChart({
     }
   }, [positions, theme, tf, symbol]);
 
-  const tb = (active: boolean): CSSProperties => ({
-    pointerEvents: "auto", cursor: "pointer", fontSize: 10, padding: "2px 7px", borderRadius: 5,
-    border: "1px solid " + (active ? "#5aa9ff" : (theme === "dark" ? "#2a3142" : "#d8dee9")),
-    background: active ? "#5aa9ff" : (theme === "dark" ? "rgba(20,26,38,0.85)" : "rgba(255,255,255,0.9)"),
-    color: active ? "#fff" : (theme === "dark" ? "#9aa6bf" : "#475569"),
+  const tbV = (active: boolean): CSSProperties => ({
+    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+    width: 30, height: 30, borderRadius: 7, border: "none",
+    background: active ? "rgba(90,169,255,0.18)" : "transparent",
+    color: active ? "#5aa9ff" : (theme === "dark" ? "#7a8699" : "#64748b"),
+    transition: "background 0.12s, color 0.12s",
+    outline: active ? "1.5px solid rgba(90,169,255,0.4)" : "none",
   });
   const bord = theme === "dark" ? "#242a38" : "#e2e8f0";
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
-      {/* Main chart pane */}
-      <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
-        <div style={{ position: "absolute", top: 6, left: 6, zIndex: 5, display: "flex", gap: 4, alignItems: "center", pointerEvents: "none" }}>
-          <button style={tb(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line — click the chart"><i className="fa-solid fa-minus" /> H-Line</button>
-          <button style={tb(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line — click two points"><i className="fa-solid fa-arrow-trend-up" /> Trend</button>
-          <button style={tb(sma)} onClick={() => setSma((v) => !v)} title="Simple MA (20)">SMA</button>
-          <button style={tb(ema)} onClick={() => setEma((v) => !v)} title="Exponential MA (20)">EMA</button>
-          <button style={tb(rsi)} onClick={() => setRsi((v) => !v)} title="RSI (14)">RSI</button>
-          {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && <button style={tb(false)} onClick={clearDrawings} title="Clear drawings"><i className="fa-solid fa-eraser" /></button>}
-          {tool !== "none" && <span style={{ pointerEvents: "none", fontSize: 9, padding: "2px 6px", borderRadius: 4, background: "rgba(90,169,255,0.85)", color: "#fff" }}>{tool === "hline" ? "Click chart to place line" : trendStart.current ? "Click second point" : "Click first point"}</span>}
-        </div>
+    <div style={{ display: "flex", height: "100%", width: "100%" }}>
+      {/* Left sidebar — TradingView-style tool panel */}
+      <div style={{ width: 34, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 2px", gap: 2, background: theme === "dark" ? "rgba(14,18,28,0.96)" : "rgba(246,248,252,0.97)", borderRight: `1px solid ${bord}` }}>
+        <button style={tbV(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line">
+          <i className="fa-solid fa-minus" style={{ fontSize: 12 }} />
+        </button>
+        <button style={tbV(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line">
+          <i className="fa-solid fa-arrow-trend-up" style={{ fontSize: 12 }} />
+        </button>
+        {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && (
+          <button style={tbV(false)} onClick={clearDrawings} title="Clear drawings">
+            <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
+          </button>
+        )}
+        <div style={{ flex: 1 }} />
+        <button style={{ ...tbV(sma), fontSize: 9, fontWeight: 700 }} onClick={() => setSma((v) => !v)} title="SMA 20">SMA</button>
+        <button style={{ ...tbV(ema), fontSize: 9, fontWeight: 700 }} onClick={() => setEma((v) => !v)} title="EMA 20">EMA</button>
+        <button style={{ ...tbV(rsi), fontSize: 9, fontWeight: 700 }} onClick={() => setRsi((v) => !v)} title="RSI 14">RSI</button>
       </div>
-      {/* RSI sub-pane */}
-      {rsi && (
-        <div style={{ position: "relative", height: "28%", minHeight: 80, borderTop: `1px solid ${bord}` }}>
-          <div ref={rsiWrapRef} style={{ position: "absolute", inset: 0 }} />
-          <span style={{ position: "absolute", top: 3, left: 6, zIndex: 5, fontSize: 9, color: "#a78bfa", pointerEvents: "none" }}>RSI 14</span>
+      {/* Chart column */}
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+        {/* Main price chart */}
+        <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+          <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
+          {tool !== "none" && (
+            <div style={{ position: "absolute", bottom: 6, left: 8, zIndex: 5, pointerEvents: "none" }}>
+              <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 4, background: "rgba(90,169,255,0.85)", color: "#fff" }}>
+                {tool === "hline" ? "Click chart to place line" : trendStart.current ? "Click second point" : "Click first point"}
+              </span>
+            </div>
+          )}
         </div>
-      )}
+        {/* RSI sub-pane — fixed 100 px height for reliable rendering */}
+        {rsi && (
+          <div style={{ flexShrink: 0, height: 100, position: "relative", borderTop: `1px solid ${bord}` }}>
+            <div ref={rsiWrapRef} style={{ position: "absolute", inset: 0 }} />
+            <span style={{ position: "absolute", top: 3, left: 6, zIndex: 5, fontSize: 9, color: "#a78bfa", pointerEvents: "none" }}>RSI 14</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

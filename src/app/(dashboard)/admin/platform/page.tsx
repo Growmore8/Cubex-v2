@@ -649,7 +649,7 @@ export default function AdminDeskPage() {
               <div className="ui-pop absolute right-0 z-50 mt-1 max-h-96 w-80 overflow-auto rounded-xl border shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
                 <div className="sticky top-0 flex items-center justify-between border-b px-3 py-2" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
                   <span className="text-[11px] font-semibold">Notifications</span>
-                  {notifUnread > 0 && <button onClick={async () => { try { await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); setNotifUnread(0); setNotifs((n: any[]) => n.map((x) => ({ ...x, read: true }))); } catch {} }} className="text-[10px]" style={{ color: "var(--accent)" }}>Mark all read</button>}
+                  {notifs.length > 0 && <button onClick={async () => { try { await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); setNotifUnread(0); setNotifs((n: any[]) => n.map((x) => ({ ...x, read: true }))); } catch {} }} className="text-[10px]" style={{ color: "var(--accent)" }}>Mark all read</button>}
                 </div>
                 {notifs.length === 0 ? <div className="px-3 py-6 text-center text-[11px] text-[var(--muted)]"><i className="fa-solid fa-bell-slash mb-1 block text-lg opacity-40" />No notifications</div>
                   : notifs.map((n: any) => (
