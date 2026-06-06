@@ -381,7 +381,13 @@ app.prepare().then(async () => {
   const sub = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
   sub.subscribe("cubex:refresh").catch(() => {});
   sub.on("message", (ch, msg) => { if (ch === "cubex:refresh" && global.__io) { try { global.__io.emit("refresh", JSON.parse(msg)); } catch (e) { global.__io.emit("refresh", {}); } } });
-  io.on("connection", (socket) => { const h = {}; for (const s of symbols) h[s] = state[s].candles; socket.emit("history", h); });
+  io.on("connection", (socket) => {
+    const h = {}; for (const s of symbols) h[s] = state[s].candles; socket.emit("history", h);
+    // Snapshot of current prices so clients (incl. for FROZEN/closed markets) know the
+    // latest price immediately — open positions then show their real last P&L, not 0.
+    const px = {}; for (const s of symbols) { const st = state[s]; if (st && st.price != null) px[s] = st.price; }
+    socket.emit("prices", px);
+  });
   await seedFromRedis();        // resume last-known prices (survives restarts)
   connectFinnhub();
   connectTD();

@@ -164,6 +164,14 @@ export default function ClientTerminal() {
       prevRef.current[symbol] = price;
       pP[symbol] = price;
     });
+    // Initial price snapshot on connect — seeds prices for frozen/closed markets so
+    // open positions show their last P&L immediately.
+    socket.on("prices", (snap: Record<string, number>) => {
+      if (snap && typeof snap === "object") {
+        for (const k in snap) prevRef.current[k] = snap[k];
+        startTransition(() => setPrices((pp) => ({ ...snap, ...pp })));
+      }
+    });
     const flushIv = setInterval(flush, 80);
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
     socket.on("refresh", (p: any) => { if (p && p.kind === "notification") loadNotifs(); else load(); });

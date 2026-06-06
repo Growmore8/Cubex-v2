@@ -11,6 +11,16 @@ const BUY = "#16a34a", SELL = "#dc2626", GOLD = "#e3a855", BLUE = "#2563eb";
 const LOTS = [0.01, 0.05, 0.1, 0.5, 1];
 
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
+
+// Keep a heavy tab mounted after first open (so re-entry is instant — no remount of
+// the chart / quotes list). `display:contents` means the active layout is identical
+// to rendering the children directly; hidden = display:none (stays mounted).
+function KeepAlive({ active, children }: { active: boolean; children: React.ReactNode }) {
+  const seen = useRef(false);
+  if (active) seen.current = true;
+  if (!seen.current) return null;
+  return <div style={{ display: active ? "contents" : "none" }}>{children}</div>;
+}
 const acctBal = (a: any) => Number(a?.deposit || 0) - Number(a?.withdrawal || 0) + Number(a?.credit || 0) + Number(a?.bonus || 0) + Number(a?.pnl || 0);
 
 const ORDER_KINDS: [string, string, string][] = [
@@ -171,7 +181,7 @@ export default function ClientMobile({ t }: { t: any }) {
       <div className="min-h-0 flex-1 overflow-auto">
 
         {/* ───────── DASHBOARD ───────── */}
-        {tab === "dashboard" && (
+        <KeepAlive active={tab === "dashboard"}>{(
           <div className="space-y-4 p-3">
             {/* premium account card (Visa/Mastercard style) */}
             <div className="relative overflow-hidden rounded-[18px] p-5 text-white" style={{
@@ -280,10 +290,10 @@ export default function ClientMobile({ t }: { t: any }) {
               )}
             </div>
           </div>
-        )}
+        )}</KeepAlive>
 
         {/* ───────── QUOTES ───────── */}
-        {tab === "quotes" && (
+        <KeepAlive active={tab === "quotes"}>{(
           <div className="p-3">
             <div className="relative mb-3">
               <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
@@ -326,10 +336,10 @@ export default function ClientMobile({ t }: { t: any }) {
               })}
             </div>
           </div>
-        )}
+        )}</KeepAlive>
 
         {/* ───────── CHART ───────── */}
-        {tab === "chart" && (
+        <KeepAlive active={tab === "chart"}>{(
           <div className="flex h-full flex-col">
             <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2">
               {/* Symbol picker — opens a searchable list of all symbols */}
@@ -370,7 +380,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
             {err && <div className="bg-[var(--panel)] pb-1 text-center text-[11px]" style={{ color: SELL }}>{err}</div>}
           </div>
-        )}
+        )}</KeepAlive>
 
         {/* ───────── TRADES ───────── */}
         {tab === "trades" && (
