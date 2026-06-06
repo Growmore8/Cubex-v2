@@ -59,18 +59,18 @@ export default function AdminManagersPage() {
     load();
   }
 
-  const input = "w-full rounded-md border px-3 py-2 text-sm";
+  const input = "ui-input w-full px-3 py-2 text-sm";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 ui-fade-up">
       {node}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Managers</h1>
-          
+
         </div>
-        <button onClick={() => setShowCreate((v) => !v)} style={{ backgroundColor: "var(--brand-primary)" }}
-          className="rounded-md px-4 py-2 text-sm font-medium text-white">
+        <button onClick={() => setShowCreate((v) => !v)}
+          className="ui-btn ui-btn-primary px-4 py-2 text-sm font-medium">
           {showCreate ? "Close" : "New manager"}
         </button>
       </div>
@@ -78,7 +78,7 @@ export default function AdminManagersPage() {
       {err && <p className="text-sm text-red-600">{err}</p>}
 
       {showCreate && (
-        <form onSubmit={create} className="space-y-3 rounded-lg border bg-white p-4">
+        <form onSubmit={create} className="ui-card space-y-3 p-4">
           <div className="grid grid-cols-3 gap-3">
             <input className={input} placeholder="Name" required value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -96,11 +96,11 @@ export default function AdminManagersPage() {
               </label>
             ))}
           </div>
-          <button type="submit" className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white">Create manager</button>
+          <button type="submit" className="ui-btn ui-btn-primary px-4 py-2 text-sm font-medium">Create manager</button>
         </form>
       )}
 
-      <div className="overflow-x-auto rounded-lg border bg-white">
+      <div className="ui-card overflow-x-auto p-0">
         <table className="w-full text-sm">
           <thead className="border-b bg-gray-50 text-left text-gray-600">
             <tr>
@@ -115,7 +115,7 @@ export default function AdminManagersPage() {
             ) : managers.length === 0 ? (
               <tr><td className="px-3 py-4" colSpan={6}>No managers yet.</td></tr>
             ) : managers.map((m) => (
-              <tr key={m.id} className="border-b last:border-0 align-top">
+              <tr key={m.id} className="ui-row border-b last:border-0 align-top">
                 <td className="px-3 py-2">{m.name}</td>
                 <td className="px-3 py-2">{m.email}</td>
                 <td className="px-3 py-2">{m._count.managedAccounts}</td>
@@ -135,10 +135,10 @@ export default function AdminManagersPage() {
                   </span>
                 </td>
                 <td className="px-3 py-2 text-right space-x-2">
-                  <button className="text-yellow-700" onClick={() => toggleStatus(m)}>
+                  <button className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-yellow-700" onClick={() => toggleStatus(m)}>
                     {m.status === "ACTIVE" ? "Suspend" : "Activate"}
                   </button>
-                  <button className="text-red-600" onClick={() => remove(m)}>Delete</button>
+                  <button className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-red-600" onClick={() => remove(m)}>Delete</button>
                 </td>
               </tr>
             ))}

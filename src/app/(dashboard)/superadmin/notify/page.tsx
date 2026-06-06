@@ -104,13 +104,13 @@ export default function SANotifyPage() {
     if (s === "global") setTenantId("");
   }
 
-  const inp = "rounded-lg border border-gray-200 px-3 py-2 text-sm w-full outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-white";
+  const inp = "ui-input px-3 py-2 text-sm w-full bg-white";
   const currentScope = SCOPES.find((s) => s.key === scope)!;
   const showTenantFilter = scope !== "global";    // Global has no tenant filter
   const tenantRequired  = scope === "tenant";     // Tenant scope must have a tenant selected
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 ui-fade-up">
       <div>
         <h1 className="text-2xl font-bold">Send Notification</h1>
         <p className="text-sm text-gray-500">Broadcast messages to your users</p>
@@ -121,7 +121,7 @@ export default function SANotifyPage() {
         <div className="space-y-4">
 
           {/* Scope Tabs */}
-          <div className="rounded-xl border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+          <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
             <div className="text-xs font-semibold uppercase text-gray-400 mb-3">
               <i className="fa-solid fa-crosshairs mr-1.5" />Target Audience
             </div>
@@ -184,9 +184,9 @@ export default function SANotifyPage() {
 
                 {/* Search dropdown */}
                 {searchResults.length > 0 && !selectedUser && (
-                  <div className="rounded-lg border overflow-hidden shadow-sm" style={{ borderColor: "#e2e8f0" }}>
+                  <div className="ui-pop rounded-xl border overflow-hidden shadow-sm" style={{ borderColor: "#e2e8f0" }}>
                     {searchResults.slice(0, 8).map((u: any) => (
-                      <button key={u.id} onClick={() => { setSelectedUser(u); setSearchQ(""); setSearchResults([]); }} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-blue-50 border-b last:border-0 transition-colors" style={{ borderColor: "#f0f4f8" }}>
+                      <button key={u.id} onClick={() => { setSelectedUser(u); setSearchQ(""); setSearchResults([]); }} className="ui-row flex w-full items-center gap-3 px-3 py-2.5 text-left border-b last:border-0" style={{ borderColor: "#f0f4f8" }}>
                         <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 bg-green-100">
                           <i className="fa-solid fa-user text-xs text-green-700" />
                         </div>
@@ -253,7 +253,7 @@ export default function SANotifyPage() {
           </div>
 
           {/* Compose */}
-          <div className="rounded-xl border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+          <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
             <div className="text-xs font-semibold uppercase text-gray-400 mb-3">
               <i className="fa-solid fa-pen-to-square mr-1.5" />Compose Message
             </div>
@@ -332,12 +332,12 @@ export default function SANotifyPage() {
         </div>
 
         {/* ── RIGHT: History ── */}
-        <div className="rounded-xl border bg-white" style={{ borderColor: "#e2e8f0", alignSelf: "start" }}>
+        <div className="ui-card bg-white" style={{ borderColor: "#e2e8f0", alignSelf: "start" }}>
           <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "#e2e8f0" }}>
             <div className="text-sm font-semibold text-gray-700">
               <i className="fa-solid fa-clock-rotate-left mr-2 text-gray-400" />Sent History
             </div>
-            <button onClick={load} className="rounded-lg border px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:border-gray-300" title="Refresh">
+            <button onClick={load} className="ui-btn px-2 py-1 text-xs text-gray-500" title="Refresh">
               <i className="fa-solid fa-rotate-right" />
             </button>
           </div>
@@ -352,7 +352,7 @@ export default function SANotifyPage() {
               const scopeKey = (h.targetScope || "").split(":")[0];
               const sc = SCOPES.find((s) => s.key === scopeKey);
               return (
-                <div key={i} className="px-4 py-3 hover:bg-gray-50/50">
+                <div key={i} className="ui-row px-4 py-3">
                   <div className="flex items-start gap-2.5">
                     <div className="mt-0.5 h-8 w-8 rounded-full flex items-center justify-center shrink-0" style={{ background: (sc?.color || "#64748b") + "16" }}>
                       <i className={"fa-solid " + (sc?.icon || "fa-bell")} style={{ fontSize: 12, color: sc?.color || "#64748b" }} />

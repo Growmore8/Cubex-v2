@@ -197,3 +197,126 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     @apply font-sans;
   }
 }
+
+/* =====================================================================
+   PREMIUM DESIGN SYSTEM — reusable UI utilities
+   All classes use existing theme CSS vars (work in dark + light).
+   App accent: #2563eb. Subtle, tasteful, motion-safe.
+   ===================================================================== */
+
+:root { --ui-accent: #2563eb; }
+
+/* ---- keyframes ---- */
+@keyframes ui-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes ui-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- shared transition helpers ---- */
+.ui-transition { transition: color .2s ease, background-color .2s ease, border-color .2s ease, box-shadow .25s ease, transform .18s cubic-bezier(.16,1,.3,1); }
+.hover-lift { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 14px 32px -12px rgba(0,0,0,0.28); }
+.dark .hover-lift:hover { box-shadow: 0 16px 36px -12px rgba(0,0,0,0.6); }
+
+/* ---- .ui-card : refined card ---- */
+.ui-card {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem; /* rounded-xl */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px -16px rgba(0,0,0,0.25);
+  transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, border-color .2s ease;
+}
+.ui-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05), 0 18px 40px -18px rgba(0,0,0,0.3);
+  border-color: color-mix(in srgb, var(--ui-accent) 28%, var(--border));
+}
+.dark .ui-card {
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 28px -16px rgba(0,0,0,0.6);
+}
+.dark .ui-card:hover {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4), 0 20px 46px -18px rgba(0,0,0,0.7);
+}
+
+/* ---- buttons ---- */
+.ui-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem; /* rounded-xl */
+  border: 1px solid var(--border);
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .25s ease, transform .12s ease, filter .2s ease;
+}
+.ui-btn:hover { filter: brightness(1.04); }
+.ui-btn:active { transform: scale(0.97); }
+.ui-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 35%, transparent);
+}
+.ui-btn:disabled { opacity: 0.55; cursor: not-allowed; filter: saturate(0.7); transform: none; }
+
+.ui-btn-primary {
+  background-color: var(--ui-accent);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--ui-accent) 75%, transparent);
+}
+.ui-btn-primary:hover { filter: brightness(1.07); box-shadow: 0 12px 28px -8px color-mix(in srgb, var(--ui-accent) 80%, transparent); }
+
+.ui-btn-ghost {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--foreground);
+}
+.ui-btn-ghost:hover { background-color: var(--secondary); filter: none; }
+
+/* ---- .ui-input : input focus ring/transition ---- */
+.ui-input {
+  background-color: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem; /* rounded-xl */
+  transition: border-color .18s ease, box-shadow .2s ease, background-color .18s ease;
+}
+.ui-input::placeholder { color: var(--muted-foreground); }
+.ui-input:focus, .ui-input:focus-within {
+  outline: none;
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 22%, transparent);
+}
+
+/* ---- .ui-row : table/list row hover ---- */
+.ui-row { transition: background-color .18s ease, color .18s ease; }
+.ui-row:hover { background-color: color-mix(in srgb, var(--muted-foreground) 10%, transparent); }
+
+/* ---- .ui-pop : modal/popover entrance ---- */
+.ui-pop { animation: ui-pop .28s cubic-bezier(.16,1,.3,1) both; }
+
+/* ---- .ui-fade-up : staggered content entrance ---- */
+.ui-fade-up { animation: ui-fade-up .5s cubic-bezier(.16,1,.3,1) both; }
+.ui-fade-up-stagger > * { animation: ui-fade-up .5s cubic-bezier(.16,1,.3,1) both; }
+.ui-fade-up-stagger > *:nth-child(1) { animation-delay: .04s; }
+.ui-fade-up-stagger > *:nth-child(2) { animation-delay: .08s; }
+.ui-fade-up-stagger > *:nth-child(3) { animation-delay: .12s; }
+.ui-fade-up-stagger > *:nth-child(4) { animation-delay: .16s; }
+.ui-fade-up-stagger > *:nth-child(5) { animation-delay: .20s; }
+.ui-fade-up-stagger > *:nth-child(6) { animation-delay: .24s; }
+.ui-fade-up-stagger > *:nth-child(7) { animation-delay: .28s; }
+.ui-fade-up-stagger > *:nth-child(8) { animation-delay: .32s; }
+
+/* ---- respect reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .ui-card, .ui-btn, .ui-btn-primary, .ui-btn-ghost, .hover-lift, .ui-transition,
+  .ui-input, .ui-row { transition: none !important; }
+  .ui-card:hover, .hover-lift:hover, .ui-btn:active, .ui-btn-primary:hover { transform: none !important; }
+  .ui-pop, .ui-fade-up, .ui-fade-up-stagger > * { animation: none !important; }
+}

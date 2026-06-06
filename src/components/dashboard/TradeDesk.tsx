@@ -58,17 +58,17 @@ export default function TradeDesk() {
   }
 
   const stat = (label: string, val: string) => (
-    <div className="rounded-md bg-white px-3 py-2 text-sm shadow-sm">
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="font-semibold">{val}</div>
+    <div className="ui-card hover-lift p-4">
+      <div className="text-xs font-medium text-gray-500">{label}</div>
+      <div className="mt-1 text-lg font-semibold tabular-nums">{val}</div>
     </div>
   );
   const dg = (s: string) => instruments[s]?.digits ?? 2;
 
   return (
-    <div className="space-y-4">
+    <div className="ui-fade-up space-y-4">
       {reps && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className="ui-fade-up-stagger grid grid-cols-2 gap-3 md:grid-cols-5">
           {stat("Clients", String(reps.clients))}
           {stat("Open positions", String(reps.openPositions))}
           {stat("Realized P&L", reps.realizedPnl.toFixed(2))}
@@ -77,9 +77,9 @@ export default function TradeDesk() {
         </div>
       )}
 
-      <div className="rounded-lg border bg-white p-2">
-        <div className="px-2 py-1 text-xs font-semibold text-gray-500">MARKET WATCH</div>
-        <div className="flex flex-wrap gap-3 px-2 pb-1 text-sm">
+      <div className="ui-card p-4">
+        <div className="px-1 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">MARKET WATCH</div>
+        <div className="flex flex-wrap gap-x-4 gap-y-2 px-1 pb-1 text-sm">
           {Object.keys(instruments).map((sym) => (
             <span key={sym} className="font-mono">{sym} <b>{prices[sym]?.toFixed(dg(sym)) ?? "..."}</b></span>
           ))}
@@ -88,29 +88,29 @@ export default function TradeDesk() {
 
       {err && <p className="text-sm text-red-600">{err}</p>}
 
-      <div className="flex gap-3 text-sm">
-        <button onClick={() => setTab("open")} className={tab === "open" ? "font-medium" : "text-gray-500"}>Open ({open.length})</button>
-        <button onClick={() => setTab("history")} className={tab === "history" ? "font-medium" : "text-gray-500"}>History</button>
+      <div className="flex gap-2 text-sm">
+        <button onClick={() => setTab("open")} className={"ui-btn px-3 py-1.5 text-sm " + (tab === "open" ? "ui-btn-primary" : "ui-btn-ghost")}>Open ({open.length})</button>
+        <button onClick={() => setTab("history")} className={"ui-btn px-3 py-1.5 text-sm " + (tab === "history" ? "ui-btn-primary" : "ui-btn-ghost")}>History</button>
       </div>
 
       {tab === "open" ? (
-        <div className="overflow-x-auto rounded-lg border bg-white">
+        <div className="ui-card overflow-x-auto p-0">
           <table className="w-full text-sm">
-            <thead className="border-b bg-gray-50 text-left text-gray-600">
+            <thead className="border-b bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
-                <th className="px-3 py-2">Ticket</th><th className="px-3 py-2">Account</th>
-                <th className="px-3 py-2">Symbol</th><th className="px-3 py-2">Side</th>
-                <th className="px-3 py-2">Lots</th><th className="px-3 py-2">Open</th>
-                <th className="px-3 py-2">Current</th><th className="px-3 py-2">P&L</th>
-                <th className="px-3 py-2 text-right">Action</th>
+                <th className="px-3 py-2.5">Ticket</th><th className="px-3 py-2.5">Account</th>
+                <th className="px-3 py-2.5">Symbol</th><th className="px-3 py-2.5">Side</th>
+                <th className="px-3 py-2.5">Lots</th><th className="px-3 py-2.5">Open</th>
+                <th className="px-3 py-2.5">Current</th><th className="px-3 py-2.5">P&L</th>
+                <th className="px-3 py-2.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
-              {open.length === 0 ? <tr><td className="px-3 py-4" colSpan={9}>No open positions.</td></tr> : open.map((p) => {
+              {open.length === 0 ? <tr><td className="px-3 py-4 text-gray-500" colSpan={9}>No open positions.</td></tr> : open.map((p) => {
                 const cur = prices[p.symbol] ?? p.openPrice;
                 const pl = pnlOf(p, cur);
                 return (
-                  <tr key={p.id} className="border-b last:border-0">
+                  <tr key={p.id} className="ui-row border-b last:border-0">
                     <td className="px-3 py-2 font-mono">{p.ticket}</td>
                     <td className="px-3 py-2">{p.accountLogin} <span className="text-gray-500">{p.accountName}</span></td>
                     <td className="px-3 py-2">{p.symbol}</td>
@@ -119,7 +119,7 @@ export default function TradeDesk() {
                     <td className="px-3 py-2 font-mono">{p.openPrice.toFixed(dg(p.symbol))}</td>
                     <td className="px-3 py-2 font-mono">{cur.toFixed(dg(p.symbol))}</td>
                     <td className={"px-3 py-2 font-medium " + (pl >= 0 ? "text-green-600" : "text-red-600")}>{pl.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-right"><button className="text-red-600" onClick={() => close(p.id)}>Force close</button></td>
+                    <td className="px-3 py-2 text-right"><button className="ui-btn ui-btn-ghost px-3 py-1 text-xs font-medium text-red-600" onClick={() => close(p.id)}>Force close</button></td>
                   </tr>
                 );
               })}
@@ -127,20 +127,20 @@ export default function TradeDesk() {
           </table>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border bg-white">
+        <div className="ui-card overflow-x-auto p-0">
           <table className="w-full text-sm">
-            <thead className="border-b bg-gray-50 text-left text-gray-600">
+            <thead className="border-b bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
-                <th className="px-3 py-2">Ticket</th><th className="px-3 py-2">Account</th>
-                <th className="px-3 py-2">Symbol</th><th className="px-3 py-2">Side</th>
-                <th className="px-3 py-2">Lots</th><th className="px-3 py-2">Open</th>
-                <th className="px-3 py-2">Close</th><th className="px-3 py-2">P&L</th>
-                <th className="px-3 py-2">Reason</th><th className="px-3 py-2">Closed</th>
+                <th className="px-3 py-2.5">Ticket</th><th className="px-3 py-2.5">Account</th>
+                <th className="px-3 py-2.5">Symbol</th><th className="px-3 py-2.5">Side</th>
+                <th className="px-3 py-2.5">Lots</th><th className="px-3 py-2.5">Open</th>
+                <th className="px-3 py-2.5">Close</th><th className="px-3 py-2.5">P&L</th>
+                <th className="px-3 py-2.5">Reason</th><th className="px-3 py-2.5">Closed</th>
               </tr>
             </thead>
             <tbody>
-              {history.length === 0 ? <tr><td className="px-3 py-4" colSpan={10}>No history.</td></tr> : history.map((h) => (
-                <tr key={h.id} className="border-b last:border-0">
+              {history.length === 0 ? <tr><td className="px-3 py-4 text-gray-500" colSpan={10}>No history.</td></tr> : history.map((h) => (
+                <tr key={h.id} className="ui-row border-b last:border-0">
                   <td className="px-3 py-2 font-mono">{h.ticket}</td>
                   <td className="px-3 py-2">{h.accountLogin}</td>
                   <td className="px-3 py-2">{h.symbol}</td>

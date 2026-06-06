@@ -41,7 +41,7 @@ export default function SAPayments() {
     setTenants((prev) => prev.map((x) => (x.id === t.id ? { ...x, ownPaymentMethods: allow } : x)));
   }
 
-  const inp = "rounded-md border px-2 py-1.5 text-sm"; const NETS = ["BEP20", "ERC20", "TRC20"];
+  const inp = "ui-input rounded-md border px-2 py-1.5 text-sm"; const NETS = ["BEP20", "ERC20", "TRC20"];
   const scopeName = scope === "global" ? "All tenants (global default)" : (tenants.find((t) => t.id === scope)?.name || "Tenant");
   const typeBadge = (t: string) => t === "UPI" ? { bg: "#ecfeff", c: "#0e7490" } : t === "LINK" ? { bg: "#fef3c7", c: "#b45309" } : { bg: "#eef2f7", c: "#475569" };
 
@@ -51,12 +51,12 @@ export default function SAPayments() {
         : { type, label: "Local Payment", url: "", active: true });
   }
 
-  return (<div className="max-w-3xl space-y-4">
+  return (<div className="max-w-3xl space-y-4 ui-fade-up">
     <div><h1 className="text-2xl font-bold">Payment Methods</h1><p className="text-sm text-gray-500">Configure deposit methods clients see — globally or per tenant</p></div>
     {err && <div className="text-sm text-red-600">{err}</div>}{msg && <div className="text-sm text-green-600">{msg}</div>}
 
     {/* Scope selector */}
-    <div className="rounded-lg border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+    <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
       <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Configure for</label>
       <select className={inp + " mt-1 block w-full"} value={scope} onChange={(e) => setScope(e.target.value)}>
         <option value="global">All tenants (global default)</option>
@@ -66,17 +66,17 @@ export default function SAPayments() {
     </div>
 
     {/* Methods list */}
-    <div className="rounded-lg border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+    <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
       <div className="mb-2 flex items-center justify-between">
         <div className="font-semibold">Methods — <span className="text-gray-500">{scopeName}</span></div>
         <div className="flex gap-1">
-          <button className="rounded bg-blue-600 px-2.5 py-1.5 text-xs text-white" onClick={() => newMethod("CRYPTO")}>+ Crypto</button>
-          <button className="rounded bg-cyan-600 px-2.5 py-1.5 text-xs text-white" onClick={() => newMethod("UPI")}>+ UPI</button>
-          <button className="rounded bg-amber-600 px-2.5 py-1.5 text-xs text-white" onClick={() => newMethod("LINK")}>+ Local Link</button>
+          <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#2563eb", borderColor: "transparent" }} onClick={() => newMethod("CRYPTO")}>+ Crypto</button>
+          <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#0891b2", borderColor: "transparent" }} onClick={() => newMethod("UPI")}>+ UPI</button>
+          <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#d97706", borderColor: "transparent" }} onClick={() => newMethod("LINK")}>+ Local Link</button>
         </div>
       </div>
       <div className="space-y-2">
-        {wallets.map((w: any) => { const tb = typeBadge(w.type); return (<div key={w.id} className="flex items-center gap-2 rounded border p-2" style={{ borderColor: "#eef2f7" }}>
+        {wallets.map((w: any) => { const tb = typeBadge(w.type); return (<div key={w.id} className="ui-row flex items-center gap-2 rounded-xl border p-2" style={{ borderColor: "#eef2f7" }}>
           <span className="rounded px-2 py-0.5 text-xs font-semibold" style={{ background: tb.bg, color: tb.c }}>{w.type === "CRYPTO" ? w.network : w.type}</span>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium">{w.label || w.asset}</div>
@@ -91,11 +91,11 @@ export default function SAPayments() {
     </div>
 
     {/* Per-tenant permission */}
-    <div className="rounded-lg border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+    <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
       <div className="font-semibold">Tenant self-service</div>
       <p className="mb-2 text-xs text-gray-500">Allow a tenant admin to add their own payment methods (in addition to your global ones).</p>
       <div className="space-y-1">
-        {tenants.map((t) => (<label key={t.id} className="flex items-center justify-between rounded border p-2 text-sm" style={{ borderColor: "#eef2f7" }}>
+        {tenants.map((t) => (<label key={t.id} className="ui-row flex items-center justify-between rounded-xl border p-2 text-sm" style={{ borderColor: "#eef2f7" }}>
           <span>{t.name}</span>
           <span className="flex items-center gap-2 text-xs text-gray-500"><input type="checkbox" checked={t.ownPaymentMethods} onChange={(e) => togglePerm(t, e.target.checked)} /> Can add own methods</span>
         </label>))}
@@ -105,7 +105,7 @@ export default function SAPayments() {
 
     {/* Edit modal */}
     {edit && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
-      <div className="w-[420px] rounded-lg bg-white p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="ui-card ui-pop w-[420px] bg-white p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 text-sm font-semibold">{edit.id ? "Edit" : "Add"} {edit.type === "CRYPTO" ? "Crypto Wallet" : edit.type === "UPI" ? "UPI" : "Local Link"} — {scopeName}</div>
         <div className="space-y-2">
           {edit.type === "CRYPTO" && (<>
@@ -123,18 +123,18 @@ export default function SAPayments() {
           </>)}
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={edit.active !== false} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} /> Active</label>
         </div>
-        <div className="mt-3 flex justify-end gap-2"><button className="rounded border px-3 py-1.5 text-sm" onClick={() => setEdit(null)}>Cancel</button>
-          <button className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white" onClick={save}>Save</button></div>
+        <div className="mt-3 flex justify-end gap-2"><button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setEdit(null)}>Cancel</button>
+          <button className="ui-btn ui-btn-primary px-3 py-1.5 text-sm" onClick={save}>Save</button></div>
       </div>
     </div>)}
 
     {/* Delete confirm */}
     {confirmDel && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
-      <div className="w-[360px] rounded-lg bg-white p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="ui-card ui-pop w-[360px] bg-white p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-1 text-sm font-semibold">Delete method?</div>
         <div className="mb-3 text-xs text-gray-500">{confirmDel.label || confirmDel.address || confirmDel.url}</div>
-        <div className="flex justify-end gap-2"><button className="rounded border px-3 py-1.5 text-sm" onClick={() => setConfirmDel(null)}>Cancel</button>
-          <button className="rounded bg-red-600 px-3 py-1.5 text-sm text-white" onClick={() => { post({ kind: "wallet", action: "delete", id: confirmDel.id }); setConfirmDel(null); }}>Delete</button></div>
+        <div className="flex justify-end gap-2"><button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setConfirmDel(null)}>Cancel</button>
+          <button className="ui-btn px-3 py-1.5 text-sm text-white" style={{ background: "#dc2626", borderColor: "transparent" }} onClick={() => { post({ kind: "wallet", action: "delete", id: confirmDel.id }); setConfirmDel(null); }}>Delete</button></div>
       </div>
     </div>)}
   </div>);

@@ -36,7 +36,7 @@ export default function SADashboard() {
         <div className="card-title">
           <span><i className={"fa-solid " + icon} style={{ marginRight: 6, color: "var(--text3)" }} />{title}</span>
         </div>
-        <div className="stats" style={{ marginBottom: 0, gridTemplateColumns: cols || "repeat(auto-fill,minmax(130px,1fr))" }}>{children}</div>
+        <div className="stats ui-fade-up-stagger" style={{ marginBottom: 0, gridTemplateColumns: cols || "repeat(auto-fill,minmax(130px,1fr))" }}>{children}</div>
       </div>
     );
   }
@@ -54,12 +54,12 @@ export default function SADashboard() {
   );
 
   return (
-    <div>
+    <div className="ui-fade-up">
       <div className="page-title">Dashboard</div>
       <div className="page-sub">Platform overview — structured data at a glance</div>
 
       {/* Quick access */}
-      <div className="quick-row">
+      <div className="quick-row ui-fade-up-stagger">
         <Quick href="/superadmin/clients" title="All Clients" sub="Browse + edit every account" color="#2e7d32" icon="fa-users" />
         <Quick href="/superadmin/tenants" title="Tenants" sub="Companies + permissions" color="#f9a825" icon="fa-building" />
         <Quick href="/superadmin/billing" title="Billing" sub="Invoices + payments" color="#1565c0" icon="fa-file-invoice-dollar" badge={s?.pendingInvoices || undefined} />
@@ -130,7 +130,7 @@ export default function SADashboard() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {online.slice(0, 10).map((u: any, i: number) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+                  <div key={i} className="ui-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 8px", borderRadius: 8, borderBottom: "1px solid var(--border)" }}>
                     <i className="fa-solid fa-desktop" style={{ color: "var(--text2)", fontSize: 12, width: 16 }} />
                     <span style={{ fontWeight: 500 }}>{u.name || u.accountName}</span>
                     {u.ip && <span style={{ fontSize: 11, color: "var(--text2)" }}>{u.ip}</span>}

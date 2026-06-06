@@ -67,32 +67,32 @@ export default function SABillingPage() {
     load();
   }
 
-  const inp = "rounded-md border px-2 py-1.5 text-sm w-full";
+  const inp = "ui-input rounded-md border px-2 py-1.5 text-sm w-full";
   const totalPending = invoices.filter((i) => i.status === "PENDING").reduce((s, i) => s + Number(i.amount), 0);
   const totalPaid = invoices.filter((i) => i.status === "PAID").reduce((s, i) => s + Number(i.amount), 0);
   const totalOverdue = invoices.filter((i) => i.status === "OVERDUE").reduce((s, i) => s + Number(i.amount), 0);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 ui-fade-up">
       {node}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Billing & Invoicing</h1>
           <p className="text-sm text-gray-500">Generate and manage tenant invoices</p>
         </div>
-        <button onClick={() => setGenOpen(true)} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+        <button onClick={() => setGenOpen(true)} className="ui-btn px-4 py-2 text-sm text-white" style={{ background: "#d97706", borderColor: "transparent" }}>
           <i className="fa-solid fa-file-invoice mr-2" />Generate Invoice
         </button>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4 ui-fade-up-stagger">
         {[
           { label: "Pending", value: fmt(totalPending), count: invoices.filter((i) => i.status === "PENDING").length, color: "#b45309", bg: "#fef3c7" },
           { label: "Paid", value: fmt(totalPaid), count: invoices.filter((i) => i.status === "PAID").length, color: "#15803d", bg: "#dcfce7" },
           { label: "Overdue", value: fmt(totalOverdue), count: invoices.filter((i) => i.status === "OVERDUE").length, color: "#dc2626", bg: "#fee2e2" },
         ].map(({ label, value, count, color, bg }) => (
-          <div key={label} className="rounded-xl border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+          <div key={label} className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
             <div className="text-xs font-semibold text-gray-500 mb-1">{label.toUpperCase()}</div>
             <div className="text-2xl font-bold" style={{ color }}>{value}</div>
             <div className="text-xs text-gray-400 mt-0.5">{count} invoice{count !== 1 ? "s" : ""}</div>
@@ -101,13 +101,13 @@ export default function SABillingPage() {
       </div>
 
       {/* Package info */}
-      <div className="rounded-xl border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+      <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
         <div className="mb-3 text-sm font-semibold text-gray-700">Package Plans</div>
         <div className="grid grid-cols-3 gap-3">
           {PLAN_KEYS.map((key) => {
             const pkg = PACKAGES[key];
             return (
-              <div key={key} className="rounded-lg border p-3" style={{ borderColor: "#e2e8f0" }}>
+              <div key={key} className="ui-card p-3" style={{ borderColor: "#e2e8f0" }}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold" style={{ color: pkg.color }}>{pkg.name}</span>
                   <span className="text-lg font-bold">${pkg.price}<span className="text-xs text-gray-400">/mo</span></span>
@@ -127,18 +127,18 @@ export default function SABillingPage() {
         </div>
       </div>
 
-      {err && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
+      {err && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
 
       {/* Invoice table */}
-      <div className="rounded-xl border bg-white" style={{ borderColor: "#e2e8f0" }}>
+      <div className="ui-card bg-white" style={{ borderColor: "#e2e8f0" }}>
         <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3" style={{ borderColor: "#e2e8f0" }}>
           <span className="font-semibold text-sm">Invoices</span>
           <div className="ml-auto flex gap-2">
-            <select className="rounded border px-2 py-1.5 text-sm" value={filterTenant} onChange={(e) => setFilterTenant(e.target.value)} style={{ borderColor: "#cbd5e1" }}>
+            <select className="ui-input rounded border px-2 py-1.5 text-sm" value={filterTenant} onChange={(e) => setFilterTenant(e.target.value)} style={{ borderColor: "#cbd5e1" }}>
               <option value="">All Tenants</option>
               {tenants.map((t: any) => <option key={t.id} value={t.id}>{t.brandName || t.name}</option>)}
             </select>
-            <select className="rounded border px-2 py-1.5 text-sm" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ borderColor: "#cbd5e1" }}>
+            <select className="ui-input rounded border px-2 py-1.5 text-sm" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ borderColor: "#cbd5e1" }}>
               <option value="">All Status</option>
               {["PENDING","PAID","OVERDUE","CANCELLED"].map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -155,7 +155,7 @@ export default function SABillingPage() {
             </thead>
             <tbody>
               {invoices.map((inv) => (
-                <tr key={inv.id} className="border-b hover:bg-gray-50/60" style={{ borderColor: "#f0f4f8" }}>
+                <tr key={inv.id} className="ui-row border-b" style={{ borderColor: "#f0f4f8" }}>
                   <td className="px-3 py-2.5 font-mono text-xs font-medium text-blue-600">{inv.number}</td>
                   <td className="px-3 py-2.5 font-medium">{inv.tenant?.brandName || inv.tenant?.name || "—"}</td>
                   <td className="px-3 py-2.5 text-gray-600">{inv.period}</td>
@@ -202,7 +202,7 @@ export default function SABillingPage() {
       {/* Generate Invoice Modal */}
       {genOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-          <div className="w-[500px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[500px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 text-lg font-semibold">Generate Invoice</div>
             <div className="space-y-3">
               <div>
@@ -241,8 +241,8 @@ export default function SABillingPage() {
             </div>
             {err && <div className="mt-2 text-sm text-red-600">{err}</div>}
             <div className="mt-4 flex justify-end gap-2">
-              <button className="rounded-lg border px-4 py-2 text-sm" onClick={() => setGenOpen(false)}>Cancel</button>
-              <button className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white" onClick={generate}>Generate</button>
+              <button className="ui-btn px-4 py-2 text-sm" onClick={() => setGenOpen(false)}>Cancel</button>
+              <button className="ui-btn px-4 py-2 text-sm text-white" style={{ background: "#d97706", borderColor: "transparent" }} onClick={generate}>Generate</button>
             </div>
           </div>
         </div>
@@ -251,12 +251,12 @@ export default function SABillingPage() {
       {/* Print Invoice */}
       {printInv && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-[600px] rounded-xl bg-white shadow-2xl print:shadow-none" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[600px] bg-white print:shadow-none" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b px-6 py-4 print:hidden" style={{ borderColor: "#e2e8f0" }}>
               <div className="font-semibold">Invoice Preview</div>
               <div className="flex gap-2">
-                <button onClick={() => window.print()} className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm text-white"><i className="fa-solid fa-print mr-1" />Print / Save PDF</button>
-                <button onClick={() => setPrintInv(null)} className="rounded-lg border px-4 py-1.5 text-sm">Close</button>
+                <button onClick={() => window.print()} className="ui-btn ui-btn-primary px-4 py-1.5 text-sm"><i className="fa-solid fa-print mr-1" />Print / Save PDF</button>
+                <button onClick={() => setPrintInv(null)} className="ui-btn px-4 py-1.5 text-sm">Close</button>
               </div>
             </div>
             <div className="p-8">

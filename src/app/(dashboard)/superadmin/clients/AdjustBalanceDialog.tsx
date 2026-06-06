@@ -38,7 +38,7 @@ export default function AdjustBalanceDialog({
 
         <div className="grid gap-3 mt-2">
           <select
-            className="rounded-md border px-2 py-1.5 text-sm"
+            className="ui-input rounded-md border px-2 py-1.5 text-sm"
             value={data?.type || "DEPOSIT"}
             onChange={(e) =>
               setData({ ...data, type: e.target.value })

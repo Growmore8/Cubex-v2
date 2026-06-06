@@ -136,24 +136,24 @@ export default function SATenantsPage() {
     setSubFor(null);
   }
 
-  const inp = "rounded-md border px-2 py-1.5 text-sm w-full";
+  const inp = "ui-input rounded-md border px-2 py-1.5 text-sm w-full";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 ui-fade-up">
       {node}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Tenant Management</h1>
           <p className="text-sm text-gray-500">Manage tenants, subscription plans, and permissions</p>
         </div>
-        <button onClick={() => setCreateOpen(true)} className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white">
+        <button onClick={() => setCreateOpen(true)} className="ui-btn px-4 py-2 text-sm text-white" style={{ background: "#d97706", borderColor: "transparent" }}>
           + New Tenant
         </button>
       </div>
 
       {err && <div className="text-sm text-red-600">{err}</div>}
 
-      <div className="rounded-lg border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+      <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
         <table className="w-full text-sm">
           <thead className="text-left text-gray-500">
             <tr>
@@ -169,7 +169,7 @@ export default function SATenantsPage() {
           </thead>
           <tbody>
             {rows.map((t: any) => (
-              <tr key={t.id} className="border-t" style={{ borderColor: "#eef2f7" }}>
+              <tr key={t.id} className="ui-row border-t" style={{ borderColor: "#eef2f7" }}>
                 <td className="px-2 py-2 font-medium">
                   {t.brandName || t.name}
                   <div className="text-xs text-gray-400">{t.name}</div>
@@ -196,21 +196,21 @@ export default function SATenantsPage() {
                 <td className="px-2 py-2 space-x-1 text-right whitespace-nowrap">
                   <button
                     title="Edit tenant info"
-                    className="rounded border px-2 py-1 text-xs"
+                    className="ui-btn px-2 py-1 text-xs"
                     onClick={() => openEdit(t)}
                   >
                     <i className="fa-solid fa-pen"></i>
                   </button>
                   <button
                     title="Permissions"
-                    className="rounded border px-2 py-1 text-xs"
+                    className="ui-btn px-2 py-1 text-xs"
                     onClick={() => openPerms(t)}
                   >
                     <i className="fa-solid fa-user-shield"></i>
                   </button>
                   <button
                     title="Subscription"
-                    className="rounded border px-2 py-1 text-xs"
+                    className="ui-btn px-2 py-1 text-xs"
                     onClick={() => openSub(t)}
                   >
                     <i className="fa-solid fa-credit-card"></i>
@@ -252,7 +252,7 @@ export default function SATenantsPage() {
       {/* Create Tenant Modal */}
       {createOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
-          <div className="w-[480px] max-h-[90vh] overflow-auto rounded-lg bg-white p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[480px] max-h-[90vh] overflow-auto bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 font-semibold">New Tenant</div>
             <div className="grid grid-cols-2 gap-2">
               <input className={inp} placeholder="Company name *" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -285,8 +285,8 @@ export default function SATenantsPage() {
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button className="rounded border px-3 py-1.5 text-sm" onClick={() => setCreateOpen(false)}>Cancel</button>
-              <button className="rounded bg-amber-600 px-3 py-1.5 text-sm text-white" onClick={create}>Create Tenant</button>
+              <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setCreateOpen(false)}>Cancel</button>
+              <button className="ui-btn px-3 py-1.5 text-sm text-white" style={{ background: "#d97706", borderColor: "transparent" }} onClick={create}>Create Tenant</button>
             </div>
           </div>
         </div>
@@ -295,7 +295,7 @@ export default function SATenantsPage() {
       {/* Subscription Modal */}
       {subFor && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
-          <div className="w-[360px] rounded-lg bg-white p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[360px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 font-semibold">Subscription — {subFor.brandName || subFor.name}</div>
             <div className="space-y-3">
               <div>
@@ -323,8 +323,8 @@ export default function SATenantsPage() {
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button className="rounded border px-3 py-1.5 text-sm" onClick={() => setSubFor(null)}>Cancel</button>
-              <button className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white" onClick={saveSub}>Save Subscription</button>
+              <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setSubFor(null)}>Cancel</button>
+              <button className="ui-btn ui-btn-primary px-3 py-1.5 text-sm" onClick={saveSub}>Save Subscription</button>
             </div>
           </div>
         </div>
@@ -333,7 +333,7 @@ export default function SATenantsPage() {
       {/* Edit Tenant Modal */}
       {editFor && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
-          <div className="w-[500px] max-h-[90vh] overflow-auto rounded-lg bg-white p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[500px] max-h-[90vh] overflow-auto bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 font-semibold text-lg">Edit Tenant — {editFor.name}</div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className="text-xs text-gray-500 block mb-1">Company Name *</label><input className={inp} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
@@ -349,8 +349,8 @@ export default function SATenantsPage() {
               <div><label className="text-xs text-gray-500 block mb-1">Accent Color</label><div className="flex gap-2"><input type="color" className="rounded border h-9 w-12 cursor-pointer" value={editForm.accentColor} onChange={(e) => setEditForm({ ...editForm, accentColor: e.target.value })} /><input className={inp} value={editForm.accentColor} onChange={(e) => setEditForm({ ...editForm, accentColor: e.target.value })} /></div></div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button className="rounded border px-3 py-1.5 text-sm" onClick={() => setEditFor(null)}>Cancel</button>
-              <button className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white" onClick={saveEdit}>Save Changes</button>
+              <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setEditFor(null)}>Cancel</button>
+              <button className="ui-btn ui-btn-primary px-3 py-1.5 text-sm" onClick={saveEdit}>Save Changes</button>
             </div>
           </div>
         </div>
@@ -359,7 +359,7 @@ export default function SATenantsPage() {
       {/* Permissions Modal */}
       {permFor && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
-          <div className="max-h-[80vh] w-[520px] overflow-auto rounded-lg bg-white p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop max-h-[80vh] w-[520px] overflow-auto bg-white p-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Tenant Permissions — {permFor.brandName || permFor.name}</div>
             <div className="mb-3 text-xs text-gray-500">If a permission is OFF, no one under this tenant can use it regardless of personal settings.</div>
             {PERM_GROUPS.map((g) => (
@@ -376,8 +376,8 @@ export default function SATenantsPage() {
               </div>
             ))}
             <div className="mt-3 flex justify-end gap-2">
-              <button className="rounded border px-3 py-1.5 text-sm" onClick={() => setPermFor(null)}>Cancel</button>
-              <button className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white" onClick={savePerms}>Save Permissions</button>
+              <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setPermFor(null)}>Cancel</button>
+              <button className="ui-btn ui-btn-primary px-3 py-1.5 text-sm" onClick={savePerms}>Save Permissions</button>
             </div>
           </div>
         </div>

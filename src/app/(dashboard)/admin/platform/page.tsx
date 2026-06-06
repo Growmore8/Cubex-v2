@@ -460,7 +460,7 @@ export default function AdminDeskPage() {
   const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const px = (sym: string) => prices[sym]?.toFixed(dg(sym)) ?? "...";
   const dot = (c: string) => (<span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: c }} />);
-  const inp = "mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--text)]";
+  const inp = "ui-input mt-1 w-full bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--text)]";
   const lab = "text-[10px] text-[var(--muted)]";
   const flab = "mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]";
   const mi = "flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)] transition-colors";
@@ -539,7 +539,7 @@ export default function AdminDeskPage() {
             );
             const dDivider = <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />;
             const dHead = (t: string) => <div className="px-3 pt-1.5 pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{t}</div>;
-            const panel = "absolute left-0 z-50 mt-1 w-52 overflow-hidden rounded-lg border py-1";
+            const panel = "ui-pop absolute left-0 z-50 mt-1 w-52 overflow-hidden rounded-xl border py-1";
             const panelStyle = { background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" } as any;
             return (<>
               {/* NEW MENU */}
@@ -614,7 +614,7 @@ export default function AdminDeskPage() {
               {notifUnread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: SELL }}>{notifUnread}</span>}
             </button>
             {notifOpen && (<><div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
-              <div className="absolute right-0 z-50 mt-1 max-h-96 w-80 overflow-auto rounded-lg border shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
+              <div className="ui-pop absolute right-0 z-50 mt-1 max-h-96 w-80 overflow-auto rounded-xl border shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
                 <div className="sticky top-0 border-b px-3 py-2 text-[11px] font-semibold" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>Notifications</div>
                 {notifs.length === 0 ? <div className="px-3 py-6 text-center text-[11px] text-[var(--muted)]"><i className="fa-solid fa-bell-slash mb-1 block text-lg opacity-40" />No notifications</div>
                   : notifs.map((n: any) => (
@@ -1038,7 +1038,7 @@ export default function AdminDeskPage() {
 
       {menu && (<>
         <div className="fixed inset-0 z-40" onClick={() => { setMenu(null); setMenuSub(""); }} />
-        <div className="fixed z-50 w-60 overflow-visible rounded-lg border py-1 text-[11px]" style={{ left: menu.x, top: menu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
+        <div className="ui-pop fixed z-50 w-60 overflow-visible rounded-xl border py-1 text-[11px]" style={{ left: menu.x, top: menu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
           <div className="mx-1 mb-1 flex items-center gap-2 rounded-md px-2 py-2" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)" }}>
             <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "var(--accent)", color: "#fff" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
             <div className="min-w-0">
@@ -1100,7 +1100,7 @@ export default function AdminDeskPage() {
 
       {ticket && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="w-[300px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[300px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">Order - {ticket}</div>
             <div className={lab}>Type</div>
             <select className={inp} value={tform.type} onChange={(e) => setTform({ ...tform, type: e.target.value })}><option>Market</option><option>Buy Limit</option><option>Sell Limit</option><option>Buy Stop</option><option>Sell Stop</option></select>
@@ -1123,7 +1123,7 @@ export default function AdminDeskPage() {
 
       {posMenu && (<>
         <div className="fixed inset-0 z-40" onClick={() => setPosMenu(null)} />
-        <div className="fixed z-50 w-44 overflow-hidden rounded-md border text-[11px]" style={{ left: posMenu.x, top: posMenu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+        <div className="ui-pop fixed z-50 w-44 overflow-hidden rounded-xl border text-[11px]" style={{ left: posMenu.x, top: posMenu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
           <div className="border-b px-3 py-1.5 text-[10px] text-[var(--muted)]" style={{ borderColor: "var(--border)" }}>{posMenu.t.symbol} {posMenu.t.type} {posMenu.t.lots}</div>
           <button onClick={() => openPos("modify", posMenu.t)} className={mi}>Modify S/L - T/P</button>
           <button onClick={() => openPos("partial", posMenu.t)} className={mi}>Partial Close</button>
@@ -1132,7 +1132,7 @@ export default function AdminDeskPage() {
       </>)}
       {pos && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="w-[300px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[300px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold">{pos.kind === "modify" ? "Modify S/L - T/P" : "Partial Close"}</div>
             <div className="mb-2 text-[10px] text-[var(--muted)]">{pos.t.symbol} {pos.t.type} {pos.t.lots} @ {pos.t.openPrice}</div>
             {pos.kind === "modify" ? (<>
@@ -1154,7 +1154,7 @@ export default function AdminDeskPage() {
         const LEVS = [50, 100, 200, 300, 500, 1000];
         return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="w-[470px] max-w-[95vw] max-h-[90vh] overflow-auto rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[470px] max-w-[95vw] max-h-[90vh] overflow-auto rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent2)" }}><i className={"fa-solid " + actIcon()} /></span>
               <div className="min-w-0 flex-1"><div className="text-sm font-semibold">{actTitle()}</div><div className="truncate text-[11px] text-[var(--muted)]">{act.acc.login} - {act.acc.name}</div></div>
@@ -1268,7 +1268,7 @@ export default function AdminDeskPage() {
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="w-[330px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[330px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">{modal === "client" && "New Client"}{modal === "manager" && "New Manager"}{modal === "group" && "Manage Groups"}{modal === "notify" && "Send Notification"}</div>
             {modal === "client" && (<>
               <div className="flex gap-1">
@@ -1345,7 +1345,7 @@ export default function AdminDeskPage() {
         const catName = (c: string) => c === "metals" ? "PREC. METALS" : c.toUpperCase();
         return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="flex max-h-[88vh] w-[580px] max-w-[95vw] flex-col rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop flex max-h-[88vh] w-[580px] max-w-[95vw] flex-col rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--red) 16%, transparent)", color: "#e05260" }}><i className="fa-solid fa-ban" /></span>
               <div className="min-w-0 flex-1"><div className="text-sm font-semibold">Disable Symbols For Client</div><div className="truncate text-[11px] text-[var(--muted)]">{symOv.acc.name} • ID: {symOv.acc.login}</div></div>
@@ -1385,7 +1385,7 @@ export default function AdminDeskPage() {
       })()}
       {mt && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="w-[420px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">Manual Trade - <span style={{ color: "var(--accent)" }}>{mt.acc.login} - {mt.acc.name}</span></div>
             <div className={lab}>Symbol</div>
             <select className={inp} value={mt.symbol} onChange={(e) => setMt({ ...mt, symbol: e.target.value, openPrice: mt.follow ? (prices[e.target.value] ?? 0) : mt.openPrice })}>{symbols.map((s) => <option key={s.symbol} value={s.symbol}>{s.symbol}</option>)}</select>
@@ -1419,7 +1419,7 @@ export default function AdminDeskPage() {
       )}
       {hEdit && (() => { const isFin = String(hEdit.id).startsWith("F"); return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="w-[360px] rounded-lg border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[360px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">Edit {isFin ? "Transaction" : "Trade"} {hEdit.ticket}</div>
             {isFin ? (<>
               <div className={lab}>Amount</div><input type="number" className={inp} value={hEdit.amt} onChange={(e) => setHEdit({ ...hEdit, amt: e.target.value })} />
@@ -1436,7 +1436,7 @@ export default function AdminDeskPage() {
       ); })()}
       {confirmBox && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="w-[340px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[340px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2 text-sm font-semibold" style={{ color: confirmBox.danger ? SELL : "var(--text)" }}>
               <i className={"fa-solid " + (confirmBox.danger ? "fa-triangle-exclamation" : "fa-circle-question")} /> Please confirm
             </div>
@@ -1465,7 +1465,7 @@ export default function AdminDeskPage() {
       {/* Symbol Access Modal */}
       {symPerm && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="flex max-h-[82vh] w-[420px] flex-col rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop flex max-h-[82vh] w-[420px] flex-col rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold">Symbol Access</div>
             <div className="mb-2 text-[10px]" style={{ color: "var(--muted)" }}>
               {symPerm.scope === "manager"
@@ -1494,7 +1494,7 @@ export default function AdminDeskPage() {
       {/* KYC Upload Modal */}
       {kycUploadFor && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="w-[360px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[360px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 text-sm font-semibold">Upload KYC Document</div>
             <div className="mb-3 text-[10px]" style={{ color: "var(--muted)" }}>{kycUploadFor.login} — {kycUploadFor.name}</div>
             <div className="space-y-2">

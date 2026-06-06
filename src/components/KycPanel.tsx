@@ -47,19 +47,19 @@ export default function KycPanel() {
 
   const tabs = ["PENDING", "APPROVED", "REJECTED", "ALL"];
   const rows = list.filter((p) => (status === "ALL" || st(p) === status)).filter((p) => (name(p) + " " + login(p) + " " + email(p)).toLowerCase().includes(q.toLowerCase()));
-  const chip = (active: boolean) => "rounded px-2 py-0.5 text-[10px] " + (active ? "" : "text-[var(--muted)]");
+  const chip = (active: boolean) => "ui-transition rounded-lg px-2 py-0.5 text-[10px] " + (active ? "" : "text-[var(--muted)]");
   const badge = (s: string) => ({ background: s === "APPROVED" ? "rgba(38,166,154,0.18)" : s === "REJECTED" ? "rgba(239,83,80,0.18)" : "rgba(240,180,41,0.18)", color: s === "APPROVED" ? BUY : s === "REJECTED" ? SELL : GOLD });
   const th = "px-2 py-1 text-left font-normal text-[var(--muted)]";
   const td = "px-2 py-1";
-  const eye = "rounded border border-[var(--border)] px-2 py-0.5 text-[9px]";
+  const eye = "ui-btn px-2 py-0.5 text-[9px]";
 
   return (
     <div className="flex h-full flex-col text-[10px]">
       {node}
       <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-1 py-1">
         {tabs.map((t) => <button key={t} onClick={() => setStatus(t)} className={chip(status === t)} style={status === t ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)" }}>{t[0] + t.slice(1).toLowerCase()}</button>)}
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / email / account" className="ml-auto w-44 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
-        <button onClick={load} className="rounded border border-[var(--border)] px-2 py-0.5">Refresh</button>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / email / account" className="ui-input ml-auto w-44 bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
+        <button onClick={load} className="ui-btn px-2 py-0.5">Refresh</button>
       </div>
       {err && <div className="px-2 py-1" style={{ color: SELL }}>{err}</div>}
       <div className="flex-1 overflow-auto">
@@ -71,7 +71,7 @@ export default function KycPanel() {
           </tr></thead>
           <tbody>
             {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={10}>No KYC submissions.</td></tr> : rows.map((p, i) => (
-              <tr key={p.id} className="border-b border-[var(--border)] hover:bg-[var(--soft)]">
+              <tr key={p.id} className="ui-row border-b border-[var(--border)]">
                 <td className={td + " text-[var(--muted)]"}>{i + 1}</td>
                 <td className={td + " text-[var(--muted)]"}>{when(p)}</td>
                 <td className={td + " font-medium"}>{login(p)}</td>
@@ -80,14 +80,14 @@ export default function KycPanel() {
                 <td className={td}>{docType(p)}</td>
                 <td className={td}>{front(p) ? <button onClick={() => setView("/api/files/kyc/" + p.id)} className={eye}>View</button> : <span className="text-[var(--muted)]">-</span>}</td>
                 <td className={td}>{back(p) ? <button onClick={() => setView("/api/files/kyc/" + p.id + "?side=back")} className={eye}>View</button> : <span className="text-amber-600">no back</span>}</td>
-                <td className={td}><span className="rounded px-1.5 py-0.5 text-[9px]" style={badge(st(p))}>{st(p)}</span></td>
+                <td className={td}><span className="rounded-full px-1.5 py-0.5 text-[9px]" style={badge(st(p))}>{st(p)}</span></td>
                 <td className={td}>
                   <div className="flex items-center justify-end gap-1">
                     {st(p) === "PENDING" ? (<>
-                      <button disabled={!!busy} onClick={() => act(p, "approve")} className="rounded px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
-                      <button disabled={!!busy} onClick={() => doReject(p)} className="rounded px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
+                      <button disabled={!!busy} onClick={() => act(p, "approve")} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
+                      <button disabled={!!busy} onClick={() => doReject(p)} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
                     </>) : <span className="text-[var(--muted)]">{reviewed(p)}</span>}
-                    <button title="Delete" onClick={() => doDelete(p)} className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[9px]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
+                    <button title="Delete" onClick={() => doDelete(p)} className="ui-btn px-1.5 py-0.5 text-[9px]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
                   </div>
                 </td>
               </tr>
@@ -96,9 +96,9 @@ export default function KycPanel() {
         </table>
       </div>
       {view && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.8)" }}>
-          <button onClick={() => setView("")} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-lg text-white hover:bg-white/30">✕</button>
-          <img src={view} alt="document" className="max-h-full max-w-full rounded" />
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.8)" }}>
+          <button onClick={() => setView("")} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-lg text-white transition-colors duration-200 hover:bg-white/30">✕</button>
+          <img src={view} alt="document" className="ui-pop max-h-full max-w-full rounded-xl" />
         </div>
       )}
     </div>

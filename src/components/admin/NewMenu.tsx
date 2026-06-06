@@ -21,32 +21,32 @@ export default function NewMenu({ onCreated }: { onCreated: () => void }) {
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
     setModal(""); onCreated();
   }
-  const inp = "mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--text)]";
+  const inp = "ui-input mt-1 w-full bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--text)]";
   const lab = "text-[10px] text-[var(--muted)]";
 
   return (<>
     <div className="relative inline-block">
-      <button onClick={() => setOpen((o) => !o)} className="rounded px-3 py-1 text-[11px]" style={{ background: "var(--accent)", color: "#fff" }}>New +</button>
+      <button onClick={() => setOpen((o) => !o)} className="ui-btn ui-btn-primary px-3 py-1 text-[11px]" style={{ background: "var(--accent)", color: "#fff" }}>New +</button>
       {open && (<>
         <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-        <div className="absolute right-0 z-50 mt-1 w-44 overflow-hidden rounded-md border text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
-          <button onClick={() => openModal("client")} className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]">New Client</button>
-          <button onClick={() => openModal("manager")} className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]">New Manager</button>
-          <button onClick={() => openModal("group")} className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]">New Group</button>
-          <button onClick={() => openModal("notify")} className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]">Send Notification</button>
+        <div className="ui-pop absolute right-0 z-50 mt-1 w-44 overflow-hidden rounded-xl border text-[11px] shadow-lg" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+          <button onClick={() => openModal("client")} className="ui-row block w-full px-3 py-1.5 text-left">New Client</button>
+          <button onClick={() => openModal("manager")} className="ui-row block w-full px-3 py-1.5 text-left">New Manager</button>
+          <button onClick={() => openModal("group")} className="ui-row block w-full px-3 py-1.5 text-left">New Group</button>
+          <button onClick={() => openModal("notify")} className="ui-row block w-full px-3 py-1.5 text-left">Send Notification</button>
         </div>
       </>)}
     </div>
 
     {modal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-        <div className="w-[330px] rounded-lg border p-4 text-left" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div className="ui-card ui-pop w-[330px] p-4 text-left" style={{ background: "var(--panel)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
           <div className="mb-2 text-sm font-semibold">{modal === "client" ? "New Client" : modal === "manager" ? "New Manager" : modal === "group" ? "New Group" : "Send Notification"}</div>
 
           {modal === "client" && (<>
             <div className="flex gap-1">
-              <button onClick={() => f("type", "LIVE")} className="flex-1 rounded py-1.5 text-xs" style={form.type === "LIVE" ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Live</button>
-              <button onClick={() => f("type", "DEMO")} className="flex-1 rounded py-1.5 text-xs" style={form.type === "DEMO" ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Demo</button>
+              <button onClick={() => f("type", "LIVE")} className="ui-transition flex-1 rounded-xl py-1.5 text-xs" style={form.type === "LIVE" ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Live</button>
+              <button onClick={() => f("type", "DEMO")} className="ui-transition flex-1 rounded-xl py-1.5 text-xs" style={form.type === "DEMO" ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Demo</button>
             </div>
             <div className={lab + " mt-2"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
             <div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} onChange={(e) => f("email", e.target.value)} />
@@ -60,30 +60,30 @@ export default function NewMenu({ onCreated }: { onCreated: () => void }) {
             </div>
             <div className={lab + " mt-2"}>Manager (optional)</div>
             <select className={inp} value={form.managerId || ""} onChange={(e) => f("managerId", e.target.value || null)}><option value="">- none -</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-            <button onClick={() => submit("/api/admin/clients", { name: form.name, email: form.email, password: form.password, type: form.type, leverage: Number(form.leverage) || 100, currency: form.currency, managerId: form.managerId || null, phone: form.phone, country: form.country, isPool: !!form.isPool })} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Create {form.type} Client</button>
+            <button onClick={() => submit("/api/admin/clients", { name: form.name, email: form.email, password: form.password, type: form.type, leverage: Number(form.leverage) || 100, currency: form.currency, managerId: form.managerId || null, phone: form.phone, country: form.country, isPool: !!form.isPool })} className="ui-btn mt-3 w-full py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Create {form.type} Client</button>
           </>)}
 
           {modal === "manager" && (<>
             <div className={lab + " mt-1"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
             <div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} onChange={(e) => f("email", e.target.value)} />
             <div className={lab + " mt-2"}>Password</div><input className={inp} value={form.password || ""} onChange={(e) => f("password", e.target.value)} />
-            <button onClick={() => submit("/api/admin/managers", { name: form.name, email: form.email, password: form.password })} className="mt-3 w-full rounded py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Create Manager</button>
+            <button onClick={() => submit("/api/admin/managers", { name: form.name, email: form.email, password: form.password })} className="ui-btn mt-3 w-full py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Create Manager</button>
           </>)}
 
           {modal === "group" && (<>
             <div className={lab + " mt-1"}>Group name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
             <div className={lab + " mt-2"}>Spread (points)</div><input type="number" className={inp} value={form.spread || ""} onChange={(e) => f("spread", Number(e.target.value))} />
-            <button onClick={() => submit("/api/admin/groups", { name: form.name, spread: Number(form.spread) || 0 })} className="mt-3 w-full rounded py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Create Group</button>
+            <button onClick={() => submit("/api/admin/groups", { name: form.name, spread: Number(form.spread) || 0 })} className="ui-btn mt-3 w-full py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Create Group</button>
           </>)}
 
           {modal === "notify" && (<>
             <div className={lab + " mt-1"}>Title</div><input className={inp} value={form.title || ""} onChange={(e) => f("title", e.target.value)} />
             <div className={lab + " mt-2"}>Message</div><textarea className={inp} rows={3} value={form.body || ""} onChange={(e) => f("body", e.target.value)} />
-            <button onClick={() => submit("/api/admin/broadcast", { title: form.title, body: form.body })} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Send to all clients</button>
+            <button onClick={() => submit("/api/admin/broadcast", { title: form.title, body: form.body })} className="ui-btn mt-3 w-full py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Send to all clients</button>
           </>)}
 
           {err && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
-          <button onClick={() => setModal("")} className="mt-2 w-full rounded py-1.5 text-xs border border-[var(--border)]">Cancel</button>
+          <button onClick={() => setModal("")} className="ui-btn ui-btn-ghost mt-2 w-full py-1.5 text-xs">Cancel</button>
         </div>
       </div>
     )}

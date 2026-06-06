@@ -25,12 +25,12 @@ export default function CountrySelect({ value, onChange, className = "", style, 
         <i className="fa-solid fa-chevron-down ml-auto text-[10px] opacity-60" />
       </button>
       {open && (
-        <div className="absolute z-[300] mt-1 max-h-64 w-full min-w-[200px] overflow-auto rounded-md border bg-white shadow-lg" style={{ borderColor: "#e2e8f0" }}>
+        <div className="ui-pop absolute z-[300] mt-1 max-h-64 w-full min-w-[200px] overflow-auto rounded-xl border bg-white shadow-lg" style={{ borderColor: "#e2e8f0" }}>
           <div className="sticky top-0 bg-white p-1.5">
-            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="w-full rounded border px-2 py-1 text-sm text-gray-800" />
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="ui-input w-full px-2 py-1 text-sm text-gray-800" />
           </div>
           {list.map((c) => (
-            <button key={c.code} type="button" onClick={() => { onChange(c.name); setOpen(false); setQ(""); }} className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm text-gray-800 hover:bg-gray-100">
+            <button key={c.code} type="button" onClick={() => { onChange(c.name); setOpen(false); setQ(""); }} className="ui-row flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm text-gray-800">
               <img src={flagUrl(c.code)} alt="" className="h-[14px] w-[19px] shrink-0 rounded-sm object-cover" />
               {c.name}
             </button>

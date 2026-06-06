@@ -81,14 +81,14 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
     (e.target as HTMLFormElement).reset(); setMsg("Submitted for review"); load();
   }
 
-  const input = "rounded-md border px-3 py-2 text-sm";
-  const badge = (s: string) => "rounded px-2 py-0.5 text-xs " + (s === "APPROVED" ? "bg-green-100 text-green-700" : s === "REJECTED" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700");
-  const tabBtn = (t: string) => "px-4 py-2 text-sm " + (tab === t ? "border-b-2 border-blue-600 font-medium text-blue-600" : "text-gray-500");
+  const input = "ui-input px-3 py-2 text-sm";
+  const badge = (s: string) => "rounded-full px-2 py-0.5 text-xs " + (s === "APPROVED" ? "bg-green-100 text-green-700" : s === "REJECTED" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700");
+  const tabBtn = (t: string) => "px-4 py-2 text-sm transition-colors duration-200 " + (tab === t ? "border-b-2 border-blue-600 font-medium text-blue-600" : "text-gray-500 hover:text-gray-700");
 
   return (<div className="space-y-4 text-gray-800">
     <div className="flex items-center justify-between">
       <h1 className="text-xl font-bold">{panelTitle}</h1>
-      {onClose ? <button onClick={onClose} className="text-sm text-gray-400 hover:text-gray-700"><i className="fa-solid fa-xmark" /> Close</button> : <a href="/client" className="text-sm text-blue-600">&larr; Back to terminal</a>}
+      {onClose ? <button onClick={onClose} className="text-sm text-gray-400 hover:text-gray-700 transition-colors duration-200"><i className="fa-solid fa-xmark" /> Close</button> : <a href="/client" className="text-sm text-blue-600 transition-colors duration-200 hover:text-blue-700">&larr; Back to terminal</a>}
     </div>
     {err && <p className="text-sm text-red-600">{err}</p>}{msg && <p className="text-sm text-green-600">{msg}</p>}
     {shown.length > 1 && (
@@ -99,50 +99,50 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
       </div>
     )}
 
-    {tab === "deposit" && (<div className="space-y-3 rounded-lg border bg-white p-4">
+    {tab === "deposit" && (<div className="ui-card ui-fade-up space-y-3 p-4">
       {crypto.length === 0 && upi.length === 0 && links.length === 0 ? <p className="text-sm text-gray-500">No payment methods configured yet. Please contact support.</p> : (<>
         {crypto.length > 0 && (<>
           <div className="text-xs text-gray-500">Choose crypto network</div>
-          <div className="flex flex-wrap gap-2">{crypto.map((w) => (<button key={w.id} onClick={() => setSelWallet(w.id)} className="rounded border px-3 py-1.5 text-sm" style={{ borderColor: selWallet === w.id ? "#2563eb" : "#e2e8f0", background: selWallet === w.id ? "#eff6ff" : "#fff" }}>{w.asset} · {w.network}</button>))}</div>
-          {wallet && (<div className="rounded-md border bg-gray-50 p-3">
+          <div className="flex flex-wrap gap-2">{crypto.map((w) => (<button key={w.id} onClick={() => setSelWallet(w.id)} className="ui-transition rounded-xl border px-3 py-1.5 text-sm" style={{ borderColor: selWallet === w.id ? "#2563eb" : "#e2e8f0", background: selWallet === w.id ? "#eff6ff" : "#fff" }}>{w.asset} · {w.network}</button>))}</div>
+          {wallet && (<div className="rounded-xl border bg-gray-50 p-3">
             <div className="text-xs text-gray-500">Send {wallet.asset} ({wallet.network}) to this address:</div>
-            <div className="mt-1 flex items-center gap-2"><code className="flex-1 break-all rounded bg-white px-2 py-1 text-xs">{wallet.address}</code><button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => { navigator.clipboard.writeText(wallet.address); setMsg("Address copied"); }}>Copy</button></div>
+            <div className="mt-1 flex items-center gap-2"><code className="flex-1 break-all rounded-lg bg-white px-2 py-1 text-xs">{wallet.address}</code><button type="button" className="ui-btn ui-btn-ghost px-2 py-1 text-xs" onClick={() => { navigator.clipboard.writeText(wallet.address); setMsg("Address copied"); }}>Copy</button></div>
           </div>)}
         </>)}
-        {upi.length > 0 && (<div className="rounded-md border p-3">
+        {upi.length > 0 && (<div className="rounded-xl border p-3">
           <div className="mb-1 text-sm font-medium">UPI</div>
-          <div className="space-y-1">{upi.map((u) => (<div key={u.id} className="flex items-center gap-2 text-xs"><span className="rounded bg-cyan-50 px-2 py-0.5 text-cyan-700">{u.label}</span><code className="flex-1 break-all rounded bg-gray-50 px-2 py-1">{u.address}</code><button type="button" className="rounded border px-2 py-0.5" onClick={() => { navigator.clipboard.writeText(u.address); setMsg("UPI id copied"); }}>Copy</button></div>))}</div>
+          <div className="space-y-1">{upi.map((u) => (<div key={u.id} className="flex items-center gap-2 text-xs"><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-cyan-700">{u.label}</span><code className="flex-1 break-all rounded-lg bg-gray-50 px-2 py-1">{u.address}</code><button type="button" className="ui-btn ui-btn-ghost px-2 py-0.5" onClick={() => { navigator.clipboard.writeText(u.address); setMsg("UPI id copied"); }}>Copy</button></div>))}</div>
         </div>)}
         <form onSubmit={submitDeposit} className="space-y-2">
           <div><div className="text-xs text-gray-500">Amount (USD)</div><input className={input + " w-full"} type="number" step="0.01" value={dAmount} onChange={(e) => setDAmount(e.target.value)} placeholder="0.00" required /></div>
           <div><div className="text-xs text-gray-500">Payment slip / screenshot (optional)</div><input className={input + " w-full"} type="file" name="file" accept="image/*,application/pdf" /></div>
-          <button className="rounded-md bg-green-600 px-4 py-2 text-sm text-white">Submit deposit request</button>
+          <button className="ui-btn bg-green-600 px-4 py-2 text-sm text-white">Submit deposit request</button>
         </form>
-        {links.map((l) => (<div key={l.id} className="rounded-md border p-3"><div className="text-sm font-medium">{l.label}</div><p className="mb-2 text-xs text-gray-500">Pay via our payment partner.</p><a href={l.url} target="_blank" rel="noreferrer" className="inline-block rounded-md bg-blue-600 px-4 py-2 text-sm text-white">Open {l.label}</a></div>))}
+        {links.map((l) => (<div key={l.id} className="rounded-xl border p-3"><div className="text-sm font-medium">{l.label}</div><p className="mb-2 text-xs text-gray-500">Pay via our payment partner.</p><a href={l.url} target="_blank" rel="noreferrer" className="ui-btn ui-btn-primary inline-block px-4 py-2 text-sm">Open {l.label}</a></div>))}
       </>)}
     </div>)}
 
-    {tab === "withdraw" && (<div className="space-y-3 rounded-lg border bg-white p-4">
+    {tab === "withdraw" && (<div className="ui-card ui-fade-up space-y-3 p-4">
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium">Saved withdrawal methods</div>
-        <button className="rounded border px-2 py-1 text-xs" onClick={() => setAddOpen(true)}>+ Add method</button>
+        <button className="ui-btn ui-btn-ghost px-2 py-1 text-xs" onClick={() => setAddOpen(true)}>+ Add method</button>
       </div>
       {methods.length === 0 ? <p className="text-sm text-gray-500">No saved methods. Add one to withdraw.</p> : (
         <div className="space-y-2">{methods.map((m) => (
-          <div key={m.id} className="flex items-center gap-2 rounded border p-2" style={{ borderColor: selMethod === m.id ? "#2563eb" : "#eef2f7", background: selMethod === m.id ? "#eff6ff" : "#fff" }}>
+          <div key={m.id} className="ui-transition flex items-center gap-2 rounded-xl border p-2" style={{ borderColor: selMethod === m.id ? "#2563eb" : "#eef2f7", background: selMethod === m.id ? "#eff6ff" : "#fff" }}>
             <input type="radio" name="wm" checked={selMethod === m.id} onChange={() => setSelMethod(m.id)} />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium">{m.label} {m.isDefault && <span className="ml-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-600">Default</span>}</div>
+              <div className="text-sm font-medium">{m.label} {m.isDefault && <span className="ml-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-600">Default</span>}</div>
               <div className="break-all text-xs text-gray-400">{m.type === "CRYPTO" ? (m.network + " · ") : (m.type + " · ")}{m.address}</div>
             </div>
-            {!m.isDefault && <button className="text-xs text-blue-600" onClick={() => methodAction({ action: "default", id: m.id })}>Set default</button>}
-            <button title="Delete" className="rounded px-2 py-1 text-red-600" onClick={() => methodAction({ action: "delete", id: m.id })}><i className="fa-solid fa-trash"></i></button>
+            {!m.isDefault && <button className="text-xs text-blue-600 transition-colors duration-200 hover:text-blue-700" onClick={() => methodAction({ action: "default", id: m.id })}>Set default</button>}
+            <button title="Delete" className="rounded-lg px-2 py-1 text-red-600 transition-colors duration-200 hover:bg-red-50" onClick={() => methodAction({ action: "delete", id: m.id })}><i className="fa-solid fa-trash"></i></button>
           </div>))}</div>
       )}
       <form onSubmit={submitWithdraw} className="space-y-2 border-t pt-3">
         <div><div className="text-xs text-gray-500">Amount (USD)</div><input className={input + " w-full"} type="number" step="0.01" value={wAmount} onChange={(e) => setWAmount(e.target.value)} placeholder="0.00" required /></div>
         <p className="text-xs text-gray-400">Only profit (PNL) balance may be withdrawable depending on your account settings.</p>
-        <button className="rounded-md bg-amber-600 px-4 py-2 text-sm text-white" disabled={!method}>Submit withdrawal request</button>
+        <button className="ui-btn bg-amber-600 px-4 py-2 text-sm text-white" disabled={!method}>Submit withdrawal request</button>
       </form>
     </div>)}
 
@@ -150,28 +150,28 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
       const latest = docs[0];
       const st = latest?.status;
       const canUpload = !latest || st === "REJECTED"; // can only (re)upload when none or after a rejection
-      return (<div className="space-y-3 rounded-lg border bg-white p-4">
-        {st === "APPROVED" && <div className="flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700"><i className="fa-solid fa-circle-check" /> Your identity is verified.</div>}
-        {st === "PENDING" && <div className="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700"><i className="fa-solid fa-clock" /> Your documents are under review. You&apos;ll be notified once a decision is made.</div>}
-        {st === "REJECTED" && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"><i className="fa-solid fa-circle-xmark mr-1" /> Your KYC was rejected{latest?.note ? ": " + latest.note : ""}. Please upload again.</div>}
+      return (<div className="ui-card ui-fade-up space-y-3 p-4">
+        {st === "APPROVED" && <div className="flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-700"><i className="fa-solid fa-circle-check" /> Your identity is verified.</div>}
+        {st === "PENDING" && <div className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700"><i className="fa-solid fa-clock" /> Your documents are under review. You&apos;ll be notified once a decision is made.</div>}
+        {st === "REJECTED" && <div className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700"><i className="fa-solid fa-circle-xmark mr-1" /> Your KYC was rejected{latest?.note ? ": " + latest.note : ""}. Please upload again.</div>}
         {canUpload && (<form onSubmit={uploadKyc} className="space-y-2">
           <div className="grid grid-cols-2 gap-3">
             <div><div className="mb-1 text-xs font-medium text-gray-600">Identity Document <span className="text-gray-400">(front)</span> <span className="text-red-500">*</span></div><input className={input + " w-full"} type="file" name="file" accept="image/*,application/pdf" required /></div>
             <div><div className="mb-1 text-xs font-medium text-gray-600">Address Proof <span className="text-gray-400">(back)</span> <span className="text-red-500">*</span></div><input className={input + " w-full"} type="file" name="back" accept="image/*,application/pdf" required /></div>
           </div>
           <p className="text-xs text-gray-400">Upload a clear photo/scan of your identity document and a proof of address. Both are required for verification.</p>
-          <button className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white">Submit for review</button>
+          <button className="ui-btn ui-btn-primary px-4 py-2 text-sm">Submit for review</button>
         </form>)}
       </div>);
     })()}
 
-    <div className="rounded-lg border bg-white p-4">
+    <div className="ui-card ui-fade-up p-4">
       <div className="mb-2 text-sm font-semibold">Recent requests</div>
-      <div className="space-y-1">{reqs.map((p) => (<div key={p.id} className="flex items-center justify-between text-sm"><span>{p.kind} {Number(p.amount).toFixed(2)} <span className="text-xs text-gray-400">({p.method})</span></span><span className={badge(p.status)}>{p.status}</span></div>))}{reqs.length === 0 && <div className="text-sm text-gray-400">No requests yet.</div>}</div>
+      <div className="space-y-1">{reqs.map((p) => (<div key={p.id} className="ui-row flex items-center justify-between rounded-lg px-1 py-0.5 text-sm"><span>{p.kind} {Number(p.amount).toFixed(2)} <span className="text-xs text-gray-400">({p.method})</span></span><span className={badge(p.status)}>{p.status}</span></div>))}{reqs.length === 0 && <div className="text-sm text-gray-400">No requests yet.</div>}</div>
     </div>
 
-    {addOpen && (<div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-6">
-      <div className="w-[400px] rounded-lg bg-white p-4 text-gray-800" onClick={(e) => e.stopPropagation()}>
+    {addOpen && (<div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+      <div className="ui-card ui-pop w-[400px] p-4 text-gray-800" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 text-sm font-semibold">Add withdrawal method</div>
         <div className="space-y-2">
           <select className={input + " w-full"} value={newM.type} onChange={(e) => setNewM({ ...newM, type: e.target.value })}>
@@ -186,8 +186,8 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
           {newM.type === "UPI" && <input className={input + " w-full"} placeholder="UPI id (name@bank)" value={newM.address} onChange={(e) => setNewM({ ...newM, address: e.target.value })} />}
           {newM.type === "BANK" && <input className={input + " w-full"} placeholder="Account number / IBAN" value={newM.address} onChange={(e) => setNewM({ ...newM, address: e.target.value })} />}
         </div>
-        <div className="mt-3 flex justify-end gap-2"><button className="rounded border px-3 py-1.5 text-sm" onClick={() => setAddOpen(false)}>Cancel</button>
-          <button className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white" onClick={() => methodAction({ action: "add", ...newM })}>Save method</button></div>
+        <div className="mt-3 flex justify-end gap-2"><button className="ui-btn ui-btn-ghost px-3 py-1.5 text-sm" onClick={() => setAddOpen(false)}>Cancel</button>
+          <button className="ui-btn ui-btn-primary px-3 py-1.5 text-sm" onClick={() => methodAction({ action: "add", ...newM })}>Save method</button></div>
       </div>
     </div>)}
   </div>);

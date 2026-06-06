@@ -9,7 +9,7 @@ export default function PasswordInput({ className = "", wrap = "relative", ...re
     <div className={wrap}>
       <input {...rest} type={show ? "text" : "password"} className={className + " w-full pr-9"} />
       <button type="button" tabIndex={-1} onClick={() => setShow((s) => !s)} aria-label="Show or hide password"
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200">
         <i className={"fa-solid " + (show ? "fa-eye-slash" : "fa-eye")} style={{ fontSize: 13 }} />
       </button>
     </div>

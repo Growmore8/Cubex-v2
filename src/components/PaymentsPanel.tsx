@@ -62,7 +62,7 @@ export default function PaymentsPanel() {
   const selCount = Object.keys(sel).filter((k) => sel[k]).length;
   const allOn = rows.length > 0 && rows.every((p) => sel[p.id]);
   function toggleAll() { if (allOn) setSel({}); else { const n: Record<string, boolean> = {}; rows.forEach((p) => (n[p.id] = true)); setSel(n); } }
-  const chip = (active: boolean) => "rounded px-2 py-0.5 text-[10px] " + (active ? "" : "text-[var(--muted)]");
+  const chip = (active: boolean) => "ui-transition rounded-lg px-2 py-0.5 text-[10px] " + (active ? "" : "text-[var(--muted)]");
   const badge = (s: string) => ({ background: s === "APPROVED" ? "rgba(38,166,154,0.18)" : s === "REJECTED" ? "rgba(239,83,80,0.18)" : "rgba(240,180,41,0.18)", color: s === "APPROVED" ? BUY : s === "REJECTED" ? SELL : GOLD });
   const th = "px-2 py-1 text-left font-normal text-[var(--muted)]";
   const td = "px-2 py-1";
@@ -72,15 +72,15 @@ export default function PaymentsPanel() {
       {node}
       <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-1 py-1">
         {tabs.map((t) => <button key={t} onClick={() => setStatus(t)} className={chip(status === t)} style={status === t ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)" }}>{t[0] + t.slice(1).toLowerCase()}</button>)}
-        <select value={kindF} onChange={(e) => setKindF(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All Kinds</option><option value="IN">In</option><option value="OUT">Out</option></select>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="ml-auto w-28 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
-        <button onClick={load} className="rounded border border-[var(--border)] px-2 py-0.5">Refresh</button>
+        <select value={kindF} onChange={(e) => setKindF(e.target.value)} className="ui-input bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All Kinds</option><option value="IN">In</option><option value="OUT">Out</option></select>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="ui-input ml-auto w-28 bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
+        <button onClick={load} className="ui-btn px-2 py-0.5">Refresh</button>
       </div>
       {selCount > 0 && (
         <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--soft)] px-2 py-1">
           <span>{selCount} selected</span>
-          <button onClick={bulkDelete} className="rounded px-2 py-0.5" style={{ background: SELL, color: "#1a0606" }}>Delete Selected</button>
-          <button onClick={() => setSel({})} className="rounded border border-[var(--border)] px-2 py-0.5">Clear</button>
+          <button onClick={bulkDelete} className="ui-btn px-2 py-0.5" style={{ background: SELL, color: "#1a0606" }}>Delete Selected</button>
+          <button onClick={() => setSel({})} className="ui-btn px-2 py-0.5">Clear</button>
         </div>
       )}
       {err && <div className="px-2 py-1" style={{ color: SELL }}>{err}</div>}
@@ -97,7 +97,7 @@ export default function PaymentsPanel() {
             {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={10}>No payment requests.</td></tr> : rows.map((p) => {
               const d = details(p); const open = expand === p.id;
               return [
-                <tr key={p.id} className="border-b border-[var(--border)] hover:bg-[var(--soft)]">
+                <tr key={p.id} className="ui-row border-b border-[var(--border)]">
                   <td className={td}><input type="checkbox" checked={!!sel[p.id]} onChange={(e) => setSel((s) => ({ ...s, [p.id]: e.target.checked }))} /></td>
                   <td className={td}>{d ? <button onClick={() => setExpand(open ? "" : p.id)} className="text-[var(--muted)]">{open ? "\u25BE" : "\u25B8"}</button> : null}</td>
                   <td className={td + " font-medium"}>{name(p)}</td>
@@ -106,15 +106,15 @@ export default function PaymentsPanel() {
                   <td className={td + " text-right"} style={{ color: isOut(p) ? SELL : BUY }}>{(isOut(p) ? "-" : "+") + "$" + Number(g(p, ["amount"], 0)).toFixed(2)}</td>
                   <td className={td}>{method(p)}</td>
                   <td className={td + " text-[var(--muted)]"}>{when(p)}</td>
-                  <td className={td}><span className="rounded px-1.5 py-0.5 text-[9px]" style={badge(st(p))}>{st(p)}</span></td>
+                  <td className={td}><span className="rounded-full px-1.5 py-0.5 text-[9px]" style={badge(st(p))}>{st(p)}</span></td>
                   <td className={td}>
                     <div className="flex items-center justify-end gap-1">
-                      {slip(p) ? <button onClick={() => setView(slip(p))} className="rounded border border-[var(--border)] px-2 py-0.5 text-[9px]">Slip</button> : null}
+                      {slip(p) ? <button onClick={() => setView(slip(p))} className="ui-btn px-2 py-0.5 text-[9px]">Slip</button> : null}
                       {st(p) === "PENDING" && (<>
-                        <button disabled={!!busy} onClick={() => act(p, "approve")} className="rounded px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
-                        <button disabled={!!busy} onClick={() => act(p, "reject")} className="rounded px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
+                        <button disabled={!!busy} onClick={() => act(p, "approve")} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
+                        <button disabled={!!busy} onClick={() => act(p, "reject")} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
                       </>)}
-                      <button disabled={!!busy} onClick={() => delOne(p.id)} className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[9px]" style={{ color: SELL }}>Del</button>
+                      <button disabled={!!busy} onClick={() => delOne(p.id)} className="ui-btn px-1.5 py-0.5 text-[9px]" style={{ color: SELL }}>Del</button>
                     </div>
                   </td>
                 </tr>,
@@ -131,9 +131,9 @@ export default function PaymentsPanel() {
         </table>
       </div>
       {view && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.8)" }}>
-          <button onClick={() => setView("")} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-lg text-white hover:bg-white/30">✕</button>
-          <img src={view} alt="slip" className="max-h-full max-w-full rounded" />
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.8)" }}>
+          <button onClick={() => setView("")} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-lg text-white transition-colors duration-200 hover:bg-white/30">✕</button>
+          <img src={view} alt="slip" className="ui-pop max-h-full max-w-full rounded-xl" />
         </div>
       )}
     </div>

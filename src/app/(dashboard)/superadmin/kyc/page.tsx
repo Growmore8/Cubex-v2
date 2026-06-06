@@ -12,21 +12,21 @@ export default function SAKyc() {
   async function doReject(id: string) { const reason = await prompt({ title: "Reject KYC", message: "Reason for rejection (shown to the client)", placeholder: "e.g. document blurry / expired", confirmLabel: "Reject" }); if (reason) act(id, "reject", reason); }
   async function doReverse(id: string) { if (await confirm({ title: "Reverse decision", message: "Send this back to PENDING? The client will be asked to upload again.", confirmLabel: "Reverse" })) act(id, "reverse"); }
   const filtered = items.filter((i: any) => (tab === "All" || i.status === tab) && (!q || (i.accountId + i.name + i.email).toLowerCase().includes(q.toLowerCase())));
-  const inp = "rounded-md border px-2 py-1.5 text-sm";
-  return (<div className="space-y-4">
+  const inp = "ui-input rounded-md border px-2 py-1.5 text-sm";
+  return (<div className="space-y-4 ui-fade-up">
     {node}
     <div><h1 className="text-2xl font-bold">KYC</h1><p className="text-sm text-gray-500">All KYC submissions across every outsource</p></div>
     {err && <div className="text-sm text-red-600">{err}</div>}
-    <div className="rounded-lg border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+    <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        {["All", "PENDING", "APPROVED", "REJECTED"].map((t) => <button key={t} onClick={() => setTab(t)} className="rounded-full px-3 py-1 text-xs" style={tab === t ? { background: "var(--accent2)", color: "#fff" } : { background: "var(--bg2)", color: "var(--text2)", border: "1px solid var(--border)" }}>{t}</button>)}
+        {["All", "PENDING", "APPROVED", "REJECTED"].map((t) => <button key={t} onClick={() => setTab(t)} className="rounded-full px-3 py-1 text-xs transition-colors duration-200" style={tab === t ? { background: "var(--accent2)", color: "#fff" } : { background: "var(--bg2)", color: "var(--text2)", border: "1px solid var(--border)" }}>{t}</button>)}
         <input className={inp + " min-w-[180px] flex-1"} placeholder="Search name / email / account" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-gray-500"><tr><th className="px-2 py-1 font-normal">Date</th><th className="px-2 py-1 font-normal">Account</th><th className="px-2 py-1 font-normal">Name</th><th className="px-2 py-1 font-normal">Email</th><th className="px-2 py-1 font-normal">Doc</th><th className="px-2 py-1 font-normal">Image</th><th className="px-2 py-1 font-normal">Status</th><th className="px-2 py-1 font-normal text-right">Action</th></tr></thead>
           <tbody>
-            {filtered.map((i: any) => (<tr key={i.id} className="border-t" style={{ borderColor: "#eef2f7" }}>
+            {filtered.map((i: any) => (<tr key={i.id} className="ui-row border-t" style={{ borderColor: "#eef2f7" }}>
               <td className="px-2 py-2 text-xs text-gray-500">{new Date(i.date).toLocaleString()}</td>
               <td className="px-2 py-2 font-medium">{i.accountId}</td>
               <td className="px-2 py-2">{i.name}</td>
@@ -45,6 +45,6 @@ export default function SAKyc() {
         </table>
       </div>
     </div>
-    {img && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6"><button onClick={() => setImg(null)} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-lg text-white hover:bg-white/30">✕</button><img src={img} alt="" className="max-h-[85vh] max-w-[90vw] rounded" /></div>}
+    {img && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6"><button onClick={() => setImg(null)} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-lg text-white hover:bg-white/30">✕</button><img src={img} alt="" className="ui-pop max-h-[85vh] max-w-[90vw] rounded-xl" /></div>}
   </div>);
 }

@@ -53,13 +53,13 @@ export default function SAAnalyticsPage() {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 ui-fade-up">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Tenant Analytics</h1>
           <p className="text-sm text-gray-500">Per-tenant breakdown with time filters</p>
         </div>
-        <div className="flex gap-1 rounded-lg border p-1" style={{ borderColor: "#e2e8f0" }}>
+        <div className="flex gap-1 rounded-xl border p-1" style={{ borderColor: "#e2e8f0" }}>
           {TIME_OPTIONS.map(({ label, days: d }) => (
             <button key={d} onClick={() => setDays(d)} className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
               style={days === d ? { background: "#2563eb", color: "#fff" } : { color: "#64748b" }}>
@@ -70,14 +70,14 @@ export default function SAAnalyticsPage() {
       </div>
 
       {/* Platform totals */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-3 ui-fade-up-stagger">
         {[
           { label: "Total Clients", value: totals.clients, color: "#15803d", icon: "fa-users" },
           { label: "Total Managers", value: totals.managers, color: "#7c3aed", icon: "fa-users-gear" },
           { label: "Open Trades", value: totals.openTrades, color: "#dc2626", icon: "fa-arrow-right-arrow-left" },
           { label: "Net Deposits", value: fmt(totals.totalDeposits - totals.totalWithdrawals), color: "#1d4ed8", icon: "fa-money-bill" },
         ].map(({ label, value, color, icon }) => (
-          <div key={label} className="rounded-xl border bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+          <div key={label} className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
             <div className="flex items-center gap-2 mb-1">
               <i className={"fa-solid " + icon} style={{ color, fontSize: 13 }} />
               <div className="text-xs font-medium text-gray-500">{label}</div>
@@ -88,7 +88,7 @@ export default function SAAnalyticsPage() {
       </div>
 
       {/* Tenant table */}
-      <div className="rounded-xl border bg-white" style={{ borderColor: "#e2e8f0" }}>
+      <div className="ui-card bg-white" style={{ borderColor: "#e2e8f0" }}>
         <div className="border-b px-4 py-3 text-sm font-semibold" style={{ borderColor: "#e2e8f0" }}>
           Per-Tenant Breakdown {days > 0 ? `(Last ${days} days)` : "(All Time)"}
         </div>
@@ -114,7 +114,7 @@ export default function SAAnalyticsPage() {
               {sorted.map((t) => {
                 const pkg = t.plan ? PACKAGES[t.plan as keyof typeof PACKAGES] : null;
                 return (
-                  <tr key={t.id} className="border-b hover:bg-gray-50/60" style={{ borderColor: "#f0f4f8" }}>
+                  <tr key={t.id} className="ui-row border-b" style={{ borderColor: "#f0f4f8" }}>
                     <td className="px-3 py-2.5">
                       <div className="font-medium">{t.brandName || t.name}</div>
                       <div className="text-xs text-gray-400">{t.subdomain}</div>

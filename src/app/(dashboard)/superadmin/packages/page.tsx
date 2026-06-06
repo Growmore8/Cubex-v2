@@ -64,10 +64,10 @@ export default function SAPackagesPage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  const inp = "rounded-md border px-2 py-1.5 text-sm w-full";
+  const inp = "ui-input rounded-md border px-2 py-1.5 text-sm w-full";
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 ui-fade-up">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Package Plans</h1>
@@ -80,9 +80,9 @@ export default function SAPackagesPage() {
         )}
       </div>
 
-      {err && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
+      {err && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
 
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-3 gap-5 ui-fade-up-stagger">
         {PLANS.map((plan) => {
           const pkg = packages[plan] || {};
           const color = PLAN_COLORS[plan];
@@ -90,7 +90,7 @@ export default function SAPackagesPage() {
           const features: string[] = pkg.features || DEFAULT_FEATURES[plan] || [];
 
           return (
-            <div key={plan} className="rounded-xl border bg-white overflow-hidden" style={{ borderColor: "#e2e8f0" }}>
+            <div key={plan} className="ui-card bg-white overflow-hidden" style={{ borderColor: "#e2e8f0" }}>
               {/* Header */}
               <div className="px-5 py-4" style={{ background: color + "12", borderBottom: `2px solid ${color}30` }}>
                 <div className="flex items-start justify-between">
@@ -135,7 +135,7 @@ export default function SAPackagesPage() {
       </div>
 
       {/* Tenant distribution */}
-      <div className="rounded-xl border bg-white p-5" style={{ borderColor: "#e2e8f0" }}>
+      <div className="ui-card bg-white p-5" style={{ borderColor: "#e2e8f0" }}>
         <div className="mb-3 text-sm font-semibold text-gray-700">
           <i className="fa-solid fa-chart-pie mr-2 text-gray-400" />Tenant Distribution
         </div>
@@ -146,7 +146,7 @@ export default function SAPackagesPage() {
             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
             const color = PLAN_COLORS[plan];
             return (
-              <div key={plan} className="flex-1 rounded-lg border p-4" style={{ borderColor: "#e2e8f0" }}>
+              <div key={plan} className="flex-1 rounded-xl border p-4 hover-lift" style={{ borderColor: "#e2e8f0" }}>
                 <div className="text-xs font-semibold uppercase mb-1" style={{ color }}>{packages[plan]?.name || plan}</div>
                 <div className="text-2xl font-bold text-gray-800">{count}</div>
                 <div className="text-xs text-gray-400">{pct}% of tenants</div>
@@ -162,7 +162,7 @@ export default function SAPackagesPage() {
       {/* Edit Modal */}
       {editing && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-          <div className="w-[500px] max-h-[90vh] overflow-auto rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[500px] max-h-[90vh] overflow-auto bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2 text-lg font-semibold">
               <div className="h-3 w-3 rounded-full" style={{ background: PLAN_COLORS[editing] }} />
               Edit {editing} Plan
@@ -200,8 +200,8 @@ export default function SAPackagesPage() {
             </div>
             {err && <div className="mt-2 text-sm text-red-600">{err}</div>}
             <div className="mt-4 flex justify-end gap-2">
-              <button className="rounded-lg border px-4 py-2 text-sm" onClick={() => setEditing(null)}>Cancel</button>
-              <button className="rounded-lg px-4 py-2 text-sm font-medium text-white" style={{ background: PLAN_COLORS[editing] }} onClick={saveEdit}>
+              <button className="ui-btn px-4 py-2 text-sm" onClick={() => setEditing(null)}>Cancel</button>
+              <button className="ui-btn px-4 py-2 text-sm text-white" style={{ background: PLAN_COLORS[editing], borderColor: "transparent" }} onClick={saveEdit}>
                 <i className="fa-solid fa-floppy-disk mr-2" />Save Changes
               </button>
             </div>

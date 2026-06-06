@@ -8,10 +8,10 @@ export default function AdminTradesPage() {
       style={active ? { color: "var(--brand-primary)" } : undefined}>{label}</Link>
   );
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 ui-fade-up">
       <div>
         <h1 className="text-2xl font-bold">Trade Desk</h1>
-        
+
       </div>
       <TradeDesk />
     </div>

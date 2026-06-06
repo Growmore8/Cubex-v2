@@ -29,7 +29,7 @@ export default function TenantBillingPage() {
   const currentPkg = subscription ? PACKAGES[subscription.plan as keyof typeof PACKAGES] : null;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 ui-fade-up">
       <div>
         <h1 className="text-2xl font-bold">Billing & Invoices</h1>
         <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Your subscription and payment history</p>
@@ -37,7 +37,7 @@ export default function TenantBillingPage() {
 
       {/* Current Plan */}
       {subscription && currentPkg && (
-        <div className="rounded-xl border p-5" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+        <div className="ui-card p-5">
           <div className="flex items-start justify-between">
             <div>
               <div className="text-xs font-semibold uppercase mb-1" style={{ color: "var(--muted-foreground)" }}>Current Plan</div>
@@ -66,13 +66,13 @@ export default function TenantBillingPage() {
       )}
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4 ui-fade-up-stagger">
         {[
           { label: "Total Paid", value: fmt(totalPaid), icon: "fa-circle-check", color: "#15803d", bg: "#dcfce7" },
           { label: "Pending / Overdue", value: fmt(pending.reduce((s, i) => s + Number(i.amount), 0)), icon: "fa-clock", color: "#b45309", bg: "#fef3c7" },
           { label: "Total Invoices", value: String(invoices.length), icon: "fa-file-invoice", color: "#1d4ed8", bg: "#dbeafe" },
         ].map(({ label, value, icon, color, bg }) => (
-          <div key={label} className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+          <div key={label} className="ui-card p-4">
             <div className="flex items-center gap-2 mb-2">
               <div className="rounded-lg w-8 h-8 flex items-center justify-center" style={{ background: bg }}>
                 <i className={"fa-solid " + icon} style={{ color, fontSize: 13 }} />
@@ -85,7 +85,7 @@ export default function TenantBillingPage() {
       </div>
 
       {/* Invoice History */}
-      <div className="rounded-xl border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+      <div className="ui-card p-0">
         <div className="border-b px-4 py-3 font-semibold text-sm" style={{ borderColor: "var(--border)" }}>Invoice History</div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -98,7 +98,7 @@ export default function TenantBillingPage() {
             </thead>
             <tbody>
               {invoices.map((inv) => (
-                <tr key={inv.id} className="border-b" style={{ borderColor: "var(--border)" }}>
+                <tr key={inv.id} className="ui-row border-b" style={{ borderColor: "var(--border)" }}>
                   <td className="px-4 py-2.5 font-mono text-xs font-semibold" style={{ color: "var(--brand-primary)" }}>{inv.number}</td>
                   <td className="px-4 py-2.5" style={{ color: "var(--muted-foreground)" }}>{inv.period}</td>
                   <td className="px-4 py-2.5">
@@ -115,7 +115,7 @@ export default function TenantBillingPage() {
                   <td className="px-4 py-2.5 text-xs" style={{ color: "var(--muted-foreground)" }}>{new Date(inv.dueAt).toLocaleDateString()}</td>
                   <td className="px-4 py-2.5 text-xs" style={{ color: "var(--muted-foreground)" }}>{inv.paidAt ? new Date(inv.paidAt).toLocaleDateString() : "—"}</td>
                   <td className="px-4 py-2.5">
-                    <button onClick={() => setPrintInv(inv)} className="rounded px-2 py-1 text-xs" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                    <button onClick={() => setPrintInv(inv)} className="ui-btn ui-btn-ghost px-2 py-1 text-xs">
                       <i className="fa-solid fa-print text-xs" style={{ color: "var(--muted-foreground)" }} />
                     </button>
                   </td>
@@ -132,12 +132,12 @@ export default function TenantBillingPage() {
       {/* Print Invoice */}
       {printInv && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-[600px] rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[600px] rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b px-6 py-4 print:hidden" style={{ borderColor: "#e2e8f0" }}>
               <div className="font-semibold text-gray-800">Invoice {printInv.number}</div>
               <div className="flex gap-2">
-                <button onClick={() => window.print()} className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm text-white"><i className="fa-solid fa-print mr-1" />Export PDF</button>
-                <button onClick={() => setPrintInv(null)} className="rounded-lg border px-4 py-1.5 text-sm text-gray-700">Close</button>
+                <button onClick={() => window.print()} className="ui-btn ui-btn-primary px-4 py-1.5 text-sm"><i className="fa-solid fa-print mr-1" />Export PDF</button>
+                <button onClick={() => setPrintInv(null)} className="ui-btn px-4 py-1.5 text-sm text-gray-700">Close</button>
               </div>
             </div>
             <div className="p-8">

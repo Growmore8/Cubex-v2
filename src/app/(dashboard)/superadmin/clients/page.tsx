@@ -146,7 +146,7 @@ export default function SAClientsPage() {
   const paged = filtered.slice((safeP - 1) * perPage, safeP * perPage);
 
   const m = (v: number) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const inp = "rounded-md border px-2 py-1.5 text-sm w-full";
+  const inp = "ui-input rounded-md border px-2 py-1.5 text-sm w-full";
 
   function statusBadge(r: any) {
     if (r.deactivated) return <span className="sab sab-amber">Inactive</span>;
@@ -154,25 +154,25 @@ export default function SAClientsPage() {
     return <span className="sab sab-green">Active</span>;
   }
 
-  const selStyle = "rounded border px-2 py-1.5 text-sm";
+  const selStyle = "ui-input rounded border px-2 py-1.5 text-sm";
   const btnStyle = (bg: string) => ({ background: bg, padding: "4px 8px", borderRadius: 4, border: "1px solid transparent", cursor: "pointer" });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 ui-fade-up">
       <div>
         <h1 className="text-2xl font-bold">All Clients</h1>
         <p className="text-sm text-gray-500">View all accounts across the platform</p>
       </div>
 
-      {err && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
+      {err && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
 
-      <div className="rounded-lg border bg-white" style={{ borderColor: "#e2e8f0" }}>
+      <div className="ui-card bg-white" style={{ borderColor: "#e2e8f0" }}>
         {/* Filter bar */}
         <div className="flex flex-wrap items-end gap-2 border-b px-3 py-2.5" style={{ borderColor: "#e2e8f0" }}>
           <div className="relative min-w-[220px] flex-1">
             <i className="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-[11px] text-gray-400" />
             <input
-              className="w-full rounded border py-1.5 pl-7 pr-2 text-sm"
+              className="ui-input w-full rounded border py-1.5 pl-7 pr-2 text-sm"
               placeholder="Search..."
               value={q}
               onChange={(e) => { setQ(e.target.value); setPage(1); }}
@@ -214,7 +214,7 @@ export default function SAClientsPage() {
             </thead>
             <tbody>
               {paged.map((r) => (
-                <tr key={r.id} className="border-b hover:bg-gray-50/60 transition-colors" style={{ borderColor: "#f0f4f8" }}>
+                <tr key={r.id} className="ui-row border-b" style={{ borderColor: "#f0f4f8" }}>
                   <td className="px-3 py-2.5">
                     <button className="font-mono text-blue-600 font-semibold hover:underline text-sm" onClick={() => openEdit(r)}>{r.login}</button>
                     {r.isPool && <div className="mt-0.5 text-[10px] font-medium" style={{ color: "#b45309" }}>POOL</div>}
@@ -295,15 +295,15 @@ export default function SAClientsPage() {
           <div className="flex items-center justify-between border-t px-3 py-2 text-sm" style={{ borderColor: "#e2e8f0" }}>
             <span className="text-gray-500">Page {safeP} of {totalPages} &nbsp;·&nbsp; {filtered.length} total</span>
             <div className="flex gap-1">
-              <button disabled={safeP <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border px-3 py-1 text-xs disabled:opacity-40">Prev</button>
+              <button disabled={safeP <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="ui-btn px-3 py-1 text-xs disabled:opacity-40">Prev</button>
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 const pg = safeP <= 3 ? i + 1 : safeP + i - 2;
                 if (pg < 1 || pg > totalPages) return null;
                 return (
-                  <button key={pg} onClick={() => setPage(pg)} className={"rounded border px-3 py-1 text-xs " + (pg === safeP ? "bg-blue-600 text-white border-blue-600" : "")}>{pg}</button>
+                  <button key={pg} onClick={() => setPage(pg)} className={"ui-btn px-3 py-1 text-xs " + (pg === safeP ? "ui-btn-primary" : "")}>{pg}</button>
                 );
               })}
-              <button disabled={safeP >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="rounded border px-3 py-1 text-xs disabled:opacity-40">Next</button>
+              <button disabled={safeP >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="ui-btn px-3 py-1 text-xs disabled:opacity-40">Next</button>
             </div>
           </div>
         )}
@@ -312,7 +312,7 @@ export default function SAClientsPage() {
       {/* ── EDIT MODAL ── */}
       {editRow && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-          <div className="w-[540px] max-h-[90vh] overflow-auto rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[540px] max-h-[90vh] overflow-auto bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-0.5 text-lg font-semibold">Edit Client</div>
             <div className="mb-4 text-xs text-gray-400">Account ID: <span className="font-mono font-semibold text-gray-700">{editRow.login}</span></div>
             <div className="grid grid-cols-2 gap-3">
@@ -346,7 +346,7 @@ export default function SAClientsPage() {
                 <CountrySelect className={inp} value={ef.country} onChange={(v) => setEf({ ...ef, country: v })} />
               </div>
             </div>
-            <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "#bfdbfe", background: "#eff6ff" }}>
+            <div className="mt-3 rounded-xl border p-3" style={{ borderColor: "#bfdbfe", background: "#eff6ff" }}>
               <div className="mb-2 text-xs font-semibold text-blue-700">
                 <i className="fa-solid fa-building mr-1.5" />TENANT ASSIGNMENT (this account only)
               </div>
@@ -358,8 +358,8 @@ export default function SAClientsPage() {
             </div>
             {err && <div className="mt-2 text-sm text-red-600">{err}</div>}
             <div className="mt-4 flex justify-end gap-2">
-              <button className="rounded-lg border px-4 py-2 text-sm" onClick={() => setEditRow(null)}>Cancel</button>
-              <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700" onClick={saveEdit}>Save Changes</button>
+              <button className="ui-btn px-4 py-2 text-sm" onClick={() => setEditRow(null)}>Cancel</button>
+              <button className="ui-btn ui-btn-primary px-4 py-2 text-sm" onClick={saveEdit}>Save Changes</button>
             </div>
           </div>
         </div>
@@ -368,7 +368,7 @@ export default function SAClientsPage() {
       {/* ── PASSWORD MODAL ── */}
       {pwRow && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
-          <div className="w-[360px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[360px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Reset Password</div>
             <div className="mb-3 text-xs text-gray-500">{pwRow.login} — {pwRow.name}</div>
             <div className="relative">
@@ -379,8 +379,8 @@ export default function SAClientsPage() {
             </div>
             {err && <div className="mt-2 text-sm text-red-600">{err}</div>}
             <div className="mt-3 flex justify-end gap-2">
-              <button className="rounded border px-3 py-1.5 text-sm" onClick={() => setPwRow(null)}>Cancel</button>
-              <button disabled={pwVal.length < 6} className="rounded bg-amber-600 px-3 py-1.5 text-sm text-white disabled:opacity-40" onClick={async () => { const ok = await act(pwRow.id, "resetPassword", { password: pwVal }); if (ok) setPwRow(null); }}>Reset</button>
+              <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setPwRow(null)}>Cancel</button>
+              <button disabled={pwVal.length < 6} className="ui-btn px-3 py-1.5 text-sm text-white disabled:opacity-40" style={{ background: "#d97706", borderColor: "transparent" }} onClick={async () => { const ok = await act(pwRow.id, "resetPassword", { password: pwVal }); if (ok) setPwRow(null); }}>Reset</button>
             </div>
           </div>
         </div>
@@ -389,14 +389,14 @@ export default function SAClientsPage() {
       {/* ── CHANGE ID MODAL ── */}
       {idRow && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
-          <div className="w-[360px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[360px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Change Login ID</div>
             <div className="mb-3 text-xs text-gray-500">Current: <span className="font-mono font-medium">{idRow.login}</span></div>
             <input className={inp + " font-mono"} value={idVal} onChange={(e) => setIdVal(e.target.value)} autoFocus />
             {err && <div className="mt-2 text-sm text-red-600">{err}</div>}
             <div className="mt-3 flex justify-end gap-2">
-              <button className="rounded border px-3 py-1.5 text-sm" onClick={() => setIdRow(null)}>Cancel</button>
-              <button disabled={!idVal || idVal === idRow.login} className="rounded bg-purple-600 px-3 py-1.5 text-sm text-white disabled:opacity-40" onClick={async () => { const ok = await act(idRow.id, "accountId", { login: idVal }); if (ok) setIdRow(null); }}>Update ID</button>
+              <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setIdRow(null)}>Cancel</button>
+              <button disabled={!idVal || idVal === idRow.login} className="ui-btn px-3 py-1.5 text-sm text-white disabled:opacity-40" style={{ background: "#7c3aed", borderColor: "transparent" }} onClick={async () => { const ok = await act(idRow.id, "accountId", { login: idVal }); if (ok) setIdRow(null); }}>Update ID</button>
             </div>
           </div>
         </div>
@@ -405,7 +405,7 @@ export default function SAClientsPage() {
       {/* ── ASSIGN MANAGER MODAL ── */}
       {mgrRow && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
-          <div className="w-[360px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[360px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Assign Manager</div>
             <div className="mb-3 text-xs text-gray-500">{mgrRow.login} — {mgrRow.name}</div>
             <select className={inp} value={mgrVal} onChange={(e) => setMgrVal(e.target.value)}>
@@ -415,8 +415,8 @@ export default function SAClientsPage() {
             {mgrTenantMgrs.length === 0 && <p className="mt-1 text-xs text-gray-400">No managers found for this tenant.</p>}
             {err && <div className="mt-2 text-sm text-red-600">{err}</div>}
             <div className="mt-3 flex justify-end gap-2">
-              <button className="rounded border px-3 py-1.5 text-sm" onClick={() => setMgrRow(null)}>Cancel</button>
-              <button className="rounded bg-green-600 px-3 py-1.5 text-sm text-white" onClick={async () => { const ok = await act(mgrRow.id, "assignManager", { managerId: mgrVal || null }); if (ok) setMgrRow(null); }}>Assign</button>
+              <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setMgrRow(null)}>Cancel</button>
+              <button className="ui-btn px-3 py-1.5 text-sm text-white" style={{ background: "#16a34a", borderColor: "transparent" }} onClick={async () => { const ok = await act(mgrRow.id, "assignManager", { managerId: mgrVal || null }); if (ok) setMgrRow(null); }}>Assign</button>
             </div>
           </div>
         </div>
@@ -425,15 +425,15 @@ export default function SAClientsPage() {
       {/* ── DELETE CONFIRM ── */}
       {delRow && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
-          <div className="w-[400px] rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-card ui-pop w-[400px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold text-red-600">Delete Client</div>
             <p className="mb-4 text-sm text-gray-600">
               Delete <span className="font-semibold">{delRow.login} — {delRow.name}</span> and all associated trades, history, and financial data? This <strong>cannot be undone</strong>.
             </p>
             {err && <div className="mb-2 text-sm text-red-600">{err}</div>}
             <div className="flex justify-end gap-2">
-              <button className="rounded-lg border px-4 py-2 text-sm" onClick={() => setDelRow(null)}>Cancel</button>
-              <button className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700" onClick={async () => { const ok = await act(delRow.id, "delete", {}); if (ok) setDelRow(null); }}>Delete</button>
+              <button className="ui-btn px-4 py-2 text-sm" onClick={() => setDelRow(null)}>Cancel</button>
+              <button className="ui-btn px-4 py-2 text-sm text-white" style={{ background: "#dc2626", borderColor: "transparent" }} onClick={async () => { const ok = await act(delRow.id, "delete", {}); if (ok) setDelRow(null); }}>Delete</button>
             </div>
           </div>
         </div>
