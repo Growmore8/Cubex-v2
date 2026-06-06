@@ -3,6 +3,7 @@ import { requireClient } from "@/lib/guard";
 import { clientAccount, listClientKyc, createKyc } from "@/services/kyc.service";
 import { notifyTenantAdmins } from "@/services/notification.service";
 import { saveUpload } from "@/lib/upload";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const s = await requireClient();
@@ -29,6 +30,7 @@ export async function POST(req: Request) {
     const backKey = await saveUpload(back, "kyc/" + account.id);
     const doc = await createKyc(account.id, docType, key, backKey);
     await notifyTenantAdmins(s.tenantId!, "New KYC submitted", account.login + " uploaded " + docType + " (front + back)");
+    await audit(s.tenantId!, "kyc.submit", account.login + " uploaded " + docType + " (front + back)", s.email || account.login, "CLIENT");
     return NextResponse.json({ ok: true, doc });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Upload failed" }, { status: 400 });
