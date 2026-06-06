@@ -570,6 +570,12 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div>
                       <div className="text-sm font-bold">{p.symbol} <span className="text-[12px] font-semibold" style={{ color: p.type === "BUY" ? BLUE : SELL }}>{p.type} {p.lots}</span></div>
                       <div className="text-[10px] text-[var(--muted)]">{Number(p.openPrice).toFixed(dd)} → {cur.toFixed(dd)}</div>
+                      {(p.sl > 0 || p.tp > 0) && (
+                        <div className="mt-0.5 flex gap-2 text-[9px] font-semibold tabular-nums">
+                          {p.sl > 0 && <span style={{ color: "#f43f5e" }}>SL {Number(p.sl).toFixed(dd)}</span>}
+                          {p.tp > 0 && <span style={{ color: "#10b981" }}>TP {Number(p.tp).toFixed(dd)}</span>}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right text-sm font-bold" style={{ color: plv >= 0 ? BUY : SELL }}>{(plv >= 0 ? "+" : "") + fmt(plv)}</div>

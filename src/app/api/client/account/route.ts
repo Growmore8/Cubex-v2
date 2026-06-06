@@ -42,10 +42,10 @@ export async function GET(req: Request) {
     });
   }
 
-  // For sub-accounts: resolve parent's name/email so the app displays consistently
-  let parentDisplay: { name: string; email: string | null } | null = null;
+  // For sub-accounts: resolve parent's name/email/phone so the app displays consistently
+  let parentDisplay: { name: string; email: string | null; phone: string | null } | null = null;
   if (account?.parentId) {
-    parentDisplay = await prisma.account.findUnique({ where: { id: account.parentId }, select: { name: true, email: true } }).catch(() => null);
+    parentDisplay = await prisma.account.findUnique({ where: { id: account.parentId }, select: { name: true, email: true, phone: true } }).catch(() => null);
   }
 
   // User-level KYC: verified if any of the user's accounts has an approved document.
@@ -82,7 +82,7 @@ export async function GET(req: Request) {
       login: account.login, type: account.type, currency: account.currency, leverage: account.leverage, locked: account.locked,
       name: parentDisplay?.name || account.name,
       email: parentDisplay?.email || account.email || account.user?.email || null,
-      phone: account.phone || null, country: account.country || null,
+      phone: parentDisplay?.phone || account.phone || null, country: account.country || null,
       ownerName: account.user?.name || account.name,
       deposit: Number(account.deposit), withdrawal: Number(account.withdrawal),
       credit: Number(account.credit), bonus: Number(account.bonus), pnl: Number(account.pnl),

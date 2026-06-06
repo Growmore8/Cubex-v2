@@ -3,6 +3,8 @@ import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { validateSlTp } from "@/lib/trademath";
 import { emitRefresh } from "@/lib/realtime";
+import { audit } from "@/lib/audit";
+import { notifyStaff } from "@/services/notification.service";
 import { Prisma } from "@prisma/client";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -13,6 +15,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = await req.json();
     const trade = await prisma.trade.findFirst({
       where: { id: BigInt(id), account: { userId: s.sub, tenantId: s.tenantId! } },
+      include: { account: { select: { login: true, managerId: true } } },
     });
     if (!trade) return NextResponse.json({ ok: false, error: "Position not found" }, { status: 404 });
     const newSl = body.sl !== undefined ? Number(body.sl) || 0 : Number(trade.sl);
@@ -23,6 +26,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (body.sl !== undefined) data.sl = new Prisma.Decimal(newSl);
     if (body.tp !== undefined) data.tp = new Prisma.Decimal(newTp);
     await prisma.trade.update({ where: { id: trade.id }, data });
+    const label = `${trade.account.login} modified ${trade.symbol} ${trade.type} #${trade.ticket} — SL: ${newSl || "off"} TP: ${newTp || "off"}`;
+    audit(s.tenantId!, "trade.modify_sl_tp", label, trade.account.login, "CLIENT");
+    notifyStaff(s.tenantId!, { type: "TRADE", title: "SL/TP modified", body: label }, trade.account.managerId).catch(() => {});
     emitRefresh();
     return NextResponse.json({ ok: true });
   } catch (e: any) {

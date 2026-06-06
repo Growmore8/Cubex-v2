@@ -3,6 +3,8 @@ import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen } from "@/lib/perms";
 import { assertMarketOpen } from "@/services/trade.service";
+import { audit } from "@/lib/audit";
+import { notifyStaff } from "@/services/notification.service";
 async function acc(s: any, accountId?: string) {
   if (accountId) {
     const a = await prisma.account.findFirst({ where: { tenantId: s.tenantId, userId: s.sub, id: accountId } });
@@ -31,6 +33,9 @@ export async function POST(req: Request) {
     const side = b.side === "SELL" ? "SELL" : "BUY";
     const kind = b.kind === "STOP" ? "STOP" : "LIMIT";
     await prisma.pendingOrder.create({ data: { tenantId: a.tenantId, accountId: a.id, symbol: b.symbol, side: side as any, kind, lots, price, sl: Number(b.sl) || 0, tp: Number(b.tp) || 0 } });
+    const label = `${a.login} placed ${kind} ${side} ${b.symbol} ${lots}L @ ${price}${Number(b.sl) ? " SL:" + b.sl : ""}${Number(b.tp) ? " TP:" + b.tp : ""}`;
+    audit(a.tenantId, "trade.pending_placed", label, a.login, "CLIENT");
+    notifyStaff(a.tenantId, { type: "TRADE", title: "Pending order placed", body: label }, a.managerId).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (e: any) { return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 }); }
 }
