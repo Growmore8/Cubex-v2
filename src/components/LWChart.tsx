@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { createChart, ColorType, LineStyle } from "lightweight-charts";
+import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries } from "lightweight-charts";
 import { io, Socket } from "socket.io-client";
 
 // Simple / exponential moving average over candle closes -> line-series data.
@@ -92,7 +92,7 @@ export default function LWChart({
       crosshair: { mode: 0 },
       autoSize: true,
     });
-    const series = (chart as any).addCandlestickSeries({
+    const series = chart.addSeries(CandlestickSeries, {
       upColor: "#26a69a", downColor: "#e05260", borderUpColor: "#26a69a", borderDownColor: "#e05260",
       wickUpColor: "#26a69a", wickDownColor: "#e05260",
       priceFormat: { type: "price", precision: digits, minMove: Math.pow(10, -digits) },
@@ -122,7 +122,7 @@ export default function LWChart({
         if (!trendStart.current) { trendStart.current = { time: param.time, value: price }; }
         else {
           const pts = [trendStart.current, { time: param.time, value: price }].sort((x, y) => (x.time as number) - (y.time as number));
-          const ls = (chart as any).addLineSeries({ color: "#5aa9ff", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+          const ls = chart.addSeries(LineSeries, { color: "#5aa9ff", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
           try { ls.setData(pts); } catch {}
           trendRefs.current.push(ls);
           trendStart.current = null; setTool("none"); setDrawN((n) => n + 1);
@@ -136,10 +136,10 @@ export default function LWChart({
   // Indicators (SMA/EMA over closes) — add/remove + recompute on toggle or data change
   useEffect(() => {
     const chart = chartRef.current; if (!chart) return;
-    if (sma && !smaRef.current) smaRef.current = chart.addLineSeries({ color: "#f0b90b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    if (sma && !smaRef.current) smaRef.current = chart.addSeries(LineSeries, { color: "#f0b90b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
     if (!sma && smaRef.current) { try { chart.removeSeries(smaRef.current); } catch {} smaRef.current = null; }
     if (sma && smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, 20, false)); } catch {} }
-    if (ema && !emaRef.current) emaRef.current = chart.addLineSeries({ color: "#a78bfa", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    if (ema && !emaRef.current) emaRef.current = chart.addSeries(LineSeries, { color: "#a78bfa", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
     if (!ema && emaRef.current) { try { chart.removeSeries(emaRef.current); } catch {} emaRef.current = null; }
     if (ema && emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, 20, true)); } catch {} }
   }, [sma, ema, symbol, tf, theme, digits, drawN]);
