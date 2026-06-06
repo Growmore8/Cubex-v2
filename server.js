@@ -204,20 +204,28 @@ function ensureSeeded() {
 // weekend (Fri 21:00 UTC → Sun 21:00 UTC); stocks/indices trade weekday US hours.
 // When closed, prices are frozen (no jitter, no feed walk) so they don't drift.
 function isMarketOpen(sym, cat) {
+  const s = String(sym || "").toUpperCase();
   const c = String(cat || "").toLowerCase();
-  if (c === "crypto" || /USDT?$/.test(sym) && /(BTC|ETH|BNB|SOL|XRP|ADA|DOGE|LTC|DOT|AVAX|TRX|LINK)/.test(sym)) return true; // 24/7
+  // Crypto: 24/7
+  if (c === "crypto" || /USDT$/.test(s) || /^(BTC|ETH|BNB|SOL|XRP|ADA|DOGE|LTC|DOT|AVAX|TRX|LINK|SHIB|MATIC|UNI)/.test(s)) return true;
   const now = new Date();
   const day = now.getUTCDay();   // 0=Sun … 6=Sat
   const h = now.getUTCHours();
+  // Stocks / indices: weekday US session
   if (c === "stocks" || c === "indices") {
     if (day === 0 || day === 6) return false;
-    return h >= 13 && h < 21;     // ~US cash session in UTC (simplified)
+    return h >= 13 && h < 21;
   }
-  // forex & metals (default): closed over the weekend
-  if (day === 6) return false;                 // Saturday
-  if (day === 0 && h < 21) return false;        // Sunday before 21:00 UTC
-  if (day === 5 && h >= 21) return false;        // Friday after 21:00 UTC
-  return true;
+  // Forex & metals: weekend close — ONLY for confirmed fx/metals (don't freeze
+  // unknown/uncategorized symbols, or the whole watch can look frozen).
+  const isFx = c === "forex" || c === "metals" || /^(XAU|XAG|XPT|XPD)/.test(s) || /^[A-Z]{6}$/.test(s);
+  if (isFx) {
+    if (day === 6) return false;                 // Saturday
+    if (day === 0 && h < 21) return false;        // Sunday before 21:00 UTC
+    if (day === 5 && h >= 21) return false;        // Friday after 21:00 UTC
+    return true;
+  }
+  return true; // unknown category/symbol → keep moving
 }
 
 function microTick() {

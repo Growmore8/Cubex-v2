@@ -4,7 +4,7 @@
 export function isMarketOpen(symbol: string, category?: string | null): boolean {
   const sym = String(symbol || "").toUpperCase();
   const c = String(category || "").toLowerCase();
-  if (c === "crypto" || (/USDT?$/.test(sym) && /(BTC|ETH|BNB|SOL|XRP|ADA|DOGE|LTC|DOT|AVAX|TRX|LINK)/.test(sym))) return true;
+  if (c === "crypto" || /USDT$/.test(sym) || /^(BTC|ETH|BNB|SOL|XRP|ADA|DOGE|LTC|DOT|AVAX|TRX|LINK|SHIB|MATIC|UNI)/.test(sym)) return true;
   const now = new Date();
   const day = now.getUTCDay(); // 0=Sun … 6=Sat
   const h = now.getUTCHours();
@@ -12,9 +12,13 @@ export function isMarketOpen(symbol: string, category?: string | null): boolean 
     if (day === 0 || day === 6) return false;
     return h >= 13 && h < 21;
   }
-  // forex & metals (default): closed over the weekend
-  if (day === 6) return false;
-  if (day === 0 && h < 21) return false;
-  if (day === 5 && h >= 21) return false;
+  // Forex & metals: weekend close — only for confirmed fx/metals; unknown stays open.
+  const isFx = c === "forex" || c === "metals" || /^(XAU|XAG|XPT|XPD)/.test(sym) || /^[A-Z]{6}$/.test(sym);
+  if (isFx) {
+    if (day === 6) return false;
+    if (day === 0 && h < 21) return false;
+    if (day === 5 && h >= 21) return false;
+    return true;
+  }
   return true;
 }
