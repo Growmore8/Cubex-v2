@@ -424,15 +424,17 @@ export default function LWChart({
     linePricesRef.current = lp;
     try { s.priceScale().applyOptions({ autoScale: true }); } catch {} // force rescale to include the lines
     for (const p of positions || []) {
-      const col = p.type === "BUY" ? "#2f81f7" : "#e05260";
       const pending = !!p.kind;
+      // Entry line: BUY=blue, SELL=crimson; pending=amber (dotted)
+      const entryCol = pending ? "#f59e0b" : (p.type === "BUY" ? "#3b82f6" : "#ef4444");
       lineRefs.current.push(s.createPriceLine({
-        price: p.openPrice, color: col, lineWidth: 2,
+        price: p.openPrice, color: entryCol, lineWidth: 2,
         lineStyle: pending ? LineStyle.Dotted : LineStyle.Solid, axisLabelVisible: true,
-        title: `${p.kind ? p.kind + " " : ""}${p.type} ${p.lots}`,
+        title: `${p.kind ? p.kind + " " : ""}${p.type} ${p.lots}${!pending && p.pnl != null ? " " + (p.pnl >= 0 ? "+" : "") + Number(p.pnl).toFixed(2) : ""}`,
       }));
-      if (p.sl) lineRefs.current.push(s.createPriceLine({ price: p.sl, color: "#e05260", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "SL" }));
-      if (p.tp) lineRefs.current.push(s.createPriceLine({ price: p.tp, color: "#26a69a", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "TP" }));
+      // SL = rose red; TP = emerald green — same for all trade types so they're always recognizable
+      if (p.sl) lineRefs.current.push(s.createPriceLine({ price: p.sl, color: "#f43f5e", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "SL" }));
+      if (p.tp) lineRefs.current.push(s.createPriceLine({ price: p.tp, color: "#10b981", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "TP" }));
     }
   }, [positions, theme, tf, symbol]);
 

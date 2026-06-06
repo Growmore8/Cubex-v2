@@ -45,6 +45,7 @@ export default function TradeDesk() {
     const socket: Socket = io({ path: "/socket.io" });
     socket.on("tick", ({ symbol, price }: any) => setPrices((p) => ({ ...p, [symbol]: price })));
     socket.on("liquidation", () => { loadOpen(); loadReports(); });
+    socket.on("refresh", () => { loadOpen(); loadHistory(); loadReports(); });
     const t = setInterval(loadOpen, 8000);
     return () => { socket.disconnect(); clearInterval(t); };
   }, []);
@@ -101,12 +102,13 @@ export default function TradeDesk() {
                 <th className="px-3 py-2.5">Ticket</th><th className="px-3 py-2.5">Account</th>
                 <th className="px-3 py-2.5">Symbol</th><th className="px-3 py-2.5">Side</th>
                 <th className="px-3 py-2.5">Lots</th><th className="px-3 py-2.5">Open</th>
+                <th className="px-3 py-2.5">SL</th><th className="px-3 py-2.5">TP</th>
                 <th className="px-3 py-2.5">Current</th><th className="px-3 py-2.5">P&L</th>
                 <th className="px-3 py-2.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
-              {open.length === 0 ? <tr><td className="px-3 py-4 text-gray-500" colSpan={9}>No open positions.</td></tr> : open.map((p) => {
+              {open.length === 0 ? <tr><td className="px-3 py-4 text-gray-500" colSpan={11}>No open positions.</td></tr> : open.map((p) => {
                 const cur = prices[p.symbol] ?? p.openPrice;
                 const pl = pnlOf(p, cur);
                 return (
@@ -117,6 +119,8 @@ export default function TradeDesk() {
                     <td className={"px-3 py-2 font-medium " + (p.type === "BUY" ? "text-blue-600" : "text-red-600")}>{p.type}</td>
                     <td className="px-3 py-2">{p.lots}</td>
                     <td className="px-3 py-2 font-mono">{p.openPrice.toFixed(dg(p.symbol))}</td>
+                    <td className="px-3 py-2 font-mono text-red-500">{p.sl > 0 ? p.sl.toFixed(dg(p.symbol)) : <span className="text-gray-400">—</span>}</td>
+                    <td className="px-3 py-2 font-mono text-green-600">{p.tp > 0 ? p.tp.toFixed(dg(p.symbol)) : <span className="text-gray-400">—</span>}</td>
                     <td className="px-3 py-2 font-mono">{cur.toFixed(dg(p.symbol))}</td>
                     <td className={"px-3 py-2 font-medium " + (pl >= 0 ? "text-green-600" : "text-red-600")}>{pl.toFixed(2)}</td>
                     <td className="px-3 py-2 text-right"><button className="ui-btn ui-btn-ghost px-3 py-1 text-xs font-medium text-red-600" onClick={() => close(p.id)}>Force close</button></td>

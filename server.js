@@ -279,6 +279,25 @@ function calcPnl(symbol, type, openPrice, price, lots) {
   return diff * lots * m.contract;
 }
 const liquidating = new Set(); // guard: prevent double-liquidation of same account
+const closing = new Set();    // guard: prevent double-close of same trade (TP/SL)
+
+async function closeTpSl(t, reason, price, io) {
+  if (closing.has(t.id.toString())) return;
+  closing.add(t.id.toString());
+  try {
+    const pnl = calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
+    await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: t.accountId, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl, closeReason: reason, openedAt: t.openedAt } });
+    await prisma.trade.delete({ where: { id: t.id } });
+    await prisma.account.update({ where: { id: t.accountId }, data: { pnl: { increment: pnl } } });
+    if (t.account && t.account.userId) {
+      const title = reason === "TP" ? "Take Profit hit ✓" : "Stop Loss hit";
+      const body = `${t.symbol} ${t.type} closed @ ${price} | P/L ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}`;
+      await prisma.notification.create({ data: { tenantId: t.account.tenantId, userId: t.account.userId, title, body } }).catch(() => {});
+    }
+    io.emit("refresh", {});
+    console.log("[" + reason + "]", t.symbol, t.type, Number(t.lots) + "L @ " + price, "P/L", calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots)).toFixed(2));
+  } catch (e) { console.error("[tp/sl close]", e); } finally { closing.delete(t.id.toString()); }
+}
 
 async function liquidate(acc, list, io) {
   if (liquidating.has(acc.id)) return;
@@ -328,6 +347,23 @@ async function monitor(io) {
       }
       if (used <= 0) continue;
       if (((balance + floating) / used) * 100 <= mc) await liquidate(acc, list, io);
+    }
+    // TP / SL auto-close — check every open trade against current price
+    for (const t of trades) {
+      if (closing.has(t.id.toString())) continue;
+      const st = state[t.symbol];
+      if (!st || st.price == null) continue;
+      const price = st.price;
+      const sl = Number(t.sl), tp = Number(t.tp);
+      let reason = null;
+      if (t.type === "BUY") {
+        if (tp > 0 && price >= tp) reason = "TP";
+        else if (sl > 0 && price <= sl) reason = "SL";
+      } else {
+        if (tp > 0 && price <= tp) reason = "TP";
+        else if (sl > 0 && price >= sl) reason = "SL";
+      }
+      if (reason) closeTpSl(t, reason, price, io); // fire-and-forget; closing Set prevents re-entry
     }
   } catch (e) { console.error("[monitor]", e); }
 }
