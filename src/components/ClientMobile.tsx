@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import LWChart from "@/components/LWChart";
+import WalletPanel from "@/components/WalletPanel";
 
 const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD@tv-basicstudies"], ["Stoch", "Stochastic@tv-basicstudies"], ["BBands", "BB@tv-basicstudies"], ["MA", "MASimple@tv-basicstudies"], ["ROC", "ROC@tv-basicstudies"]];
 
@@ -40,6 +41,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [qcat, setQcat] = useState<string>("Crypto"); // quotes open on Crypto by default
   const [symPickerOpen, setSymPickerOpen] = useState(false);
   const [symSearch, setSymSearch] = useState("");
+  const [walletTab, setWalletTab] = useState<null | "deposit" | "withdraw" | "kyc">(null);
   const [modifyId, setModifyId] = useState<string | null>(null);
   const [mSl, setMSl] = useState("");
   const [mTp, setMTp] = useState("");
@@ -223,8 +225,8 @@ export default function ClientMobile({ t }: { t: any }) {
             {/* action buttons — LIVE: deposit/withdraw/transfer · DEMO: top-up only */}
             {account?.type === "LIVE" ? (
               <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => { window.location.href = "/client/wallet?action=deposit"; }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-down" /><span className="text-[11px] font-semibold">Deposit</span></button>
-                <button onClick={() => { window.location.href = "/client/wallet?action=withdraw"; }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-up" /><span className="text-[11px] font-semibold">Withdraw</span></button>
+                <button onClick={() => setWalletTab("deposit")} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-down" /><span className="text-[11px] font-semibold">Deposit</span></button>
+                <button onClick={() => setWalletTab("withdraw")} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-up" /><span className="text-[11px] font-semibold">Withdraw</span></button>
                 <button onClick={() => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BLUE }}><i className="fa-solid fa-right-left" /><span className="text-[11px] font-semibold">Transfer</span></button>
               </div>
             ) : (
@@ -513,7 +515,7 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(240,180,41,0.5)", background: "rgba(240,180,41,0.1)" }}>
                 <div className="flex items-center gap-2 text-[13px] font-bold" style={{ color: "#f0b829" }}><i className="fa-solid fa-id-card" /> Verify your identity</div>
                 <p className="mt-1 text-[12px] text-[var(--muted)]">Upload your Identity Document and Address Proof to unlock trading on your live account. Demo accounts work without KYC — switch below to trade demo now.</p>
-                <button onClick={() => { window.location.href = "/client/wallet?action=kyc"; }} className="mt-3 w-full rounded-xl py-2.5 text-sm font-semibold text-white" style={{ background: "#f0b829" }}>Upload KYC</button>
+                <button onClick={() => setWalletTab("kyc")} className="mt-3 w-full rounded-xl py-2.5 text-sm font-semibold text-white" style={{ background: "#f0b829" }}>Upload KYC</button>
                 {demoAccts.length > 0 && <button onClick={() => { const d = demoAccts.find((a: any) => a.id !== accId) || demoAccts[0]; if (d) switchAcc(d.id); }} className="mt-2 w-full rounded-xl border py-2 text-[12px] font-semibold" style={{ borderColor: "var(--border)" }}>Switch to demo account</button>}
               </div>
             )}
@@ -791,6 +793,15 @@ export default function ClientMobile({ t }: { t: any }) {
       )}
 
       {/* PIN change modal */}
+      {/* WALLET (Deposit / Withdraw / KYC) — opens IN-APP, not a separate page */}
+      {walletTab && (
+        <div className="fixed inset-0 z-[125] flex items-start justify-center overflow-auto p-3" style={{ background: "rgba(0,0,0,0.55)", paddingTop: "max(12px, env(safe-area-inset-top))", paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <WalletPanel key={walletTab} initialTab={walletTab} onClose={() => setWalletTab(null)} />
+          </div>
+        </div>
+      )}
+
       {/* SYMBOL SEARCH PICKER (chart) */}
       {symPickerOpen && (
         <div className="fixed inset-0 z-[115] flex flex-col" style={{ background: "var(--bg)", paddingTop: "env(safe-area-inset-top)" }}>
