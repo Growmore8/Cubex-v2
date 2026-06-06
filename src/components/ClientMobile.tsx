@@ -760,17 +760,29 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
       )}
 
-      {/* BOTTOM NAV — iOS Liquid Glass floating bar */}
-      <div className="px-3 pt-1.5" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
-        <div className="glass glass-edge relative flex overflow-hidden rounded-[22px]" style={{ background: theme === "dark" ? "rgba(28,30,38,0.55)" : "rgba(255,255,255,0.58)" }}>
-          {/* springy active capsule */}
-          <span className="nav-ios-pill pointer-events-none absolute bottom-1.5 top-1.5 rounded-[15px]" style={{ width: `calc(${100 / navItems.length}% - 8px)`, left: `calc(${Math.max(0, navItems.findIndex(([k]) => k === tab)) * (100 / navItems.length)}% + 4px)`, background: theme === "dark" ? "rgba(47,129,247,0.22)" : "rgba(47,129,247,0.14)" }} />
+      {/* BOTTOM NAV — premium floating glass bar */}
+      <div className="px-3.5 pt-2" style={{ paddingBottom: "max(0.55rem, env(safe-area-inset-bottom))" }}>
+        <div className="glass relative flex items-stretch rounded-[24px] px-1.5 py-1.5"
+          style={{
+            background: theme === "dark" ? "rgba(20,24,33,0.72)" : "rgba(255,255,255,0.74)",
+            boxShadow: theme === "dark"
+              ? "0 12px 32px -12px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.10)"
+              : "0 12px 30px -14px rgba(15,23,42,0.45), inset 0 1px 0 rgba(255,255,255,0.7)",
+          }}>
           {navItems.map(([k, icon, label]) => {
             const active = tab === k;
             return (
-              <button key={k} onClick={() => setTab(k as any)} className="nav-ios-item relative z-10 flex flex-1 flex-col items-center gap-0.5 py-2.5" style={{ color: active ? BLUE : "var(--muted)" }}>
-                <i className={`fa-solid ${icon} text-[16px]`} />
-                <span className="text-[9px] font-semibold tracking-tight">{label}</span>
+              <button key={k} onClick={() => setTab(k as any)} className="nav-ios-item relative flex flex-1 flex-col items-center justify-center gap-1 py-1">
+                <span className="flex h-9 w-9 items-center justify-center rounded-[14px]"
+                  style={{
+                    background: active ? "linear-gradient(135deg, #3b8bff, #2563eb)" : "transparent",
+                    boxShadow: active ? "0 8px 18px -6px rgba(47,129,247,0.65)" : "none",
+                    transform: active ? "translateY(-2px)" : "none",
+                    transition: "background .3s ease, box-shadow .3s ease, transform .28s cubic-bezier(.34,1.56,.64,1)",
+                  }}>
+                  <i className={`fa-solid ${icon}`} style={{ fontSize: active ? 16 : 15, color: active ? "#fff" : "var(--muted)", transition: "color .25s ease, font-size .2s ease" }} />
+                </span>
+                <span className="text-[9px] font-semibold tracking-tight" style={{ color: active ? BLUE : "var(--muted)", transition: "color .25s ease" }}>{label}</span>
               </button>
             );
           })}
