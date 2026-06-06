@@ -85,13 +85,24 @@ export default function ClientMobile({ t }: { t: any }) {
     return ((p - b) / b) * 100;
   };
 
-  // movers
-  const priced = (symbols || []).filter((s: any) => prices[s.symbol] != null);
-  // Rank by cumulative % change (stable order) — NOT instantaneous tick direction,
-  // which flipped every 80ms and made the list jump/glitch.
-  const _ranked = [...priced].sort((a: any, b: any) => pctOf(b.symbol) - pctOf(a.symbol));
-  const gainers = _ranked.filter((s: any) => pctOf(s.symbol) > 0).slice(0, 3);
-  const losers = _ranked.filter((s: any) => pctOf(s.symbol) < 0).slice(-3).reverse();
+  // movers — snapshotted every 3s (not every ~80ms tick) so the list & numbers
+  // stay calm instead of flickering. Ranked by cumulative % change.
+  const pricesRef = useRef(prices); pricesRef.current = prices;
+  const [movers, setMovers] = useState<{ gainers: any[]; losers: any[]; any: boolean }>({ gainers: [], losers: [], any: false });
+  useEffect(() => {
+    const compute = () => {
+      const pr = pricesRef.current; const b = baselineRef.current;
+      const list = (symbols || []).filter((s: any) => pr[s.symbol] != null).map((s: any) => {
+        const base = b[s.symbol]; const p = pr[s.symbol];
+        return { symbol: s.symbol, display: s.display, price: p, pct: (base && p) ? ((p - base) / base) * 100 : 0 };
+      });
+      list.sort((a: any, b2: any) => b2.pct - a.pct);
+      setMovers({ gainers: list.filter((x: any) => x.pct > 0).slice(0, 3), losers: list.filter((x: any) => x.pct < 0).slice(-3).reverse(), any: list.length > 0 });
+    };
+    compute();
+    const t = setInterval(compute, 3000);
+    return () => clearInterval(t);
+  }, [symbols]);
 
   const Avatar = ({ size }: { size: number }) => (
     <div className="overflow-hidden rounded-full" style={{ width: size, height: size, background: avatarUrl ? undefined : "linear-gradient(135deg,#2563eb,#16a34a)" }}>
@@ -261,16 +272,16 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="text-[11px] font-bold tracking-wide"><i className="fa-solid fa-arrow-trend-up mr-1.5" style={{ color: BUY }} />MARKET MOVERS</div>
                 <span className="text-[9px] text-[var(--muted)]">LIVE</span>
               </div>
-              {priced.length === 0 ? <div className="py-4 text-center text-[11px] text-[var(--muted)]">Waiting for live prices…</div> : (
+              {!movers.any ? <div className="py-4 text-center text-[11px] text-[var(--muted)]">Waiting for live prices…</div> : (
                 <div className="space-y-3">
                   <div>
                     <div className="mb-1 text-[9px] font-semibold text-[var(--muted)]">TOP GAINERS</div>
-                    {(gainers.length ? gainers : priced.slice(0, 3)).map((s: any) => {
-                      const p = pctOf(s.symbol);
+                    {movers.gainers.map((s: any) => {
+                      const p = s.pct;
                       return (
                         <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 py-1.5">
                           <span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-up" /></span>
-                          <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] text-[var(--muted)]">{prices[s.symbol]?.toFixed(dg(s.symbol))}</div></div>
+                          <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
                           <span className="text-[12px] font-semibold" style={{ color: BUY }}>{(p >= 0 ? "+" : "") + p.toFixed(2)}%</span>
                         </button>
                       );
@@ -278,12 +289,12 @@ export default function ClientMobile({ t }: { t: any }) {
                   </div>
                   <div>
                     <div className="mb-1 text-[9px] font-semibold text-[var(--muted)]">TOP LOSERS</div>
-                    {(losers.length ? losers : priced.slice(3, 6)).map((s: any) => {
-                      const p = pctOf(s.symbol);
+                    {movers.losers.map((s: any) => {
+                      const p = s.pct;
                       return (
                         <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 py-1.5">
                           <span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-down" /></span>
-                          <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] text-[var(--muted)]">{prices[s.symbol]?.toFixed(dg(s.symbol))}</div></div>
+                          <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
                           <span className="text-[12px] font-semibold" style={{ color: SELL }}>{p.toFixed(2)}%</span>
                         </button>
                       );

@@ -1,11 +1,16 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 // Polls session validity. Logs out on deactivation / other-device / expiry,
 // and shows a global red READ-ONLY banner when the account is locked.
 export default function SessionGuard() {
   const done = useRef(false);
   const [readOnly, setReadOnly] = useState(false);
+  const path = usePathname() || "";
+  // The client terminal + admin/manager desk render their OWN read-only banner,
+  // so suppress this global one there (it was showing twice). Polling still runs.
+  const ownBanner = path.startsWith("/client") || path.startsWith("/admin") || path.startsWith("/manager");
 
   useEffect(() => {
     let alive = true;
@@ -29,7 +34,7 @@ export default function SessionGuard() {
     return () => { alive = false; clearInterval(t); };
   }, []);
 
-  if (!readOnly) return null;
+  if (!readOnly || ownBanner) return null;
   return (
     <div
       style={{
