@@ -218,29 +218,66 @@ export default function ClientMobile({ t }: { t: any }) {
       {/* Notification panel — full-screen overlay */}
       {notisOpen && (
         <>
-          <div className="fixed inset-0 z-[70]" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setNotisOpen(false)} />
-          <div className="fixed inset-x-0 top-0 z-[80] flex flex-col rounded-b-3xl shadow-2xl" style={{ background: "var(--panel)", maxHeight: "72vh" }}>
-            <div className="flex items-center justify-between px-5 pb-3 pt-5">
-              <div className="text-[15px] font-bold text-[var(--text)]">Notifications</div>
-              <button onClick={() => setNotisOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-sm" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-xmark" /></button>
+          {/* Backdrop */}
+          <div className="fixed inset-0 z-[70]" style={{ background: "rgba(0,0,0,0.5)", animation: "fadeIn 0.2s ease" }} onClick={() => setNotisOpen(false)} />
+          {/* Bottom sheet */}
+          <div className="fixed inset-x-0 bottom-0 z-[80] flex flex-col rounded-t-3xl shadow-2xl" style={{ background: "var(--panel)", maxHeight: "78vh", animation: "slideUp 0.28s cubic-bezier(0.32,0.72,0,1)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="h-1 w-10 rounded-full" style={{ background: "var(--border)" }} />
             </div>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pb-3 pt-1">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: GOLD + "20" }}>
+                  <i className="fa-solid fa-bell text-sm" style={{ color: GOLD }} />
+                </div>
+                <div>
+                  <div className="text-[15px] font-bold text-[var(--text)]">Notifications</div>
+                  {unread > 0 && <div className="text-[10px]" style={{ color: GOLD }}>{unread} unread</div>}
+                </div>
+              </div>
+              <button onClick={() => setNotisOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-base transition-opacity active:opacity-60" style={{ background: "var(--soft)", color: "var(--muted)" }}>
+                <i className="fa-solid fa-xmark" />
+              </button>
+            </div>
+            {/* Divider */}
+            <div className="mx-5 mb-2 h-px" style={{ background: "var(--border)" }} />
+            {/* Notification list */}
             <div className="overflow-auto pb-4">
-              {(notis || []).length === 0
-                ? <div className="py-12 text-center text-[13px] text-[var(--muted)]"><i className="fa-solid fa-bell-slash mb-3 block text-3xl opacity-30" />No notifications</div>
-                : (notis || []).map((n: any, i: number) => (
-                  <div key={i} className="flex gap-3 border-b px-5 py-3.5 last:border-0" style={{ borderColor: "var(--border)", background: !n.read ? "color-mix(in srgb, var(--soft) 60%, transparent)" : undefined }}>
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm" style={{ background: "rgba(227,168,85,0.18)", color: GOLD }}>
-                      <i className="fa-solid fa-bell" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[13px] font-semibold text-[var(--text)]">{n.title}</div>
-                      {n.body && <div className="mt-0.5 text-[12px] leading-snug text-[var(--muted)]">{n.body}</div>}
-                      <div className="mt-1 text-[10px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div>
-                    </div>
-                    {!n.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ background: SELL }} />}
+              {(notis || []).length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-14 text-center">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full" style={{ background: "var(--soft)" }}>
+                    <i className="fa-solid fa-bell-slash text-2xl" style={{ color: "var(--muted)" }} />
                   </div>
-                ))
-              }
+                  <div className="text-[14px] font-semibold text-[var(--text)]">All caught up</div>
+                  <div className="mt-1 text-[12px]" style={{ color: "var(--muted)" }}>No notifications yet</div>
+                </div>
+              ) : (notis || []).map((n: any, i: number) => {
+                const t = String(n.type || "").toUpperCase();
+                const isTrade = t === "TRADE";
+                const isFunds = t === "FUNDS";
+                const isKyc = t === "KYC";
+                const iconName = isTrade ? "fa-chart-line" : isFunds ? "fa-money-bill-wave" : isKyc ? "fa-id-card" : "fa-bell";
+                const iconColor = isTrade ? "#2f81f7" : isFunds ? BUY : isKyc ? "#a78bfa" : GOLD;
+                return (
+                  <div key={i} className="mx-3 mb-2 overflow-hidden rounded-2xl" style={{ background: !n.read ? "color-mix(in srgb, var(--soft) 80%, transparent)" : "var(--soft)" }}>
+                    <div className="flex gap-3 px-4 py-3.5">
+                      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: iconColor + "18" }}>
+                        <i className={"fa-solid " + iconName + " text-sm"} style={{ color: iconColor }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-[13px] font-semibold leading-tight text-[var(--text)]">{n.title}</div>
+                          {!n.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: GOLD }} />}
+                        </div>
+                        {n.body && <div className="mt-0.5 text-[12px] leading-snug" style={{ color: "var(--muted)" }}>{n.body}</div>}
+                        <div className="mt-1.5 text-[10px]" style={{ color: "var(--muted)" }}>{new Date(n.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </>
