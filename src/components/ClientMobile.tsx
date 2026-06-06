@@ -167,10 +167,20 @@ export default function ClientMobile({ t }: { t: any }) {
 
   const Stepper = ({ small }: { small?: boolean }) => (
     <div className="flex flex-col items-center">
-      <div className="flex items-center gap-2">
-        <button onClick={() => setVol((v: number) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)]" style={{ width: small ? 30 : 34, height: small ? 30 : 34 }}>−</button>
-        <span className="font-semibold tabular-nums" style={{ minWidth: 44, textAlign: "center" }}>{Number(vol).toFixed(2)}</span>
-        <button onClick={() => setVol((v: number) => +(v + 0.01).toFixed(2))} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)]" style={{ width: small ? 30 : 34, height: small ? 30 : 34 }}>+</button>
+      <div className="flex items-center gap-1.5">
+        <button onPointerDown={(e) => { e.preventDefault(); setVol((v: number) => Math.max(0.01, +(v - 0.01).toFixed(2))); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>−</button>
+        <input
+          type="number"
+          inputMode="decimal"
+          min="0.01"
+          step="0.01"
+          value={vol}
+          onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) setVol(+v.toFixed(2)); }}
+          onBlur={(e) => { const v = parseFloat(e.target.value); setVol(isNaN(v) || v < 0.01 ? 0.01 : +v.toFixed(2)); }}
+          className="rounded-lg border border-[var(--border)] bg-[var(--soft)] text-center font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]"
+          style={{ width: small ? 54 : 62, height: small ? 30 : 34, fontSize: small ? 12 : 13 }}
+        />
+        <button onPointerDown={(e) => { e.preventDefault(); setVol((v: number) => +(v + 0.01).toFixed(2)); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>+</button>
       </div>
       <span className="mt-0.5 text-[9px] text-[var(--muted)]">Lots</span>
     </div>
