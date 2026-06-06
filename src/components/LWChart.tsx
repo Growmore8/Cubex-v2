@@ -3,6 +3,21 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries } from "lightweight-charts";
 import { io, Socket } from "socket.io-client";
 
+// RSI (Wilder's smoothing) over candle closes -> line-series data.
+function computeRSI(bars: any[], period = 14) {
+  if (!bars || bars.length < period + 1) return [];
+  const out: { time: any; value: number }[] = [];
+  let ag = 0, al = 0;
+  for (let i = 1; i <= period; i++) { const d = bars[i].close - bars[i - 1].close; if (d > 0) ag += d; else al -= d; }
+  ag /= period; al /= period;
+  for (let i = period; i < bars.length; i++) {
+    if (i > period) { const d = bars[i].close - bars[i - 1].close; ag = (ag * (period - 1) + (d > 0 ? d : 0)) / period; al = (al * (period - 1) + (d < 0 ? -d : 0)) / period; }
+    const rs = al < 1e-10 ? 1000 : ag / al;
+    out.push({ time: bars[i].time, value: Number((100 - 100 / (1 + rs)).toFixed(2)) });
+  }
+  return out;
+}
+
 // Simple / exponential moving average over candle closes -> line-series data.
 function computeMA(bars: any[], period: number, exp: boolean) {
   if (!bars || bars.length < period) return [];
@@ -64,12 +79,18 @@ export default function LWChart({
   const toolRef = useRef(tool); toolRef.current = tool;
   const [sma, setSma] = useState(false);
   const [ema, setEma] = useState(false);
+  const [rsi, setRsi] = useState(false);
   const [drawN, setDrawN] = useState(0);
   const hlineRefs = useRef<any[]>([]);
   const trendRefs = useRef<any[]>([]);
   const trendStart = useRef<{ time: any; value: number } | null>(null);
   const smaRef = useRef<any>(null);
   const emaRef = useRef<any>(null);
+  const rsiWrapRef = useRef<HTMLDivElement | null>(null);
+  const rsiChartRef = useRef<any>(null);
+  const rsiSeriesRef = useRef<any>(null);
+  // Called inside seed() after bars load so indicators update even before user toggles
+  const onBarsLoaded = useRef<() => void>(() => {});
 
   function clearDrawings() {
     for (const l of hlineRefs.current) { try { seriesRef.current?.removePriceLine(l); } catch {} }
@@ -142,7 +163,50 @@ export default function LWChart({
     if (ema && !emaRef.current) emaRef.current = chart.addSeries(LineSeries, { color: "#a78bfa", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
     if (!ema && emaRef.current) { try { chart.removeSeries(emaRef.current); } catch {} emaRef.current = null; }
     if (ema && emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, 20, true)); } catch {} }
-  }, [sma, ema, symbol, tf, theme, digits, drawN]);
+    // RSI data sync (chart managed separately)
+    if (rsi && rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
+    // Keep onBarsLoaded fresh so seed() triggers correct indicator recompute
+    onBarsLoaded.current = () => {
+      if (smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, 20, false)); } catch {} }
+      if (emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, 20, true)); } catch {} }
+      if (rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
+    };
+  }, [sma, ema, rsi, symbol, tf, theme, digits, drawN]);
+
+  // RSI sub-pane chart (separate LW instance below main chart)
+  useEffect(() => {
+    if (!rsi) {
+      if (rsiChartRef.current) { rsiChartRef.current.remove(); rsiChartRef.current = null; rsiSeriesRef.current = null; }
+      return;
+    }
+    if (!rsiWrapRef.current) return;
+    const dark = theme === "dark";
+    const chart = createChart(rsiWrapRef.current, {
+      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: dark ? "#9aa6bf" : "#475569", fontSize: 9 },
+      grid: { vertLines: { color: "transparent" }, horzLines: { color: dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.05)" } },
+      rightPriceScale: { borderColor: dark ? "#242a38" : "#e2e8f0", scaleMargins: { top: 0.1, bottom: 0.1 } },
+      timeScale: { visible: false },
+      autoSize: true,
+      handleScroll: false,
+      handleScale: false,
+    });
+    const series = chart.addSeries(LineSeries, {
+      color: "#a78bfa", lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
+      priceFormat: { type: "price", precision: 1, minMove: 0.1 },
+      autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
+    });
+    series.createPriceLine({ price: 30, color: "#e05260", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+    series.createPriceLine({ price: 70, color: "#26a69a", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+    rsiChartRef.current = chart; rsiSeriesRef.current = series;
+    if (barsRef.current.length) { try { series.setData(computeRSI(barsRef.current)); } catch {} }
+    // Sync visible range with main chart
+    const syncToRsi = (range: any) => { if (range && rsiChartRef.current) { try { rsiChartRef.current.timeScale().setVisibleLogicalRange(range); } catch {} } };
+    if (chartRef.current) chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(syncToRsi);
+    return () => {
+      if (chartRef.current) { try { chartRef.current.timeScale().unsubscribeVisibleLogicalRangeChange(syncToRsi); } catch {} }
+      chart.remove(); rsiChartRef.current = null; rsiSeriesRef.current = null;
+    };
+  }, [rsi, theme]);
 
   // Load Twelve Data historical candles (up to 5000) on symbol / timeframe change
   useEffect(() => {
@@ -161,7 +225,7 @@ export default function LWChart({
         .sort((a: any, b: any) => a.time - b.time)
         .filter((c: any) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
       if (!bars.length) return false;
-      try { seriesRef.current.setData(bars); barsRef.current = bars; chartRef.current?.timeScale().fitContent(); return true; }
+      try { seriesRef.current.setData(bars); barsRef.current = bars; chartRef.current?.timeScale().fitContent(); onBarsLoaded.current(); return true; }
       catch { return false; }
     }
     // Build a plausible `count`-bar history (random walk) ending at `lastPrice`,
@@ -199,6 +263,7 @@ export default function LWChart({
           let done = false;
           const finish = () => { if (!done) { done = true; try { sock.disconnect(); } catch {} } };
           sock.on("tick", ({ symbol: sym, price }: any) => {
+            if (!alive) { finish(); return; }
             if (done || sym !== symRef.current || !(price > 0) || barsRef.current.length) return;
             if (seed(synth(price, 5000))) finish();
           });
@@ -207,7 +272,7 @@ export default function LWChart({
           setTimeout(finish, 5000);
         }
       })
-      .catch(() => {});
+      .catch((e) => console.warn("[LWChart] candle fetch failed", e));
     return () => { alive = false; };
   }, [symbol, tf]);
 
@@ -272,17 +337,29 @@ export default function LWChart({
     background: active ? "#5aa9ff" : (theme === "dark" ? "rgba(20,26,38,0.85)" : "rgba(255,255,255,0.9)"),
     color: active ? "#fff" : (theme === "dark" ? "#9aa6bf" : "#475569"),
   });
+  const bord = theme === "dark" ? "#242a38" : "#e2e8f0";
   return (
-    <div style={{ position: "relative", height: "100%", width: "100%" }}>
-      <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
-      <div style={{ position: "absolute", top: 6, left: 6, zIndex: 5, display: "flex", gap: 4, alignItems: "center", pointerEvents: "none" }}>
-        <button style={tb(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line — click the chart"><i className="fa-solid fa-minus" /> H-Line</button>
-        <button style={tb(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line — click two points"><i className="fa-solid fa-arrow-trend-up" /> Trend</button>
-        <button style={tb(sma)} onClick={() => setSma((v) => !v)} title="Simple MA (20)">SMA</button>
-        <button style={tb(ema)} onClick={() => setEma((v) => !v)} title="Exponential MA (20)">EMA</button>
-        {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && <button style={tb(false)} onClick={clearDrawings} title="Clear drawings"><i className="fa-solid fa-eraser" /></button>}
-        {tool !== "none" && <span style={{ pointerEvents: "none", fontSize: 9, padding: "2px 6px", borderRadius: 4, background: "rgba(90,169,255,0.85)", color: "#fff" }}>{tool === "hline" ? "Click chart to place line" : trendStart.current ? "Click second point" : "Click first point"}</span>}
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
+      {/* Main chart pane */}
+      <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+        <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
+        <div style={{ position: "absolute", top: 6, left: 6, zIndex: 5, display: "flex", gap: 4, alignItems: "center", pointerEvents: "none" }}>
+          <button style={tb(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line — click the chart"><i className="fa-solid fa-minus" /> H-Line</button>
+          <button style={tb(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line — click two points"><i className="fa-solid fa-arrow-trend-up" /> Trend</button>
+          <button style={tb(sma)} onClick={() => setSma((v) => !v)} title="Simple MA (20)">SMA</button>
+          <button style={tb(ema)} onClick={() => setEma((v) => !v)} title="Exponential MA (20)">EMA</button>
+          <button style={tb(rsi)} onClick={() => setRsi((v) => !v)} title="RSI (14)">RSI</button>
+          {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && <button style={tb(false)} onClick={clearDrawings} title="Clear drawings"><i className="fa-solid fa-eraser" /></button>}
+          {tool !== "none" && <span style={{ pointerEvents: "none", fontSize: 9, padding: "2px 6px", borderRadius: 4, background: "rgba(90,169,255,0.85)", color: "#fff" }}>{tool === "hline" ? "Click chart to place line" : trendStart.current ? "Click second point" : "Click first point"}</span>}
+        </div>
       </div>
+      {/* RSI sub-pane */}
+      {rsi && (
+        <div style={{ position: "relative", height: "28%", minHeight: 80, borderTop: `1px solid ${bord}` }}>
+          <div ref={rsiWrapRef} style={{ position: "absolute", inset: 0 }} />
+          <span style={{ position: "absolute", top: 3, left: 6, zIndex: 5, fontSize: 9, color: "#a78bfa", pointerEvents: "none" }}>RSI 14</span>
+        </div>
+      )}
     </div>
   );
 }

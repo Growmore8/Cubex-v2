@@ -8,6 +8,7 @@ import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
 import { prisma } from "@/lib/prisma";
 import { deviceFromUA } from "@/lib/presence";
+import { rateLimit } from "@/lib/rateLimit";
 
 const schema = z.object({ email: z.string().email(), password: z.string().min(1), remember: z.boolean().optional() });
 
@@ -17,6 +18,9 @@ export async function POST(req: Request) {
     const h = await headers();
     const host = h.get("host");
     const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || undefined;
+    if (!rateLimit(`login:${ip || "unknown"}`, 10, 60_000)) {
+      return NextResponse.json({ ok: false, error: "Too many attempts. Please wait a minute." }, { status: 429 });
+    }
     const session = await authenticate(host, email, password, ip, h.get("user-agent") || undefined);
     audit(session.tenantId, "auth.login", `${session.role} "${session.name}" logged in` + (ip ? ` (${ip})` : ""), session.email, session.role as any);
     // Notify staff when a client logs in (drives the login sound on admin/manager side)

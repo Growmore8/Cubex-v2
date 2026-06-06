@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { registerClient } from "@/services/auth.service";
 import { signSession, SESSION_COOKIE } from "@/lib/jwt";
 import { ROLE_HOME } from "@/config/roles";
+import { rateLimit } from "@/lib/rateLimit";
 
 const schema = z.object({
   name: z.string().min(2),
@@ -18,7 +19,12 @@ const schema = z.object({
 export async function POST(req: Request) {
   try {
     const { name, email, password, phone, country, type, tenantSlug } = schema.parse(await req.json());
-    const host = (await headers()).get("host");
+    const h = await headers();
+    const host = h.get("host");
+    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+    if (!rateLimit(`register:${ip}`, 5, 60_000)) {
+      return NextResponse.json({ ok: false, error: "Too many attempts. Please wait a minute." }, { status: 429 });
+    }
     const session = await registerClient(host, name, email.toLowerCase(), password, phone, country, type, tenantSlug);
     const token = await signSession(session);
     const res = NextResponse.json({ ok: true, redirect: ROLE_HOME[session.role] });

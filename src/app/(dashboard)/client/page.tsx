@@ -125,7 +125,7 @@ export default function ClientTerminal() {
     setAccount(d.account); setKycVerified(!!d.kycVerified); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); if (d.brand) setBrand(d.brand);
     (d.symbols || []).forEach((s: any) => { DIGITS[s.symbol] = s.digits; });
     if (!selSymRef.current && d.symbols.length) setSelSym(d.symbols[0].symbol);
-    fetch("/api/client/accounts").then((r) => r.json()).then((ad) => { if (ad.ok) { setAccts(ad.accounts || []); if (!accIdRef.current && ad.accounts && ad.accounts.length) { accIdRef.current = ad.accounts[0].id; setAccId(ad.accounts[0].id); } } }).catch(() => {});
+    fetch("/api/client/accounts").then((r) => r.json()).then((ad) => { if (ad.ok) { setAccts(ad.accounts || []); if (!accIdRef.current && ad.accounts && ad.accounts.length) { accIdRef.current = ad.accounts[0].id; setAccId(ad.accounts[0].id); } } }).catch((e) => console.warn("[client] accounts fetch failed", e));
     loadNotifs();
     fetch("/api/client/pending?accountId=" + (accIdRef.current || "")).then((r) => r.json()).then((pd) => { if (pd.ok) setPending(pd.pending || []); }).catch(() => {});
   }
@@ -133,6 +133,10 @@ export default function ClientTerminal() {
   // the bell updates live without reloading the whole account).
   function loadNotifs() {
     fetch("/api/client/notifications").then((r) => r.json()).then((nd) => { if (!nd.ok) return; const items = nd.items || []; if (notifPrimed.current) { for (const n of items) { const id = String(n.id); if (!notifSeen.current.has(id)) { playSound(soundForNotification(n)); pushToast(n); } } } items.forEach((n: any) => notifSeen.current.add(String(n.id))); notifPrimed.current = true; setNotis(items); }).catch(() => {});
+  }
+  async function markAllNotifsRead() {
+    await fetch("/api/client/notifications", { method: "POST" }).catch(() => {});
+    loadNotifs();
   }
   useEffect(() => { load(); }, []);
   useEffect(() => { fetch("/api/client/pin").then((r) => r.json()).then((d) => { if (d.ok && d.hasPin) { setPinHasPin(true); if (sessionStorage.getItem("cubex-pin-ok") !== "1") setPinLock(true); } }).catch(() => {}); }, []);
@@ -275,7 +279,9 @@ export default function ClientTerminal() {
   }
   async function savePin() {
     setPinErr("");
-    const r = await fetch("/api/client/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: pinForm.pin, current: pinForm.current }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+    const pin = String(pinForm.pin || "");
+    if (!/^\d{4,6}$/.test(pin)) { setPinErr("PIN must be 4–6 digits"); return; }
+    const r = await fetch("/api/client/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, current: pinForm.current }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { setPinErr(r.error || "Failed"); return; }
     setPinHasPin(true); setPinModal(false); setPinForm({}); sessionStorage.setItem("cubex-pin-ok", "1");
   }
@@ -358,7 +364,7 @@ export default function ClientTerminal() {
   const histShown = history.filter((h: any) => { if (histRange === "all") return true; const t = new Date(h.closedAt).getTime(); const now = Date.now(); const day = 86400000; if (histRange === "today") return t >= now - day; if (histRange === "week") return t >= now - 7 * day; return t >= now - 30 * day; });
   const tab = (active: boolean) => "px-3 py-1.5 text-[11px] " + (active ? "" : "text-[var(--muted)]");
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, logout: async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, pinForm, setPinForm, savePin }, cToasts, pushToast }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, logout: async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, pinForm, setPinForm, savePin }, cToasts, pushToast }} />;
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {needKyc && (
@@ -423,7 +429,7 @@ export default function ClientTerminal() {
           <button onClick={toggleTheme} title={theme === "dark" ? "Light mode" : "Dark mode"} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className={"fa-solid " + (theme === "dark" ? "fa-sun" : "fa-moon")} /></button>
           <div className="relative">
             <button onClick={() => { const w = !notiOpen; setNotiOpen(w); if (w && unread > 0) { fetch("/api/client/notifications", { method: "POST" }).then(() => setNotis((ns) => ns.map((n) => ({ ...n, read: true })))); } }} title="Notifications" className="relative rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-bell" />{unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 text-[8px] font-bold" style={{ background: SELL, color: "#fff" }}>{unread}</span>}</button>
-            {notiOpen && (<><div className="fixed inset-0 z-[80]" onClick={() => setNotiOpen(false)} /><div className="ui-pop absolute right-0 z-[90] mt-1 max-h-80 w-72 overflow-auto rounded-xl border p-1 text-left text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>{notis.length === 0 ? <div className="px-2 py-3 text-center text-[var(--muted)]">No notifications</div> : notis.map((n, i) => (<div key={i} className="border-b px-2 py-2 last:border-0" style={{ borderColor: "var(--border)" }}><div className="font-medium text-[var(--text)]">{n.title}</div>{n.body && <div className="mt-0.5 text-[var(--muted)]">{n.body}</div>}{n.image && <img src={n.image} alt="" className="mt-1 max-h-28 w-full rounded object-cover" />}<div className="mt-1 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div></div>))}</div></>)}
+            {notiOpen && (<><div className="fixed inset-0 z-[80]" onClick={() => setNotiOpen(false)} /><div className="ui-pop absolute right-0 z-[90] mt-1 max-h-80 w-72 overflow-hidden rounded-xl border text-left text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)" }}><div className="sticky top-0 flex items-center justify-between border-b px-3 py-2" style={{ background: "var(--panel)", borderColor: "var(--border)" }}><span className="font-semibold">Notifications</span>{unread > 0 && <button onClick={() => { markAllNotifsRead(); }} className="text-[10px]" style={{ color: GOLD }}>Mark all read</button>}</div><div className="overflow-auto" style={{ maxHeight: "calc(20rem - 36px)" }}>{notis.length === 0 ? <div className="px-2 py-3 text-center text-[var(--muted)]">No notifications</div> : notis.map((n, i) => (<div key={i} className="border-b px-2 py-2 last:border-0" style={{ borderColor: "var(--border)", background: !n.read ? "color-mix(in srgb, var(--soft) 60%, transparent)" : undefined }}><div className="font-medium text-[var(--text)]">{n.title}</div>{n.body && <div className="mt-0.5 text-[var(--muted)]">{n.body}</div>}{n.image && <img src={n.image} alt="" className="mt-1 max-h-28 w-full rounded object-cover" />}<div className="mt-1 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div></div>))}</div></div></>)}
           </div>
           <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} title="Logout" className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-right-from-bracket" /></button>
         </div>

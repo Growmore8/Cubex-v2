@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import LWChart from "@/components/LWChart";
 import PriceCell from "@/components/PriceCell";
@@ -36,6 +36,19 @@ export default function AdminDeskPage() {
   function toggleTheme() { setTheme((t) => { const n = t === "dark" ? "light" : "dark"; localStorage.setItem("cubex-theme", n); return n; }); }
 
   const [clients, setClients] = useState<any[]>([]);
+  // Accounts that are "secondary" for their userId (oldest account = root, all others = sub)
+  const subAccIds = useMemo(() => {
+    const groups: Record<string, { id: string; createdAt: string }[]> = {};
+    clients.forEach((c: any) => { const uid = c.userId || c.id; (groups[uid] || (groups[uid] = [])).push({ id: c.id, createdAt: c.createdAt }); });
+    const s = new Set<string>();
+    Object.values(groups).forEach((accs) => {
+      if (accs.length <= 1) return;
+      const sorted = [...accs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      sorted.slice(1).forEach((a) => s.add(a.id));
+    });
+    return s;
+  }, [clients]);
+  const isSubAcc = (c: any) => !!c.parentId || subAccIds.has(c.id);
   const [managers, setManagers] = useState<any[]>([]);
   const [tradeGroups, setTradeGroups] = useState<any[]>([]);
   const [nrecent, setNrecent] = useState<any[]>([]);
@@ -346,7 +359,6 @@ export default function AdminDeskPage() {
   async function doDeactivateAll(acc: any, deactivate: boolean) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deactivateAll", deactivated: deactivate }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   function doClearPin(acc: any) { setMenu(null); askConfirm(`Reset (clear) the PIN for ${acc.login}? They can set a new one next login.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "clearPin" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else setOk("PIN reset"); }, false); }
   async function doPool(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "pool", promote: !acc.isPool }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
-  async function doDeactivateManage(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deactivate", deactivated: !acc.deactivated }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   async function modifyTrade(id: string, fields: any) { const r = await fetch("/api/desk/trades/" + id + "/modify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Modify failed"); return; } setInlineEdit((e) => { const n = { ...e }; delete n[id]; return n; }); loadAll(); }
   async function uploadKyc() { setErr(""); setKycUpMsg(""); if (!kycUploadFor || !kycUploadFile) { setErr("Select the front side"); return; } if (!kycBackFile) { setErr("Select the back side — both front and back are required"); return; } const fd = new FormData(); fd.append("login", kycUploadFor.login); fd.append("docType", kycUploadType); fd.append("file", kycUploadFile); fd.append("back", kycBackFile); const r = await fetch("/api/admin/kyc/upload", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); if (!r.ok) { setErr(r.error || "Upload failed"); return; } setKycUpMsg("Uploaded successfully"); setKycUploadFile(null); setKycBackFile(null); setTimeout(() => { setKycUploadFor(null); setKycUpMsg(""); }, 1500); loadAll(); }
 
@@ -502,8 +514,8 @@ export default function AdminDeskPage() {
         {c.locked ? sIco("fa-lock", SELL, "Locked") : null}
         {/* Do Not Liquidate */}
         {c.doNotLiquidate ? sIco("fa-hand", GOLD, "Do Not Liquidate (DNL)") : null}
-        {/* KYC — only for live root accounts (not sub-accounts) */}
-        {c.type === "LIVE" && !c.parentId && (c.kycStatus === "APPROVED"
+        {/* KYC — only for live root (non-sub) accounts */}
+        {c.type === "LIVE" && !isSubAcc(c) && (c.kycStatus === "APPROVED"
           ? sIco("fa-id-card", BUY, "KYC Verified")
           : c.kycStatus === "PENDING"
           ? sIco("fa-id-card", GOLD, "KYC Pending")
@@ -635,7 +647,10 @@ export default function AdminDeskPage() {
             </button>
             {notifOpen && (<><div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
               <div className="ui-pop absolute right-0 z-50 mt-1 max-h-96 w-80 overflow-auto rounded-xl border shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
-                <div className="sticky top-0 border-b px-3 py-2 text-[11px] font-semibold" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>Notifications</div>
+                <div className="sticky top-0 flex items-center justify-between border-b px-3 py-2" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
+                  <span className="text-[11px] font-semibold">Notifications</span>
+                  {notifUnread > 0 && <button onClick={async () => { try { await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); setNotifUnread(0); setNotifs((n: any[]) => n.map((x) => ({ ...x, read: true }))); } catch {} }} className="text-[10px]" style={{ color: "var(--accent)" }}>Mark all read</button>}
+                </div>
                 {notifs.length === 0 ? <div className="px-3 py-6 text-center text-[11px] text-[var(--muted)]"><i className="fa-solid fa-bell-slash mb-1 block text-lg opacity-40" />No notifications</div>
                   : notifs.map((n: any) => (
                     <div key={n.id} className="border-b px-3 py-2 last:border-0" style={{ borderColor: "var(--border)" }}>
@@ -1172,33 +1187,41 @@ export default function AdminDeskPage() {
 
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
 
-          {/* Edit Client accordion */}
-          <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-[var(--soft)]">
-            {mIco("fa-pen-to-square")}<span className="flex-1">Edit Client</span>
-            <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "edit" ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
-          </button>
-          <div style={{ maxHeight: menuSub === "edit" ? "200px" : "0", overflow: "hidden", transition: "max-height 0.2s ease" }}>
-            <div className="mx-1 mb-1 overflow-hidden rounded-lg" style={{ background: "var(--soft)" }}>
-              <button onClick={() => openAct("rename", menu.acc)} className={subi}>{mIco("fa-user-pen")}Edit Details</button>
-              <button onClick={() => openAct("accountid", menu.acc)} className={subi}>{mIco("fa-id-card")}Change Account ID</button>
-              <button onClick={() => openAct("password", menu.acc)} className={subi}>{mIco("fa-key")}Change Password</button>
-              <button onClick={() => openAct("assign", menu.acc)} className={subi}>{mIco("fa-user-tie")}Assign Manager &amp; Group</button>
-              <button onClick={() => doClearPin(menu.acc)} className={subi}>{mIco("fa-unlock-keyhole")}Reset PIN</button>
+          {/* Edit Client / KYC — hidden for linked sub-accounts (managed via parent) */}
+          {isSubAcc(menu.acc) ? (
+            <div className="mx-3 mb-1 flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[10px]" style={{ background: "color-mix(in srgb, var(--muted) 10%, transparent)", color: "var(--muted)" }}>
+              <i className="fa-solid fa-link text-[9px]" />
+              <span>Linked sub-account — edit via parent</span>
             </div>
-          </div>
-
-          {/* KYC */}
-          {menu.acc.kycStatus ? (
-            <button onClick={() => { setTab("kyc"); setTabState((s) => ({ ...s, kyc: true })); setMenu(null); }} className={mi}>
-              {mIco("fa-id-card-clip", menu.acc.kycStatus === "APPROVED" ? BUY : menu.acc.kycStatus === "PENDING" ? GOLD : SELL)}
-              View KYC
-              <span className="ml-auto rounded px-1.5 py-0.5 text-[8px] font-semibold" style={{ background: (menu.acc.kycStatus === "APPROVED" ? BUY : menu.acc.kycStatus === "PENDING" ? GOLD : SELL) + "22", color: menu.acc.kycStatus === "APPROVED" ? BUY : menu.acc.kycStatus === "PENDING" ? GOLD : SELL }}>
-                {menu.acc.kycStatus === "APPROVED" ? "✓ Verified" : menu.acc.kycStatus === "PENDING" ? "Pending" : "Rejected"}
-              </span>
+          ) : (<>
+            {/* Edit Client accordion */}
+            <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-[var(--soft)]">
+              {mIco("fa-pen-to-square")}<span className="flex-1">Edit Client</span>
+              <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "edit" ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
             </button>
-          ) : (
-            <button onClick={() => { setKycUploadFor(menu.acc); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); setMenu(null); }} className={mi}>{mIco("fa-cloud-arrow-up", "#38bdf8")}Upload KYC</button>
-          )}
+            <div style={{ maxHeight: menuSub === "edit" ? "200px" : "0", overflow: "hidden", transition: "max-height 0.2s ease" }}>
+              <div className="mx-1 mb-1 overflow-hidden rounded-lg" style={{ background: "var(--soft)" }}>
+                <button onClick={() => openAct("rename", menu.acc)} className={subi}>{mIco("fa-user-pen")}Edit Details</button>
+                <button onClick={() => openAct("accountid", menu.acc)} className={subi}>{mIco("fa-id-card")}Change Account ID</button>
+                <button onClick={() => openAct("password", menu.acc)} className={subi}>{mIco("fa-key")}Change Password</button>
+                <button onClick={() => openAct("assign", menu.acc)} className={subi}>{mIco("fa-user-tie")}Assign Manager &amp; Group</button>
+                <button onClick={() => doClearPin(menu.acc)} className={subi}>{mIco("fa-unlock-keyhole")}Reset PIN</button>
+              </div>
+            </div>
+
+            {/* KYC */}
+            {menu.acc.kycStatus ? (
+              <button onClick={() => { setTab("kyc"); setTabState((s) => ({ ...s, kyc: true })); setMenu(null); }} className={mi}>
+                {mIco("fa-id-card-clip", menu.acc.kycStatus === "APPROVED" ? BUY : menu.acc.kycStatus === "PENDING" ? GOLD : SELL)}
+                View KYC
+                <span className="ml-auto rounded px-1.5 py-0.5 text-[8px] font-semibold" style={{ background: (menu.acc.kycStatus === "APPROVED" ? BUY : menu.acc.kycStatus === "PENDING" ? GOLD : SELL) + "22", color: menu.acc.kycStatus === "APPROVED" ? BUY : menu.acc.kycStatus === "PENDING" ? GOLD : SELL }}>
+                  {menu.acc.kycStatus === "APPROVED" ? "✓ Verified" : menu.acc.kycStatus === "PENDING" ? "Pending" : "Rejected"}
+                </span>
+              </button>
+            ) : (
+              <button onClick={() => { setKycUploadFor(menu.acc); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); setMenu(null); }} className={mi}>{mIco("fa-cloud-arrow-up", "#38bdf8")}Upload KYC</button>
+            )}
+          </>)}
 
           {/* Settings accordion */}
           <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-[var(--soft)]">
@@ -1489,7 +1512,7 @@ export default function AdminDeskPage() {
               <div className="flex flex-wrap gap-1">{Object.keys(NOTI_TEMPLATES).map((k) => (<button key={k} onClick={() => { const t = NOTI_TEMPLATES[k]; setForm((pp: any) => ({ ...pp, title: t.title, body: t.body, template: k })); }} className="rounded border px-2 py-1 text-[10px]" style={{ borderColor: "var(--border)", color: form.template === k ? "var(--text)" : "var(--muted)", background: form.template === k ? "var(--soft)" : "transparent" }}>{k}</button>))}</div>
               <div className={lab + " mt-2"}>Target</div>
               <select className={inp} value={form.ntarget || "all_clients"} onChange={(e) => f("ntarget", e.target.value)}><option value="all_clients">All clients</option><option value="managers">All managers</option><option value="client">Specific client</option></select>
-              {form.ntarget === "client" && (<><div className={lab + " mt-2"}>Client</div><select className={inp} value={form.naccountId || ""} onChange={(e) => f("naccountId", e.target.value)}><option value="">- select -</option>{clients.map((cl: any) => <option key={cl.id} value={cl.id}>{cl.login} - {cl.name}</option>)}</select></>)}
+              {form.ntarget === "client" && (<><div className={lab + " mt-2"}>Client</div><select className={inp} value={form.naccountId || ""} onChange={(e) => f("naccountId", e.target.value)}><option value="">- select -</option>{clients.filter((cl: any) => !cl.parentId).map((cl: any) => <option key={cl.id} value={cl.id}>{cl.login} - {cl.name}</option>)}</select></>)}
               <div className={lab + " mt-2"}>Title</div><input className={inp} value={form.title || ""} onChange={(e) => f("title", e.target.value)} />
               <div className={lab + " mt-2"}>Message</div><textarea className={inp} rows={3} value={form.body || ""} onChange={(e) => f("body", e.target.value)} />
               <div className={lab + " mt-2"}>Image URL (optional)</div><input className={inp} value={form.image || ""} onChange={(e) => f("image", e.target.value)} placeholder="https://..." />

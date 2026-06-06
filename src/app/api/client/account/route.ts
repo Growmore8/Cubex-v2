@@ -42,6 +42,12 @@ export async function GET(req: Request) {
     });
   }
 
+  // For sub-accounts: resolve parent's name/email so the app displays consistently
+  let parentDisplay: { name: string; email: string | null } | null = null;
+  if (account?.parentId) {
+    parentDisplay = await prisma.account.findUnique({ where: { id: account.parentId }, select: { name: true, email: true } }).catch(() => null);
+  }
+
   // User-level KYC: verified if any of the user's accounts has an approved document.
   // Only the parent/primary needs KYC; all linked accounts (incl. sub-accounts and
   // the client's own additional accounts) inherit it.
@@ -74,7 +80,9 @@ export async function GET(req: Request) {
     brand,
     account: account ? {
       login: account.login, type: account.type, currency: account.currency, leverage: account.leverage, locked: account.locked,
-      name: account.name, email: account.email || account.user?.email || null, phone: account.phone || null, country: account.country || null,
+      name: parentDisplay?.name || account.name,
+      email: parentDisplay?.email || account.email || account.user?.email || null,
+      phone: account.phone || null, country: account.country || null,
       ownerName: account.user?.name || account.name,
       deposit: Number(account.deposit), withdrawal: Number(account.withdrawal),
       credit: Number(account.credit), bonus: Number(account.bonus), pnl: Number(account.pnl),

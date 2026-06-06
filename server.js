@@ -278,7 +278,11 @@ function calcPnl(symbol, type, openPrice, price, lots) {
   const m = meta[sym] || { contract: 100000 };
   return diff * lots * m.contract;
 }
+const liquidating = new Set(); // guard: prevent double-liquidation of same account
+
 async function liquidate(acc, list, io) {
+  if (liquidating.has(acc.id)) return;
+  liquidating.add(acc.id);
   try {
     let total = 0;
     for (const t of list) {
@@ -295,7 +299,7 @@ async function liquidate(acc, list, io) {
     io.emit("liquidation", { accountId: acc.id, login: acc.login });
     io.emit("refresh", {});
     console.log("[MC] liquidated", acc.login, list.length, "trades, total P/L:", total.toFixed(2));
-  } catch (e) { console.error("[liquidate]", e); }
+  } catch (e) { console.error("[liquidate]", e); } finally { liquidating.delete(acc.id); }
 }
 async function monitor(io) {
   try {
@@ -348,7 +352,7 @@ async function checkPending(io) {
       if (o.account && o.account.userId) await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + px } }).catch(() => {});
       io.emit("refresh", {});
     }
-  } catch (e) {}
+  } catch (e) { console.error("[checkPending]", e); }
 }
 // REST price poller — TD WebSocket only streams a subset of symbols on most
 // plans, so we batch-poll /price for every base symbol. One request covers all;

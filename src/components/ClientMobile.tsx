@@ -44,7 +44,7 @@ export default function ClientMobile({ t }: { t: any }) {
     setSelSym, setVol, setSl, setTp, setTf,
     place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr,
     toggleTheme, enablePush, disablePush, addPasskey, openPin, favs, toggleFav, avatarUrl, uploadAvatar,
-    fmt, csz, pnlOf, dg, logout, pin,
+    fmt, csz, pnlOf, dg, markAllNotifsRead, logout, pin,
   } = t;
 
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "profile">("dashboard");
@@ -237,9 +237,16 @@ export default function ClientMobile({ t }: { t: any }) {
                   {unread > 0 && <div className="text-[10px]" style={{ color: GOLD }}>{unread} unread</div>}
                 </div>
               </div>
-              <button onClick={() => setNotisOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-base transition-opacity active:opacity-60" style={{ background: "var(--soft)", color: "var(--muted)" }}>
-                <i className="fa-solid fa-xmark" />
-              </button>
+              <div className="flex items-center gap-2">
+                {(notis || []).some((n: any) => !n.read) && (
+                  <button onClick={() => markAllNotifsRead && markAllNotifsRead()} className="rounded-full px-3 py-1 text-[11px] font-medium transition-opacity active:opacity-60" style={{ background: GOLD + "20", color: GOLD }}>
+                    Mark all read
+                  </button>
+                )}
+                <button onClick={() => setNotisOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-base transition-opacity active:opacity-60" style={{ background: "var(--soft)", color: "var(--muted)" }}>
+                  <i className="fa-solid fa-xmark" />
+                </button>
+              </div>
             </div>
             {/* Divider */}
             <div className="mx-5 mb-2 h-px" style={{ background: "var(--border)" }} />
