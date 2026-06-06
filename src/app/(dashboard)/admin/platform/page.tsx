@@ -340,8 +340,10 @@ export default function AdminDeskPage() {
     setAct(null); loadAll();
   }
   async function doStatus(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "status", locked: !acc.locked }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
-  async function doDeactivate(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deactivated: !acc.deactivated }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
+  async function doDeactivate(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deactivate", deactivated: !acc.deactivated }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   async function doDNL(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "settings", doNotLiquidate: !acc.doNotLiquidate }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
+  async function doStatusAll(acc: any, lock: boolean) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "statusAll", locked: lock }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
+  async function doDeactivateAll(acc: any, deactivate: boolean) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deactivateAll", deactivated: deactivate }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   function doClearPin(acc: any) { setMenu(null); askConfirm(`Reset (clear) the PIN for ${acc.login}? They can set a new one next login.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "clearPin" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else setOk("PIN reset"); }, false); }
   async function doPool(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "pool", promote: !acc.isPool }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
   async function doDeactivateManage(acc: any) { setMenu(null); const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deactivate", deactivated: !acc.deactivated }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }
@@ -1034,7 +1036,7 @@ export default function AdminDeskPage() {
                               <td className="px-2 py-1 text-right whitespace-nowrap">
                                 <button title="Edit" onClick={() => openAct("rename", c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen-to-square" /></button>
                                 <button title={c.locked ? "Unlock" : "Lock"} onClick={() => doStatus(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: c.locked ? BUY : SELL }}><i className={"fa-solid " + (c.locked ? "fa-lock-open" : "fa-lock")} /></button>
-                                <button title={c.deactivated ? "Activate" : "Deactivate"} onClick={() => doDeactivateManage(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: GOLD }}><i className={"fa-solid " + (c.deactivated ? "fa-circle-check" : "fa-ban")} /></button>
+                                <button title={c.deactivated ? "Activate" : "Deactivate"} onClick={() => doDeactivate(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: GOLD }}><i className={"fa-solid " + (c.deactivated ? "fa-circle-check" : "fa-ban")} /></button>
                                 <button title={c.isPool ? "Demote from Pool" : "Promote to Pool"} onClick={() => doPool(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "#a78bfa" }}><i className={"fa-solid " + (c.isPool ? "fa-circle-minus" : "fa-circle-plus")} /></button>
                                 <button title="Change ID" onClick={() => openAct("accountid", c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--muted)" }}><i className="fa-solid fa-id-card" /></button>
                                 <button title="Upload KYC" onClick={() => { setKycUploadFor(c); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); }} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "#38bdf8" }}><i className="fa-solid fa-id-card-clip" /></button>
@@ -1091,36 +1093,65 @@ export default function AdminDeskPage() {
 
       {menu && (<>
         <div className="fixed inset-0 z-40" onClick={() => { setMenu(null); setMenuSub(""); }} />
-        <div className="ui-pop fixed z-50 w-60 overflow-visible rounded-xl border py-1 text-[11px]" style={{ left: menu.x, top: menu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
-          <div className="mx-1 mb-1 flex items-center gap-2 rounded-md px-2 py-2" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)" }}>
-            <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "var(--accent)", color: "#fff" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
-            <div className="min-w-0">
-              <div className="truncate font-semibold" style={{ color: GOLD }}>{menu.acc.login}</div>
-              <div className="truncate text-[9px] text-[var(--muted)]">{menu.acc.name}</div>
+        <div className="ui-pop fixed z-50 w-64 overflow-hidden rounded-2xl border py-1 text-[11px]" style={{ left: menu.x, top: menu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 20px 48px rgba(0,0,0,0.55)", animation: "menuPop 0.12s ease-out" }}>
+          {/* Header */}
+          <div className="mx-1 mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2.5" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ background: "var(--accent)", color: "#fff" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate font-bold" style={{ color: GOLD }}>{menu.acc.login}</span>
+                <span className="rounded px-1 py-px text-[8px] font-semibold" style={{ background: (menu.acc.type === "LIVE" ? BUY : "#6366f1") + "22", color: menu.acc.type === "LIVE" ? BUY : "#818cf8" }}>{menu.acc.type}</span>
+              </div>
+              <div className="truncate text-[9px]" style={{ color: "var(--muted)" }}>{menu.acc.name}</div>
+            </div>
+            <div className="flex flex-col items-end gap-0.5">
+              {menu.acc.locked && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: SELL + "22", color: SELL }}>LOCKED</span>}
+              {menu.acc.deactivated && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: GOLD + "22", color: GOLD }}>INACTIVE</span>}
+              {menu.acc.doNotLiquidate && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: "#a78bfa22", color: "#a78bfa" }}>DNL</span>}
             </div>
           </div>
-          {(can("processDeposits") || can("processWithdrawals") || can("creditBonus") || can("editFinancial") || can("transferFunds")) && <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-coins", GOLD)}<span className="flex-1">Money</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "money" ? "fa-chevron-down" : "fa-chevron-right")} /></button>}
-          {menuSub === "money" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
-            {can("processDeposits") && <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>{mIco("fa-arrow-down-to-bracket", BUY)}Deposit</button>}
-            {can("processWithdrawals") && <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>{mIco("fa-arrow-up-from-bracket", GOLD)}Withdrawal</button>}
-            {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-plus", BUY)}Credit In</button>}
-            {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-minus", GOLD)}Credit Out</button>}
-            {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus")} className={subi} style={{ color: BUY }}>{mIco("fa-gift", BUY)}Bonus</button>}
-            {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>{mIco("fa-shield-halved")}Insurance</button>}
-            {can("editFinancial") && <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>{mIco("fa-chart-line")}Manual P/L</button>}
-            {can("transferFunds") && <button onClick={() => openAct("transfer", menu.acc)} className={subi}>{mIco("fa-right-left")}Transfer Between Accounts</button>}
-          </div>)}
+
+          {/* Money accordion */}
+          {(can("processDeposits") || can("processWithdrawals") || can("creditBonus") || can("editFinancial") || can("transferFunds")) && <>
+            <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-[var(--soft)]">
+              {mIco("fa-coins", GOLD)}<span className="flex-1">Money</span>
+              <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "money" ? "fa-chevron-down rotate-0" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
+            </button>
+            <div style={{ maxHeight: menuSub === "money" ? "280px" : "0", overflow: "hidden", transition: "max-height 0.2s ease" }}>
+              <div className="mx-1 mb-1 overflow-hidden rounded-lg" style={{ background: "var(--soft)" }}>
+                {can("processDeposits") && <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>{mIco("fa-arrow-down-to-bracket", BUY)}Deposit</button>}
+                {can("processWithdrawals") && <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>{mIco("fa-arrow-up-from-bracket", GOLD)}Withdrawal</button>}
+                {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-plus", BUY)}Credit In</button>}
+                {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-minus", GOLD)}Credit Out</button>}
+                {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus")} className={subi} style={{ color: BUY }}>{mIco("fa-gift", BUY)}Bonus</button>}
+                {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>{mIco("fa-shield-halved")}Insurance</button>}
+                {can("editFinancial") && <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>{mIco("fa-chart-line")}Manual P/L</button>}
+                {can("transferFunds") && <button onClick={() => openAct("transfer", menu.acc)} className={subi}>{mIco("fa-right-left")}Transfer Between Accounts</button>}
+              </div>
+            </div>
+          </>}
+
           {can("manualTrade") && <button onClick={() => openMT(menu.acc)} className={mi}>{mIco("fa-bolt", "var(--accent)")}Manual Trade</button>}
           <button onClick={() => openAct("subaccount", menu.acc)} className={mi}>{mIco("fa-sitemap")}Create Sub-Account</button>
+
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
-          <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-pen-to-square")}<span className="flex-1">Edit Client</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "edit" ? "fa-chevron-down" : "fa-chevron-right")} /></button>
-          {menuSub === "edit" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
-            <button onClick={() => openAct("rename", menu.acc)} className={subi}>{mIco("fa-user-pen")}Edit Details</button>
-            <button onClick={() => openAct("accountid", menu.acc)} className={subi}>{mIco("fa-id-card")}Change Account ID</button>
-            <button onClick={() => openAct("password", menu.acc)} className={subi}>{mIco("fa-key")}Change Password</button>
-            <button onClick={() => openAct("assign", menu.acc)} className={subi}>{mIco("fa-user-tie")}Assign Manager &amp; Group</button>
-            <button onClick={() => doClearPin(menu.acc)} className={subi}>{mIco("fa-unlock-keyhole")}Reset PIN</button>
-          </div>)}
+
+          {/* Edit Client accordion */}
+          <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-[var(--soft)]">
+            {mIco("fa-pen-to-square")}<span className="flex-1">Edit Client</span>
+            <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "edit" ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
+          </button>
+          <div style={{ maxHeight: menuSub === "edit" ? "200px" : "0", overflow: "hidden", transition: "max-height 0.2s ease" }}>
+            <div className="mx-1 mb-1 overflow-hidden rounded-lg" style={{ background: "var(--soft)" }}>
+              <button onClick={() => openAct("rename", menu.acc)} className={subi}>{mIco("fa-user-pen")}Edit Details</button>
+              <button onClick={() => openAct("accountid", menu.acc)} className={subi}>{mIco("fa-id-card")}Change Account ID</button>
+              <button onClick={() => openAct("password", menu.acc)} className={subi}>{mIco("fa-key")}Change Password</button>
+              <button onClick={() => openAct("assign", menu.acc)} className={subi}>{mIco("fa-user-tie")}Assign Manager &amp; Group</button>
+              <button onClick={() => doClearPin(menu.acc)} className={subi}>{mIco("fa-unlock-keyhole")}Reset PIN</button>
+            </div>
+          </div>
+
+          {/* KYC */}
           {menu.acc.kycStatus ? (
             <button onClick={() => { setTab("kyc"); setTabState((s) => ({ ...s, kyc: true })); setMenu(null); }} className={mi}>
               {mIco("fa-id-card-clip", menu.acc.kycStatus === "APPROVED" ? BUY : menu.acc.kycStatus === "PENDING" ? GOLD : SELL)}
@@ -1132,20 +1163,68 @@ export default function AdminDeskPage() {
           ) : (
             <button onClick={() => { setKycUploadFor(menu.acc); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); setMenu(null); }} className={mi}>{mIco("fa-cloud-arrow-up", "#38bdf8")}Upload KYC</button>
           )}
+
+          {/* Settings accordion */}
+          <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-[var(--soft)]">
+            {mIco("fa-gear")}<span className="flex-1">Settings</span>
+            <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "settings" ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
+          </button>
+          <div style={{ maxHeight: menuSub === "settings" ? "160px" : "0", overflow: "hidden", transition: "max-height 0.2s ease" }}>
+            <div className="mx-1 mb-1 overflow-hidden rounded-lg" style={{ background: "var(--soft)" }}>
+              <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
+              <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
+              <button onClick={() => openSymOv(menu.acc)} className={subi}>{mIco("fa-ban")}Disable Symbols</button>
+              <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
+            </div>
+          </div>
+
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
-          <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-gear")}<span className="flex-1">Settings</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "settings" ? "fa-chevron-down" : "fa-chevron-right")} /></button>
-          {menuSub === "settings" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
-            <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
-            <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
-            <button onClick={() => openSymOv(menu.acc)} className={subi}>{mIco("fa-ban")}Disable Symbols</button>
-            <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
+
+          {/* Status section — this account */}
+          <div className="px-2.5 pb-1 pt-0.5">
+            <div className="mb-1.5 px-0.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>This Account</div>
+            <div className="flex gap-1.5">
+              <button onClick={() => doStatus(menu.acc)} className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-semibold transition-opacity hover:opacity-75"
+                style={{ background: menu.acc.locked ? BUY + "20" : SELL + "20", color: menu.acc.locked ? BUY : SELL }}>
+                <i className={"fa-solid text-[9px] " + (menu.acc.locked ? "fa-lock-open" : "fa-lock")} />
+                {menu.acc.locked ? "Unlock" : "Lock"}
+              </button>
+              <button onClick={() => doDeactivate(menu.acc)} className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-semibold transition-opacity hover:opacity-75"
+                style={{ background: menu.acc.deactivated ? BUY + "20" : GOLD + "20", color: menu.acc.deactivated ? BUY : GOLD }}>
+                <i className={"fa-solid text-[9px] " + (menu.acc.deactivated ? "fa-circle-check" : "fa-ban")} />
+                {menu.acc.deactivated ? "Activate" : "Deactivate"}
+              </button>
+              <button onClick={() => doDNL(menu.acc)} title={menu.acc.doNotLiquidate ? "Disable Do-Not-Liquidate" : "Enable Do-Not-Liquidate"} className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-semibold transition-opacity hover:opacity-75"
+                style={{ background: menu.acc.doNotLiquidate ? "#a78bfa20" : "var(--soft)", color: menu.acc.doNotLiquidate ? "#a78bfa" : "var(--muted)" }}>
+                <i className="fa-solid fa-hand text-[9px]" />
+                DNL
+              </button>
+            </div>
+          </div>
+
+          {/* Status section — all accounts of this user */}
+          {menu.acc.userId && (<div className="px-2.5 pb-2 pt-0.5">
+            <div className="mb-1.5 px-0.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>All Accounts (This User)</div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button onClick={() => doStatusAll(menu.acc, true)} className="flex items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-semibold transition-opacity hover:opacity-75"
+                style={{ background: SELL + "20", color: SELL }}>
+                <i className="fa-solid fa-lock text-[9px]" />Lock All
+              </button>
+              <button onClick={() => doStatusAll(menu.acc, false)} className="flex items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-semibold transition-opacity hover:opacity-75"
+                style={{ background: BUY + "20", color: BUY }}>
+                <i className="fa-solid fa-lock-open text-[9px]" />Unlock All
+              </button>
+              <button onClick={() => doDeactivateAll(menu.acc, true)} className="flex items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-semibold transition-opacity hover:opacity-75"
+                style={{ background: GOLD + "20", color: GOLD }}>
+                <i className="fa-solid fa-ban text-[9px]" />Deactivate All
+              </button>
+              <button onClick={() => doDeactivateAll(menu.acc, false)} className="flex items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-semibold transition-opacity hover:opacity-75"
+                style={{ background: BUY + "20", color: BUY }}>
+                <i className="fa-solid fa-circle-check text-[9px]" />Activate All
+              </button>
+            </div>
           </div>)}
-          <button onClick={() => setMenuSub(menuSub === "status" ? "" : "status")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)]">{mIco("fa-toggle-on")}<span className="flex-1">Status</span><i className={"fa-solid text-[8px] text-[var(--muted)] " + (menuSub === "status" ? "fa-chevron-down" : "fa-chevron-right")} /></button>
-          {menuSub === "status" && (<div className="absolute left-full top-0 z-50 w-52 overflow-hidden rounded-lg border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
-            <button onClick={() => doStatus(menu.acc)} className={subi}>{mIco(menu.acc.locked ? "fa-lock-open" : "fa-lock", menu.acc.locked ? BUY : SELL)}{menu.acc.locked ? "Unlock Client" : "Lock Client"}</button>
-            <button onClick={() => doDeactivate(menu.acc)} className={subi}>{mIco(menu.acc.deactivated ? "fa-circle-check" : "fa-ban", GOLD)}{menu.acc.deactivated ? "Activate Client" : "Deactivate Client"}</button>
-            <button onClick={() => doDNL(menu.acc)} className={subi}>{mIco("fa-hand", menu.acc.doNotLiquidate ? GOLD : undefined)}{menu.acc.doNotLiquidate ? "Disable DNL" : "Enable DNL"}</button>
-          </div>)}
+
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
           {can("deleteClients") && <button onClick={() => delClient(menu.acc)} className={mi} style={{ color: SELL }}>{mIco("fa-trash", SELL)}Delete Client</button>}
         </div>

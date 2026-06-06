@@ -7,7 +7,7 @@ import { assertCan } from "@/lib/perms";
 import { notify } from "@/services/notification.service";
 import { assertSeatAvailable } from "@/services/tenant.service";
 
-const MANAGER_ALLOWED = ["status", "deactivate", "rename", "pool", "clearPin", "assign"];
+const MANAGER_ALLOWED = ["status", "deactivate", "statusAll", "deactivateAll", "rename", "pool", "clearPin", "assign"];
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -145,6 +145,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       case "deactivate": {
         await prisma.account.update({ where: { id: acc.id }, data: { deactivated: !!b.deactivated } });
         await audit(tenantId, "client.deactivate", acc.login + (b.deactivated ? " deactivated" : " activated"), actor);
+        break;
+      }
+      case "statusAll": {
+        if (!acc.userId) throw new Error("Account not linked to a user");
+        await prisma.account.updateMany({ where: { tenantId, userId: acc.userId }, data: { locked: !!b.locked } });
+        await audit(tenantId, "client.statusAll", "userId:" + acc.userId + (b.locked ? " all locked" : " all unlocked"), actor);
+        break;
+      }
+      case "deactivateAll": {
+        if (!acc.userId) throw new Error("Account not linked to a user");
+        await prisma.account.updateMany({ where: { tenantId, userId: acc.userId }, data: { deactivated: !!b.deactivated } });
+        await audit(tenantId, "client.deactivateAll", "userId:" + acc.userId + (b.deactivated ? " all deactivated" : " all activated"), actor);
         break;
       }
       case "pool": {

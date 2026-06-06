@@ -22,9 +22,8 @@ export async function POST(req: Request) {
     const type = b.type === "DEMO" ? "DEMO" : "LIVE";
     const user = await prisma.user.findUnique({ where: { id: s.sub } });
     if (!user) throw new Error("User not found");
-    // If the client has been locked/deactivated by staff, block new account creation
-    const restricted = await prisma.account.findFirst({ where: { userId: s.sub, OR: [{ locked: true }, { deactivated: true }] }, select: { id: true } });
-    if (restricted) throw new Error("Your account is restricted. Please contact support.");
+    // Block only if the user account itself is suspended/locked by staff
+    if (user.status !== "ACTIVE") throw new Error("Your account is restricted. Please contact support.");
     if (type === "DEMO") {
       // a client may hold only one demo account
       const demoCount = await prisma.account.count({ where: { userId: s.sub, type: "DEMO" } });
