@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
 import LWChart from "@/components/LWChart";
 import { playSound, soundForNotification } from "@/lib/sounds";
@@ -146,9 +146,17 @@ export default function ClientTerminal() {
     // caused the slow/glitchy feel. The chart and the Buy/Sell buttons both read this
     // same `prices` state, so they now update in lockstep at the same speed.
     const flush = () => {
-      const px = pP; const dr = pD;
-      if (Object.keys(px).length) { setPrices((pp) => ({ ...pp, ...px })); for (const k in px) delete px[k]; }
-      if (Object.keys(dr).length) { setDirs((dd) => ({ ...dd, ...dr })); for (const k in dr) delete dr[k]; }
+      const pxKeys = Object.keys(pP), drKeys = Object.keys(pD);
+      if (!pxKeys.length && !drKeys.length) return;
+      const px = { ...pP }, dr = { ...pD };           // snapshot then clear the buffers
+      for (const k in pP) delete pP[k];
+      for (const k in pD) delete pD[k];
+      // Low-priority: lets urgent updates (a nav tap) interrupt the price re-render,
+      // so switching tabs feels instant instead of waiting on the price churn.
+      startTransition(() => {
+        if (pxKeys.length) setPrices((pp) => ({ ...pp, ...px }));
+        if (drKeys.length) setDirs((dd) => ({ ...dd, ...dr }));
+      });
     };
     socket.on("tick", ({ symbol, price }: any) => {
       const prev = prevRef.current[symbol];
