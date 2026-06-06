@@ -7,6 +7,7 @@ import { ROLE_HOME } from "@/config/roles";
 import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
 import { prisma } from "@/lib/prisma";
+import { deviceFromUA } from "@/lib/presence";
 
 const schema = z.object({ email: z.string().email(), password: z.string().min(1), remember: z.boolean().optional() });
 
@@ -22,7 +23,9 @@ export async function POST(req: Request) {
     if (session.role === "CLIENT" && session.tenantId) {
       try {
         const acc = await prisma.account.findFirst({ where: { tenantId: session.tenantId, userId: session.sub }, select: { managerId: true, login: true } });
-        notifyStaff(session.tenantId, { type: "LOGIN", title: "Client login", body: `${session.name} (${acc?.login || ""}) signed in` }, acc?.managerId).catch(() => {});
+        const dev = deviceFromUA(h.get("user-agent"));
+        const meta = (ip ? ` · IP ${ip}` : "") + (dev ? ` · ${dev}` : "");
+        notifyStaff(session.tenantId, { type: "LOGIN", title: "Client login", body: `${session.name} (${acc?.login || ""}) signed in${meta}` }, acc?.managerId).catch(() => {});
       } catch {}
     }
     const token = await signSession(session, remember ? "30d" : undefined);
