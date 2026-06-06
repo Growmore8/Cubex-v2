@@ -194,12 +194,20 @@ export default function AdminDeskPage() {
       const d = await fetch("/api/notifications").then((r) => r.json());
       if (!d.ok) return;
       const items = d.items || [];
+      // Activity (client/manager financial + trade + login) shows as a transient toast.
+      // The header bell keeps only Superadmin-sent / News / Maintenance notices.
+      const ACTIVITY = new Set(["TRADE", "FUNDS", "LOGIN"]);
+      const isActivity = (n: any) => ACTIVITY.has(String(n.type || "").toUpperCase());
       if (notifPrimed.current) {
-        for (const n of items) { const id = String(n.id); if (!notifSeen.current.has(id)) { playSound(soundForNotification(n)); pushNotifToast(n); } }
+        for (const n of items) {
+          const id = String(n.id);
+          if (!notifSeen.current.has(id)) { playSound(soundForNotification(n)); if (isActivity(n)) pushNotifToast(n); }
+        }
       }
       items.forEach((n: any) => notifSeen.current.add(String(n.id)));
       notifPrimed.current = true;
-      setNotifs(items); setNotifUnread(d.unread || 0);
+      const bell = items.filter((n: any) => !isActivity(n));
+      setNotifs(bell); setNotifUnread(bell.filter((n: any) => !n.read).length);
     } catch {}
   }
   useEffect(() => { loadNotifs(); const t = setInterval(loadNotifs, 20000); return () => clearInterval(t); }, []);
