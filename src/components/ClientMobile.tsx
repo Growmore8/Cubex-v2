@@ -33,6 +33,34 @@ const ORDER_KINDS: [string, string, string][] = [
   ["STOP", "BUY", "Buy Stop"], ["STOP", "SELL", "Sell Stop"],
 ];
 
+function LotStepper({ vol, setVol, small }: { vol: number; setVol: (v: number) => void; small?: boolean }) {
+  const [inp, setInp] = useState(vol.toFixed(2));
+  useEffect(() => { setInp(vol.toFixed(2)); }, [vol]);
+  const commit = (raw: string) => { const v = parseFloat(raw); const n = isNaN(v) || v < 0.01 ? 0.01 : +v.toFixed(2); setVol(n); };
+  const stepDown = () => { const n = Math.max(0.01, +(parseFloat(inp || "0") - 0.01).toFixed(2)); setVol(n); setInp(n.toFixed(2)); };
+  const stepUp = () => { const n = +(parseFloat(inp || "0") + 0.01).toFixed(2); setVol(n); setInp(n.toFixed(2)); };
+  return (
+    <div className="flex flex-col items-center">
+      <div className="flex items-center gap-1.5">
+        <button onPointerDown={(e) => { e.preventDefault(); stepDown(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>−</button>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={inp}
+          onChange={e => setInp(e.target.value)}
+          onFocus={e => e.target.select()}
+          onBlur={e => commit(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } }}
+          className="rounded-lg border border-[var(--border)] bg-[var(--soft)] text-center font-semibold tabular-nums text-[var(--text)]"
+          style={{ width: small ? 54 : 62, height: small ? 30 : 34, fontSize: small ? 12 : 13 }}
+        />
+        <button onPointerDown={(e) => { e.preventDefault(); stepUp(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>+</button>
+      </div>
+      <span className="mt-0.5 text-[9px] text-[var(--muted)]">Lots</span>
+    </div>
+  );
+}
+
 export default function ClientMobile({ t }: { t: any }) {
   const [noOpen, setNoOpen] = useState(false);
   const [noForm, setNoForm] = useState<any>({ idx: 0, lots: 0.01, trigger: "", sl: "", tp: "" });
@@ -164,34 +192,6 @@ export default function ClientMobile({ t }: { t: any }) {
       await fetch("/api/client/orders/" + id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sl: mSl, tp: mTp }) });
     } catch { }
     setModifyId(null); setExpanded(null);
-  };
-
-  const Stepper = ({ small }: { small?: boolean }) => {
-    const [inp, setInp] = useState(Number(vol).toFixed(2));
-    useEffect(() => { setInp(Number(vol).toFixed(2)); }, []);
-    const commit = (raw: string) => { const v = parseFloat(raw); const n = isNaN(v) || v < 0.01 ? 0.01 : +v.toFixed(2); setVol(n); setInp(n.toFixed(2)); };
-    const stepDown = () => { const n = Math.max(0.01, +(parseFloat(inp || "0") - 0.01).toFixed(2)); setVol(n); setInp(n.toFixed(2)); };
-    const stepUp = () => { const n = +(parseFloat(inp || "0") + 0.01).toFixed(2); setVol(n); setInp(n.toFixed(2)); };
-    return (
-      <div className="flex flex-col items-center">
-        <div className="flex items-center gap-1.5">
-          <button onPointerDown={(e) => { e.preventDefault(); stepDown(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>−</button>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={inp}
-            onChange={e => setInp(e.target.value)}
-            onFocus={e => e.target.select()}
-            onBlur={e => commit(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } }}
-            className="rounded-lg border border-[var(--border)] bg-[var(--soft)] text-center font-semibold tabular-nums text-[var(--text)]"
-            style={{ width: small ? 54 : 62, height: small ? 30 : 34, fontSize: small ? 12 : 13 }}
-          />
-          <button onPointerDown={(e) => { e.preventDefault(); stepUp(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>+</button>
-        </div>
-        <span className="mt-0.5 text-[9px] text-[var(--muted)]">Lots</span>
-      </div>
-    );
   };
 
   return (
@@ -475,7 +475,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "SELL"); }} className="rounded-lg py-2 text-center text-white" style={{ background: SELL }}>
                         <div className="text-[10px] opacity-80">SELL</div><div className="text-sm font-bold tabular-nums">{sBid != null ? sBid.toFixed(dd) : "…"}</div>
                       </button>
-                      <Stepper small />
+                      <LotStepper vol={vol} setVol={setVol} small />
                       <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "BUY"); }} className="rounded-lg py-2 text-center text-white" style={{ background: BUY }}>
                         <div className="text-[10px] opacity-80">BUY</div><div className="text-sm font-bold tabular-nums">{sAsk != null ? sAsk.toFixed(dd) : "…"}</div>
                       </button>
@@ -519,7 +519,7 @@ export default function ClientMobile({ t }: { t: any }) {
               <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: SELL, touchAction: "manipulation" }}>
                 <div className="text-[10px] opacity-80">SELL</div><div className="text-base font-bold tabular-nums">{price != null ? bid.toFixed(dg(selSym)) : "…"}</div>
               </button>
-              <div className="flex items-center"><Stepper /></div>
+              <div className="flex items-center"><LotStepper vol={vol} setVol={setVol} /></div>
               <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: BUY, touchAction: "manipulation" }}>
                 <div className="text-[10px] opacity-80">BUY</div><div className="text-base font-bold tabular-nums">{price != null ? ask.toFixed(dg(selSym)) : "…"}</div>
               </button>
