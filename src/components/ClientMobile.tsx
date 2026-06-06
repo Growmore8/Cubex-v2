@@ -1,7 +1,11 @@
 "use client";
-import { useEffect, useRef, useState, startTransition } from "react";
-import LWChart from "@/components/LWChart";
+import { useEffect, useMemo, useRef, useState, startTransition } from "react";
+import dynamic from "next/dynamic";
 import WalletPanel from "@/components/WalletPanel";
+
+// Lazy-load the chart lib — it's ~350 kB and only needed on the Chart tab.
+// Loads on first tab open; subsequent visits are instant (module cached).
+const LWChart = dynamic(() => import("@/components/LWChart"), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">Loading chart…</div> });
 
 const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD@tv-basicstudies"], ["Stoch", "Stochastic@tv-basicstudies"], ["BBands", "BB@tv-basicstudies"], ["MA", "MASimple@tv-basicstudies"], ["ROC", "ROC@tv-basicstudies"]];
 
@@ -69,15 +73,18 @@ export default function ClientMobile({ t }: { t: any }) {
 
   // categories — ordered Crypto, Forex, Indices, then the rest
   const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "agriculture", "other"];
-  const cats: string[] = [];
-  (symbols || []).forEach((s: any) => { const c = cap(s.category || "Other"); if (!cats.includes(c)) cats.push(c); });
-  cats.sort((a, b) => { const ia = CAT_ORDER.indexOf(a.toLowerCase()); const ib = CAT_ORDER.indexOf(b.toLowerCase()); return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib); });
+  const cats = useMemo(() => {
+    const cs: string[] = [];
+    (symbols || []).forEach((s: any) => { const c = cap(s.category || "Other"); if (!cs.includes(c)) cs.push(c); });
+    cs.sort((a, b) => { const ia = CAT_ORDER.indexOf(a.toLowerCase()); const ib = CAT_ORDER.indexOf(b.toLowerCase()); return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib); });
+    return cs;
+  }, [symbols]);
 
-  const quoteList = (symbols || []).filter((s: any) => {
+  const quoteList = useMemo(() => (symbols || []).filter((s: any) => {
     if (search && !(`${s.display || s.symbol}`.toLowerCase().includes(search.toLowerCase()))) return false;
     if (qcat === "favs") return (favs || []).includes(s.symbol);
     return cap(s.category || "Other") === qcat;
-  });
+  }), [symbols, search, qcat, favs]);
 
   const pctOf = (sym: string) => {
     const b = baselineRef.current[sym]; const p = prices[sym];
@@ -163,7 +170,7 @@ export default function ClientMobile({ t }: { t: any }) {
   );
 
   return (
-    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", height: "100dvh", paddingTop: "env(safe-area-inset-top)" }} className="flex flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", height: "100dvh", paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation" }} className="flex flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarRef} onChange={uploadAvatar} />
 
       {/* TOP HEADER — iOS glass */}

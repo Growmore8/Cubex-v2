@@ -172,7 +172,7 @@ export default function ClientTerminal() {
         startTransition(() => setPrices((pp) => ({ ...snap, ...pp })));
       }
     });
-    const flushIv = setInterval(flush, 80);
+    const flushIv = setInterval(flush, 200);
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
     socket.on("refresh", (p: any) => { if (p && p.kind === "notification") loadNotifs(); else load(); });
     return () => { socket.disconnect(); clearInterval(clr); clearInterval(flushIv); };
