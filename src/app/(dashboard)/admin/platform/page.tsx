@@ -90,6 +90,7 @@ export default function AdminDeskPage() {
   const [cliQ, setCliQ] = useState("");
   const [cliType, setCliType] = useState("ALL");
   const [cliStatus, setCliStatus] = useState("ALL");
+  const [auditCat, setAuditCat] = useState("ALL");
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
   const [navSearch, setNavSearch] = useState("");
   const [mwSearch, setMwSearch] = useState("");
@@ -483,10 +484,9 @@ export default function AdminDeskPage() {
   const acctRow = (c: any) => (
     <button key={c.id} onClick={() => setSelAcc(c)} onContextMenu={(e) => { e.preventDefault(); setSelAcc(c); setMenu({ x: e.clientX, y: e.clientY, acc: c }); }}
       className="flex w-full items-center gap-1 rounded px-1.5 py-1 text-left" style={selAcc?.id === c.id ? { background: "var(--soft)", color: GOLD } : undefined}>
-      {dot(c.deactivated ? "var(--muted)" : c.locked ? SELL : BUY)}<span className="flex-1 truncate">{c.login} - {c.name}</span>
+      {dot(presenceOnline(c.user?.lastSeenAt) ? "#16a34a" : c.deactivated ? "var(--muted)" : c.locked ? SELL : BUY)}<span className="flex-1 truncate">{c.login} - {c.name}</span>
       <span className="flex shrink-0 items-center gap-1.5">
-        {/* presence: online dot + login device */}
-        {presenceOnline(c.user?.lastSeenAt) && sIco("fa-circle", "#16a34a", "Online")}
+        {/* device icon only — left dot already encodes online/offline */}
         {c.user?.lastDevice && sIco(String(c.user.lastDevice).toLowerCase() === "mobile" ? "fa-mobile-screen-button" : String(c.user.lastDevice).toLowerCase() === "tablet" ? "fa-tablet-screen-button" : "fa-laptop", "#8b97a8", c.user.lastDevice)}
         {/* Active / Deactivated */}
         {c.deactivated ? sIco("fa-ban", "#8b97a8", "Deactivated") : sIco("fa-circle-check", BUY, "Active")}
@@ -771,7 +771,7 @@ export default function AdminDeskPage() {
               {orderedGroups.map(([cat, list]) => (
                 <div key={cat}>
                   <div onClick={() => toggleCat(cat)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[cat] ? "\u25B8" : "\u25BE"} {cat.toUpperCase()}</div>
-                  {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dg(s.symbol); const bid = p != null ? (p * 0.9999).toFixed(d) : "..."; const ask = p != null ? (p * 1.0001).toFixed(d) : "..."; const dir = dirs[s.symbol] || 0;
+                  {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dg(s.symbol); const bid = p != null ? (p * 0.9999).toFixed(d) : "—"; const ask = p != null ? (p * 1.0001).toFixed(d) : "—"; const dir = dirs[s.symbol] || 0;
                     return (
                     <div key={s.symbol} onDoubleClick={() => setTile(s.symbol)} className={"grid grid-cols-[1fr_72px_72px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")} style={{ borderRadius: 3, minHeight: 22 }}>
                       <button onClick={() => setTile(s.symbol)} className="truncate pl-2 text-left">{s.symbol}</button>
@@ -792,6 +792,8 @@ export default function AdminDeskPage() {
         <span>Equity: <span className="text-[var(--text)]">{selAcc ? fmt(equity) : "--"}</span></span>
         <span>Free: <span className="text-[var(--text)]">{selAcc ? fmt(free) : "--"}</span></span>
         <span>Level: <span className="text-[var(--text)]">{selAcc && level ? level.toFixed(1) + "%" : "--"}</span></span>
+        {selAcc && <span>MC: <span style={{ color: Number(selAcc.mcLevel) > 0 ? SELL : "var(--muted)" }}>{Number(selAcc.mcLevel) > 0 ? selAcc.mcLevel + "%" : "Off"}</span></span>}
+        {selAcc && <span>DNL: <span style={{ color: selAcc.doNotLiquidate ? GOLD : "var(--muted)" }}>{selAcc.doNotLiquidate ? "On" : "Off"}</span></span>}
         <span>{selAcc ? selAcc.login + " - " + selAcc.name : "No account selected"}</span>
       </div>
       {err && !act && !modal && !ticket && <div className="px-3 py-1 text-[11px]" style={{ color: SELL }}>{err}</div>}
@@ -1041,7 +1043,40 @@ export default function AdminDeskPage() {
                 </div>
               );
             })()}
-            {tab === "audit" && <div className="px-2 py-2 text-[10px] text-[var(--muted)]">{audit.length ? audit.slice(0, 60).map((l) => <div key={l.id} className="border-b border-[var(--border)] py-1">{l.performedBy} - {l.action} <span className="text-[var(--text)]">{l.detail}</span></div>) : "No activity."}</div>}
+            {tab === "audit" && (() => {
+              const AUDIT_CATS = ["ALL", "SUPERADMIN", "ADMIN", "MANAGER", "CLIENT"];
+              const AUDIT_COL: Record<string, string> = { SUPERADMIN: "#a78bfa", ADMIN: GOLD, MANAGER: "#38bdf8", CLIENT: BUY };
+              const auditRows = audit.filter((l) => auditCat === "ALL" || (l.category || "ADMIN").toUpperCase() === auditCat);
+              return (
+                <div className="flex h-full flex-col text-[10px]">
+                  <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-2 py-1.5">
+                    {AUDIT_CATS.map((c) => (
+                      <button key={c} onClick={() => setAuditCat(c)} className="rounded px-2 py-0.5" style={auditCat === c ? { background: AUDIT_COL[c] || "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{c}</button>
+                    ))}
+                    <span className="ml-auto text-[var(--muted)]">{auditRows.length} entries</span>
+                  </div>
+                  <div className="flex-1 overflow-auto px-2 py-1">
+                    {auditRows.length === 0 ? <div className="py-4 text-center text-[var(--muted)]">No activity.</div> : auditRows.slice(0, 150).map((l) => {
+                      const cat = (l.category || "ADMIN").toUpperCase();
+                      const col = AUDIT_COL[cat] || "var(--muted)";
+                      return (
+                        <div key={l.id} className="flex items-start gap-2 border-b border-[var(--border)] py-1.5">
+                          <span className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold tracking-wide" style={{ background: col + "22", color: col }}>{cat}</span>
+                          <div className="min-w-0 flex-1 leading-snug">
+                            <span className="text-[var(--muted)]">{l.performedBy}</span>
+                            <span className="mx-1 opacity-30">·</span>
+                            <span className="font-semibold" style={{ color: "var(--accent)" }}>{l.action}</span>
+                            <span className="mx-1 opacity-30">·</span>
+                            <span className="text-[var(--text)]">{l.detail}</span>
+                          </div>
+                          {l.createdAt && <span className="shrink-0 text-[var(--muted)]">{new Date(l.createdAt).toLocaleString()}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             {tab === "payments" && <PaymentsPanel />}
             {tab === "kyc" && <KycPanel />}
           </div>

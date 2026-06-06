@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, startTransition } from "react";
 import LWChart from "@/components/LWChart";
 import WalletPanel from "@/components/WalletPanel";
 
@@ -314,9 +314,9 @@ export default function ClientMobile({ t }: { t: any }) {
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search symbols" className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)]" />
             </div>
             <div className="mb-3 flex gap-4 overflow-x-auto pb-1 text-[12px]" style={{ scrollbarWidth: "none" }}>
-              <button onClick={() => setQcat("favs")} className="whitespace-nowrap pb-1 font-semibold" style={{ color: qcat === "favs" ? BLUE : "var(--muted)", borderBottom: qcat === "favs" ? `2px solid ${BLUE}` : "2px solid transparent" }}><i className="fa-solid fa-star mr-1" />Favourites</button>
+              <button onPointerDown={() => startTransition(() => setQcat("favs"))} className="whitespace-nowrap pb-1 font-semibold" style={{ color: qcat === "favs" ? BLUE : "var(--muted)", borderBottom: qcat === "favs" ? `2px solid ${BLUE}` : "2px solid transparent", touchAction: "manipulation" }}><i className="fa-solid fa-star mr-1" />Favourites</button>
               {cats.map((c) => (
-                <button key={c} onClick={() => setQcat(c)} className="whitespace-nowrap pb-1 font-semibold" style={{ color: qcat === c ? BLUE : "var(--muted)", borderBottom: qcat === c ? `2px solid ${BLUE}` : "2px solid transparent" }}>{c}</button>
+                <button key={c} onPointerDown={() => startTransition(() => setQcat(c))} className="whitespace-nowrap pb-1 font-semibold" style={{ color: qcat === c ? BLUE : "var(--muted)", borderBottom: qcat === c ? `2px solid ${BLUE}` : "2px solid transparent", touchAction: "manipulation" }}>{c}</button>
               ))}
             </div>
             <div className="space-y-2.5">
@@ -357,7 +357,7 @@ export default function ClientMobile({ t }: { t: any }) {
           <div className="flex h-full flex-col">
             <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2">
               {/* Symbol picker — opens a searchable list of all symbols */}
-              <button onClick={() => { setSymSearch(""); setSymPickerOpen(true); }} className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1 text-sm font-bold text-[var(--text)]">
+              <button onPointerDown={(e) => { e.preventDefault(); setSymSearch(""); setSymPickerOpen(true); }} className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-2 text-sm font-bold text-[var(--text)]" style={{ touchAction: "manipulation" }}>
                 <i className="fa-solid fa-magnifying-glass text-[10px] opacity-60" />
                 <span className="truncate">{selSym || "Select symbol"}</span>
                 <i className="fa-solid fa-chevron-down text-[9px] opacity-60" />
@@ -795,7 +795,7 @@ export default function ClientMobile({ t }: { t: any }) {
           {navItems.map(([k, icon, label]) => {
             const active = tab === k;
             return (
-              <button key={k} onClick={() => setTab(k as any)} className="nav-ios-item relative flex flex-1 flex-col items-center justify-center gap-1 py-1">
+              <button key={k} onClick={() => startTransition(() => setTab(k as any))} className="nav-ios-item relative flex flex-1 flex-col items-center justify-center gap-1 py-1">
                 <span className="flex h-9 w-9 items-center justify-center rounded-[14px]"
                   style={{
                     background: active ? "linear-gradient(135deg, #3b8bff, #2563eb)" : "transparent",
