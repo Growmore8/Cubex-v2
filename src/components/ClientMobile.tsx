@@ -195,7 +195,7 @@ export default function ClientMobile({ t }: { t: any }) {
   };
 
   return (
-    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", height: "100dvh", paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation" }} className="flex flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", inset: 0, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation" }} className="flex flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarRef} onChange={uploadAvatar} />
 
       {/* TOP HEADER — iOS glass */}
