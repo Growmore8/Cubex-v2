@@ -59,9 +59,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       case "rename": {
         const name = String(b.name || acc.name);
         const data: any = { name };
-        if (b.email !== undefined) data.email = String(b.email);
         if (b.phone !== undefined) data.phone = b.phone || null;
         if (b.country !== undefined) data.country = b.country || null;
+        if (b.email !== undefined) {
+          const newEmail = String(b.email || "").trim().toLowerCase();
+          data.email = newEmail || null;
+          if (acc.parentId && !newEmail) {
+            // Clearing email on a sub-account → auto-unlink from parent
+            data.parentId = null;
+          } else if (!acc.parentId && newEmail) {
+            // Setting email on a standalone account → try to re-link to matching user's primary account
+            const matchUser = await prisma.user.findFirst({ where: { tenantId, email: newEmail } });
+            if (matchUser && matchUser.id !== acc.userId) {
+              const primary = await prisma.account.findFirst({ where: { tenantId, userId: matchUser.id, parentId: null, NOT: { id: acc.id } }, orderBy: { createdAt: "asc" } });
+              if (primary) { data.parentId = primary.id; data.userId = matchUser.id; }
+            }
+          }
+        }
         await prisma.account.update({ where: { id: acc.id }, data });
         await audit(tenantId, "client.rename", acc.login + " -> " + name, actor);
         break;

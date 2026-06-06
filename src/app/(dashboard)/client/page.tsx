@@ -234,6 +234,16 @@ export default function ClientTerminal() {
       pushToast({ title: "Push alerts enabled", type: "NOTICE" });
     } catch (e) { setErr("Failed to enable alerts"); }
   }
+  async function disablePush() {
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+      const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+      let endpoint = "";
+      if (reg) { const sub = await reg.pushManager.getSubscription(); if (sub) { endpoint = sub.endpoint; await sub.unsubscribe(); } }
+      await fetch("/api/client/push", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint }) });
+      pushToast({ title: "Push alerts disabled", type: "NOTICE" });
+    } catch (e) { setErr("Failed to disable alerts"); }
+  }
   async function addPasskey() {
     try {
       const mod: any = await import("@simplewebauthn/browser");
@@ -348,7 +358,7 @@ export default function ClientTerminal() {
   const histShown = history.filter((h: any) => { if (histRange === "all") return true; const t = new Date(h.closedAt).getTime(); const now = Date.now(); const day = 86400000; if (histRange === "today") return t >= now - day; if (histRange === "week") return t >= now - 7 * day; return t >= now - 30 * day; });
   const tab = (active: boolean) => "px-3 py-1.5 text-[11px] " + (active ? "" : "text-[var(--muted)]");
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, logout: async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, pinForm, setPinForm, savePin }, cToasts, pushToast }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, logout: async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, pinForm, setPinForm, savePin }, cToasts, pushToast }} />;
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {needKyc && (

@@ -502,8 +502,8 @@ export default function AdminDeskPage() {
         {c.locked ? sIco("fa-lock", SELL, "Locked") : null}
         {/* Do Not Liquidate */}
         {c.doNotLiquidate ? sIco("fa-hand", GOLD, "Do Not Liquidate (DNL)") : null}
-        {/* KYC status — only relevant for live accounts */}
-        {c.type === "LIVE" && (c.kycStatus === "APPROVED"
+        {/* KYC — only for live root accounts (not sub-accounts) */}
+        {c.type === "LIVE" && !c.parentId && (c.kycStatus === "APPROVED"
           ? sIco("fa-id-card", BUY, "KYC Verified")
           : c.kycStatus === "PENDING"
           ? sIco("fa-id-card", GOLD, "KYC Pending")
@@ -667,15 +667,47 @@ export default function AdminDeskPage() {
                 const base = navTab === "live" ? liveAccs : demoAccs;
                 const list = navSearch ? base.filter((c: any) => (c.login + " " + c.name + " " + (c.user?.email || c.email || "")).toLowerCase().includes(navSearch.toLowerCase())) : base;
                 if (!list.length) return <div className="px-2 py-3 text-center text-[var(--muted)]">No {navTab} accounts.</div>;
-                // 3-level hierarchy: manager > group > client.
-                // - direct: no manager AND no group -> top-level "Accounts"
-                // - admin-level groups (no manager) -> top-level group sections
-                // - each manager -> its owned groups (nested) + its clients with no group
+
+                // Build parent→children map for nesting sub-accounts under their primary
+                const listIds = new Set(list.map((c: any) => c.id));
+                const childMap: Record<string, any[]> = {};
+                list.forEach((c: any) => {
+                  if (c.parentId && listIds.has(c.parentId)) {
+                    if (!childMap[c.parentId]) childMap[c.parentId] = [];
+                    childMap[c.parentId].push(c);
+                  }
+                });
+                // Root = no parentId, or parent is in a different navTab / not in list
+                const isRoot = (c: any) => !c.parentId || !listIds.has(c.parentId);
+
+                // Render a root account + its nested sub-accounts (no nesting when searching)
+                const acctBlock = (c: any) => {
+                  const kids = !navSearch ? (childMap[c.id] || []) : [];
+                  if (!kids.length) return acctRow(c);
+                  const key = "par-" + c.id;
+                  return (
+                    <div key={c.id}>
+                      <div className="flex items-center">
+                        <button onClick={(e) => { e.stopPropagation(); toggleCat(key); }} className="flex w-5 shrink-0 items-center justify-center self-stretch" style={{ color: "var(--muted)" }}>
+                          <i className={"fa-solid " + (collapsed[key] ? "fa-chevron-right" : "fa-chevron-down")} style={{ fontSize: 7 }} />
+                        </button>
+                        <div className="min-w-0 flex-1">{acctRow(c)}</div>
+                      </div>
+                      {!collapsed[key] && (
+                        <div className="ml-5 flex flex-col gap-0.5 border-l pl-1" style={{ borderColor: "var(--border)" }}>
+                          {kids.map((ch: any) => acctRow(ch))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                };
+
+                // 3-level hierarchy: manager > group > client (same as before, now with sub-account nesting)
                 const direct = list.filter((c: any) => !c.manager && !c.group);
-                const grpOwner: Record<string, string | null> = {}; // groupId -> managerId|null
+                const grpOwner: Record<string, string | null> = {};
                 tradeGroups.forEach((g: any) => { grpOwner[g.id] = g.managerId || null; });
                 const grpRows: Record<string, any[]> = {};
-                const mgrDirect: Record<string, any[]> = {}; // manager clients with no group
+                const mgrDirect: Record<string, any[]> = {};
                 list.forEach((c: any) => {
                   if (c.group) { (grpRows[c.group.id] || (grpRows[c.group.id] = [])).push(c); }
                   else if (c.manager) { (mgrDirect[c.manager.id] || (mgrDirect[c.manager.id] = [])).push(c); }
@@ -698,17 +730,19 @@ export default function AdminDeskPage() {
                     <span className="rounded px-1.5" style={{ background: color + "22" }}>{count}</span>
                   </button>
                 );
+                // Count roots only for header badge (sub-accounts counted under parent)
+                const rootCount = (arr: any[]) => arr.filter(isRoot).length;
                 const groupSection = (gid: string, nested = false) => (
                   <div key={"grp-" + gid} className={nested ? "" : "mt-0.5"}>
                     {header("grp-" + gid, grpName(gid), "fa-folder", "var(--accent)", grpRows[gid].length)}
-                    {!collapsed["grp-" + gid] && <div className="flex flex-col gap-0.5 pl-2">{grpRows[gid].map(acctRow)}</div>}
+                    {!collapsed["grp-" + gid] && <div className="flex flex-col gap-0.5 pl-2">{grpRows[gid].filter(isRoot).map(acctBlock)}</div>}
                   </div>
                 );
                 return (
                   <div className="flex flex-col gap-0.5">
                     {direct.length > 0 && (<>
                       <div className="px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{navTab === "live" ? "Live" : "Demo"} Accounts</div>
-                      {direct.map(acctRow)}
+                      {direct.filter(isRoot).map(acctBlock)}
                     </>)}
                     {adminGroups.map((gid) => groupSection(gid))}
                     {managerIds.map((mid) => {
@@ -721,7 +755,7 @@ export default function AdminDeskPage() {
                           {!collapsed["mgr-" + mid] && (
                             <div className="flex flex-col gap-0.5 pl-2">
                               {groups.map((gid) => groupSection(gid, true))}
-                              {loose.map(acctRow)}
+                              {loose.filter(isRoot).map(acctBlock)}
                             </div>
                           )}
                         </div>

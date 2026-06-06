@@ -43,7 +43,7 @@ export default function ClientMobile({ t }: { t: any }) {
     balance, equity, floating, free, used, level, price, bid, ask, tf, TFS,
     setSelSym, setVol, setSl, setTp, setTf,
     place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr,
-    toggleTheme, enablePush, addPasskey, openPin, favs, toggleFav, avatarUrl, uploadAvatar,
+    toggleTheme, enablePush, disablePush, addPasskey, openPin, favs, toggleFav, avatarUrl, uploadAvatar,
     fmt, csz, pnlOf, dg, logout, pin,
   } = t;
 
@@ -774,12 +774,15 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="flex-1"><div className="text-[12px] font-semibold">Face ID / Fingerprint</div><div className="text-[10px] text-[var(--muted)]">Tap to enable a passkey</div></div>
                 <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
               </button>
-              <button onClick={pushEnabled ? undefined : enablePush} className="flex w-full items-center gap-3 py-2.5 text-left">
+              <button onClick={pushEnabled ? () => { disablePush(); setPushEnabled(false); } : () => { enablePush(); navigator.serviceWorker?.ready.then((r) => r.pushManager.getSubscription().then((s) => setPushEnabled(!!s))).catch(() => {}); }} className="flex w-full items-center gap-3 py-2.5 text-left">
                 <i className="fa-solid fa-bell" style={{ color: pushEnabled ? BUY : "var(--muted)" }} />
-                <div className="flex-1"><div className="text-[12px] font-semibold">Push Notifications</div><div className="text-[10px] text-[var(--muted)]">{pushEnabled ? "Alerts enabled" : "Tap to enable alerts"}</div></div>
-                {pushEnabled
-                  ? <span className="rounded px-1.5 py-0.5 text-[8px] font-bold" style={{ background: "rgba(22,163,74,.15)", color: BUY }}>ON</span>
-                  : <i className="fa-solid fa-chevron-right text-[var(--muted)]" />}
+                <div className="flex-1">
+                  <div className="text-[12px] font-semibold">Push Notifications</div>
+                  <div className="text-[10px] text-[var(--muted)]">{pushEnabled ? "Tap to disable alerts" : "Tap to enable alerts"}</div>
+                </div>
+                <div className="flex h-6 w-11 items-center rounded-full px-0.5 transition-colors duration-200" style={{ background: pushEnabled ? BUY : "var(--border)" }}>
+                  <div className="h-5 w-5 rounded-full bg-white shadow transition-transform duration-200" style={{ transform: pushEnabled ? "translateX(20px)" : "translateX(0)" }} />
+                </div>
               </button>
               <button onClick={toggleTheme} className="flex w-full items-center gap-3 py-2.5 text-left">
                 <i className={`fa-solid fa-${theme === "dark" ? "sun" : "moon"} text-[var(--muted)]`} />

@@ -27,3 +27,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
   }
 }
+
+export async function DELETE(req: Request) {
+  const s = await requireClient();
+  if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  try {
+    const b = await req.json().catch(() => ({}));
+    const endpoint = String(b.endpoint || "");
+    if (endpoint) {
+      await prisma.pushSubscription.deleteMany({ where: { userId: s.sub, endpoint } });
+    } else {
+      await prisma.pushSubscription.deleteMany({ where: { userId: s.sub } });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
+  }
+}
