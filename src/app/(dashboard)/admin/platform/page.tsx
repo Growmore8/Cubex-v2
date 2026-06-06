@@ -668,17 +668,19 @@ export default function AdminDeskPage() {
                 const list = navSearch ? base.filter((c: any) => (c.login + " " + c.name + " " + (c.user?.email || c.email || "")).toLowerCase().includes(navSearch.toLowerCase())) : base;
                 if (!list.length) return <div className="px-2 py-3 text-center text-[var(--muted)]">No {navTab} accounts.</div>;
 
-                // Build parent→children map for nesting sub-accounts under their primary
-                const listIds = new Set(list.map((c: any) => c.id));
+                // Group by userId: the oldest account per user is the root; all others nest under it.
+                // This works even for accounts without parentId set (legacy / created before auto-link).
+                const userGroups: Record<string, any[]> = {};
+                list.forEach((c: any) => { const uid = c.userId || c.id; (userGroups[uid] || (userGroups[uid] = [])).push(c); });
                 const childMap: Record<string, any[]> = {};
-                list.forEach((c: any) => {
-                  if (c.parentId && listIds.has(c.parentId)) {
-                    if (!childMap[c.parentId]) childMap[c.parentId] = [];
-                    childMap[c.parentId].push(c);
-                  }
+                const primaryIdForUser: Record<string, string> = {};
+                Object.entries(userGroups).forEach(([uid, accs]) => {
+                  if (accs.length <= 1) return;
+                  const sorted = [...accs].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                  primaryIdForUser[uid] = sorted[0].id;
+                  childMap[sorted[0].id] = sorted.slice(1);
                 });
-                // Root = no parentId, or parent is in a different navTab / not in list
-                const isRoot = (c: any) => !c.parentId || !listIds.has(c.parentId);
+                const isRoot = (c: any) => { const uid = c.userId || c.id; return !primaryIdForUser[uid] || primaryIdForUser[uid] === c.id; };
 
                 // Render a root account + its nested sub-accounts (no nesting when searching)
                 const acctBlock = (c: any) => {
