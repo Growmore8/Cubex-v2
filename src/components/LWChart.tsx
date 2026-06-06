@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries } from "lightweight-charts";
+import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries, HistogramSeries } from "lightweight-charts";
 import { io, Socket } from "socket.io-client";
 
 // RSI (Wilder's smoothing) over candle closes -> line-series data.
@@ -41,6 +41,49 @@ function computeMA(bars: any[], period: number, exp: boolean) {
   return out;
 }
 
+// Bollinger Bands (SMA20 ± 2σ) — mid, upper, lower band
+function computeBB(bars: any[], period = 20, mult = 2) {
+  if (!bars || bars.length < period) return { mid: [], upper: [], lower: [] };
+  const mid: { time: any; value: number }[] = [], upper: { time: any; value: number }[] = [], lower: { time: any; value: number }[] = [];
+  for (let i = period - 1; i < bars.length; i++) {
+    let s = 0; for (let j = i - period + 1; j <= i; j++) s += bars[j].close; const sma = s / period;
+    let v = 0; for (let j = i - period + 1; j <= i; j++) v += (bars[j].close - sma) ** 2; const sd = Math.sqrt(v / period);
+    mid.push({ time: bars[i].time, value: +sma.toFixed(6) });
+    upper.push({ time: bars[i].time, value: +(sma + mult * sd).toFixed(6) });
+    lower.push({ time: bars[i].time, value: +(sma - mult * sd).toFixed(6) });
+  }
+  return { mid, upper, lower };
+}
+
+// MACD (12, 26, 9) — macd line, signal line, histogram bars
+function computeMACD(bars: any[], fast = 12, slow = 26, sig = 9) {
+  if (!bars || bars.length < slow + sig) return { macd: [], signal: [], hist: [] };
+  const ema = (src: number[], n: number) => {
+    const k = 2 / (n + 1), r: (number | null)[] = new Array(src.length).fill(null);
+    let e = src.slice(0, n).reduce((a, b) => a + b, 0) / n; r[n - 1] = e;
+    for (let i = n; i < src.length; i++) { e = src[i] * k + e * (1 - k); r[i] = e; }
+    return r;
+  };
+  const closes = bars.map((b: any) => b.close), fe = ema(closes, fast), se = ema(closes, slow);
+  const macdVals: number[] = [], macdLine: { time: any; value: number }[] = [];
+  for (let i = 0; i < bars.length; i++) {
+    if (fe[i] == null || se[i] == null) { macdVals.push(0); continue; }
+    const m = fe[i]! - se[i]!; macdVals.push(m);
+    if (i >= slow - 1) macdLine.push({ time: bars[i].time, value: +m.toFixed(6) });
+  }
+  const sigVals = ema(macdVals, sig);
+  const signalLine: { time: any; value: number }[] = [], hist: { time: any; value: number; color: string }[] = [];
+  let mIdx = 0;
+  for (let i = slow - 1; i < bars.length; i++) {
+    if (sigVals[i] == null || mIdx >= macdLine.length) break;
+    const sv = sigVals[i]!, mv = macdLine[mIdx].value;
+    signalLine.push({ time: bars[i].time, value: +sv.toFixed(6) });
+    hist.push({ time: bars[i].time, value: +(mv - sv).toFixed(6), color: mv >= sv ? "#26a69a99" : "#e0526099" });
+    mIdx++;
+  }
+  return { macd: macdLine, signal: signalLine, hist };
+}
+
 export type ChartPosition = {
   id: string;
   type: "BUY" | "SELL";
@@ -55,7 +98,7 @@ export type ChartPosition = {
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
 export default function LWChart({
-  symbol, tf, theme, positions, digits = 2,
+  symbol, tf, theme, positions, digits = 2, showTools = true,
 }: {
   symbol: string;
   tf: string;
@@ -63,6 +106,7 @@ export default function LWChart({
   positions?: ChartPosition[];
   digits?: number;
   onClose?: (id: string) => void;
+  showTools?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
@@ -91,6 +135,13 @@ export default function LWChart({
   const rsiSeriesRef = useRef<any>(null);
   // Called inside seed() after bars load so indicators update even before user toggles
   const onBarsLoaded = useRef<() => void>(() => {});
+  // Bollinger Bands
+  const [bb, setBb] = useState(false);
+  const bbMidRef = useRef<any>(null), bbUpRef = useRef<any>(null), bbLoRef = useRef<any>(null);
+  // MACD
+  const [macd, setMacd] = useState(false);
+  const macdWrapRef = useRef<HTMLDivElement | null>(null);
+  const macdChartRef = useRef<any>(null), macdLineRef = useRef<any>(null), macdSignalRef = useRef<any>(null), macdHistRef = useRef<any>(null);
 
   function clearDrawings() {
     for (const l of hlineRefs.current) { try { seriesRef.current?.removePriceLine(l); } catch {} }
@@ -154,24 +205,40 @@ export default function LWChart({
     return () => { chart.remove(); chartRef.current = null; seriesRef.current = null; };
   }, [theme, digits]);
 
-  // Indicators (SMA/EMA over closes) — add/remove + recompute on toggle or data change
+  // Indicators (SMA / EMA / BB overlays) — add/remove + recompute on toggle or data change
   useEffect(() => {
     const chart = chartRef.current; if (!chart) return;
+    // SMA
     if (sma && !smaRef.current) smaRef.current = chart.addSeries(LineSeries, { color: "#f0b90b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
     if (!sma && smaRef.current) { try { chart.removeSeries(smaRef.current); } catch {} smaRef.current = null; }
     if (sma && smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, 20, false)); } catch {} }
+    // EMA
     if (ema && !emaRef.current) emaRef.current = chart.addSeries(LineSeries, { color: "#a78bfa", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
     if (!ema && emaRef.current) { try { chart.removeSeries(emaRef.current); } catch {} emaRef.current = null; }
     if (ema && emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, 20, true)); } catch {} }
-    // RSI data sync (chart managed separately)
+    // Bollinger Bands
+    if (bb && !bbMidRef.current) {
+      bbMidRef.current = chart.addSeries(LineSeries, { color: "#f0b90b88", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      bbUpRef.current = chart.addSeries(LineSeries, { color: "#5aa9ff66", lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      bbLoRef.current = chart.addSeries(LineSeries, { color: "#5aa9ff66", lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    }
+    if (!bb && bbMidRef.current) {
+      try { chart.removeSeries(bbMidRef.current); chart.removeSeries(bbUpRef.current); chart.removeSeries(bbLoRef.current); } catch {}
+      bbMidRef.current = null; bbUpRef.current = null; bbLoRef.current = null;
+    }
+    if (bb && bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current); try { bbMidRef.current.setData(mid); bbUpRef.current.setData(upper); bbLoRef.current.setData(lower); } catch {} }
+    // Sub-pane data sync (charts managed by their own effects)
     if (rsi && rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
-    // Keep onBarsLoaded fresh so seed() triggers correct indicator recompute
+    if (macd && macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
+    // Keep onBarsLoaded fresh so seed() triggers indicator recompute after async bar load
     onBarsLoaded.current = () => {
       if (smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, 20, false)); } catch {} }
       if (emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, 20, true)); } catch {} }
+      if (bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current); try { bbMidRef.current.setData(mid); bbUpRef.current?.setData(upper); bbLoRef.current?.setData(lower); } catch {} }
       if (rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
+      if (macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
     };
-  }, [sma, ema, rsi, symbol, tf, theme, digits, drawN]);
+  }, [sma, ema, bb, rsi, macd, symbol, tf, theme, digits, drawN]);
 
   // RSI sub-pane chart (separate LW instance below main chart)
   useEffect(() => {
@@ -213,6 +280,38 @@ export default function LWChart({
       if (rsiChartRef.current) { rsiChartRef.current.remove(); rsiChartRef.current = null; rsiSeriesRef.current = null; }
     };
   }, [rsi, theme]);
+
+  // MACD sub-pane chart (separate LW instance, stacks below RSI if both active)
+  useEffect(() => {
+    if (!macd) {
+      if (macdChartRef.current) { macdChartRef.current.remove(); macdChartRef.current = null; macdLineRef.current = null; macdSignalRef.current = null; macdHistRef.current = null; }
+      return;
+    }
+    const el = macdWrapRef.current; if (!el) return;
+    let raf = 0; let syncFn: ((r: any) => void) | null = null;
+    raf = requestAnimationFrame(() => {
+      if (!el.isConnected) return;
+      const dark = theme === "dark";
+      const chart = createChart(el, {
+        layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: dark ? "#9aa6bf" : "#475569", fontSize: 9 },
+        grid: { vertLines: { color: "transparent" }, horzLines: { color: dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.05)" } },
+        rightPriceScale: { borderColor: dark ? "#242a38" : "#e2e8f0", scaleMargins: { top: 0.15, bottom: 0.15 } },
+        timeScale: { visible: false }, autoSize: true, handleScroll: false, handleScale: false,
+      });
+      const histS = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false });
+      const lineS = chart.addSeries(LineSeries, { color: "#22d3ee", lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, priceFormat: { type: "price", precision: 5, minMove: 0.00001 } });
+      const sigS = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      macdChartRef.current = chart; macdLineRef.current = lineS; macdSignalRef.current = sigS; macdHistRef.current = histS;
+      if (barsRef.current.length) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { lineS.setData(ml); sigS.setData(sl); histS.setData(hl); } catch {} }
+      syncFn = (range: any) => { if (range && macdChartRef.current) { try { macdChartRef.current.timeScale().setVisibleLogicalRange(range); } catch {} } };
+      if (chartRef.current) chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(syncFn);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      if (syncFn && chartRef.current) { try { chartRef.current.timeScale().unsubscribeVisibleLogicalRangeChange(syncFn); } catch {} }
+      if (macdChartRef.current) { macdChartRef.current.remove(); macdChartRef.current = null; macdLineRef.current = null; macdSignalRef.current = null; macdHistRef.current = null; }
+    };
+  }, [macd, theme]);
 
   // Load Twelve Data historical candles (up to 5000) on symbol / timeframe change
   useEffect(() => {
@@ -348,24 +447,28 @@ export default function LWChart({
   const bord = theme === "dark" ? "#242a38" : "#e2e8f0";
   return (
     <div style={{ display: "flex", height: "100%", width: "100%" }}>
-      {/* Left sidebar — TradingView-style tool panel */}
-      <div style={{ width: 34, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 2px", gap: 2, background: theme === "dark" ? "rgba(14,18,28,0.96)" : "rgba(246,248,252,0.97)", borderRight: `1px solid ${bord}` }}>
-        <button style={tbV(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line">
-          <i className="fa-solid fa-minus" style={{ fontSize: 12 }} />
-        </button>
-        <button style={tbV(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line">
-          <i className="fa-solid fa-arrow-trend-up" style={{ fontSize: 12 }} />
-        </button>
-        {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && (
-          <button style={tbV(false)} onClick={clearDrawings} title="Clear drawings">
-            <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
+      {/* Left sidebar — TradingView-style tool panel (hidden when showTools=false) */}
+      {showTools && (
+        <div style={{ width: 34, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 2px", gap: 2, background: theme === "dark" ? "rgba(14,18,28,0.96)" : "rgba(246,248,252,0.97)", borderRight: `1px solid ${bord}` }}>
+          <button style={tbV(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line">
+            <i className="fa-solid fa-minus" style={{ fontSize: 12 }} />
           </button>
-        )}
-        <div style={{ flex: 1 }} />
-        <button style={{ ...tbV(sma), fontSize: 9, fontWeight: 700 }} onClick={() => setSma((v) => !v)} title="SMA 20">SMA</button>
-        <button style={{ ...tbV(ema), fontSize: 9, fontWeight: 700 }} onClick={() => setEma((v) => !v)} title="EMA 20">EMA</button>
-        <button style={{ ...tbV(rsi), fontSize: 9, fontWeight: 700 }} onClick={() => setRsi((v) => !v)} title="RSI 14">RSI</button>
-      </div>
+          <button style={tbV(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line">
+            <i className="fa-solid fa-arrow-trend-up" style={{ fontSize: 12 }} />
+          </button>
+          {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && (
+            <button style={tbV(false)} onClick={clearDrawings} title="Clear drawings">
+              <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          <button style={{ ...tbV(sma), fontSize: 9, fontWeight: 700 }} onClick={() => setSma((v) => !v)} title="SMA 20">SMA</button>
+          <button style={{ ...tbV(ema), fontSize: 9, fontWeight: 700 }} onClick={() => setEma((v) => !v)} title="EMA 20">EMA</button>
+          <button style={{ ...tbV(bb), fontSize: 8, fontWeight: 700 }} onClick={() => setBb((v) => !v)} title="Bollinger Bands (20,2)">BB</button>
+          <button style={{ ...tbV(rsi), fontSize: 9, fontWeight: 700 }} onClick={() => setRsi((v) => !v)} title="RSI 14">RSI</button>
+          <button style={{ ...tbV(macd), fontSize: 7, fontWeight: 700 }} onClick={() => setMacd((v) => !v)} title="MACD (12,26,9)">MACD</button>
+        </div>
+      )}
       {/* Chart column */}
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
         {/* Main price chart */}
@@ -379,11 +482,20 @@ export default function LWChart({
             </div>
           )}
         </div>
-        {/* RSI sub-pane — fixed 100 px height for reliable rendering */}
+        {/* RSI sub-pane */}
         {rsi && (
           <div style={{ flexShrink: 0, height: 100, position: "relative", borderTop: `1px solid ${bord}` }}>
             <div ref={rsiWrapRef} style={{ position: "absolute", inset: 0 }} />
             <span style={{ position: "absolute", top: 3, left: 6, zIndex: 5, fontSize: 9, color: "#a78bfa", pointerEvents: "none" }}>RSI 14</span>
+          </div>
+        )}
+        {/* MACD sub-pane */}
+        {macd && (
+          <div style={{ flexShrink: 0, height: 100, position: "relative", borderTop: `1px solid ${bord}` }}>
+            <div ref={macdWrapRef} style={{ position: "absolute", inset: 0 }} />
+            <span style={{ position: "absolute", top: 3, left: 6, zIndex: 5, fontSize: 9, pointerEvents: "none" }}>
+              <span style={{ color: "#22d3ee" }}>MACD</span><span style={{ color: "#f97316", marginLeft: 4 }}>Signal</span>
+            </span>
           </div>
         )}
       </div>

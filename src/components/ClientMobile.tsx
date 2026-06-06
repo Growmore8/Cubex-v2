@@ -68,12 +68,8 @@ export default function ClientMobile({ t }: { t: any }) {
   }, []);
   const avatarRef = useRef<HTMLInputElement>(null);
   const baselineRef = useRef<Record<string, number>>({});
-  const stepperInputRef = useRef<HTMLInputElement>(null);
-  // Keep uncontrolled lot-size input in sync with vol when changed by +/- buttons
-  useEffect(() => {
-    const el = stepperInputRef.current;
-    if (el && document.activeElement !== el) el.value = String(vol);
-  }, [vol]);
+  const [chartFull, setChartFull] = useState(false);
+  const [lotPadOpen, setLotPadOpen] = useState(false);
 
   // capture a session baseline price for % change movers
   useEffect(() => {
@@ -171,20 +167,76 @@ export default function ClientMobile({ t }: { t: any }) {
     setModifyId(null); setExpanded(null);
   };
 
+  const LotPad = ({ onClose }: { onClose: () => void }) => {
+    const [disp, setDisp] = useState(Number(vol).toFixed(2));
+    const num = Math.max(0, parseFloat(disp) || 0);
+    const pipVal = +(num * 10).toFixed(2);
+    const press = (k: string) => setDisp(prev => {
+      if (k === "⌫") return prev.length > 1 ? prev.slice(0, -1) : "0";
+      if (k === "." && prev.includes(".")) return prev;
+      if (prev === "0" && k !== ".") return k;
+      if (prev.includes(".") && (prev.split(".")[1]?.length ?? 0) >= 2) return prev;
+      return prev + k;
+    });
+    const confirm = () => { const v = parseFloat(disp); setVol(isNaN(v) || v < 0.01 ? 0.01 : +v.toFixed(2)); onClose(); };
+    const isSel = (v: number) => Math.abs(num - v) < 0.001;
+    const btnBg = (active: boolean) => active ? `${GOLD}28` : "var(--soft)";
+    return (
+      <div className="fixed inset-0 z-[92]" style={{ background: "rgba(0,0,0,0.55)" }} onClick={onClose}>
+        <div className="absolute bottom-0 left-0 right-0" style={{ borderRadius: "28px 28px 0 0", background: theme === "dark" ? "rgba(13,17,27,0.98)" : "rgba(255,255,255,0.98)", backdropFilter: "blur(28px)", borderTop: `1px solid ${GOLD}22` }} onClick={e => e.stopPropagation()}>
+          {/* Handle */}
+          <div className="flex justify-center pb-1 pt-3"><div className="h-1 w-10 rounded-full" style={{ background: "var(--border)" }} /></div>
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-2">
+            <span className="text-[14px] font-bold" style={{ color: "var(--text)" }}>Lot Size</span>
+            <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-xmark text-[11px]" /></button>
+          </div>
+          {/* Display */}
+          <div className="mx-4 mb-3 overflow-hidden rounded-2xl" style={{ background: "var(--soft)", border: `1px solid ${GOLD}33` }}>
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <span className="text-[36px] font-black tabular-nums" style={{ color: GOLD, letterSpacing: 2 }}>{disp || "0"}</span>
+              <button onPointerDown={e => { e.preventDefault(); press("⌫"); }} className="flex h-11 w-11 items-center justify-center rounded-xl active:scale-90" style={{ background: "rgba(224,82,96,0.12)", color: SELL, transition: "transform 0.08s" }}>
+                <i className="fa-solid fa-delete-left text-lg" />
+              </button>
+            </div>
+            <div className="flex items-center justify-between border-t px-5 py-2 text-[10px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
+              <span>Pip value ≈ <span style={{ color: BUY, fontWeight: 600 }}>${pipVal}</span></span>
+              <span style={{ color: num >= 0.01 ? "#22c55e" : SELL }}>{num >= 0.01 ? `${num.toFixed(2)} lots` : "min 0.01"}</span>
+            </div>
+          </div>
+          {/* Presets */}
+          <div className="mb-3 flex gap-2 px-4">
+            {[0.01, 0.05, 0.10, 1.00].map(v => (
+              <button key={v} onPointerDown={e => { e.preventDefault(); setDisp(v.toFixed(2)); }} className="flex-1 rounded-xl py-2 text-[11px] font-bold transition-all active:scale-95" style={{ background: btnBg(isSel(v)), color: isSel(v) ? GOLD : "var(--muted)", border: `1px solid ${isSel(v) ? GOLD + "55" : "var(--border)"}` }}>
+                {v.toFixed(2)}
+              </button>
+            ))}
+          </div>
+          {/* Numpad */}
+          <div className="mb-3 grid grid-cols-3 gap-2 px-4">
+            {["1","2","3","4","5","6","7","8","9",".","0","⌫"].map(k => (
+              <button key={k} onPointerDown={e => { e.preventDefault(); press(k); }} className="flex items-center justify-center rounded-2xl text-[20px] font-semibold active:scale-90" style={{ height: 54, background: k === "⌫" ? "rgba(224,82,96,0.10)" : "var(--soft)", color: k === "⌫" ? SELL : "var(--text)", transition: "transform 0.08s", boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+                {k === "⌫" ? <i className="fa-solid fa-delete-left" /> : k}
+              </button>
+            ))}
+          </div>
+          {/* Actions */}
+          <div className="flex gap-3 px-4 pb-10">
+            <button onClick={onClose} className="flex-1 rounded-2xl py-4 text-[14px] font-semibold" style={{ background: "var(--soft)", color: "var(--muted)" }}>Cancel</button>
+            <button onPointerDown={e => { e.preventDefault(); confirm(); }} className="rounded-2xl py-4 text-[14px] font-bold text-white" style={{ flex: 2, background: `linear-gradient(135deg, ${GOLD}, #f59e0b)`, boxShadow: `0 6px 24px ${GOLD}44` }}>✓ Confirm</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const Stepper = ({ small }: { small?: boolean }) => (
     <div className="flex flex-col items-center">
       <div className="flex items-center gap-1.5">
         <button onPointerDown={(e) => { e.preventDefault(); setVol((v: number) => Math.max(0.01, +(v - 0.01).toFixed(2))); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>−</button>
-        <input
-          ref={stepperInputRef}
-          type="text"
-          inputMode="decimal"
-          defaultValue={String(vol)}
-          onFocus={(e) => e.target.select()}
-          onBlur={(e) => { const v = parseFloat(e.target.value); const safe = isNaN(v) || v < 0.01 ? 0.01 : +v.toFixed(2); setVol(safe); if (stepperInputRef.current) stepperInputRef.current.value = String(safe); }}
-          className="rounded-lg border border-[var(--border)] bg-[var(--soft)] text-center font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]"
-          style={{ width: small ? 54 : 62, height: small ? 30 : 34, fontSize: small ? 12 : 13, touchAction: "manipulation" }}
-        />
+        <button onPointerDown={(e) => { e.preventDefault(); setLotPadOpen(true); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] text-center font-semibold tabular-nums text-[var(--text)]" style={{ width: small ? 54 : 62, height: small ? 30 : 34, fontSize: small ? 12 : 13, touchAction: "manipulation", cursor: "pointer" }}>
+          {Number(vol).toFixed(2)}
+        </button>
         <button onPointerDown={(e) => { e.preventDefault(); setVol((v: number) => +(v + 0.01).toFixed(2)); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>+</button>
       </div>
       <span className="mt-0.5 text-[9px] text-[var(--muted)]">Lots</span>
@@ -487,28 +539,25 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── CHART ───────── */}
         <KeepAlive active={tab === "chart"}>{(
           <div className="flex h-full flex-col">
+            {/* Chart header — symbol picker + price + TF + expand */}
             <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2">
-              {/* Symbol picker — opens a searchable list of all symbols */}
-              <button onPointerDown={(e) => { e.preventDefault(); setSymSearch(""); setSymPickerOpen(true); }} className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-2 text-sm font-bold text-[var(--text)]" style={{ touchAction: "manipulation" }}>
+              <button onPointerDown={(e) => { e.preventDefault(); setSymSearch(""); setSymPickerOpen(true); }} className="flex max-w-[160px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1.5 text-sm font-bold text-[var(--text)]" style={{ touchAction: "manipulation" }}>
                 <i className="fa-solid fa-magnifying-glass text-[10px] opacity-60" />
-                <span className="truncate">{selSym || "Select symbol"}</span>
-                <i className="fa-solid fa-chevron-down text-[9px] opacity-60" />
+                <span className="truncate">{selSym || "Symbol"}</span>
               </button>
-              <span className="text-[12px] font-semibold" style={{ color: BUY }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</span>
+              <span className="text-[12px] font-semibold tabular-nums" style={{ color: BUY }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</span>
               <div className="ml-auto flex items-center gap-1.5">
                 <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-1 text-[11px] text-[var(--text)]">
                   {(TFS || []).map((x: string) => <option key={x} value={x}>{x}</option>)}
                 </select>
-                <select value="" onChange={(e) => { if (e.target.value) setMInd((a) => a.includes(e.target.value) ? a : [...a, e.target.value]); }} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-1 text-[11px] text-[var(--text)]">
-                  <option value="">+ Indicator</option>
-                  {INDS.map(([label, id]) => <option key={id} value={id}>{label}</option>)}
-                </select>
-                <button onClick={() => setMInd([])} className="flex h-7 w-7 items-center justify-center rounded border border-[var(--border)] text-[var(--muted)]"><i className="fa-solid fa-trash text-[11px]" /></button>
-                <button onClick={() => setMInd([])} className="flex h-7 w-7 items-center justify-center rounded border border-[var(--border)] text-[var(--muted)]"><i className="fa-solid fa-xmark" /></button>
+                <button onPointerDown={(e) => { e.preventDefault(); setChartFull(true); }} className="flex h-7 w-7 items-center justify-center rounded border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
+                  <i className="fa-solid fa-expand text-[11px]" />
+                </button>
               </div>
             </div>
+            {/* Chart — no sidebar tools by default (use full-screen for tools) */}
             <div className="relative min-h-0 flex-1 bg-[var(--bg)]">
-              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)}
+              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={false}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
@@ -527,6 +576,35 @@ export default function ClientMobile({ t }: { t: any }) {
             {err && <div className="bg-[var(--panel)] pb-1 text-center text-[11px]" style={{ color: SELL }}>{err}</div>}
           </div>
         )}</KeepAlive>
+
+        {/* ───────── FULL-SCREEN CHART OVERLAY ───────── */}
+        {chartFull && (
+          <div className="fixed inset-0 z-[85] flex flex-col" style={{ background: "var(--bg)" }}>
+            <div className="flex items-center gap-2 border-b px-3 py-2" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
+              <span className="font-bold text-sm">{selSym}</span>
+              <span className="text-[12px] tabular-nums" style={{ color: BUY }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</span>
+              <div className="ml-auto flex items-center gap-2">
+                <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text)]">
+                  {(TFS || []).map((x: string) => <option key={x} value={x}>{x}</option>)}
+                </select>
+                <button onPointerDown={(e) => { e.preventDefault(); setChartFull(false); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
+                  <i className="fa-solid fa-compress text-[12px]" />
+                </button>
+              </div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={true}
+                positions={[
+                  ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
+                  ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
+                ]}
+                onClose={(id: string) => { if (id.startsWith("pnd-")) { t.cancelPending && t.cancelPending(id.slice(4)); } else close(id); }} />
+            </div>
+          </div>
+        )}
+
+        {/* ───────── LOT PAD ───────── */}
+        {lotPadOpen && <LotPad onClose={() => setLotPadOpen(false)} />}
 
         {/* ───────── TRADES ───────── */}
         {tab === "trades" && (

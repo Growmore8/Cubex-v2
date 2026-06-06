@@ -798,7 +798,9 @@ export default function AdminDeskPage() {
               <button onClick={() => { const a = symbols.find((s) => openCharts.indexOf(s.symbol) === -1); if (a) addChart(a.symbol); }} className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[var(--muted)]">+</button>
             </div>
             <span className="mx-1 h-3 w-px bg-[var(--border)]" />
-            {TFS.map((t) => (<button key={t} onClick={() => setTf(t)} className="rounded px-2 py-0.5" style={tf === t ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{t}</button>))}
+            <select value={tf} onChange={(e) => setTf(e.target.value)} className="ml-auto rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[11px] text-[var(--text)]" style={{ cursor: "pointer" }}>
+              {TFS.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
