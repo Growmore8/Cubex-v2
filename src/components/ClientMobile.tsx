@@ -205,32 +205,35 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
       )}
 
-      {/* Notification panel — slides over content when bell is tapped */}
+      {/* Notification panel — full-screen overlay */}
       {notisOpen && (
-        <div className="absolute inset-x-0 top-0 z-50 flex flex-col rounded-b-2xl border-b shadow-2xl" style={{ background: "var(--panel)", borderColor: "var(--border)", maxHeight: "65vh" }}>
-          <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
-            <div className="text-[13px] font-bold">Notifications</div>
-            <button onClick={() => setNotisOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "var(--soft)" }}><i className="fa-solid fa-xmark text-[var(--muted)]" /></button>
-          </div>
-          <div className="overflow-auto">
-            {(notis || []).length === 0
-              ? <div className="py-10 text-center text-[12px] text-[var(--muted)]">No notifications</div>
-              : (notis || []).map((n: any, i: number) => (
-                <div key={i} className="flex gap-3 border-b px-4 py-3 last:border-0" style={{ borderColor: "var(--border)", background: !n.read ? "var(--soft)" : undefined }}>
-                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px]" style={{ background: "rgba(227,168,85,0.15)", color: GOLD }}>
-                    <i className="fa-solid fa-bell" />
+        <>
+          <div className="fixed inset-0 z-[70]" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setNotisOpen(false)} />
+          <div className="fixed inset-x-0 top-0 z-[80] flex flex-col rounded-b-3xl shadow-2xl" style={{ background: "var(--panel)", maxHeight: "72vh" }}>
+            <div className="flex items-center justify-between px-5 pb-3 pt-5">
+              <div className="text-[15px] font-bold text-[var(--text)]">Notifications</div>
+              <button onClick={() => setNotisOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-sm" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <div className="overflow-auto pb-4">
+              {(notis || []).length === 0
+                ? <div className="py-12 text-center text-[13px] text-[var(--muted)]"><i className="fa-solid fa-bell-slash mb-3 block text-3xl opacity-30" />No notifications</div>
+                : (notis || []).map((n: any, i: number) => (
+                  <div key={i} className="flex gap-3 border-b px-5 py-3.5 last:border-0" style={{ borderColor: "var(--border)", background: !n.read ? "color-mix(in srgb, var(--soft) 60%, transparent)" : undefined }}>
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm" style={{ background: "rgba(227,168,85,0.18)", color: GOLD }}>
+                      <i className="fa-solid fa-bell" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-semibold text-[var(--text)]">{n.title}</div>
+                      {n.body && <div className="mt-0.5 text-[12px] leading-snug text-[var(--muted)]">{n.body}</div>}
+                      <div className="mt-1 text-[10px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div>
+                    </div>
+                    {!n.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ background: SELL }} />}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[12px] font-semibold text-[var(--text)]">{n.title}</div>
-                    {n.body && <div className="mt-0.5 text-[11px] text-[var(--muted)]">{n.body}</div>}
-                    <div className="mt-1 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div>
-                  </div>
-                  {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: SELL }} />}
-                </div>
-              ))
-            }
+                ))
+              }
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Toast overlay — bottom of screen, auto-dismiss */}
@@ -254,13 +257,26 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── DASHBOARD ───────── */}
         <KeepAlive active={tab === "dashboard"}>{(
           <div className="space-y-4 p-3">
-            {/* premium account card (Visa/Mastercard style) */}
+            {/* premium account card (Visa/Mastercard style) — swipe left/right to switch accounts */}
             <div className="relative overflow-hidden rounded-[18px] p-5 text-white" style={{
               background: account?.type === "LIVE"
                 ? `linear-gradient(135deg, ${brand?.primaryColor || "#1e3a8a"} 0%, #0b1220 78%)`
                 : `linear-gradient(135deg, #5b4410 0%, #0d0f16 78%)`,
               boxShadow: "0 16px 34px -14px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08)",
-            }}>
+              touchAction: "pan-y",
+            }}
+              onTouchStart={(e) => { (e.currentTarget as any)._sx = e.touches[0].clientX; }}
+              onTouchEnd={(e) => {
+                const sx = (e.currentTarget as any)._sx;
+                if (sx == null) return;
+                const dx = e.changedTouches[0].clientX - sx;
+                if (Math.abs(dx) < 40) return;
+                const ids = (accts || []).map((a: any) => a.id);
+                const cur = ids.indexOf(accId);
+                if (dx < 0 && cur < ids.length - 1) switchAcc(ids[cur + 1]);
+                else if (dx > 0 && cur > 0) switchAcc(ids[cur - 1]);
+              }}
+            >
               {/* gloss + animated sheen */}
               <div className="card-sheen pointer-events-none absolute inset-0" />
               <div className="pointer-events-none absolute -right-14 -top-20 h-56 w-56 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%)" }} />
