@@ -449,7 +449,7 @@ export default function LWChart({
     <div style={{ display: "flex", height: "100%", width: "100%" }}>
       {/* Left sidebar — TradingView-style tool panel (hidden when showTools=false) */}
       {showTools && (
-        <div style={{ width: 34, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 2px", gap: 2, background: theme === "dark" ? "rgba(14,18,28,0.96)" : "rgba(246,248,252,0.97)", borderRight: `1px solid ${bord}` }}>
+        <div style={{ width: 42, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 5px", gap: 4, background: theme === "dark" ? "rgba(14,18,28,0.96)" : "rgba(246,248,252,0.97)", borderRight: `1px solid ${bord}` }}>
           <button style={tbV(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line">
             <i className="fa-solid fa-minus" style={{ fontSize: 12 }} />
           </button>

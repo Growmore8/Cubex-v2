@@ -579,8 +579,8 @@ export default function ClientMobile({ t }: { t: any }) {
 
         {/* ───────── FULL-SCREEN CHART OVERLAY ───────── */}
         {chartFull && (
-          <div className="fixed inset-0 z-[85] flex flex-col" style={{ background: "var(--bg)" }}>
-            <div className="flex items-center gap-2 border-b px-3 py-2" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
+          <div className="fixed inset-0 z-[85] flex flex-col" style={{ background: "var(--bg)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
+            <div className="flex items-center gap-2 border-b px-4" style={{ paddingTop: "calc(env(safe-area-inset-top) + 10px)", paddingBottom: 10, borderColor: "var(--border)", background: "var(--panel)" }}>
               <span className="font-bold text-sm">{selSym}</span>
               <span className="text-[12px] tabular-nums" style={{ color: BUY }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</span>
               <div className="ml-auto flex items-center gap-2">
