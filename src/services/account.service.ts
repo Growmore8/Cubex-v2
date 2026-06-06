@@ -10,7 +10,7 @@ export function listClients(tenantId: string, managerId?: string | null) {
     where: managerId ? { tenantId, managerId } : { tenantId },
     orderBy: { createdAt: "desc" },
     include: {
-      user: { select: { email: true, status: true, lastLoginIp: true, lastLoginAt: true } },
+      user: { select: { email: true, status: true, lastLoginIp: true, lastLoginAt: true, lastSeenAt: true, lastDevice: true } },
       manager: { select: { id: true, name: true } },
       group: { select: { id: true, name: true } },
     },

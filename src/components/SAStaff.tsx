@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { PresenceDot, DeviceIcon, ago } from "@/components/ui/Presence";
 
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
   { sec: "Users", items: [["createClients", "Create Clients"], ["deleteClients", "Delete Clients"], ["manageManagers", "Manage Managers"]] },
@@ -135,8 +136,14 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
               {filtered.map((u: any) => (
                 <tr key={u.id} className="ui-row border-b" style={{ borderColor: "#f0f4f8" }}>
                   <td className="px-3 py-2.5">
-                    <div className="font-medium">{u.name}</div>
-                    <div className="text-xs text-gray-400">{u.email}</div>
+                    <div className="flex items-start gap-2">
+                      <span className="mt-1.5"><PresenceDot online={u.online} /></span>
+                      <div>
+                        <div className="flex items-center gap-1.5 font-medium">{u.name}{u.device && <DeviceIcon device={u.device} className="text-[11px] text-gray-400" />}</div>
+                        <div className="text-xs text-gray-400">{u.email}</div>
+                        <div className="text-[10px]" style={{ color: u.online ? "#16a34a" : "#94a3b8" }}>{u.online ? "Online" : "last seen " + ago(u.lastSeenAt)}</div>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-3 py-2.5">
                     {u.company

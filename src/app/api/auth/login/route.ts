@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     const h = await headers();
     const host = h.get("host");
     const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || undefined;
-    const session = await authenticate(host, email, password, ip);
+    const session = await authenticate(host, email, password, ip, h.get("user-agent") || undefined);
     audit(session.tenantId, "auth.login", `${session.role} "${session.name}" logged in` + (ip ? ` (${ip})` : ""), session.email, session.role as any);
     // Notify staff when a client logs in (drives the login sound on admin/manager side)
     if (session.role === "CLIENT" && session.tenantId) {

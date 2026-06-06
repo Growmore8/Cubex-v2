@@ -2,11 +2,12 @@
 import { useEffect, useState } from "react";
 import { useDialog } from "@/components/ui/ConfirmDialog";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { PresenceDot, DeviceIcon, isOnline, ago } from "@/components/ui/Presence";
 
 interface Client {
   id: string; login: string; name: string; type: string; leverage: number; currency: string;
   locked: boolean; deposit: string; withdrawal: string; credit: string; bonus: string; pnl: string;
-  managerId: string | null; user: { email: string } | null; manager: { id: string; name: string } | null;
+  managerId: string | null; user: { email: string; lastSeenAt?: string | null; lastDevice?: string | null; lastLoginIp?: string | null } | null; manager: { id: string; name: string } | null;
 }
 interface Manager { id: string; name: string; }
 
@@ -105,7 +106,16 @@ export default function AdminClientsPage() {
             {loading ? <tr><td className="px-3 py-4" colSpan={8}>Loading...</td></tr> : clients.length === 0 ? <tr><td className="px-3 py-4" colSpan={8}>No clients.</td></tr> : clients.map((c) => (
               <tr key={c.id} className="ui-row border-b last:border-0">
                 <td className="px-3 py-2 font-mono">{c.login}</td>
-                <td className="px-3 py-2">{c.name}<div className="text-xs text-gray-500">{c.user?.email}</div></td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <PresenceDot online={isOnline(c.user?.lastSeenAt)} />
+                    <div>
+                      <div className="flex items-center gap-1.5">{c.name}{c.user?.lastDevice && <DeviceIcon device={c.user.lastDevice} className="text-[11px] text-gray-400" />}</div>
+                      <div className="text-xs text-gray-500">{c.user?.email}</div>
+                      <div className="text-[10px]" style={{ color: isOnline(c.user?.lastSeenAt) ? "#16a34a" : "#94a3b8" }}>{isOnline(c.user?.lastSeenAt) ? "Online" : "last seen " + ago(c.user?.lastSeenAt)}</div>
+                    </div>
+                  </div>
+                </td>
                 <td className="px-3 py-2">{c.type}</td><td className="px-3 py-2">1:{c.leverage}</td>
                 <td className="px-3 py-2">{bal(c).toFixed(2)} {c.currency}</td>
                 <td className="px-3 py-2">{c.manager?.name || "-"}</td>

@@ -3,11 +3,12 @@ import { verifyPassword, hashPassword } from "@/lib/auth";
 import { resolveTenant } from "@/lib/tenant";
 import { nextLogin } from "@/services/account.service";
 import { assertSeatAvailable } from "@/services/tenant.service";
+import { deviceFromUA } from "@/lib/presence";
 import { Prisma } from "@prisma/client";
 import type { SessionPayload } from "@/types";
 import type { Role } from "@/config/roles";
 
-export async function authenticate(host: string | null, email: string, password: string, ip?: string): Promise<SessionPayload> {
+export async function authenticate(host: string | null, email: string, password: string, ip?: string, ua?: string): Promise<SessionPayload> {
   const tenant = await resolveTenant(host);
   const tenantId = tenant?.id ?? null;
 
@@ -38,7 +39,9 @@ export async function authenticate(host: string | null, email: string, password:
     where: { id: user.id },
     data: {
       lastLoginAt: new Date(),
+      lastSeenAt: new Date(),
       ...(ip ? { lastLoginIp: ip } : {}),
+      ...(ua ? { lastDevice: deviceFromUA(ua) } : {}),
       ...(isStaff ? { activeSession: sid } : {}),
     },
   });

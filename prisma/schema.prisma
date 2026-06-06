@@ -74,6 +74,8 @@ model User {
   perms           Json       @default("{}")
   lastLoginAt     DateTime?
   lastLoginIp     String?
+  lastSeenAt      DateTime?
+  lastDevice      String?
   activeSession   String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
