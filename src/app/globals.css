@@ -191,6 +191,8 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   body {
     @apply bg-background text-foreground;
   }
+  /* stop the iOS rubber-band overscroll that shows white gaps at top/bottom */
+  html, body { overscroll-behavior: none; }
   html {
     @apply font-sans;
   }

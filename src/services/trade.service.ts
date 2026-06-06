@@ -6,6 +6,16 @@ import { Prisma } from "@prisma/client";
 import { pnlFor, validateSlTp, usedMargin } from "@/lib/trademath";
 import { notifyStaff } from "@/services/notification.service";
 import { audit } from "@/lib/audit";
+import { isMarketOpen } from "@/lib/market";
+
+// Throws if the symbol's market is closed (weekend forex/metals, etc.). Used to
+// block live + pending orders for clients and normal desk trades. Admin/manager
+// MANUAL trades bypass this.
+export async function assertMarketOpen(symbol: string) {
+  let cat: string | null = null;
+  try { const gs = await prisma.globalSymbol.findUnique({ where: { symbol }, select: { category: true } }); cat = gs?.category || null; } catch {}
+  if (!isMarketOpen(symbol, cat)) throw new Error("Market is closed for " + symbol + ". Trading resumes when the market reopens.");
+}
 
 export async function placeOrder(tenantId: string, userId: string, input: any) {
   const account = input.accountId
@@ -15,6 +25,7 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   if (account.deactivated) throw new Error("Account is deactivated");
   if (account.locked) throw new Error("Account is locked (read-only)");
   await assertTradingOpen();
+  await assertMarketOpen(input.symbol);     // block when the market is closed
   const price = await getPrice(input.symbol);
   if (price == null) throw new Error("No price for " + input.symbol);
 

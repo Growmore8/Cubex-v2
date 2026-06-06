@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireStaff, assertWritable } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen, assertCan } from "@/lib/perms";
+import { assertMarketOpen } from "@/services/trade.service";
 import { audit } from "@/lib/audit";
 
 export async function GET() {
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
     await assertTradingOpen();
     await assertCan(s, "manualTrade");
     const b = await req.json();
+    await assertMarketOpen(b.symbol);     // block pending orders when the market is closed
     const a: any = await prisma.account.findUnique({ where: { id: b.accountId } });
     if (!a) throw new Error("Account not found");
     if (s.role !== "SUPERADMIN" && a.tenantId !== s.tenantId) throw new Error("Forbidden");

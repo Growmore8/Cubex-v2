@@ -9,11 +9,11 @@ function getSecret() {
   return new TextEncoder().encode(s);
 }
 
-export async function signSession(payload: SessionPayload) {
+export async function signSession(payload: SessionPayload, expiresIn?: string) {
   return await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(process.env.JWT_EXPIRES_IN || "8h")
+    .setExpirationTime(expiresIn || process.env.JWT_EXPIRES_IN || "8h")
     .sign(getSecret());
 }
 

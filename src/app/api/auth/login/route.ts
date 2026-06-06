@@ -8,11 +8,11 @@ import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
 import { prisma } from "@/lib/prisma";
 
-const schema = z.object({ email: z.string().email(), password: z.string().min(1) });
+const schema = z.object({ email: z.string().email(), password: z.string().min(1), remember: z.boolean().optional() });
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = schema.parse(await req.json());
+    const { email, password, remember } = schema.parse(await req.json());
     const h = await headers();
     const host = h.get("host");
     const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || undefined;
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
         notifyStaff(session.tenantId, { type: "LOGIN", title: "Client login", body: `${session.name} (${acc?.login || ""}) signed in` }, acc?.managerId).catch(() => {});
       } catch {}
     }
-    const token = await signSession(session);
+    const token = await signSession(session, remember ? "30d" : undefined);
     const res = NextResponse.json({
       ok: true,
       redirect: ROLE_HOME[session.role],
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     });
     res.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
-      path: "/", maxAge: 60 * 60 * 8,
+      path: "/", maxAge: remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8, // 30 days if "remember me"
     });
     return res;
   } catch (e: any) {

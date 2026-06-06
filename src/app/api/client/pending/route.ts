@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen } from "@/lib/perms";
+import { assertMarketOpen } from "@/services/trade.service";
 async function acc(s: any, accountId?: string) {
   if (accountId) {
     const a = await prisma.account.findFirst({ where: { tenantId: s.tenantId, userId: s.sub, id: accountId } });
@@ -21,6 +22,7 @@ export async function POST(req: Request) {
   try {
     await assertTradingOpen();
     const b = await req.json();
+    await assertMarketOpen(b.symbol);     // block pending orders when the market is closed
     const a = await acc(s, b.accountId); if (!a) throw new Error("No account");
     if (a.locked) throw new Error("Account is locked");
     const lots = Number(b.lots); const price = Number(b.price);

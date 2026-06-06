@@ -5,6 +5,7 @@ import PasswordInput from "@/components/ui/PasswordInput";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [err, setErr] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,7 +24,7 @@ export default function LoginPage() {
     const r = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, remember }),
     });
     const d = await r.json();
     setLoading(false);
@@ -60,6 +61,12 @@ export default function LoginPage() {
             className={base} style={{ borderColor: "var(--border)" }} placeholder="••••••••" />
         </div>
       </div>
+
+      <label className="flex cursor-pointer select-none items-center gap-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
+        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
+          className="h-4 w-4 rounded" style={{ accentColor: "var(--brand-primary)" }} />
+        Keep me signed in for 30 days
+      </label>
 
       <button type="submit" disabled={loading}
         style={{ background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))` }}
