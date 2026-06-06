@@ -45,6 +45,6 @@ export default function SAKyc() {
         </table>
       </div>
     </div>
-    {img && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6"><button onClick={() => setImg(null)} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-lg text-white hover:bg-white/30">✕</button><img src={img} alt="" className="ui-pop max-h-[85vh] max-w-[90vw] rounded-xl" /></div>}
+    {img && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6"><button onClick={() => setImg(null)} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-lg text-white hover:bg-white/30"><i className="fa-solid fa-xmark" /></button><img src={img} alt="" className="ui-pop max-h-[85vh] max-w-[90vw] rounded-xl" /></div>}
   </div>);
 }

@@ -39,7 +39,7 @@ export default function SessionGuard() {
         boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
       }}
     >
-      🔒 READ-ONLY ACCESS — your account has been locked. You can view everything, but no actions are allowed. Contact support.
+      <i className="fa-solid fa-lock mr-2" />READ-ONLY ACCESS — your account has been locked. You can view everything, but no actions are allowed. Contact support.
     </div>
   );
 }
