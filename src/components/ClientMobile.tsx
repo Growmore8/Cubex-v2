@@ -426,22 +426,25 @@ export default function ClientMobile({ t }: { t: any }) {
                 <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(255,255,255,0.16)", color: "#fff" }}>{account?.type}</span>
               </div>
 
-              {/* EMV chip */}
-              <div className="relative mt-5 flex h-8 w-11 flex-col justify-center gap-[3px] rounded-md px-1" style={{ background: "linear-gradient(135deg, #f4df8e 0%, #c8a64a 50%, #b8923a 100%)", boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.25)" }}>
-                <div className="h-[2px] w-full rounded bg-black/20" /><div className="h-[2px] w-full rounded bg-black/20" /><div className="h-[2px] w-full rounded bg-black/20" />
+              {/* big balance */}
+              <div className="relative mt-5">
+                <div className="text-[9px] font-semibold tracking-[0.18em] text-white/55">TOTAL BALANCE</div>
+                <div className="mt-1 text-[30px] font-extrabold leading-none tracking-tight text-white" style={{ textShadow: "0 2px 14px rgba(0,0,0,0.45)" }}>${fmt(balance)}</div>
+                <div className="mt-1.5 flex items-center gap-2 text-[10px] text-white/70">
+                  <span className="font-mono tracking-wider">{account?.login}</span>
+                  <span className="text-white/40">·</span>
+                  <span className="uppercase">{account?.ownerName || account?.name}</span>
+                </div>
               </div>
 
-              <div className="relative mt-3 font-mono text-xl tracking-[0.26em] text-white" style={{ textShadow: "0 1px 2px rgba(0,0,0,0.45)" }}>{fmtLogin(account?.login)}</div>
+              {/* divider */}
+              <div className="relative my-3 h-px" style={{ background: "rgba(255,255,255,0.18)" }} />
 
-              <div className="relative mt-4 flex items-end justify-between">
-                <div>
-                  <div className="text-[8px] tracking-[0.2em] text-white/45">CARDHOLDER</div>
-                  <div className="text-[12px] font-semibold uppercase tracking-wide text-white/95">{account?.ownerName || account?.name}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[8px] tracking-[0.2em] text-white/45">BALANCE</div>
-                  <div className="text-base font-bold text-white">${fmt(balance)}</div>
-                </div>
+              {/* live stats */}
+              <div className="relative grid grid-cols-3 gap-2 text-white">
+                <div><div className="text-[8px] tracking-[0.12em] text-white/50">EQUITY</div><div className="text-[13px] font-bold tabular-nums">${fmt(equity)}</div></div>
+                <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE</div><div className="text-[13px] font-bold tabular-nums">${fmt(free)}</div></div>
+                <div><div className="text-[8px] tracking-[0.12em] text-white/50">FLT P/L</div><div className="text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#5ef2b3" : "#ff9a9a" }}>{floating >= 0 ? "+" : ""}{fmt(floating)}</div></div>
               </div>
             </div>
             {/* dots */}
