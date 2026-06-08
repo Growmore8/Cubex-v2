@@ -75,79 +75,73 @@ export function buildStatementPdf(data: StatementData, periodLabel: string): Pro
       doc.on("data", (c) => chunks.push(c as Buffer));
       doc.on("end", () => resolve(Buffer.concat(chunks)));
 
-      const left = 40;
-      const totalW = doc.page.width - 80;
+      const left = 36;
+      const totalW = doc.page.width - 72;
+      const pageBottom = doc.page.height - 46;
 
-      // Header
-      doc.fillColor(accent).font("Helvetica-Bold").fontSize(20).text(brand.brandName, left, 42);
-      if (t.slogan) doc.fillColor("#6b7280").font("Helvetica").fontSize(9).text(String(t.slogan), left, 66);
-      doc.fillColor("#6b7280").font("Helvetica").fontSize(9)
-        .text("ACCOUNT STATEMENT", left, 44, { width: totalW, align: "right" })
-        .text(periodLabel, left, 58, { width: totalW, align: "right" })
-        .text("Generated " + dt(new Date()), left, 72, { width: totalW, align: "right" });
-      doc.moveTo(left, 92).lineTo(left + totalW, 92).strokeColor(accent).lineWidth(2).stroke();
+      // ── Header band ──
+      doc.save().rect(0, 0, doc.page.width, 60).fill(accent).restore();
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(17).text(brand.brandName, left, 16, { width: totalW * 0.6, lineBreak: false });
+      if (t.slogan) { doc.fillOpacity(0.85).font("Helvetica").fontSize(8).text(String(t.slogan), left, 38, { width: totalW * 0.6, lineBreak: false }); doc.fillOpacity(1); }
+      doc.fillColor("#ffffff").font("Helvetica").fontSize(8)
+        .text("ACCOUNT STATEMENT", left, 15, { width: totalW, align: "right" })
+        .text(periodLabel, left, 28, { width: totalW, align: "right" })
+        .text("Generated " + dt(new Date()), left, 41, { width: totalW, align: "right" });
 
-      let y = 104;
+      let y = 76;
+
+      // ── Summary cards ──
+      const cards: [string, string, string?][] = [
+        ["Account", String(account.login)],
+        ["Type / Leverage", `${account.type}  1:${account.leverage}`],
+        ["Holder", account.name || account.user?.name || ""],
+        ["Balance", money(balance)],
+        ["Closed P/L", money(pnl), pnl >= 0 ? "#16a34a" : "#dc2626"],
+        ["Deposit", money(deposit), "#16a34a"],
+        ["Withdrawal", money(withdrawal), "#dc2626"],
+        ["Credit + Bonus", money(credit + bonus)],
+      ];
+      const perRow = 4, cardW = totalW / perRow, cardH = 36, cardGap = 6;
+      cards.forEach((c, i) => {
+        const col = i % perRow, row = Math.floor(i / perRow);
+        const cx = left + col * cardW, cy = y + row * (cardH + cardGap);
+        doc.save().roundedRect(cx, cy, cardW - cardGap, cardH, 4).fill("#f8fafc").restore();
+        doc.roundedRect(cx, cy, cardW - cardGap, cardH, 4).lineWidth(0.5).stroke("#e5e7eb");
+        doc.fillColor("#64748b").font("Helvetica").fontSize(6.8).text(String(c[0]).toUpperCase(), cx + 7, cy + 7, { width: cardW - cardGap - 12, lineBreak: false });
+        doc.fillColor(c[2] || "#0f172a").font("Helvetica-Bold").fontSize(10.5).text(c[1], cx + 7, cy + 17, { width: cardW - cardGap - 12, lineBreak: false });
+      });
+      y += Math.ceil(cards.length / perRow) * (cardH + cardGap) + 4;
+
       const heading = (label: string) => {
-        if (y > doc.page.height - 90) { doc.addPage(); y = 50; }
-        doc.fillColor("#374151").font("Helvetica-Bold").fontSize(11).text(label, left, y);
-        y += 18;
-      };
-      const kv = (pairs: [string, string, string?][]) => {
-        const colW = totalW / 3;
-        pairs.forEach((p, i) => {
-          const col = i % 3; const cx = left + col * colW;
-          if (col === 0 && i > 0) y += 30;
-          doc.fillColor("#6b7280").font("Helvetica").fontSize(8).text(p[0], cx, y);
-          doc.fillColor(p[2] || "#111827").font("Helvetica-Bold").fontSize(12).text(p[1], cx, y + 10);
-        });
-        y += 34;
+        if (y > pageBottom - 36) { doc.addPage(); y = 46; }
+        doc.fillColor(accent).font("Helvetica-Bold").fontSize(9).text(label.toUpperCase(), left, y);
+        doc.moveTo(left, y + 12).lineTo(left + totalW, y + 12).lineWidth(0.7).stroke("#e5e7eb");
+        y += 17;
       };
 
       const table = (cols: { label: string; w: number; align?: "left" | "right" }[], rows: string[][], emptyMsg: string) => {
-        const headH = 18, rowH = 15, pad = 4;
-        if (y + headH + rowH > doc.page.height - 50) { doc.addPage(); y = 50; }
-        doc.save().rect(left, y, totalW, headH).fill("#f3f4f6").restore();
+        const headH = 14, rowH = 13, pad = 4;
+        if (y + headH + rowH > pageBottom) { doc.addPage(); y = 46; }
+        doc.save().rect(left, y, totalW, headH).fill("#eef2f7").restore();
         let x = left;
-        doc.fillColor("#374151").font("Helvetica-Bold").fontSize(7.5);
-        cols.forEach((c) => { doc.text(c.label, x + pad, y + 5.5, { width: c.w - 2 * pad, align: c.align || "left", lineBreak: false }); x += c.w; });
+        doc.fillColor("#475569").font("Helvetica-Bold").fontSize(6.8);
+        cols.forEach((c) => { doc.text(c.label.toUpperCase(), x + pad, y + 4.5, { width: c.w - 2 * pad, align: c.align || "left", lineBreak: false }); x += c.w; });
         y += headH;
         if (!rows.length) {
-          doc.fillColor("#9ca3af").font("Helvetica").fontSize(8).text(emptyMsg, left + pad, y + 4);
-          y += rowH + 4; return;
+          doc.fillColor("#9ca3af").font("Helvetica-Oblique").fontSize(7.5).text(emptyMsg, left + pad, y + 3);
+          y += rowH; return;
         }
         doc.font("Helvetica").fontSize(7.5);
-        for (const r of rows) {
-          if (y + rowH > doc.page.height - 45) { doc.addPage(); y = 50; }
+        rows.forEach((rw, ri) => {
+          if (y + rowH > pageBottom) { doc.addPage(); y = 46; }
+          if (ri % 2 === 1) doc.save().rect(left, y, totalW, rowH).fill("#fafbfc").restore();
           x = left;
-          r.forEach((cell, i) => {
-            const c = cols[i];
-            doc.fillColor(i === 0 ? "#111827" : "#1f2937").text(cell, x + pad, y + 3.5, { width: c.w - 2 * pad, align: c.align || "left", lineBreak: false });
-            x += c.w;
-          });
-          doc.moveTo(left, y + rowH).lineTo(left + totalW, y + rowH).strokeColor("#eef1f5").lineWidth(0.5).stroke();
+          rw.forEach((cell, i) => { const c = cols[i]; doc.fillColor(i === 0 ? "#0f172a" : "#334155").text(cell, x + pad, y + 3, { width: c.w - 2 * pad, align: c.align || "left", lineBreak: false }); x += c.w; });
           y += rowH;
-        }
-        y += 6;
+        });
+        doc.moveTo(left, y).lineTo(left + totalW, y).lineWidth(0.5).stroke("#e5e7eb");
+        y += 8;
       };
-
-      heading("Account");
-      kv([
-        ["Account", String(account.login)],
-        ["Holder", account.name || account.user?.name || ""],
-        ["Type / Leverage", `${account.type} · 1:${account.leverage}`],
-      ]);
-
-      heading("Balance Summary");
-      kv([
-        ["Deposit", money(deposit), "#16a34a"],
-        ["Withdrawal", money(withdrawal), "#dc2626"],
-        ["Closed P/L", money(pnl), pnl >= 0 ? "#16a34a" : "#dc2626"],
-        ["Credit", money(credit)],
-        ["Bonus", money(bonus)],
-        ["Balance", money(balance)],
-      ]);
-      y += 4;
 
       heading("Running Trades");
       table(
@@ -177,12 +171,12 @@ export function buildStatementPdf(data: StatementData, periodLabel: string): Pro
         "No transactions in this period.",
       );
 
-      if (y > doc.page.height - 70) { doc.addPage(); y = 50; }
-      y = Math.max(y, doc.page.height - 60);
-      doc.moveTo(left, y).lineTo(left + totalW, y).strokeColor("#e5e7eb").lineWidth(0.5).stroke();
-      doc.fillColor("#9ca3af").font("Helvetica").fontSize(8)
+      if (y + 32 > pageBottom) { doc.addPage(); y = 46; }
+      y += 4;
+      doc.moveTo(left, y).lineTo(left + totalW, y).lineWidth(0.5).stroke("#e5e7eb");
+      doc.fillColor("#94a3b8").font("Helvetica").fontSize(7.5)
         .text(`${brand.brandName} — Finance Department`, left, y + 6, { width: totalW, align: "center" })
-        .text("This statement was generated automatically. Figures are indicative.", left, y + 18, { width: totalW, align: "center" });
+        .text("This statement was generated automatically. Figures are indicative.", left, y + 17, { width: totalW, align: "center" });
 
       doc.end();
     } catch (e) { reject(e); }
