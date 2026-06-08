@@ -428,7 +428,16 @@ export default function ClientTerminal() {
                   {head("Accounts")}
                   {!accts.some((a: any) => a.type === "DEMO") && mItem(() => openAccount("DEMO"), "fa-vial", "Open Demo Account", undefined, readOnly)}
                   {mItem(() => openAccount("LIVE"), "fa-bolt", "Open Live Account", BUY, readOnly)}
-                  {mItem(() => { close(); setWalletModal("kyc"); }, "fa-id-card", "KYC Verification")}
+                  {curAcct?.type === "LIVE" && mItem(() => { close(); setWalletModal("kyc"); }, "fa-id-card", "KYC Verification")}
+                  {div}
+                  {head("Reports")}
+                  {mItem(async () => {
+                    const to = account?.email || "your registered email";
+                    if (!confirm(`Email your account statement (PDF) to ${to}?`)) return;
+                    const tid = toast.loading("Sending statement…");
+                    const r = await fetch("/api/client/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accId }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+                    if (r.ok) toast.success("Statement sent to " + r.to, { id: tid }); else toast.error(r.error || "Failed to send", { id: tid });
+                  }, "fa-envelope-open-text", "Email Statement", BUY)}
                   {div}
                   {head("Security")}
                   {mItem(() => { setPinErr(""); setPinForm({}); setPinModal(true); }, "fa-shield-halved", pinHasPin ? "Change PIN" : "Set PIN")}

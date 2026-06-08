@@ -109,6 +109,9 @@ export default function AdminDeskPage() {
   const [stmtPreset, setStmtPreset] = useState("all");
   const [stmtFrom, setStmtFrom] = useState("");
   const [stmtTo, setStmtTo] = useState("");
+  const [stmtEmail, setStmtEmail] = useState("");
+  const [stmtMsg, setStmtMsg] = useState("");
+  const [stmtSending, setStmtSending] = useState(false);
   const [navSearch, setNavSearch] = useState("");
   const [mwSearch, setMwSearch] = useState("");
   const [showOC, setShowOC] = useState(true); // chart buy/sell strip visibility
@@ -635,7 +638,7 @@ export default function AdminDeskPage() {
                 {topMenu === "report" && (<><div className="fixed inset-0 z-40" onClick={closeTm} />
                   <div className={panel} style={panelStyle}>
                     {dHead("Account Reports")}
-                    {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } setStmtPreset("all"); setStmtFrom(""); setStmtTo(""); setStmtModal(true); }, "fa-file-pdf", "Export PDF Statement", "#ef4444")}
+                    {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } setStmtPreset("all"); setStmtFrom(""); setStmtTo(""); setStmtEmail(""); setStmtMsg(""); setStmtModal(true); }, "fa-file-pdf", "Export PDF Statement", "#ef4444")}
                   </div></>)}
               </div>
             </>);
@@ -1768,6 +1771,9 @@ export default function AdminDeskPage() {
                 </div>
               </div>
             )}
+            <div className="mb-1 mt-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Email statement to</div>
+            <input type="email" value={stmtEmail} onChange={(e) => { setStmtEmail(e.target.value); setStmtMsg(""); }} placeholder="Leave blank to use client's registered email" className="mb-2 w-full rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+            {stmtMsg && <div className="mb-2 text-[10px]" style={{ color: stmtMsg.startsWith("✓") ? "#16a34a" : "#ef4444" }}>{stmtMsg}</div>}
             <div className="flex gap-2">
               <button onClick={() => setStmtModal(false)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
               <button onClick={() => {
@@ -1778,6 +1784,16 @@ export default function AdminDeskPage() {
                 setStmtModal(false);
               }} className="flex-1 rounded py-2 text-[11px] font-semibold" style={{ background: "#ef4444", color: "#fff" }}>
                 <i className="fa-solid fa-file-pdf mr-1" /> Generate PDF
+              </button>
+              <button disabled={stmtSending} onClick={async () => {
+                const dest = stmtEmail.trim() || "the client's registered email";
+                if (!confirm(`Email this account statement (PDF) to ${dest}?`)) return;
+                setStmtSending(true); setStmtMsg("");
+                const r = await fetch("/api/desk/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: selAcc.id, email: stmtEmail.trim() || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+                setStmtSending(false);
+                if (r.ok) setStmtMsg("✓ Sent to " + r.to); else setStmtMsg(r.error || "Failed to send");
+              }} className="flex-1 rounded py-2 text-[11px] font-semibold disabled:opacity-60" style={{ background: "#3b82f6", color: "#fff" }}>
+                <i className="fa-solid fa-envelope mr-1" /> {stmtSending ? "Sending…" : "Email PDF"}
               </button>
             </div>
           </div>

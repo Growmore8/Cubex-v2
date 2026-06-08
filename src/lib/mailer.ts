@@ -11,11 +11,28 @@ function inferSmtpHost(email: string): string {
   return `smtp.${domain}`;
 }
 
+export interface MailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 export interface MailOptions {
   to: string;
   subject: string;
   html: string;
   from?: string;
+  /** Display name shown as the sender (e.g. the tenant brand). */
+  fromName?: string;
+  /** Reply-To address. For no-reply mails pass a no-reply@<domain> address. */
+  replyTo?: string;
+  attachments?: MailAttachment[];
+}
+
+// Derive a no-reply address from an SMTP mailbox (no-reply@<its domain>).
+export function noReplyAddress(smtpEmail: string): string {
+  const domain = smtpEmail.split("@")[1] || "localhost";
+  return `no-reply@${domain}`;
 }
 
 export async function sendTenantMail(
@@ -32,10 +49,14 @@ export async function sendTenantMail(
     tls: { rejectUnauthorized: false },
   });
   await transporter.sendMail({
-    from: opts.from || `"CubeX" <${smtpEmail}>`,
+    from: opts.from || `"${opts.fromName || "CubeX"}" <${smtpEmail}>`,
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
+    ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+    ...(opts.attachments ? { attachments: opts.attachments } : {}),
+    // Discourage auto-responders / out-of-office replies to automated mail.
+    headers: { "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All" },
   });
 }
 

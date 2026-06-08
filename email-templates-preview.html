@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CubeX — Email Template Preview</title>
+<style>
+  body { margin:0; background:#0d1117; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:#c9d1d9; }
+  .wrap { max-width:1180px; margin:0 auto; padding:28px 20px 80px; }
+  h1.page { font-size:20px; font-weight:800; color:#fff; margin:0 0 4px; }
+  p.lead { color:#8b949e; font-size:13px; margin:0 0 26px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:26px; }
+  .col h2 { font-size:13px; font-weight:700; color:#58a6ff; text-transform:uppercase; letter-spacing:.06em; margin:0 0 10px; }
+  .col .note { font-size:11px; color:#8b949e; margin:0 0 12px; }
+  .frame { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:18px; }
+  /* ===== EMAIL-SAFE STYLES (what actually renders in inbox) ===== */
+  .email { background:#f4f6fb; padding:24px; border-radius:8px; }
+  .card { max-width:520px; margin:0 auto; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 6px 24px -10px rgba(0,0,0,.25); }
+  .ehead { padding:22px 28px; text-align:left; color:#fff; }
+  .ehead .logo { font-size:19px; font-weight:800; letter-spacing:.02em; }
+  .ehead .tag { font-size:11px; opacity:.85; margin-top:2px; }
+  .ebody { padding:30px 30px 8px; color:#1f2937; }
+  .ebody h3 { font-size:19px; margin:0 0 8px; color:#111827; }
+  .ebody p { font-size:14px; line-height:1.6; color:#4b5563; margin:0 0 16px; }
+  .code { text-align:center; margin:26px 0; }
+  .code span { display:inline-block; font-size:38px; font-weight:800; letter-spacing:12px; color:#111827; background:#f3f4f6; border-radius:10px; padding:14px 22px 14px 34px; }
+  .btn { display:inline-block; color:#fff !important; text-decoration:none; font-weight:700; font-size:14px; padding:13px 30px; border-radius:9px; }
+  .muted { font-size:12px; color:#9ca3af; }
+  .summary { width:100%; border-collapse:collapse; margin:6px 0 18px; font-size:13px; }
+  .summary td { padding:9px 12px; border-bottom:1px solid #eef1f5; }
+  .summary td.k { color:#6b7280; }
+  .summary td.v { text-align:right; font-weight:700; color:#111827; }
+  .pos { color:#16a34a !important; } .neg { color:#dc2626 !important; }
+  .attach { display:flex; align-items:center; gap:12px; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; margin:4px 0 20px; }
+  .attach .ic { width:38px; height:46px; border-radius:6px; background:#dc2626; color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+  .attach .fn { font-size:13px; font-weight:700; color:#111827; } .attach .fs { font-size:11px; color:#9ca3af; }
+  .efoot { padding:20px 30px 26px; border-top:1px solid #eef1f5; margin-top:14px; }
+  .efoot .bn { font-size:13px; font-weight:800; color:#111827; }
+  .efoot .ci { font-size:11px; color:#9ca3af; line-height:1.6; margin-top:4px; }
+  .efoot .nr { font-size:11px; color:#b91c1c; margin-top:10px; }
+  /* ===== MOBILE RESPONSIVE (phones / narrow mail apps) ===== */
+  @media only screen and (max-width:600px) {
+    .email { padding:10px !important; }
+    .card { width:100% !important; border-radius:10px !important; }
+    .ehead { padding:18px 18px !important; }
+    .ehead .logo { font-size:17px !important; }
+    .ebody { padding:22px 18px 4px !important; }
+    .ebody h3 { font-size:17px !important; }
+    .ebody p { font-size:13px !important; }
+    .code span { font-size:30px !important; letter-spacing:8px !important; padding:12px 12px 12px 20px !important; }
+    .btn { display:block !important; text-align:center !important; padding:14px 0 !important; }
+    .summary td { padding:8px 8px !important; font-size:12px !important; }
+    .attach { padding:10px 12px !important; }
+    .efoot { padding:16px 18px 20px !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="page">CubeX — Email Template Preview</h1>
+  <p class="lead">Sample brand: <strong style="color:#fff">Acme Markets</strong> · accent <strong style="color:#2f6df6">#2f6df6</strong>. Every tenant's real brand name, logo, colour, address &amp; support email are injected automatically. Header colour = the tenant's primary colour. The footer carries the brand name + “do not reply”. Tell me any wording/layout changes.</p>
+
+  <div class="grid">
+
+    <!-- ============ 1. EMAIL VERIFICATION ============ -->
+    <div class="col">
+      <h2>1 · Email verification</h2>
+      <p class="note">Sent on registration. 6-digit code, expires in 15 min.</p>
+      <div class="frame">
+        <div class="email">
+          <div class="card">
+            <div class="ehead" style="background:linear-gradient(135deg,#2f6df6,#22c55e)">
+              <div class="logo">Acme Markets</div>
+              <div class="tag">Trade with confidence</div>
+            </div>
+            <div class="ebody">
+              <h3>Verify your email address</h3>
+              <p>Welcome to Acme Markets. Use the code below to verify your email and activate your trading account.</p>
+              <div class="code"><span>418207</span></div>
+              <p class="muted">This code expires in 15 minutes. If you didn’t create an account, you can safely ignore this email.</p>
+            </div>
+            <div class="efoot">
+              <div class="bn">Acme Markets</div>
+              <div class="ci">Finance Department</div>
+              <div class="nr">This is an automated message — please do not reply to this email.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 2. FORGOT PASSWORD ============ -->
+    <div class="col">
+      <h2>2 · Password reset</h2>
+      <p class="note">Sent on “forgot password”. Secure link, expires in 15 min.</p>
+      <div class="frame">
+        <div class="email">
+          <div class="card">
+            <div class="ehead" style="background:linear-gradient(135deg,#2f6df6,#22c55e)">
+              <div class="logo">Acme Markets</div>
+              <div class="tag">Trade with confidence</div>
+            </div>
+            <div class="ebody">
+              <h3>Reset your password</h3>
+              <p>We received a request to reset the password for your Acme Markets account. Click the button below to choose a new password.</p>
+              <div style="text-align:center;margin:24px 0 18px">
+                <a class="btn" href="#" style="background:#2f6df6">Reset password</a>
+              </div>
+              <p class="muted">This link expires in 15 minutes. If you didn’t request a reset, ignore this email — your password won’t change.</p>
+            </div>
+            <div class="efoot">
+              <div class="bn">Acme Markets</div>
+              <div class="ci">Finance Department</div>
+              <div class="nr">This is an automated message — please do not reply to this email.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 3. STATEMENT / REPORT ============ -->
+    <div class="col">
+      <h2>3 · Account statement / report</h2>
+      <p class="note">Manual “email statement”, plus weekly (Mon) &amp; monthly (1st) auto-send. Official cover note + PDF attached.</p>
+      <div class="frame">
+        <div class="email">
+          <div class="card">
+            <div class="ehead" style="background:linear-gradient(135deg,#2f6df6,#22c55e)">
+              <div class="logo">Acme Markets</div>
+              <div class="tag">Trade with confidence</div>
+            </div>
+            <div class="ebody">
+              <h3>Your account statement</h3>
+              <p>Dear John Carter, please find your account statement for <strong>1–7 June 2026</strong> attached as a PDF. A summary is shown below.</p>
+              <table class="summary">
+                <tr><td class="k">Account</td><td class="v">500142 · LIVE</td></tr>
+                <tr><td class="k">Balance</td><td class="v">$12,480.55</td></tr>
+                <tr><td class="k">Closed P/L (period)</td><td class="v pos">+$1,240.00</td></tr>
+                <tr><td class="k">Open (running) trades</td><td class="v">4</td></tr>
+                <tr><td class="k">Deposits / Withdrawals</td><td class="v">$5,000.00 / $0.00</td></tr>
+              </table>
+              <div class="attach">
+                <div class="ic">PDF</div>
+                <div><div class="fn">Statement-500142-2026-06-07.pdf</div><div class="fs">Full statement · 86 KB</div></div>
+              </div>
+              <p class="muted">Figures are indicative. The attached PDF is the full record of trades, financials and requests.</p>
+            </div>
+            <div class="efoot">
+              <div class="bn">Acme Markets</div>
+              <div class="ci">Finance Department</div>
+              <div class="nr">This is an automated message — please do not reply to this email.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

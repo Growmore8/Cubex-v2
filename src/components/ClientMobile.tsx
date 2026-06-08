@@ -886,6 +886,18 @@ export default function ClientMobile({ t }: { t: any }) {
               <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
             </button>
 
+            {/* email statement */}
+            <button onClick={async () => {
+              const to = account?.email || "your registered email";
+              if (!confirm(`Email your account statement (PDF) to ${to}?`)) return;
+              const r = await fetch("/api/client/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accId }) }).then((x: any) => x.json()).catch(() => ({ ok: false }));
+              pushToast?.({ id: "stmt-" + Date.now(), title: r.ok ? "Statement emailed to " + r.to : (r.error || "Failed to send"), st: "funds" });
+            }} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left">
+              <i className="fa-solid fa-envelope-open-text" style={{ color: BLUE }} />
+              <div className="flex-1"><div className="text-[12px] font-semibold">Email Statement</div><div className="text-[10px] text-[var(--muted)]">Send PDF to your registered email</div></div>
+              <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
+            </button>
+
             {/* logout */}
             <button onClick={logout} className="w-full rounded-xl py-3 text-sm font-semibold text-white" style={{ background: SELL }}><i className="fa-solid fa-right-from-bracket mr-1.5" /> Logout</button>
           </div>

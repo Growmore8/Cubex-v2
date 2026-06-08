@@ -425,6 +425,28 @@ async function pollPrices() {
   }
 }
 
+// ── Statement email scheduler ──
+// Ticks once per clock hour and calls the internal cron route, which decides per
+// client (in their local time) whether it's the Monday 06:00 (weekly) or 1st 06:00
+// (monthly) send window. Runs in-process against this same server.
+const CRON_SECRET = process.env.CRON_SECRET || "";
+async function statementCronTick() {
+  try {
+    const res = await fetch("http://127.0.0.1:" + port + "/api/cron/statements", {
+      method: "POST",
+      headers: CRON_SECRET ? { "x-cron-secret": CRON_SECRET } : {},
+    });
+    const d = await res.json().catch(() => ({}));
+    if (d && (d.weekly || d.monthly)) console.log("[statements] sent", d.weekly || 0, "weekly,", d.monthly || 0, "monthly");
+  } catch (e) { /* transient — retried next hour */ }
+}
+function startStatementCron() {
+  statementCronTick(); // catch the current hour on boot
+  const now = new Date();
+  const msToNextHour = (60 - now.getMinutes()) * 60000 - now.getSeconds() * 1000 - now.getMilliseconds();
+  setTimeout(() => { statementCronTick(); setInterval(statementCronTick, 60 * 60 * 1000); }, Math.max(1000, msToNextHour));
+}
+
 app.prepare().then(async () => {
   try { await loadCatalog(); } catch (e) { console.error('[feed] catalog load failed:', e.message); }
   const server = createServer((req, res) => handle(req, res));
@@ -449,6 +471,7 @@ app.prepare().then(async () => {
   setInterval(microTick, 140);
   setInterval(() => monitor(io), MONITOR_MS);
   setInterval(() => checkPending(io), 2000);
+  startStatementCron();
   server.listen(port, () => console.log("> Ready on http://localhost:" + port));
 });
 

@@ -225,7 +225,10 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 @keyframes ui-fade-up {
   from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
+  /* End at `none` (not translateY(0)). With animation-fill-mode:both a lingering
+     non-none transform turns the wrapper into a containing block for position:fixed
+     children, which pushes nested modals out of viewport-center. `none` avoids that. */
+  to   { opacity: 1; transform: none; }
 }
 
 /* ---- shared transition helpers ---- */

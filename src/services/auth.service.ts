@@ -4,7 +4,8 @@ import { resolveTenant } from "@/lib/tenant";
 import { nextLogin } from "@/services/account.service";
 import { assertSeatAvailable } from "@/services/tenant.service";
 import { deviceFromUA } from "@/lib/presence";
-import { sendTenantMail } from "@/lib/mailer";
+import { sendTenantMail, noReplyAddress } from "@/lib/mailer";
+import { verificationEmail, resetPasswordEmail, type BrandInfo } from "@/lib/email-templates";
 import { Prisma } from "@prisma/client";
 import type { SessionPayload } from "@/types";
 import type { Role } from "@/config/roles";
@@ -34,6 +35,12 @@ export async function authenticate(host: string | null, email: string, password:
 
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) throw new Error("Invalid email or password");
+
+  // Pending email verification: emailToken is set and is NOT a password-reset token.
+  // Checked only after password is confirmed so we don't leak account existence.
+  if ((user as any).emailToken && !String((user as any).emailToken).startsWith("reset:")) {
+    throw new Error("Please verify your email before signing in. Check your inbox for the verification code.");
+  }
 
   // Single-device enforcement for staff roles: issue a fresh session id that
   // supersedes any previous login. CLIENT may use multiple devices.
@@ -108,20 +115,14 @@ export async function registerClient(
   });
 
   if (hasSmtp && emailToken) {
+    const brand: BrandInfo = { brandName: tenant.brandName || tenant.name, primaryColor: tenant.primaryColor, accentColor: tenant.accentColor, logoUrl: tenant.logoUrl };
     // Send verification email — non-blocking so registration succeeds even if SMTP fails
     sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
       to: lowerEmail,
-      subject: "Verify your email address",
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
-          <h2 style="margin:0 0 8px">Welcome to ${tenant.brandName || tenant.name}</h2>
-          <p style="color:#555;margin:0 0 24px">Enter the code below to verify your email address and activate your trading account.</p>
-          <div style="text-align:center;margin:32px 0">
-            <span style="font-size:40px;font-weight:800;letter-spacing:12px;color:#1a2332">${emailToken}</span>
-          </div>
-          <p style="color:#888;font-size:12px">This code expires in 15 minutes. If you didn't register, you can ignore this email.</p>
-        </div>
-      `,
+      subject: `Verify your email — ${brand.brandName}`,
+      fromName: brand.brandName,
+      replyTo: noReplyAddress(tenant.smtpEmail),
+      html: verificationEmail(brand, emailToken),
     }).catch(() => {});
     return { needsVerification: true, email: lowerEmail };
   }
@@ -158,17 +159,13 @@ export async function sendForgotPassword(host: string | null, email: string): Pr
   const token = makeCode() + makeCode(); // 12-digit reset token
   await (prisma.user.update as any)({ where: { id: user.id }, data: { emailToken: "reset:" + token } });
   const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || `https://${tenant.subdomain}.cubexenterprises.com`}/reset-password?email=${encodeURIComponent(lowerEmail)}&token=${token}`;
+  const brand: BrandInfo = { brandName: tenant.brandName || tenant.name, primaryColor: tenant.primaryColor, accentColor: tenant.accentColor, logoUrl: tenant.logoUrl };
   await sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
     to: lowerEmail,
-    subject: "Reset your password",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
-        <h2 style="margin:0 0 8px">Password Reset</h2>
-        <p style="color:#555;margin:0 0 24px">Click the button below to reset your password. This link expires in 15 minutes.</p>
-        <a href="${resetLink}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">Reset Password</a>
-        <p style="color:#888;font-size:12px;margin-top:24px">If you didn't request this, ignore this email. Your password won't change.</p>
-      </div>
-    `,
+    subject: `Reset your password — ${brand.brandName}`,
+    fromName: brand.brandName,
+    replyTo: noReplyAddress(tenant.smtpEmail),
+    html: resetPasswordEmail(brand, resetLink),
   });
 }
 
