@@ -156,6 +156,7 @@ export async function manualPnl(tenantId: string, id: string, amount: number, no
   if (!acc) throw new Error("Account not found");
   await prisma.account.update({ where: { id }, data: { pnl: { increment: new Prisma.Decimal(amount) } } });
   await audit(tenantId, "client.manualPnl", acc.login + " " + amount + " " + (note || ""), by);
+  notifyStaff(tenantId, { type: "FUNDS", title: "Manual P/L — " + acc.login, body: (amount >= 0 ? "+" : "") + amount + (note ? " — " + note : "") + " by " + by }, acc.managerId).catch(() => {});
   return { ok: true };
 }
 
@@ -165,6 +166,7 @@ export async function resetPassword(tenantId: string, id: string, newPass: strin
   const passwordHash = await hashPassword(newPass);
   await prisma.user.update({ where: { id: acc.userId }, data: { passwordHash } });
   await audit(tenantId, "client.resetPassword", acc.login, by);
+  notifyStaff(tenantId, { type: "NOTICE", title: "Password reset — " + acc.login, body: "by " + by }, acc.managerId).catch(() => {});
   return { ok: true };
 }
 
