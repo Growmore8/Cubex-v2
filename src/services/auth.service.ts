@@ -86,9 +86,11 @@ export async function registerClient(
   const lowerEmail = email.toLowerCase();
   const passwordHash = await hashPassword(password);
 
-  // If tenant has SMTP configured, send a verification email before creating the session
+  // Email verification (OTP) is mandatory. If the broker has no SMTP configured we
+  // cannot send a code, so we block account creation entirely (no silent fallback).
   const hasSmtp = !!(tenant.smtpEmail && tenant.smtpPassword);
-  const emailToken = hasSmtp ? makeCode() : null;
+  if (!hasSmtp) throw new Error("Registration is temporarily unavailable for this broker (email verification is not configured). Please contact support.");
+  const emailToken = makeCode();
 
   const session = await prisma.$transaction(async (tx) => {
     const exists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail, role: "CLIENT" } });
