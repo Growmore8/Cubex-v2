@@ -432,8 +432,6 @@ export default function ClientTerminal() {
                   {div}
                   {head("Reports")}
                   {mItem(async () => {
-                    const to = account?.email || "your registered email";
-                    if (!confirm(`Email your account statement (PDF) to ${to}?`)) return;
                     const tid = toast.loading("Sending statement…");
                     const r = await fetch("/api/client/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accId }) }).then((x) => x.json()).catch(() => ({ ok: false }));
                     if (r.ok) toast.success("Statement sent to " + r.to, { id: tid }); else toast.error(r.error || "Failed to send", { id: tid });

@@ -888,8 +888,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
             {/* email statement */}
             <button onClick={async () => {
-              const to = account?.email || "your registered email";
-              if (!confirm(`Email your account statement (PDF) to ${to}?`)) return;
+              pushToast?.({ id: "stmt-" + Date.now(), title: "Sending statement…", st: "funds" });
               const r = await fetch("/api/client/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accId }) }).then((x: any) => x.json()).catch(() => ({ ok: false }));
               pushToast?.({ id: "stmt-" + Date.now(), title: r.ok ? "Statement emailed to " + r.to : (r.error || "Failed to send"), st: "funds" });
             }} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left">

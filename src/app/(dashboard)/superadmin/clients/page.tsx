@@ -170,9 +170,9 @@ export default function SAClientsPage() {
 
       {err && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
 
-      <div className="ui-card bg-white" style={{ borderColor: "#e2e8f0" }}>
+      <div className="ui-card bg-white" style={{ borderColor: "var(--border)" }}>
         {/* Filter bar */}
-        <div className="flex flex-wrap items-end gap-2 border-b px-3 py-2.5" style={{ borderColor: "#e2e8f0" }}>
+        <div className="flex flex-wrap items-end gap-2 border-b px-3 py-2.5" style={{ borderColor: "var(--border)" }}>
           <div className="relative min-w-[220px] flex-1">
             <i className="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-[11px] text-gray-400" />
             <input
@@ -180,7 +180,7 @@ export default function SAClientsPage() {
               placeholder="Search..."
               value={q}
               onChange={(e) => { setQ(e.target.value); setPage(1); }}
-              style={{ borderColor: "#cbd5e1" }}
+              style={{ borderColor: "var(--border)" }}
             />
           </div>
           {[
@@ -192,14 +192,14 @@ export default function SAClientsPage() {
           ].map(({ label, val, set, opts }) => (
             <div key={label}>
               <div className="mb-0.5 text-[10px] font-medium text-gray-400">{label}</div>
-              <select className={selStyle} value={val} onChange={(e) => { (set as any)(e.target.value); setPage(1); }} style={{ borderColor: "#cbd5e1" }}>
+              <select className={selStyle} value={val} onChange={(e) => { (set as any)(e.target.value); setPage(1); }} style={{ borderColor: "var(--border)" }}>
                 {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
           ))}
           <div className="ml-auto">
             <div className="mb-0.5 text-[10px] font-medium text-gray-400">ROWS</div>
-            <select className={selStyle} value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }} style={{ borderColor: "#cbd5e1" }}>
+            <select className={selStyle} value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }} style={{ borderColor: "var(--border)" }}>
               {[10, 20, 30, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </div>
@@ -210,7 +210,7 @@ export default function SAClientsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left" style={{ borderColor: "#e2e8f0", background: "#f8fafc" }}>
+              <tr className="border-b text-left" style={{ borderColor: "var(--border)", background: "var(--bg2)" }}>
                 {["ID","NAME / EMAIL / PHONE","COUNTRY","COMPANY / MANAGER","TYPE","BALANCE","ONLINE","IP","JOINED","STATUS","ACTIONS"].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-[11px] font-semibold text-gray-500">{h}</th>
                 ))}
@@ -218,7 +218,7 @@ export default function SAClientsPage() {
             </thead>
             <tbody>
               {paged.map((r) => (
-                <tr key={r.id} className="ui-row border-b" style={{ borderColor: "#f0f4f8" }}>
+                <tr key={r.id} className="ui-row border-b" style={{ borderColor: "var(--border)" }}>
                   <td className="px-3 py-2.5">
                     <button className="font-mono text-blue-600 font-semibold hover:underline text-sm" onClick={() => openEdit(r)}>{r.login}</button>
                     {r.isPool && <div className="mt-0.5 text-[10px] font-medium" style={{ color: "#b45309" }}>POOL</div>}
@@ -302,7 +302,7 @@ export default function SAClientsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t px-3 py-2 text-sm" style={{ borderColor: "#e2e8f0" }}>
+          <div className="flex items-center justify-between border-t px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }}>
             <span className="text-gray-500">Page {safeP} of {totalPages} &nbsp;·&nbsp; {filtered.length} total</span>
             <div className="flex gap-1">
               <button disabled={safeP <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="ui-btn px-3 py-1 text-xs disabled:opacity-40">Prev</button>
@@ -360,7 +360,7 @@ export default function SAClientsPage() {
               <div className="mb-2 text-xs font-semibold text-blue-700">
                 <i className="fa-solid fa-building mr-1.5" />TENANT ASSIGNMENT (this account only)
               </div>
-              <select className={inp} value={ef.tenantId} onChange={(e) => setEf({ ...ef, tenantId: e.target.value })} style={{ background: "#fff" }}>
+              <select className={inp} value={ef.tenantId} onChange={(e) => setEf({ ...ef, tenantId: e.target.value })} style={{ background: "var(--bg2)" }}>
                 <option value="">— No Tenant (Main Admin) —</option>
                 {tenants.map((t: any) => <option key={t.id} value={t.id}>{t.brandName || t.name}</option>)}
               </select>
@@ -447,8 +447,6 @@ export default function SAClientsPage() {
             <div className="mt-3 flex justify-end gap-2">
               <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setRepRow(null)}>Close</button>
               <button disabled={repSending} className="ui-btn px-3 py-1.5 text-sm text-white disabled:opacity-60" style={{ background: "#2563eb", borderColor: "transparent" }} onClick={async () => {
-                const dest = repEmail.trim() || "the client's registered email";
-                if (!confirm(`Email this statement (PDF) to ${dest}?`)) return;
                 setRepSending(true); setRepMsg("");
                 const r = await fetch("/api/superadmin/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: repRow.id, email: repEmail.trim() || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false }));
                 setRepSending(false);

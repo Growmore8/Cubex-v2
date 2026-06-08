@@ -106,6 +106,7 @@ export default function AdminDeskPage() {
   const [auditCat, setAuditCat] = useState("ALL");
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
   const [stmtModal, setStmtModal] = useState(false);
+  const [stmtEmailModal, setStmtEmailModal] = useState(false);
   const [stmtPreset, setStmtPreset] = useState("all");
   const [stmtFrom, setStmtFrom] = useState("");
   const [stmtTo, setStmtTo] = useState("");
@@ -346,7 +347,6 @@ export default function AdminDeskPage() {
       url = "/api/admin/clients/" + id + "/manage"; body = { action: "rename", name: aform.name ?? act.acc.name, email: aform.email ?? act.acc.email, phone: aform.phone ?? act.acc.phone, country: aform.country ?? act.acc.country };
     }
     else if (act.kind === "accountid") { const login = String(aform.login ?? act.acc.login).trim(); if (!login) { setErr("Enter an account ID"); return; } url = "/api/admin/clients/" + id + "/manage"; body = { action: "accountId", login }; }
-    else if (act.kind === "password") { const pw = aform.password || ""; if (pw.length < 6) { setErr("Min 6 characters"); return; } url = "/api/admin/clients/" + id + "/password"; body = { password: pw }; }
     else if (act.kind === "assignmgr") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assignManager", managerId: aform.managerId || null }; }
     else if (act.kind === "settings") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", leverage: Number(aform.leverage ?? act.acc.leverage), mcLevel: Number(aform.mcLevel ?? act.acc.mcLevel), doNotLiquidate: aform.doNotLiquidate ?? act.acc.doNotLiquidate, currency: aform.currency ?? act.acc.currency }; }
     else if (act.kind === "subaccount") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "subAccount", name: aform.name || "", type: aform.subType || "LIVE", leverage: Number(aform.subLev) || act.acc.leverage, currency: aform.subCcy || act.acc.currency, deposit: Number(aform.subDep) || 0 }; }
@@ -638,7 +638,8 @@ export default function AdminDeskPage() {
                 {topMenu === "report" && (<><div className="fixed inset-0 z-40" onClick={closeTm} />
                   <div className={panel} style={panelStyle}>
                     {dHead("Account Reports")}
-                    {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } setStmtPreset("all"); setStmtFrom(""); setStmtTo(""); setStmtEmail(""); setStmtMsg(""); setStmtModal(true); }, "fa-file-pdf", "Export PDF Statement", "#ef4444")}
+                    {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } setStmtPreset("all"); setStmtFrom(""); setStmtTo(""); setStmtModal(true); }, "fa-file-pdf", "Download Statement", "#ef4444")}
+                    {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } setStmtEmail(""); setStmtMsg(""); setStmtEmailModal(true); }, "fa-envelope", "Email Statement", "#3b82f6")}
                   </div></>)}
               </div>
             </>);
@@ -1423,7 +1424,6 @@ export default function AdminDeskPage() {
               <div className="text-[11px] text-[var(--muted)]">Current ID: <span className="font-semibold text-[var(--text)]">{act.acc.login}</span> — {act.acc.name}</div>
               <div><div className={flab}>Enter new Account ID</div><input className={inp} value={aform.login ?? act.acc.login} onChange={(e) => af("login", e.target.value)} autoFocus /></div>
             </>)}
-            {act.kind === "password" && (<div><div className={flab}>New Password (min 6)</div><PasswordInput className={inp} value={aform.password || ""} onChange={(e) => af("password", e.target.value)} autoFocus /></div>)}
             {act.kind === "assignmgr" && (<div><div className={flab}>Manager</div><select className={inp} value={aform.managerId ?? (act.acc.managerId || "")} onChange={(e) => af("managerId", e.target.value)}><option value="">- none -</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>)}
             {act.kind === "subaccount" && (<>
               <div className="text-[11px] text-[var(--muted)]">Under client: <span className="font-semibold text-[var(--text)]">{act.acc.name}</span></div>
@@ -1770,9 +1770,6 @@ export default function AdminDeskPage() {
                 </div>
               </div>
             )}
-            <div className="mb-1 mt-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Email statement to</div>
-            <input type="email" value={stmtEmail} onChange={(e) => { setStmtEmail(e.target.value); setStmtMsg(""); }} placeholder="Leave blank to use client's registered email" className="mb-2 w-full rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
-            {stmtMsg && <div className="mb-2 text-[10px]" style={{ color: stmtMsg.startsWith("✓") ? "#16a34a" : "#ef4444" }}>{stmtMsg}</div>}
             <div className="flex gap-2">
               <button onClick={() => setStmtModal(false)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
               <button onClick={() => {
@@ -1784,15 +1781,31 @@ export default function AdminDeskPage() {
               }} className="flex-1 rounded py-2 text-[11px] font-semibold" style={{ background: "#ef4444", color: "#fff" }}>
                 <i className="fa-solid fa-file-pdf mr-1" /> Generate PDF
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Statement Modal (separate from download). The visible recipient is
+          the confirmation — no browser dialog. */}
+      {stmtEmailModal && selAcc && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setStmtEmailModal(false)}>
+          <div className="ui-pop w-[340px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 text-sm font-semibold">Email Statement</div>
+            <div className="mb-4 text-[10px]" style={{ color: "var(--muted)" }}>{selAcc.login} — {selAcc.name}</div>
+            <div className="mb-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Send statement (PDF) to</div>
+            <input type="email" value={stmtEmail} onChange={(e) => { setStmtEmail(e.target.value); setStmtMsg(""); }} placeholder="Leave blank to use client's registered email" className="mb-1 w-full rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+            <div className="mb-2 text-[9px]" style={{ color: "var(--muted)" }}>Sent from the broker's email as no-reply.</div>
+            {stmtMsg && <div className="mb-2 text-[10px]" style={{ color: stmtMsg.startsWith("✓") ? "#16a34a" : "#ef4444" }}>{stmtMsg}</div>}
+            <div className="flex gap-2">
+              <button onClick={() => setStmtEmailModal(false)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
               <button disabled={stmtSending} onClick={async () => {
-                const dest = stmtEmail.trim() || "the client's registered email";
-                if (!confirm(`Email this account statement (PDF) to ${dest}?`)) return;
                 setStmtSending(true); setStmtMsg("");
                 const r = await fetch("/api/desk/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: selAcc.id, email: stmtEmail.trim() || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false }));
                 setStmtSending(false);
                 if (r.ok) setStmtMsg("✓ Sent to " + r.to); else setStmtMsg(r.error || "Failed to send");
               }} className="flex-1 rounded py-2 text-[11px] font-semibold disabled:opacity-60" style={{ background: "#3b82f6", color: "#fff" }}>
-                <i className="fa-solid fa-envelope mr-1" /> {stmtSending ? "Sending…" : "Email PDF"}
+                <i className="fa-solid fa-envelope mr-1" /> {stmtSending ? "Sending…" : "Send Email"}
               </button>
             </div>
           </div>

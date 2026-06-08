@@ -154,7 +154,7 @@ export default function SATenantsPage() {
 
       {err && <div className="text-sm text-red-600">{err}</div>}
 
-      <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+      <div className="ui-card bg-white p-4" style={{ borderColor: "var(--border)" }}>
         <table className="w-full text-sm">
           <thead className="text-left text-gray-500">
             <tr>
@@ -170,7 +170,7 @@ export default function SATenantsPage() {
           </thead>
           <tbody>
             {rows.map((t: any) => (
-              <tr key={t.id} className="ui-row border-t" style={{ borderColor: "#eef2f7" }}>
+              <tr key={t.id} className="ui-row border-t" style={{ borderColor: "var(--border)" }}>
                 <td className="px-2 py-2 font-medium">
                   {t.brandName || t.name}
                   <div className="text-xs text-gray-400">{t.name}</div>

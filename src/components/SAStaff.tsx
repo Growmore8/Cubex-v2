@@ -118,15 +118,15 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
       {err && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
 
       <div className="ui-card overflow-hidden p-0">
-        <div className="flex items-center gap-2 border-b px-4 py-2.5" style={{ borderColor: "#e2e8f0" }}>
+        <div className="flex items-center gap-2 border-b px-4 py-2.5" style={{ borderColor: "var(--border)" }}>
           <i className="fa-solid fa-magnifying-glass text-[11px] text-gray-400" />
           <input className="flex-1 border-none bg-transparent text-sm outline-none" placeholder="Search name / email" value={q} onChange={(e) => setQ(e.target.value)} />
           <span className="text-xs text-gray-400">{filtered.length} rows</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead style={{ background: "#f8fafc" }}>
-              <tr className="border-b text-left" style={{ borderColor: "#e2e8f0" }}>
+            <thead style={{ background: "var(--bg2)" }}>
+              <tr className="border-b text-left" style={{ borderColor: "var(--border)" }}>
                 {["Name / Email", "Tenant", "Status", "Last Login", "Last IP", "Permissions", "Actions"].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-[11px] font-semibold text-gray-500">{h}</th>
                 ))}
@@ -134,7 +134,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
             </thead>
             <tbody>
               {filtered.map((u: any) => (
-                <tr key={u.id} className="ui-row border-b" style={{ borderColor: "#f0f4f8" }}>
+                <tr key={u.id} className="ui-row border-b" style={{ borderColor: "var(--border)" }}>
                   <td className="px-3 py-2.5">
                     <div className="flex items-start gap-2">
                       <span className="mt-1.5"><PresenceDot online={u.online} /></span>
@@ -286,7 +286,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
             <div className="mb-4 text-xs text-gray-500">Personal permissions (still gated by the tenant-level permissions).</div>
             {PERM_GROUPS.map((g) => (
               <div key={g.sec} className="mb-4">
-                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b pb-1" style={{ borderColor: "#e2e8f0" }}>{g.sec}</div>
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b pb-1" style={{ borderColor: "var(--border)" }}>{g.sec}</div>
                 <div className="grid grid-cols-2 gap-2">
                   {g.items.map(([k, lbl]) => (
                     <label key={k} className="flex items-center gap-2 text-sm cursor-pointer transition-colors duration-200">

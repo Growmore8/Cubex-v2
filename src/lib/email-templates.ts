@@ -52,14 +52,12 @@ export function brandedEmail(brand: BrandInfo, heading: string, bodyHtml: string
 }
 
 export function verificationEmail(brand: BrandInfo, code: string): string {
-  const primary = esc(brand.primaryColor || "#2563eb");
   return brandedEmail(brand, "Verify your email address", `
     <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 16px">Welcome to ${esc(brand.brandName)}. Use the code below to verify your email and activate your trading account.</p>
     <div style="text-align:center;margin:26px 0">
       <span class="em-code" style="display:inline-block;font-size:38px;font-weight:800;letter-spacing:12px;color:#111827;background:#f3f4f6;border-radius:10px;padding:14px 22px 14px 34px">${esc(code)}</span>
     </div>
-    <p style="font-size:12px;color:#9ca3af;margin:0 0 16px">This code expires in 15 minutes. If you didn't create an account, you can safely ignore this email.</p>
-    <span style="display:none">${primary}</span>`);
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 16px">This code expires in 15 minutes. If you didn't create an account, you can safely ignore this email.</p>`);
 }
 
 export function resetPasswordEmail(brand: BrandInfo, resetLink: string): string {
