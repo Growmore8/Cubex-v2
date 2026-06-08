@@ -71,6 +71,12 @@ export default function ClientTerminal() {
   const [ordIdx, setOrdIdx] = useState(0); // selected order kind (app-style grid)
   const [walletModal, setWalletModal] = useState<null | "deposit" | "withdraw" | "kyc">(null);
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false });
+  const [stmtRep, setStmtRep] = useState(false);
+  const [repPreset, setRepPreset] = useState("all");
+  const [repFrom, setRepFrom] = useState("");
+  const [repTo, setRepTo] = useState("");
+  const [repSending, setRepSending] = useState(false);
+  const [repMsg, setRepMsg] = useState("");
   const [vol, setVol] = useState(0.01);
   const [sl, setSl] = useState("");
   const [tp, setTp] = useState("");
@@ -437,11 +443,7 @@ export default function ClientTerminal() {
                   {curAcct?.type === "LIVE" && mItem(() => { close(); setWalletModal("kyc"); }, "fa-id-card", "KYC Verification")}
                   {div}
                   {head("Reports")}
-                  {mItem(async () => {
-                    const tid = toast.loading("Sending statement…");
-                    const r = await fetch("/api/client/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accId }) }).then((x) => x.json()).catch(() => ({ ok: false }));
-                    if (r.ok) toast.success("Statement sent to " + r.to, { id: tid }); else toast.error(r.error || "Failed to send", { id: tid });
-                  }, "fa-envelope-open-text", "Email Statement", BUY)}
+                  {mItem(() => { close(); setRepPreset("all"); setRepFrom(""); setRepTo(""); setRepMsg(""); setStmtRep(true); }, "fa-file-invoice", "Statement / Report", BUY)}
                   {div}
                   {head("Security")}
                   {mItem(() => { setPinErr(""); setPinForm({}); setPinModal(true); }, "fa-shield-halved", pinHasPin ? "Change PIN" : "Set PIN")}
@@ -851,6 +853,38 @@ export default function ClientTerminal() {
         </div>
       </div>
 
+      {stmtRep && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}>
+          <div className="ui-pop w-[340px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 text-sm font-semibold">Statement / Report</div>
+            <div className="mb-3 text-[10px]" style={{ color: "var(--muted)" }}>{curAcct?.login} · {curAcct?.type}</div>
+            <div className="mb-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Date Range</div>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {(["day", "month", "year", "all", "custom"] as const).map((p) => (
+                <button key={p} onClick={() => { setRepPreset(p); setRepMsg(""); if (p !== "custom") { const now = new Date(); if (p === "day") { const dd = now.toISOString().slice(0, 10); setRepFrom(dd); setRepTo(dd); } else if (p === "month") { const y = now.getFullYear(), m = now.getMonth(); setRepFrom(new Date(y, m, 1).toISOString().slice(0, 10)); setRepTo(new Date(y, m + 1, 0).toISOString().slice(0, 10)); } else if (p === "year") { const y = now.getFullYear(); setRepFrom(`${y}-01-01`); setRepTo(`${y}-12-31`); } else { setRepFrom(""); setRepTo(""); } } }} className="rounded-lg px-2.5 py-1 text-[10px] font-semibold capitalize" style={{ background: repPreset === p ? BUY : "var(--soft)", color: repPreset === p ? "#04140e" : "var(--text)", border: "1px solid " + (repPreset === p ? "transparent" : "var(--border)") }}>{p === "all" ? "All Time" : p}</button>
+              ))}
+            </div>
+            {repPreset === "custom" && (
+              <div className="mb-3 flex gap-2">
+                <input type="date" value={repFrom} onChange={(e) => setRepFrom(e.target.value)} className="flex-1 rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+                <input type="date" value={repTo} onChange={(e) => setRepTo(e.target.value)} className="flex-1 rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+              </div>
+            )}
+            <div className="mb-2 text-[9px]" style={{ color: "var(--muted)" }}>Email is sent to your registered address ({account?.email || "—"}) as no-reply.</div>
+            {repMsg && <div className="mb-2 text-[10px]" style={{ color: repMsg.startsWith("✓") ? "#16a34a" : "#ef4444" }}>{repMsg}</div>}
+            <div className="flex gap-2">
+              <button onClick={() => setStmtRep(false)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Close</button>
+              <button onClick={() => { const q = new URLSearchParams({ accountId: accId || "" }); if (repFrom) q.set("from", repFrom); if (repTo) q.set("to", repTo); window.open("/api/client/statement?" + q.toString(), "_blank"); }} className="flex-1 rounded py-2 text-[11px] font-semibold" style={{ background: "#ef4444", color: "#fff" }}><i className="fa-solid fa-file-pdf mr-1" /> Download</button>
+              <button disabled={repSending} onClick={async () => {
+                setRepSending(true); setRepMsg("");
+                const r = await fetch("/api/client/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accId, from: repFrom || undefined, to: repTo || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+                setRepSending(false);
+                setRepMsg(r.ok ? "✓ Sent to " + r.to : (r.error || "Failed to send"));
+              }} className="flex-1 rounded py-2 text-[11px] font-semibold disabled:opacity-60" style={{ background: BUY, color: "#04140e" }}><i className="fa-solid fa-envelope mr-1" /> {repSending ? "…" : "Email"}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {walletModal && (
         <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-auto p-4 sm:items-center" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="ui-pop w-full max-w-2xl rounded-xl bg-[var(--panel)] text-[var(--text)] p-5 shadow-2xl" style={{ ["--foreground" as any]: "var(--text)", "--card": "var(--soft)", "--card-foreground": "var(--text)", "--background": "var(--bg)", "--secondary": "var(--soft)", "--secondary-foreground": "var(--text)", "--muted-foreground": "var(--muted)" } as any} onClick={(e) => e.stopPropagation()}>

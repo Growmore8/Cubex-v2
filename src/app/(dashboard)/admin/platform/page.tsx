@@ -671,7 +671,7 @@ export default function AdminDeskPage() {
                   <div className={panel} style={panelStyle}>
                     {dHead("Account Reports")}
                     {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } setStmtPreset("all"); setStmtFrom(""); setStmtTo(""); setStmtModal(true); }, "fa-file-pdf", "Download Statement", "#ef4444")}
-                    {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } setStmtEmail(""); setStmtMsg(""); setStmtEmailModal(true); }, "fa-envelope", "Email Statement", "#3b82f6")}
+                    {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } setStmtEmail(""); setStmtMsg(""); setStmtPreset("all"); setStmtFrom(""); setStmtTo(""); setStmtEmailModal(true); }, "fa-envelope", "Email Statement", "#3b82f6")}
                   </div></>)}
               </div>
             </>);
@@ -1864,7 +1864,19 @@ export default function AdminDeskPage() {
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="ui-pop w-[340px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 text-sm font-semibold">Email Statement</div>
-            <div className="mb-4 text-[10px]" style={{ color: "var(--muted)" }}>{selAcc.login} — {selAcc.name}</div>
+            <div className="mb-3 text-[10px]" style={{ color: "var(--muted)" }}>{selAcc.login} — {selAcc.name}</div>
+            <div className="mb-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Date Range</div>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {(["day", "month", "year", "all", "custom"] as const).map((p) => (
+                <button key={p} onClick={() => { setStmtPreset(p); if (p !== "custom") { const now = new Date(); if (p === "day") { const dd = now.toISOString().slice(0, 10); setStmtFrom(dd); setStmtTo(dd); } else if (p === "month") { const y = now.getFullYear(), m = now.getMonth(); setStmtFrom(new Date(y, m, 1).toISOString().slice(0, 10)); setStmtTo(new Date(y, m + 1, 0).toISOString().slice(0, 10)); } else if (p === "year") { const y = now.getFullYear(); setStmtFrom(`${y}-01-01`); setStmtTo(`${y}-12-31`); } else { setStmtFrom(""); setStmtTo(""); } } }} className="rounded-lg px-2.5 py-1 text-[10px] font-semibold capitalize" style={{ background: stmtPreset === p ? "#3b82f6" : "var(--soft)", color: stmtPreset === p ? "#fff" : "var(--text)", border: "1px solid " + (stmtPreset === p ? "transparent" : "var(--border)") }}>{p === "all" ? "All Time" : p}</button>
+              ))}
+            </div>
+            {stmtPreset === "custom" && (
+              <div className="mb-3 flex gap-2">
+                <input type="date" value={stmtFrom} onChange={(e) => setStmtFrom(e.target.value)} className="flex-1 rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+                <input type="date" value={stmtTo} onChange={(e) => setStmtTo(e.target.value)} className="flex-1 rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+              </div>
+            )}
             <div className="mb-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Send statement (PDF) to</div>
             <input type="email" value={stmtEmail} onChange={(e) => { setStmtEmail(e.target.value); setStmtMsg(""); }} placeholder="Leave blank to use client's registered email" className="mb-1 w-full rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
             <div className="mb-2 text-[9px]" style={{ color: "var(--muted)" }}>Sent from the broker's email as no-reply.</div>
@@ -1873,7 +1885,7 @@ export default function AdminDeskPage() {
               <button onClick={() => setStmtEmailModal(false)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
               <button disabled={stmtSending} onClick={async () => {
                 setStmtSending(true); setStmtMsg("");
-                const r = await fetch("/api/desk/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: selAcc.id, email: stmtEmail.trim() || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+                const r = await fetch("/api/desk/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: selAcc.id, email: stmtEmail.trim() || undefined, from: stmtFrom || undefined, to: stmtTo || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false }));
                 setStmtSending(false);
                 if (r.ok) setStmtMsg("✓ Sent to " + r.to); else setStmtMsg(r.error || "Failed to send");
               }} className="flex-1 rounded py-2 text-[11px] font-semibold disabled:opacity-60" style={{ background: "#3b82f6", color: "#fff" }}>

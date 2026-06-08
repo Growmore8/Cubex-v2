@@ -8,14 +8,21 @@ export async function GET(req: Request) {
   const s = await requireClient();
   if (!s) return new Response("Forbidden", { status: 403 });
   try {
-    const accountId = new URL(req.url).searchParams.get("accountId");
+    const url = new URL(req.url);
+    const accountId = url.searchParams.get("accountId");
+    const fromStr = url.searchParams.get("from");
+    const toStr = url.searchParams.get("to");
+    const range: any = {};
+    if (fromStr) range.gte = new Date(fromStr);
+    if (toStr) range.lte = new Date(toStr + "T23:59:59");
+    const hasRange = Object.keys(range).length > 0;
     const account = await prisma.account.findFirst({
       where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false, ...(accountId ? { id: accountId } : {}) },
       orderBy: { createdAt: "asc" },
       include: {
         user: { select: { name: true, email: true } },
-        history: { orderBy: { closedAt: "desc" }, take: 200 },
-        financials: { orderBy: { appliedAt: "desc" }, take: 200 },
+        history: { where: hasRange ? { closedAt: range } : undefined, orderBy: { closedAt: "desc" }, take: 500 },
+        financials: { where: hasRange ? { appliedAt: range } : undefined, orderBy: { appliedAt: "desc" }, take: 500 },
         trades: { orderBy: { openedAt: "desc" } },
       },
     });

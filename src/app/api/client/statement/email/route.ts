@@ -15,8 +15,11 @@ export async function POST(req: Request) {
       accountId = acc?.id;
     }
     if (!accountId) return NextResponse.json({ ok: false, error: "No account" }, { status: 404 });
+    const since = body.from ? new Date(String(body.from)) : undefined;
+    const until = body.to ? new Date(String(body.to) + "T23:59:59") : undefined;
+    const periodLabel = (body.from || body.to) ? `${body.from || "—"} to ${body.to || "—"}` : undefined;
     // userId scope ensures a client can only email their own account.
-    const r = await sendStatementEmail({ tenantId: s.tenantId!, accountId, userId: s.sub });
+    const r = await sendStatementEmail({ tenantId: s.tenantId!, accountId, userId: s.sub, since, until, periodLabel });
     if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
     return NextResponse.json({ ok: true, to: r.to });
   } catch (e: any) {
