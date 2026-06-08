@@ -17,6 +17,17 @@ export async function assertMarketOpen(symbol: string) {
   if (!isMarketOpen(symbol, cat)) throw new Error("Market is closed for " + symbol + ". Trading resumes when the market reopens.");
 }
 
+// Short, per-tenant sequential trade ticket (MT5-style, e.g. 1000001) instead of a
+// 16-digit timestamp. Atomic upsert+increment keeps Trade.ticket (@unique) safe.
+export async function nextTicket(tenantId: string): Promise<bigint> {
+  const c = await prisma.counter.upsert({
+    where: { tenantId_name: { tenantId, name: "ticket" } },
+    create: { tenantId, name: "ticket", nextVal: BigInt(1000001) },
+    update: { nextVal: { increment: 1 } },
+  });
+  return c.nextVal as bigint;
+}
+
 export async function placeOrder(tenantId: string, userId: string, input: any) {
   const account = input.accountId
     ? await prisma.account.findFirst({ where: { tenantId, userId, id: input.accountId } })
@@ -48,7 +59,7 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   const usedAfter = usedMargin(after, lev, (s) => priceMap[s] ?? price);
   if (usedAfter > equity + 1e-6) throw new Error("Not enough money");
 
-  const ticket = BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
+  const ticket = await nextTicket(tenantId);
   const trade = await prisma.trade.create({
     data: {
       ticket, accountId: account.id, symbol: input.symbol, type: input.side,

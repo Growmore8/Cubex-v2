@@ -24,6 +24,16 @@ let symbols = [];
 function r(v, d) { return Number(v.toFixed(d)); }
 function bucketStart(ms) { return Math.floor(ms / CANDLE_MS) * CANDLE_MS; }
 
+// Short, per-tenant sequential trade ticket (matches src/services/trade.service.ts).
+async function nextTicket(tenantId) {
+  const c = await prisma.counter.upsert({
+    where: { tenantId_name: { tenantId, name: "ticket" } },
+    create: { tenantId, name: "ticket", nextVal: 1000001n },
+    update: { nextVal: { increment: 1 } },
+  });
+  return c.nextVal;
+}
+
 // ── Derived (calculated) symbols: metal crosses + grams ──
 // Computed from base XAU/XAG + FX rates on each base tick. 1 troy oz = 31.1035 g.
 const OZ = 31.1035;
@@ -382,7 +392,7 @@ async function checkPending(io) {
       else if (o.side === "SELL" && o.kind === "LIMIT") fill = px >= trig;
       else if (o.side === "SELL" && o.kind === "STOP") fill = px <= trig;
       if (!fill) continue;
-      const ticket = BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
+      const ticket = await nextTicket(o.account.tenantId);
       await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: px, sl: o.sl, tp: o.tp } });
       await prisma.pendingOrder.delete({ where: { id: o.id } });
       if (o.account && o.account.userId) await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + px, type: "TRADE" } }).catch(() => {});

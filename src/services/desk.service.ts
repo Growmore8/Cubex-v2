@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { pnlFor } from "@/lib/trademath";
 import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
+import { nextTicket } from "@/services/trade.service";
 
 function accountWhere(s: any) {
   if (s.role === "ADMIN" || s.role === "SUPERADMIN") return { tenantId: s.tenantId };
@@ -91,7 +92,7 @@ export async function manualTrade(s: any, input: any) {
   const openPrice = (input.openPrice != null && Number(input.openPrice) > 0) ? Number(input.openPrice) : live;
   if (openPrice == null) throw new Error("No price for " + input.symbol);
   const openedAt = input.openedAt ? new Date(input.openedAt) : undefined;
-  const ticket = BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
+  const ticket = await nextTicket(acc.tenantId);
   const t = await prisma.trade.create({
     data: { ticket, accountId: acc.id, symbol: input.symbol, type: input.type,
       lots: new Prisma.Decimal(input.lots), openPrice: new Prisma.Decimal(openPrice),
