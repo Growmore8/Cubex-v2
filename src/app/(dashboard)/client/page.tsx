@@ -77,6 +77,7 @@ export default function ClientTerminal() {
   const [rightTab, setRightTab] = useState("TRADE");
   const [ctx, setCtx] = useState<{ x: number; y: number; sym: string } | null>(null);
   const [botTab, setBotTab] = useState<"positions" | "pending" | "history" | "summary">("positions");
+  const [tpSlEdit, setTpSlEdit] = useState<{ id: string; field: "tp" | "sl"; val: string } | null>(null);
   const [err, setErr] = useState("");
   const [pinLock, setPinLock] = useState(false);
   const [pinHasPin, setPinHasPin] = useState(false);
@@ -284,6 +285,16 @@ export default function ClientTerminal() {
     const r = await fetch("/api/client/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, current: pinForm.current }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { setPinErr(r.error || "Failed"); return; }
     setPinHasPin(true); setPinModal(false); setPinForm({}); sessionStorage.setItem("cubex-pin-ok", "1");
+  }
+  async function saveTpSl() {
+    if (!tpSlEdit) return;
+    const val = parseFloat(tpSlEdit.val);
+    const body: any = { [tpSlEdit.field]: isNaN(val) ? 0 : val };
+    const r = await fetch("/api/client/orders/" + tpSlEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await r.json();
+    setTpSlEdit(null);
+    if (!d.ok) { setErr(d.error || "Failed"); return; }
+    load();
   }
   async function close(id: string) {
     if (account?.locked) { setErr("Your account is read-only. Closing is disabled."); return; }
@@ -671,7 +682,20 @@ export default function ClientTerminal() {
                     <td className="px-2 py-1 text-[var(--muted)]">{new Date(p.openedAt).toLocaleDateString()}</td>
                     <td className="px-2 py-1 text-right">{p.lots}</td><td className="px-2 py-1 text-right">{p.openPrice.toFixed(dg(p.symbol))}</td>
                     <td className="px-2 py-1 text-right tabular-nums" style={{ color: cdir > 0 ? "#16c784" : cdir < 0 ? "#e05260" : "var(--text)", transition: "color 0.3s ease" }}>{cur.toFixed(dg(p.symbol))}</td>
-                    <td className="px-2 py-1 text-right text-[var(--muted)]">{p.tp || "-"}</td><td className="px-2 py-1 text-right text-[var(--muted)]">{p.sl || "-"}</td>
+                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "tp", val: p.tp ? String(p.tp) : "" }); }} title="Click to edit TP" style={{ cursor: "pointer" }}>
+                      {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "tp" ? (
+                        <input type="text" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "tp", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-20 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#10b981", color: "#10b981" }} onClick={(e) => e.stopPropagation()} />
+                      ) : (
+                        <span style={{ color: p.tp ? "#10b981" : "var(--muted)" }}>{p.tp ? Number(p.tp).toFixed(dg(p.symbol)) : <span className="text-[9px]">+ TP</span>}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "sl", val: p.sl ? String(p.sl) : "" }); }} title="Click to edit SL" style={{ cursor: "pointer" }}>
+                      {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "sl" ? (
+                        <input type="text" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "sl", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-20 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#f43f5e", color: "#f43f5e" }} onClick={(e) => e.stopPropagation()} />
+                      ) : (
+                        <span style={{ color: p.sl ? "#f43f5e" : "var(--muted)" }}>{p.sl ? Number(p.sl).toFixed(dg(p.symbol)) : <span className="text-[9px]">+ SL</span>}</span>
+                      )}
+                    </td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">0.00</td>
                     <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
                     <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
