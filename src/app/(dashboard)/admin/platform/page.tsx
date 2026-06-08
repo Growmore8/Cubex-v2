@@ -1496,6 +1496,7 @@ export default function AdminDeskPage() {
               <div className={lab + " mt-1"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
               <div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} onChange={(e) => f("email", e.target.value)} />
               <div className={lab + " mt-2"}>Password</div><PasswordInput className={inp} value={form.password || ""} onChange={(e) => f("password", e.target.value)} />
+              {err && modal === "manager" && <div className="mt-2 rounded border px-2 py-1.5 text-[10px]" style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.3)", color: SELL }}><i className="fa-solid fa-circle-exclamation mr-1" />{err}</div>}
               <button onClick={() => submit("/api/admin/managers", { name: form.name, email: form.email, password: form.password }, "Manager")} className="mt-3 w-full rounded py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Create Manager</button>
             </>)}
             {modal === "group" && (<>

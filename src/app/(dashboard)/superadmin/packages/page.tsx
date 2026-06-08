@@ -32,6 +32,7 @@ export default function SAPackagesPage() {
       price: pkg.price || 0,
       description: pkg.description || "",
       seats: pkg.seats || 5,
+      managers: pkg.managers ?? (plan === "STARTER" ? 1 : plan === "PRO" ? 5 : 25),
       features: (pkg.features || DEFAULT_FEATURES[plan] || []).join("\n"),
     });
     setEditing(plan);
@@ -48,6 +49,7 @@ export default function SAPackagesPage() {
         price: Number(ef.price),
         description: ef.description,
         seats: Number(ef.seats),
+        managers: Number(ef.managers),
         features: ef.features.split("\n").map((f: string) => f.trim()).filter(Boolean),
       },
     };
@@ -104,9 +106,12 @@ export default function SAPackagesPage() {
                     <div className="text-xs text-gray-400">/month</div>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-3">
+                <div className="mt-3 flex items-center gap-3 flex-wrap">
                   <div className="text-xs font-medium text-gray-600">
-                    <i className="fa-solid fa-users mr-1" style={{ color }} />{pkg.seats || 5} seats
+                    <i className="fa-solid fa-chart-line mr-1" style={{ color }} />{pkg.seats || 5} live accts
+                  </div>
+                  <div className="text-xs font-medium text-gray-600">
+                    <i className="fa-solid fa-user-tie mr-1" style={{ color }} />{pkg.managers ?? (plan === "STARTER" ? 1 : plan === "PRO" ? 5 : 25)} managers
                   </div>
                   <div className="text-xs font-medium" style={{ color: count > 0 ? "#15803d" : "#9ca3af" }}>
                     <i className="fa-solid fa-building mr-1" />{count} tenant{count !== 1 ? "s" : ""}
@@ -184,8 +189,12 @@ export default function SAPackagesPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-gray-500 block mb-1">SEATS (max accounts)</label>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">LIVE ACCOUNTS (seats)</label>
                   <input className={inp} type="number" min="1" value={ef.seats} onChange={(e) => setEf({ ...ef, seats: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">MANAGERS (max)</label>
+                  <input className={inp} type="number" min="0" value={ef.managers} onChange={(e) => setEf({ ...ef, managers: e.target.value })} />
                 </div>
               </div>
               <div>

@@ -9,29 +9,56 @@ export function seatsForPlan(plan?: string): number {
   return (PACKAGES as any)[plan || "STARTER"]?.seats ?? 5;
 }
 
-// The LIVE account limit for a plan: the package default overridden by whatever the
-// super admin saved in Packages & Pricing. Read fresh so a seat-count change in that
-// section applies to every tenant on that plan immediately — no snapshot.
-export async function effectiveSeatsForPlan(client: any, plan?: string): Promise<number> {
-  const key = plan || "STARTER";
-  const def = seatsForPlan(key);
+// The default manager limit per plan.
+export function managersForPlan(plan?: string): number {
+  return (PACKAGES as any)[plan || "STARTER"]?.managers ?? 1;
+}
+
+// Helper: read overrideable plan value from the super-admin Packages & Pricing setting.
+async function effectivePlanValue(client: any, plan: string, field: "seats" | "managers", fallback: number): Promise<number> {
   try {
     const setting = await client.setting.findUnique({ where: { key: PKG_SETTING_KEY } });
-    const override = Number((setting?.value as any)?.[key]?.seats);
-    return Number.isFinite(override) && override > 0 ? override : def;
+    const override = Number((setting?.value as any)?.[plan]?.[field]);
+    return Number.isFinite(override) && override > 0 ? override : fallback;
   } catch {
-    return def;
+    return fallback;
   }
 }
 
-// Throws if the tenant has reached its plan's account limit. Only LIVE accounts
-// count against the limit — demo accounts are unlimited practice accounts.
+// The LIVE account limit for a plan, overrideable in Packages & Pricing.
+export async function effectiveSeatsForPlan(client: any, plan?: string): Promise<number> {
+  const key = plan || "STARTER";
+  return effectivePlanValue(client, key, "seats", seatsForPlan(key));
+}
+
+// The manager limit for a plan, overrideable in Packages & Pricing.
+export async function effectiveManagersForPlan(client: any, plan?: string): Promise<number> {
+  const key = plan || "STARTER";
+  return effectivePlanValue(client, key, "managers", managersForPlan(key));
+}
+
+// Throws if the tenant has reached its plan's LIVE account limit.
+// Demo accounts are unlimited.
 export async function assertSeatAvailable(client: any, tenantId: string, type: string = "LIVE") {
-  if (type !== "LIVE") return; // demos don't consume a seat
+  if (type !== "LIVE") return;
   const sub = await client.subscription.findUnique({ where: { tenantId } });
   const limit = await effectiveSeatsForPlan(client, sub?.plan);
   const used = await client.account.count({ where: { tenantId, type: "LIVE" } });
-  if (used >= limit) throw new Error(`Account limit reached (${used}/${limit} live accounts on the ${sub?.plan || "current"} plan). Upgrade your package or contact sales.`);
+  if (used >= limit) {
+    const plan = sub?.plan || "current";
+    throw new Error(`Live account limit reached (${used}/${limit} on the ${plan} plan). Please contact support or upgrade your package.`);
+  }
+}
+
+// Throws if the tenant has reached its plan's manager limit.
+export async function assertManagerAvailable(client: any, tenantId: string) {
+  const sub = await client.subscription.findUnique({ where: { tenantId } });
+  const limit = await effectiveManagersForPlan(client, sub?.plan);
+  const used = await client.user.count({ where: { tenantId, role: "MANAGER" } });
+  if (used >= limit) {
+    const plan = sub?.plan || "current";
+    throw new Error(`Manager limit reached (${used}/${limit} on the ${plan} plan). Please contact support or upgrade your package.`);
+  }
 }
 
 export function listTenants() {

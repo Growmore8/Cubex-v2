@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
+import { assertManagerAvailable } from "@/services/tenant.service";
 
 export function listManagers(tenantId: string) {
   return prisma.user.findMany({
@@ -13,6 +14,7 @@ export function listManagers(tenantId: string) {
 }
 
 export async function createManager(tenantId: string, input: any) {
+  await assertManagerAvailable(prisma, tenantId);
   const existing = await prisma.user.findFirst({ where: { tenantId, email: input.email.toLowerCase() } });
   if (existing) throw new Error("Email already in use");
   const passwordHash = await hashPassword(input.password);
