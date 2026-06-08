@@ -88,6 +88,9 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mSl, setMSl] = useState("");
   const [mTp, setMTp] = useState("");
   const [notisOpen, setNotisOpen] = useState(false);
+  // Account card 3D flip — auto-rotates every few idle seconds; tap flips manually.
+  const [flipped, setFlipped] = useState(false);
+  useEffect(() => { const t = setInterval(() => setFlipped((f) => !f), 7000); return () => clearInterval(t); }, []);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [bioOn, setBioOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -257,6 +260,12 @@ export default function ClientMobile({ t }: { t: any }) {
     setModifyId(null); setExpanded(null);
   };
 
+  // Account-card palette — LIVE uses the tenant brand colours, DEMO a distinct amber/gold.
+  const cIsLive = account?.type === "LIVE";
+  const cardC1 = cIsLive ? (brand?.primaryColor || "#3b82f6") : "#f59e0b";
+  const cardC2 = cIsLive ? (brand?.accentColor || brand?.primaryColor || "#1e3a8a") : "#b45309";
+  const cardGlow = cIsLive ? "rgba(22,163,74,.6)" : "rgba(245,158,11,.65)";
+
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", inset: 0, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation",
       // Frosted-glass design: faint brand-tinted glows behind the content so the
@@ -386,68 +395,75 @@ export default function ClientMobile({ t }: { t: any }) {
         <KeepAlive active={tab === "dashboard"}>{(
           <div className="space-y-4 p-3">
             {/* premium glass account card — swipe left/right to switch accounts */}
-            <div className="relative overflow-hidden rounded-[18px] p-5 text-white" style={{
-              background: account?.type === "LIVE"
-                ? `linear-gradient(150deg, color-mix(in srgb, ${brand?.primaryColor || "#3b82f6"} 60%, transparent) 0%, color-mix(in srgb, ${brand?.accentColor || brand?.primaryColor || "#1e3a8a"} 22%, transparent) 55%, rgba(255,255,255,0.04) 100%)`
-                : `linear-gradient(150deg, color-mix(in srgb, ${brand?.primaryColor || "#7c3aed"} 50%, transparent) 0%, color-mix(in srgb, ${brand?.accentColor || "#a16207"} 20%, transparent) 55%, rgba(255,255,255,0.04) 100%)`,
-              backdropFilter: "blur(22px) saturate(180%)",
-              WebkitBackdropFilter: "blur(22px) saturate(180%)",
-              border: "1px solid rgba(255,255,255,0.18)",
-              boxShadow: "0 22px 48px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.28)",
-              touchAction: "pan-y",
-            }}
+            <div style={{ perspective: 1400, touchAction: "pan-y" }}
               onTouchStart={(e) => { (e.currentTarget as any)._sx = e.touches[0].clientX; }}
               onTouchEnd={(e) => {
                 const sx = (e.currentTarget as any)._sx;
                 if (sx == null) return;
                 const dx = e.changedTouches[0].clientX - sx;
-                if (Math.abs(dx) < 40) return;
+                if (Math.abs(dx) < 40) { setFlipped((f) => !f); return; } // tap = flip
                 const ids = (accts || []).map((a: any) => a.id);
                 const cur = ids.indexOf(accId);
                 if (dx < 0 && cur < ids.length - 1) switchAcc(ids[cur + 1]);
                 else if (dx > 0 && cur > 0) switchAcc(ids[cur - 1]);
-              }}
-            >
-              {/* glowing brand accent bar across the top (mockup hero) */}
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-[4px]" style={{
-                background: account?.type === "LIVE"
-                  ? `linear-gradient(90deg, ${BUY}, ${brand?.accentColor || "#22d3ee"}, ${BUY})`
-                  : `linear-gradient(90deg, ${brand?.primaryColor || "#7c3aed"}, ${brand?.accentColor || "#2563eb"}, ${brand?.primaryColor || "#a78bfa"})`,
-                boxShadow: `0 0 16px 1px ${account?.type === "LIVE" ? "rgba(22,163,74,.7)" : "rgba(124,58,237,.7)"}`,
-              }} />
-              {/* gloss + animated sheen */}
-              <div className="card-sheen pointer-events-none absolute inset-0" />
-              <div className="pointer-events-none absolute -right-14 -top-20 h-56 w-56 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%)" }} />
-              {/* network mark (overlapping circles in brand colours) */}
-              <div className="absolute right-5 top-5 flex items-center">
-                <span className="h-7 w-7 rounded-full" style={{ background: brand?.primaryColor || "#eb001b", opacity: 0.95 }} />
-                <span className="-ml-3 h-7 w-7 rounded-full" style={{ background: brand?.accentColor || "#f79e1b", opacity: 0.85, mixBlendMode: "screen" }} />
-              </div>
+              }}>
+              <div className="flip3d relative" style={{ transform: flipped ? "rotateY(180deg)" : "none" }}>
 
-              <div className="relative flex items-center gap-2">
-                <div className="text-[11px] font-bold tracking-[0.2em] text-white/85">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
-                <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(255,255,255,0.16)", color: "#fff" }}>{account?.type}</span>
-              </div>
-
-              {/* big balance */}
-              <div className="relative mt-5">
-                <div className="text-[9px] font-semibold tracking-[0.18em] text-white/55">TOTAL BALANCE</div>
-                <div className="mt-1 text-[30px] font-extrabold leading-none tracking-tight text-white" style={{ textShadow: "0 2px 14px rgba(0,0,0,0.45)" }}>${fmt(balance)}</div>
-                <div className="mt-1.5 flex items-center gap-2 text-[10px] text-white/70">
-                  <span className="font-mono tracking-wider">{account?.login}</span>
-                  <span className="text-white/40">·</span>
-                  <span className="uppercase">{account?.ownerName || account?.name}</span>
+                {/* ── FRONT ── */}
+                <div className="face front overflow-hidden rounded-[18px] p-5 text-white" style={{
+                  background: `linear-gradient(150deg, color-mix(in srgb, ${cardC1} 60%, transparent) 0%, color-mix(in srgb, ${cardC2} 22%, transparent) 55%, rgba(255,255,255,0.04) 100%)`,
+                  backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  boxShadow: "0 22px 48px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.28)",
+                }}>
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[4px]" style={{ background: `linear-gradient(90deg, ${cardC1}, ${cardC2}, ${cardC1})`, boxShadow: `0 0 16px 1px ${cardGlow}` }} />
+                  <div className="card-sheen pointer-events-none absolute inset-0" />
+                  <div className="pointer-events-none absolute -right-14 -top-20 h-56 w-56 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%)" }} />
+                  <div className="absolute right-5 top-5 flex items-center">
+                    <span className="h-7 w-7 rounded-full" style={{ background: cardC1, opacity: 0.95 }} />
+                    <span className="-ml-3 h-7 w-7 rounded-full" style={{ background: cardC2, opacity: 0.85, mixBlendMode: "screen" }} />
+                  </div>
+                  <div className="relative flex items-center gap-2">
+                    <div className="text-[11px] font-bold tracking-[0.2em] text-white/85">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
+                    <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(255,255,255,0.16)", color: "#fff" }}>{account?.type}</span>
+                  </div>
+                  <div className="relative mt-5">
+                    <div className="text-[9px] font-semibold tracking-[0.18em] text-white/55">TOTAL BALANCE</div>
+                    <div className="mt-1 text-[30px] font-extrabold leading-none tracking-tight text-white" style={{ textShadow: "0 2px 14px rgba(0,0,0,0.45)" }}>${fmt(balance)}</div>
+                    <div className="mt-1.5 flex items-center gap-2 text-[10px] text-white/70">
+                      <span className="font-mono tracking-wider">{account?.login}</span>
+                      <span className="text-white/40">·</span>
+                      <span className="uppercase">{account?.ownerName || account?.name}</span>
+                    </div>
+                  </div>
+                  <div className="relative my-3 h-px" style={{ background: "rgba(255,255,255,0.18)" }} />
+                  <div className="relative grid grid-cols-3 gap-2 text-white">
+                    <div><div className="text-[8px] tracking-[0.12em] text-white/50">EQUITY</div><div className="text-[13px] font-bold tabular-nums">${fmt(equity)}</div></div>
+                    <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE</div><div className="text-[13px] font-bold tabular-nums">${fmt(free)}</div></div>
+                    <div><div className="text-[8px] tracking-[0.12em] text-white/50">FLT P/L</div><div className="text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#5ef2b3" : "#ff9a9a" }}>{floating >= 0 ? "+" : ""}{fmt(floating)}</div></div>
+                  </div>
                 </div>
-              </div>
 
-              {/* divider */}
-              <div className="relative my-3 h-px" style={{ background: "rgba(255,255,255,0.18)" }} />
+                {/* ── BACK ($ animation) ── */}
+                <div className="face back overflow-hidden rounded-[18px] p-5 text-white" style={{
+                  background: `linear-gradient(150deg, color-mix(in srgb, ${cardC2} 65%, transparent) 0%, color-mix(in srgb, ${cardC1} 28%, transparent) 60%, rgba(255,255,255,0.04) 100%)`,
+                  backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  boxShadow: "0 22px 48px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.28)",
+                }}>
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[4px]" style={{ background: `linear-gradient(90deg, ${cardC1}, ${cardC2}, ${cardC1})`, boxShadow: `0 0 16px 1px ${cardGlow}` }} />
+                  {/* floating dollar signs */}
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <span key={i} className="dollar-fx pointer-events-none absolute font-black text-white/70" style={{ left: `${8 + i * 15}%`, bottom: 10, fontSize: 16 + (i % 3) * 8, animationDelay: `${(i * 0.5).toFixed(1)}s` }}>$</span>
+                  ))}
+                  <div className="relative flex h-full flex-col items-center justify-center">
+                    <div className="coin-spin flex h-16 w-16 items-center justify-center rounded-full text-2xl font-black text-white" style={{ background: `linear-gradient(135deg, ${cardC1}, ${cardC2})`, boxShadow: `0 0 30px ${cardGlow}, inset 0 1px 0 rgba(255,255,255,0.4)` }}>$</div>
+                    <div className="mt-3 text-[11px] font-bold tracking-[0.2em] text-white/85">{(brand?.name || "TRADING").toUpperCase()}</div>
+                    <div className="text-[22px] font-extrabold tabular-nums text-white" style={{ textShadow: "0 2px 14px rgba(0,0,0,0.45)" }}>${fmt(balance)}</div>
+                    <div className="mt-1 text-[9px] text-white/55">tap to flip</div>
+                  </div>
+                </div>
 
-              {/* live stats */}
-              <div className="relative grid grid-cols-3 gap-2 text-white">
-                <div><div className="text-[8px] tracking-[0.12em] text-white/50">EQUITY</div><div className="text-[13px] font-bold tabular-nums">${fmt(equity)}</div></div>
-                <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE</div><div className="text-[13px] font-bold tabular-nums">${fmt(free)}</div></div>
-                <div><div className="text-[8px] tracking-[0.12em] text-white/50">FLT P/L</div><div className="text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#5ef2b3" : "#ff9a9a" }}>{floating >= 0 ? "+" : ""}{fmt(floating)}</div></div>
               </div>
             </div>
             {/* dots */}
@@ -463,17 +479,23 @@ export default function ClientMobile({ t }: { t: any }) {
             {/* action buttons — LIVE: deposit/withdraw/transfer · DEMO: top-up only */}
             {account?.type === "LIVE" ? (
               <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => setWalletTab("deposit")} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-down" /><span className="text-[11px] font-semibold">Deposit</span></button>
-                <button onClick={() => setWalletTab("withdraw")} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-up" /><span className="text-[11px] font-semibold">Withdraw</span></button>
-                <button onClick={() => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); }} className="flex flex-col items-center gap-1 rounded-xl py-3 text-white" style={{ background: BLUE }}><i className="fa-solid fa-right-left" /><span className="text-[11px] font-semibold">Transfer</span></button>
+                {([
+                  { label: "Deposit", icon: "fa-arrow-down", col: BUY, on: () => setWalletTab("deposit") },
+                  { label: "Withdraw", icon: "fa-arrow-up", col: SELL, on: () => setWalletTab("withdraw") },
+                  { label: "Transfer", icon: "fa-right-left", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); } },
+                ]).map((b) => (
+                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-1 rounded-xl py-3 font-semibold backdrop-blur-md" style={{ color: "#fff", background: `linear-gradient(150deg, color-mix(in srgb, ${b.col} 55%, transparent), color-mix(in srgb, ${b.col} 22%, transparent))`, border: `1px solid color-mix(in srgb, ${b.col} 55%, transparent)`, boxShadow: `0 10px 22px -12px ${b.col}` }}>
+                    <i className={"fa-solid coin-bob " + b.icon} style={{ color: "#fff" }} /><span className="text-[11px]">{b.label}</span>
+                  </button>
+                ))}
               </div>
             ) : (
               <div>
                 <div className="mb-1.5 text-[10px] font-semibold text-[var(--muted)]">Top up your demo balance</div>
                 <div className="grid grid-cols-3 gap-2">
                   {[1000, 5000, 10000].map((amt) => (
-                    <button key={amt} onClick={() => doTopUp(amt)} className="flex flex-col items-center gap-0.5 rounded-xl py-3 font-semibold" style={{ background: "rgba(240,180,41,0.14)", color: GOLD, border: "1px solid rgba(240,180,41,0.4)" }}>
-                      <i className="fa-solid fa-coins" /><span className="text-[12px]">${amt.toLocaleString()}</span>
+                    <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-0.5 rounded-xl py-3 font-semibold backdrop-blur-md" style={{ color: "#fde68a", background: "linear-gradient(150deg, color-mix(in srgb, #f59e0b 45%, transparent), color-mix(in srgb, #f59e0b 16%, transparent))", border: "1px solid color-mix(in srgb, #f59e0b 55%, transparent)", boxShadow: "0 10px 22px -12px #f59e0b" }}>
+                      <i className="fa-solid fa-coins coin-bob" style={{ color: "#fcd34d" }} /><span className="text-[12px]">${amt.toLocaleString()}</span>
                     </button>
                   ))}
                 </div>
