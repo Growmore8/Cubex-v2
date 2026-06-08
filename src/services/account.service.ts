@@ -39,6 +39,9 @@ export async function createClient(tenantId: string, input: any, actor = "admin"
   const acc = await prisma.$transaction(async (tx) => {
     await assertSeatAvailable(tx, tenantId, type); // enforce the plan's account limit (live only)
     const email = input.email.toLowerCase();
+    // One identity per person: an email used by a staff member can't also be a client.
+    const staffClash = await tx.user.findFirst({ where: { tenantId, email, role: { in: ["ADMIN", "MANAGER"] } } });
+    if (staffClash) throw new Error("This email is already in use by a staff member. Use a different email.");
     // Scope to CLIENT so a manager/admin sharing the email isn't reused as the owner.
     let user = await tx.user.findFirst({ where: { tenantId, email, role: "CLIENT" } });
     if (!user) {

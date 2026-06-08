@@ -41,8 +41,9 @@ export async function POST(req: Request) {
     if (!b.tenantId) throw new Error("Select an outsource");
     const role = b.role === "ADMIN" ? "ADMIN" : "MANAGER";
     const email = String(b.email).toLowerCase();
-    const dup = await prisma.user.findFirst({ where: { tenantId: b.tenantId, email, role: role as any } });
-    if (dup) throw new Error("Email already in use by another " + role.toLowerCase());
+    // One identity per person: the email must be free across all roles in the tenant.
+    const dup = await prisma.user.findFirst({ where: { tenantId: b.tenantId, email } });
+    if (dup) throw new Error("This email is already in use in this tenant.");
     const u = await prisma.user.create({ data: { tenantId: b.tenantId, email, name: b.name, passwordHash: await hashPassword(b.password), role: role as any, status: "ACTIVE" as any, perms: {} } });
     // Staff get their own trading account too (they trade like a client).
     await createStaffAccount(b.tenantId, u.id, b.name).catch(() => {});

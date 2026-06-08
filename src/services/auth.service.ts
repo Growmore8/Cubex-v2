@@ -95,6 +95,9 @@ export async function registerClient(
   const session = await prisma.$transaction(async (tx) => {
     const exists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail, role: "CLIENT" } });
     if (exists) throw new Error("Email already registered");
+    // One identity per person: an email used by a staff member can't also be a client.
+    const staffExists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail, role: { in: ["ADMIN", "MANAGER"] } } });
+    if (staffExists) throw new Error("This email is already in use. Please use a different email.");
     // Only LIVE accounts consume a seat
     await assertSeatAvailable(tx, tenant!.id, type);
 

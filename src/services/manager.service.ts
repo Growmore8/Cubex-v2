@@ -16,8 +16,10 @@ export function listManagers(tenantId: string) {
 
 export async function createManager(tenantId: string, input: any) {
   await assertManagerAvailable(prisma, tenantId);
-  const existing = await prisma.user.findFirst({ where: { tenantId, email: input.email.toLowerCase(), role: "MANAGER" } });
-  if (existing) throw new Error("Email already in use by another manager");
+  const lower = input.email.toLowerCase();
+  // One identity per person: the email must be free across all roles in the tenant.
+  const taken = await prisma.user.findFirst({ where: { tenantId, email: lower } });
+  if (taken) throw new Error("This email is already in use. Please use a different email.");
   const passwordHash = await hashPassword(input.password);
   const manager = await prisma.user.create({
     data: {
