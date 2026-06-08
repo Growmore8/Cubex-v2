@@ -1225,13 +1225,9 @@ export default function AdminDeskPage() {
 
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
 
-          {/* Edit Client / KYC — hidden for linked sub-accounts (managed via parent) */}
-          {isSubAcc(menu.acc) ? (
-            <div className="mx-3 mb-1 flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[10px]" style={{ background: "color-mix(in srgb, var(--muted) 10%, transparent)", color: "var(--muted)" }}>
-              <i className="fa-solid fa-link text-[9px]" />
-              <span>Linked sub-account — edit via parent</span>
-            </div>
-          ) : (<>
+          {/* Edit Client / KYC — available on every account (live or demo). Detail
+              edits propagate to all of the client's connected accounts server-side. */}
+          {(<>
             {/* Edit Client accordion */}
             <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)]">
               {mIco("fa-pen-to-square")}<span className="flex-1">Edit Client</span>
