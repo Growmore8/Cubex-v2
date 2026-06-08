@@ -915,7 +915,7 @@ export default function AdminDeskPage() {
             <div className="flex flex-1 gap-1 overflow-auto">
               {TABS.filter(([k]) => tabState[k] && (k !== "audit" || can("viewAudit"))).map(([k, lbl]) => (
                 <span key={k} className="flex items-center">
-                  <button onClick={() => setTab(k)} className="px-3 py-1.5 text-xs font-bold" style={tab === k ? { color: "var(--accent)" } : { color: "var(--text)" }}>{lbl}{k === "trade" ? " (" + accOpen.length + (accPending.length ? " + " + accPending.length + "p" : "") + ")" : ""}</button>
+                  <button onClick={() => setTab(k)} className="px-3 py-1.5 text-xs font-bold transition-colors" style={tab === k ? { color: "var(--accent)", borderBottom: "2px solid var(--accent)", background: "color-mix(in srgb, var(--accent) 8%, transparent)" } : { color: "var(--text)", borderBottom: "2px solid transparent" }}>{lbl}{k === "trade" ? " (" + accOpen.length + (accPending.length ? " + " + accPending.length + "p" : "") + ")" : ""}</button>
                   <button onClick={() => setTabState((s) => ({ ...s, [k]: false }))} className="text-[var(--muted)]">{"\u00D7"}</button>
                 </span>
               ))}
