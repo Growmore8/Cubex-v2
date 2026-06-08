@@ -243,18 +243,20 @@ export default function ClientTerminal() {
   async function cancelPending(id: string) { await fetch("/api/client/pending/" + id, { method: "DELETE" }); pushToast({ title: "Pending order cancelled", type: "TRADE" }); load(); }
   function urlB64ToUint8Array(base64String: string) { const padding = "=".repeat((4 - (base64String.length % 4)) % 4); const b = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/"); const raw = atob(b); const arr = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i); return arr; }
   async function enablePush() {
+    const fail = (m: string) => { setErr(m); pushToast({ title: m, type: "NOTICE" }); };
     try {
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) { setErr("Push not supported in this browser"); return; }
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) { fail("Push isn't supported on this device/browser"); return; }
       const reg = await navigator.serviceWorker.register("/sw.js");
       const perm = await Notification.requestPermission();
-      if (perm !== "granted") { setErr("Notifications blocked"); return; }
+      if (perm !== "granted") { fail(perm === "denied" ? "Notifications are blocked — enable them in your browser/app settings" : "Notification permission not granted"); return; }
       const keyRes = await fetch("/api/client/push").then((r) => r.json());
-      if (!keyRes.publicKey) { setErr("Push not configured on server"); return; }
+      if (!keyRes.publicKey) { fail("Push isn't configured on the server (VAPID key missing)"); return; }
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(keyRes.publicKey) });
       const j: any = sub.toJSON();
-      await fetch("/api/client/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: j.endpoint, keys: j.keys }) });
+      const r = await fetch("/api/client/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: j.endpoint, keys: j.keys }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+      if (!r.ok) { fail(r.error || "Couldn't save the subscription"); return; }
       pushToast({ title: "Push alerts enabled", type: "NOTICE" });
-    } catch (e) { setErr("Failed to enable alerts"); }
+    } catch (e: any) { fail(e?.name === "NotAllowedError" ? "Notifications are blocked" : "Failed to enable alerts"); }
   }
   async function disablePush() {
     try {

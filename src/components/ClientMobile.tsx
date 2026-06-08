@@ -90,7 +90,24 @@ export default function ClientMobile({ t }: { t: any }) {
   const [notisOpen, setNotisOpen] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [bioOn, setBioOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   useEffect(() => { try { setBioOn(localStorage.getItem("cubex-bio") === "1"); } catch {} }, []);
+  // Await the enable/disable, THEN read the real subscription state (the old inline
+  // handler raced the check before subscribe() finished, so the toggle never flipped).
+  async function togglePush() {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (pushEnabled) await disablePush?.();
+      else await enablePush?.();
+    } catch {}
+    try {
+      const reg = await navigator.serviceWorker?.ready;
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      setPushEnabled(!!sub);
+    } catch { setPushEnabled(false); }
+    setPushBusy(false);
+  }
   async function toggleBio() {
     if (bioOn) { try { localStorage.removeItem("cubex-bio"); } catch {} setBioOn(false); return; }
     try { await addPasskey?.(); localStorage.setItem("cubex-bio", "1"); setBioOn(true); } catch { /* user cancelled */ }
@@ -902,11 +919,11 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div className="h-5 w-5 rounded-full bg-white shadow transition-transform duration-200" style={{ transform: bioOn ? "translateX(20px)" : "translateX(0)" }} />
                 </div>
               </button>
-              <button onClick={pushEnabled ? () => { disablePush(); setPushEnabled(false); } : () => { enablePush(); navigator.serviceWorker?.ready.then((r) => r.pushManager.getSubscription().then((s) => setPushEnabled(!!s))).catch(() => {}); }} className="flex w-full items-center gap-3 py-2.5 text-left">
-                <i className="fa-solid fa-bell" style={{ color: pushEnabled ? BUY : "var(--muted)" }} />
+              <button onClick={togglePush} disabled={pushBusy} className="flex w-full items-center gap-3 py-2.5 text-left disabled:opacity-70">
+                <i className={"fa-solid " + (pushBusy ? "fa-circle-notch fa-spin" : "fa-bell")} style={{ color: pushEnabled ? BUY : "var(--muted)" }} />
                 <div className="flex-1">
                   <div className="text-[12px] font-semibold">Push Notifications</div>
-                  <div className="text-[10px] text-[var(--muted)]">{pushEnabled ? "Tap to disable alerts" : "Tap to enable alerts"}</div>
+                  <div className="text-[10px] text-[var(--muted)]">{pushBusy ? "Working…" : pushEnabled ? "Enabled — tap to disable" : "Tap to enable alerts"}</div>
                 </div>
                 <div className="flex h-6 w-11 items-center rounded-full px-0.5 transition-colors duration-200" style={{ background: pushEnabled ? BUY : "var(--border)" }}>
                   <div className="h-5 w-5 rounded-full bg-white shadow transition-transform duration-200" style={{ transform: pushEnabled ? "translateX(20px)" : "translateX(0)" }} />
