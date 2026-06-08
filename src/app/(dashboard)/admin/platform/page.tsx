@@ -1087,9 +1087,9 @@ export default function AdminDeskPage() {
               <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>Please select an account first.</div>
             )}
             {tab === "summary" && selAcc && (
-              <div className="flex flex-wrap gap-2 p-3 text-[11px]">
+              <div className="grid grid-cols-2 gap-2 p-3 text-[11px] sm:grid-cols-4">
                 {([["TOTAL DEPOSITS", fmt(Number(selAcc?.deposit || 0)), BUY], ["TOTAL WITHDRAWALS", "-" + fmt(Number(selAcc?.withdrawal || 0)), SELL], ["NET DEPOSITS", fmt(Number(selAcc?.deposit || 0) - Number(selAcc?.withdrawal || 0)), "var(--text)"], ["CREDIT/BONUS", fmt(Number(selAcc?.credit || 0) + Number(selAcc?.bonus || 0)), BUY], ["CLOSED TRADE P/L", fmt(Number(selAcc?.pnl || 0)), Number(selAcc?.pnl || 0) >= 0 ? BUY : SELL], ["CURRENT BALANCE", fmt(balance), "var(--text)"], ["MC LEVEL", Number(selAcc?.mcLevel || 0) > 0 ? selAcc?.mcLevel + "%" : "Off", GOLD], ["NET BALANCE", fmt(equity), "var(--accent)"]] as [string, string, string][]).map(([k, v, c]) => (
-                  <div key={k as string} className="min-w-[120px] flex-1 rounded-lg border border-[var(--border)] bg-[var(--soft)] px-3 py-2"><div className="text-[10px] text-[var(--muted)]">{k}</div><div className="mt-1 text-base font-semibold" style={{ color: c }}>{v}</div></div>
+                  <div key={k as string} className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{k}</div><div className="mt-1 text-base font-bold tabular-nums" style={{ color: c }}>{v}</div></div>
                 ))}
               </div>
             )}
