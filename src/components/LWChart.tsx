@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, memo, type CSSProperties } from "react";
 import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries, HistogramSeries } from "lightweight-charts";
 import { io, Socket } from "socket.io-client";
 
@@ -97,7 +97,7 @@ export type ChartPosition = {
 
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
-export default function LWChart({
+function LWChart({
   symbol, tf, theme, positions, digits = 2, showTools = true, ind,
 }: {
   symbol: string;
@@ -551,3 +551,18 @@ export default function LWChart({
       </div>
   );
 }
+
+// The chart streams its own live candles via an internal socket, so the parent's
+// `positions` prop is only for overlay lines. Re-render ONLY when the chart's
+// inputs or a position's STRUCTURE change — NOT on every per-tick P&L update.
+// This stops the heavy desk from re-rendering all open charts on each price tick.
+function posSig(ps?: ChartPosition[]) {
+  if (!ps || !ps.length) return "";
+  return ps.map((p) => `${p.id}:${p.type}:${p.openPrice}:${p.sl ?? ""}:${p.tp ?? ""}:${p.lots ?? ""}:${p.kind ?? ""}`).join("|");
+}
+function areEqual(a: any, b: any) {
+  return a.symbol === b.symbol && a.tf === b.tf && a.theme === b.theme && a.digits === b.digits
+    && a.showTools === b.showTools && JSON.stringify(a.ind) === JSON.stringify(b.ind)
+    && posSig(a.positions) === posSig(b.positions);
+}
+export default memo(LWChart, areEqual);
