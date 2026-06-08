@@ -89,6 +89,12 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mTp, setMTp] = useState("");
   const [notisOpen, setNotisOpen] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [bioOn, setBioOn] = useState(false);
+  useEffect(() => { try { setBioOn(localStorage.getItem("cubex-bio") === "1"); } catch {} }, []);
+  async function toggleBio() {
+    if (bioOn) { try { localStorage.removeItem("cubex-bio"); } catch {} setBioOn(false); return; }
+    try { await addPasskey?.(); localStorage.setItem("cubex-bio", "1"); setBioOn(true); } catch { /* user cancelled */ }
+  }
   // Statement export/email range picker
   const [stmtOpen, setStmtOpen] = useState(false);
   const [stmtPreset, setStmtPreset] = useState("month");
@@ -874,23 +880,24 @@ export default function ClientMobile({ t }: { t: any }) {
             {/* security */}
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
               <div className="mb-2 text-[11px] font-bold tracking-wide">SECURITY & SIGN-IN</div>
-              <button onClick={openPin} className="flex w-full items-center gap-3 py-2.5 text-left">
-                <i className="fa-solid fa-shield-halved text-[var(--muted)]" />
-                <div className="flex-1"><div className="text-[12px] font-semibold">PIN Access</div><div className="text-[10px] text-[var(--muted)]">{pin?.pinHasPin ? "PIN is set — tap to change" : "Set a PIN"}</div></div>
-                {pin?.pinHasPin && <span className="rounded px-1.5 py-0.5 text-[8px] font-bold" style={{ background: "rgba(22,163,74,.15)", color: BUY }}>ENABLED</span>}
-                <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
+              {/* PIN — toggle (on = set, off = remove) */}
+              <button onClick={() => { if (pin?.pinHasPin) pin?.disablePin?.(); else openPin?.(); }} className="flex w-full items-center gap-3 py-2.5 text-left">
+                <i className="fa-solid fa-shield-halved" style={{ color: pin?.pinHasPin ? BUY : "var(--muted)" }} />
+                <div className="flex-1"><div className="text-[12px] font-semibold">PIN Access</div><div className="text-[10px] text-[var(--muted)]">{pin?.pinHasPin ? "Enabled — tap to disable" : "Tap to set a PIN"}</div></div>
+                <div className="flex h-6 w-11 items-center rounded-full px-0.5 transition-colors duration-200" style={{ background: pin?.pinHasPin ? BUY : "var(--border)" }}>
+                  <div className="h-5 w-5 rounded-full bg-white shadow transition-transform duration-200" style={{ transform: pin?.pinHasPin ? "translateX(20px)" : "translateX(0)" }} />
+                </div>
               </button>
               {pin?.pinHasPin && (
-                <button onClick={pin?.disablePin} className="flex w-full items-center gap-3 py-2.5 text-left">
-                  <i className="fa-solid fa-shield-slash" style={{ color: SELL }} />
-                  <div className="flex-1"><div className="text-[12px] font-semibold" style={{ color: SELL }}>Disable PIN</div><div className="text-[10px] text-[var(--muted)]">Remove PIN lock from this app</div></div>
-                  <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
-                </button>
+                <button onClick={openPin} className="flex w-full items-center gap-3 py-1 pl-7 text-left text-[10px] text-[var(--muted)]"><i className="fa-solid fa-pen text-[9px]" /> Change PIN</button>
               )}
-              <button onClick={addPasskey} className="flex w-full items-center gap-3 py-2.5 text-left">
-                <i className="fa-solid fa-fingerprint text-[var(--muted)]" />
-                <div className="flex-1"><div className="text-[12px] font-semibold">Face ID / Fingerprint</div><div className="text-[10px] text-[var(--muted)]">Tap to enable a passkey</div></div>
-                <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
+              {/* Biometric — toggle */}
+              <button onClick={toggleBio} className="flex w-full items-center gap-3 py-2.5 text-left">
+                <i className="fa-solid fa-fingerprint" style={{ color: bioOn ? BUY : "var(--muted)" }} />
+                <div className="flex-1"><div className="text-[12px] font-semibold">Face ID / Fingerprint</div><div className="text-[10px] text-[var(--muted)]">{bioOn ? "Enabled — tap to disable" : "Tap to enable a passkey"}</div></div>
+                <div className="flex h-6 w-11 items-center rounded-full px-0.5 transition-colors duration-200" style={{ background: bioOn ? BUY : "var(--border)" }}>
+                  <div className="h-5 w-5 rounded-full bg-white shadow transition-transform duration-200" style={{ transform: bioOn ? "translateX(20px)" : "translateX(0)" }} />
+                </div>
               </button>
               <button onClick={pushEnabled ? () => { disablePush(); setPushEnabled(false); } : () => { enablePush(); navigator.serviceWorker?.ready.then((r) => r.pushManager.getSubscription().then((s) => setPushEnabled(!!s))).catch(() => {}); }} className="flex w-full items-center gap-3 py-2.5 text-left">
                 <i className="fa-solid fa-bell" style={{ color: pushEnabled ? BUY : "var(--muted)" }} />
