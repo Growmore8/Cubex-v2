@@ -265,6 +265,15 @@ export default function ClientMobile({ t }: { t: any }) {
   const cardC1 = cIsLive ? (brand?.primaryColor || "#3b82f6") : "#f59e0b";
   const cardC2 = cIsLive ? (brand?.accentColor || brand?.primaryColor || "#1e3a8a") : "#b45309";
   const cardGlow = cIsLive ? "rgba(22,163,74,.6)" : "rgba(245,158,11,.65)";
+  // Glass in dark mode; in LIGHT mode use a richer, deeper gradient so the white
+  // card text stays readable (translucent-over-light washed it out).
+  const cardDark = theme === "dark";
+  const cardFrontBg = cardDark
+    ? `linear-gradient(150deg, color-mix(in srgb, ${cardC1} 60%, transparent) 0%, color-mix(in srgb, ${cardC2} 22%, transparent) 55%, rgba(255,255,255,0.04) 100%)`
+    : `linear-gradient(150deg, ${cardC1} 0%, ${cardC2} 70%, color-mix(in srgb, ${cardC2} 70%, #000) 100%)`;
+  const cardBackBg = cardDark
+    ? `linear-gradient(150deg, color-mix(in srgb, ${cardC2} 65%, transparent) 0%, color-mix(in srgb, ${cardC1} 28%, transparent) 60%, rgba(255,255,255,0.04) 100%)`
+    : `linear-gradient(150deg, ${cardC2} 0%, ${cardC1} 70%, color-mix(in srgb, ${cardC2} 70%, #000) 100%)`;
 
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", inset: 0, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation",
@@ -411,7 +420,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
                 {/* ── FRONT ── */}
                 <div className="face front overflow-hidden rounded-[18px] p-5 text-white" style={{
-                  background: `linear-gradient(150deg, color-mix(in srgb, ${cardC1} 60%, transparent) 0%, color-mix(in srgb, ${cardC2} 22%, transparent) 55%, rgba(255,255,255,0.04) 100%)`,
+                  background: cardFrontBg,
                   backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)",
                   border: "1px solid rgba(255,255,255,0.18)",
                   boxShadow: "0 22px 48px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.28)",
@@ -446,7 +455,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
                 {/* ── BACK ($ animation) ── */}
                 <div className="face back overflow-hidden rounded-[18px] p-5 text-white" style={{
-                  background: `linear-gradient(150deg, color-mix(in srgb, ${cardC2} 65%, transparent) 0%, color-mix(in srgb, ${cardC1} 28%, transparent) 60%, rgba(255,255,255,0.04) 100%)`,
+                  background: cardBackBg,
                   backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)",
                   border: "1px solid rgba(255,255,255,0.18)",
                   boxShadow: "0 22px 48px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.28)",
@@ -484,8 +493,8 @@ export default function ClientMobile({ t }: { t: any }) {
                   { label: "Withdraw", icon: "fa-arrow-up", col: SELL, on: () => setWalletTab("withdraw") },
                   { label: "Transfer", icon: "fa-right-left", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); } },
                 ]).map((b) => (
-                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-1 rounded-xl py-3 font-semibold backdrop-blur-md" style={{ color: "#fff", background: `linear-gradient(150deg, color-mix(in srgb, ${b.col} 55%, transparent), color-mix(in srgb, ${b.col} 22%, transparent))`, border: `1px solid color-mix(in srgb, ${b.col} 55%, transparent)`, boxShadow: `0 10px 22px -12px ${b.col}` }}>
-                    <i className={"fa-solid coin-bob " + b.icon} style={{ color: "#fff" }} /><span className="text-[11px]">{b.label}</span>
+                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-1 rounded-xl py-3 font-semibold backdrop-blur-md" style={{ color: b.col, background: `color-mix(in srgb, ${b.col} ${cardDark ? 18 : 14}%, transparent)`, border: `1px solid color-mix(in srgb, ${b.col} 45%, transparent)` }}>
+                    <i className={"fa-solid coin-bob " + b.icon} style={{ color: b.col }} /><span className="text-[11px]">{b.label}</span>
                   </button>
                 ))}
               </div>
@@ -494,8 +503,8 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="mb-1.5 text-[10px] font-semibold text-[var(--muted)]">Top up your demo balance</div>
                 <div className="grid grid-cols-3 gap-2">
                   {[1000, 5000, 10000].map((amt) => (
-                    <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-0.5 rounded-xl py-3 font-semibold backdrop-blur-md" style={{ color: "#fde68a", background: "linear-gradient(150deg, color-mix(in srgb, #f59e0b 45%, transparent), color-mix(in srgb, #f59e0b 16%, transparent))", border: "1px solid color-mix(in srgb, #f59e0b 55%, transparent)", boxShadow: "0 10px 22px -12px #f59e0b" }}>
-                      <i className="fa-solid fa-coins coin-bob" style={{ color: "#fcd34d" }} /><span className="text-[12px]">${amt.toLocaleString()}</span>
+                    <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-0.5 rounded-xl py-3 font-semibold backdrop-blur-md" style={{ color: cardDark ? "#fcd34d" : "#b45309", background: `color-mix(in srgb, #f59e0b ${cardDark ? 18 : 14}%, transparent)`, border: "1px solid color-mix(in srgb, #f59e0b 45%, transparent)" }}>
+                      <i className="fa-solid fa-coins coin-bob" style={{ color: cardDark ? "#fcd34d" : "#d97706" }} /><span className="text-[12px]">${amt.toLocaleString()}</span>
                     </button>
                   ))}
                 </div>
