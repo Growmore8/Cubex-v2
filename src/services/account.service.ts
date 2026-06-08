@@ -106,7 +106,15 @@ export async function updateClient(tenantId: string, id: string, data: any, acto
   if (data.mcLevel !== undefined) patch.mcLevel = new Prisma.Decimal(data.mcLevel);
   if (data.currency !== undefined) patch.currency = data.currency;
   if (data.managerId !== undefined) patch.managerId = data.managerId || null; if (data.phone !== undefined) patch.phone = data.phone || null; if (data.country !== undefined) patch.country = data.country || null; if (data.isPool !== undefined) patch.isPool = !!data.isPool; if (data.deactivated !== undefined) patch.deactivated = !!data.deactivated;
+  if (data.name !== undefined) patch.name = data.name; if (data.email !== undefined) patch.email = data.email || null;
   const updated = await prisma.account.update({ where: { id }, data: patch });
+  // One identity per person: shared profile fields propagate to ALL the client's
+  // accounts (live + demo), so editing in one place reflects everywhere.
+  const shared: any = {};
+  for (const k of ["name", "email", "phone", "country"]) if (patch[k] !== undefined) shared[k] = patch[k];
+  if (acc.userId && Object.keys(shared).length) {
+    await prisma.account.updateMany({ where: { tenantId, userId: acc.userId, NOT: { id } }, data: shared }).catch(() => {});
+  }
   await audit(tenantId, "client.update", acc.login + " " + JSON.stringify(patch), actor);
   return updated;
 }

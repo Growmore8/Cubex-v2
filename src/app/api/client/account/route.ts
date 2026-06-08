@@ -42,11 +42,24 @@ export async function GET(req: Request) {
     });
   }
 
-  // For sub-accounts: resolve parent's name/email/phone so the app displays consistently
-  let parentDisplay: { name: string; email: string | null; phone: string | null } | null = null;
-  if (account?.parentId) {
-    parentDisplay = await prisma.account.findUnique({ where: { id: account.parentId }, select: { name: true, email: true, phone: true } }).catch(() => null);
+  // One identity per person: a client's name/email/phone/country are shared across
+  // ALL their accounts (live + demo). Resolve each field from the oldest account that
+  // has a value (oldest-first), so every linked account shows the same details — even
+  // if a particular sub-account was created before the parent-linking existed.
+  let ident: { name: string; email: string | null; phone: string | null; country: string | null } | null = null;
+  if (account) {
+    const sibs = await prisma.account.findMany({
+      where: { tenantId: s.tenantId!, userId: s.sub },
+      orderBy: { createdAt: "asc" },
+      select: { name: true, email: true, phone: true, country: true },
+    }).catch(() => [] as any[]);
+    const firstOf = (k: "name" | "email" | "phone" | "country") => {
+      for (const a of sibs) { const v = (a as any)[k]; if (v != null && String(v).trim() !== "") return v; }
+      return null;
+    };
+    ident = { name: firstOf("name") || account.name, email: firstOf("email"), phone: firstOf("phone"), country: firstOf("country") };
   }
+  const parentDisplay = ident;
 
   // User-level KYC: verified if any of the user's accounts has an approved document.
   // Only the parent/primary needs KYC; all linked accounts (incl. sub-accounts and
@@ -82,7 +95,7 @@ export async function GET(req: Request) {
       login: account.login, type: account.type, currency: account.currency, leverage: account.leverage, locked: account.locked,
       name: parentDisplay?.name || account.name,
       email: parentDisplay?.email || account.email || account.user?.email || null,
-      phone: parentDisplay?.phone || account.phone || null, country: account.country || null,
+      phone: parentDisplay?.phone || account.phone || null, country: parentDisplay?.country || account.country || null,
       ownerName: account.user?.name || account.name,
       deposit: Number(account.deposit), withdrawal: Number(account.withdrawal),
       credit: Number(account.credit), bonus: Number(account.bonus), pnl: Number(account.pnl),
