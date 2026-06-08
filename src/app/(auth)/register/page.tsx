@@ -1,5 +1,5 @@
 "use client";
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PasswordInput from "@/components/ui/PasswordInput";
 import CountrySelect from "@/components/ui/CountrySelect";
@@ -52,6 +52,12 @@ function RegisterForm() {
   const [verifyCode, setVerifyCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verifyErr, setVerifyErr] = useState("");
+  const [resendIn, setResendIn] = useState(0); // resend OTP cooldown (seconds)
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,6 +81,7 @@ function RegisterForm() {
     if (!d.ok) { setErr(d.error || "Registration failed"); return; }
     if (d.needsVerification) {
       setVerifyEmail(d.email);
+      setResendIn(120); // a code was just sent — start the 2-min resend cooldown
       return;
     }
     window.location.href = d.redirect;
@@ -94,9 +101,11 @@ function RegisterForm() {
   }
 
   async function resendCode() {
+    if (resendIn > 0) return; // enforce the 2-minute cooldown
     setVerifyErr("");
     const dc = DIAL_CODES.find((d) => d.code === dialCode);
     const fullPhone = phone ? (dc ? dc.dial + phone : phone) : undefined;
+    setResendIn(120);
     await fetch("/api/auth/register", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email: verifyEmail, password, phone: fullPhone, country: country || undefined, type, tenantSlug }),
@@ -133,8 +142,8 @@ function RegisterForm() {
       </button>
       <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
         Didn&apos;t receive the code?{" "}
-        <button type="button" onClick={resendCode} className="font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}>
-          Resend
+        <button type="button" onClick={resendCode} disabled={resendIn > 0} className="font-semibold hover:underline disabled:no-underline disabled:opacity-60" style={{ color: "var(--brand-primary)" }}>
+          {resendIn > 0 ? `Resend in ${Math.floor(resendIn / 60)}:${String(resendIn % 60).padStart(2, "0")}` : "Resend"}
         </button>
       </p>
     </form>

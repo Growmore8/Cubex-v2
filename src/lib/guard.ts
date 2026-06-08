@@ -17,9 +17,21 @@ export async function assertWritable(s: SessionPayload) {
   }
 }
 
+// A suspended brokerage instantly cuts off all of its users: every protected
+// route returns null (-> 401/redirect) so admins, managers and clients are
+// effectively logged out the moment SuperAdmin suspends the tenant.
+async function tenantSuspended(tenantId: string | null): Promise<boolean> {
+  if (!tenantId) return false;
+  try {
+    const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { status: true } });
+    return t?.status === "SUSPENDED";
+  } catch { return false; }
+}
+
 export async function requireAdmin() {
   const s = await getSession();
   if (!s || s.role !== "ADMIN" || !s.tenantId) return null;
+  if (await tenantSuspended(s.tenantId)) return null;
   return s;
 }
 
@@ -31,12 +43,14 @@ export async function requireSuperAdmin() {
 export async function requireClient() {
   const s = await getSession();
   if (!s || s.role !== "CLIENT" || !s.tenantId) return null;
+  if (await tenantSuspended(s.tenantId)) return null;
   return s;
 }
 
 export async function requireAdminOrManager() {
   const s = await getSession();
   if (!s || !s.tenantId) return null;
+  if (await tenantSuspended(s.tenantId)) return null;
   if (s.role === "ADMIN" || s.role === "MANAGER") return s;
   return null;
 }
@@ -44,6 +58,7 @@ export async function requireAdminOrManager() {
 export async function requireStaff() {
   const s = await getSession();
   if (!s || !s.tenantId) return null;
+  if (await tenantSuspended(s.tenantId)) return null;
   if (s.role === "ADMIN" || s.role === "MANAGER" || s.role === "SUPERADMIN") return s;
   return null;
 }

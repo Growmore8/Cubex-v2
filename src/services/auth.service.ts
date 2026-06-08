@@ -32,7 +32,8 @@ export async function authenticate(host: string | null, email: string, password:
   if (!user) throw new Error("Invalid email or password");
   // SUSPENDED = deactivated -> cannot sign in. LOCKED = read-only -> allowed (banner shown).
   if (user.status === "SUSPENDED") throw new Error("Your account has been deactivated. Please contact support.");
-  // Tenant SUSPENDED = read-only (allowed). PENDING = not yet activated (blocked).
+  // Tenant SUSPENDED = brokerage suspended → block sign-in. PENDING = not yet activated.
+  if (tenant && tenant.status === "SUSPENDED") throw new Error("This brokerage has been suspended. Please contact support.");
   if (tenant && tenant.status === "PENDING") throw new Error("This workspace is not active yet");
 
   // Pending email verification: emailToken is set and is NOT a password-reset token.
