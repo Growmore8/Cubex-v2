@@ -98,7 +98,7 @@ export type ChartPosition = {
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
 function LWChart({
-  symbol, tf, theme, positions, digits = 2, showTools = true, ind,
+  symbol, tf, theme, positions, digits = 2, showTools = true, ind, calcPnl,
 }: {
   symbol: string;
   tf: string;
@@ -107,6 +107,9 @@ function LWChart({
   digits?: number;
   onClose?: (id: string) => void;
   showTools?: boolean;
+  /** Pure P&L formula from the parent so the chart can update position labels
+      live on its own internal tick (without re-rendering). */
+  calcPnl?: (p: ChartPosition, price: number) => number;
   /** Controlled indicators from a parent header (desktop). When set, the in-chart
       left sidebar is hidden and the parent renders the SMA/EMA/BB/RSI/MACD buttons. */
   ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean };
@@ -117,6 +120,8 @@ function LWChart({
   const barsRef = useRef<any[]>([]);
   const lineRefs = useRef<any[]>([]);
   const linePricesRef = useRef<number[]>([]); // entry/SL/TP/trigger prices to keep in view
+  const posLinesRef = useRef<{ line: any; p: ChartPosition }[]>([]); // open-trade entry lines for live P&L labels
+  const calcPnlRef = useRef(calcPnl); calcPnlRef.current = calcPnl;
   const symRef = useRef(symbol);
   const tfRef = useRef(tf);
   symRef.current = symbol; tfRef.current = tf;
@@ -425,6 +430,13 @@ function LWChart({
           seriesRef.current.update(bar);
         }
       } catch { /* out-of-order tick during a reseed — ignore */ }
+      // Live P&L labels on each open-trade entry line, computed from the live price.
+      const calc = calcPnlRef.current;
+      if (calc && posLinesRef.current.length) {
+        for (const { line, p } of posLinesRef.current) {
+          try { const v = calc(p, close); line.applyOptions({ title: `${p.type} ${p.lots} ${v >= 0 ? "+" : ""}${v.toFixed(2)}` }); } catch {}
+        }
+      }
     };
     const iv = setInterval(apply, 80);
     return () => { socket.disconnect(); clearInterval(iv); };
@@ -435,6 +447,7 @@ function LWChart({
     const s = seriesRef.current; if (!s) return;
     for (const l of lineRefs.current) { try { s.removePriceLine(l); } catch {} }
     lineRefs.current = [];
+    posLinesRef.current = [];
     const lp: number[] = [];
     for (const p of positions || []) { lp.push(p.openPrice); if (p.sl) lp.push(p.sl); if (p.tp) lp.push(p.tp); }
     linePricesRef.current = lp;
@@ -443,11 +456,13 @@ function LWChart({
       const pending = !!p.kind;
       // Entry line: BUY=blue, SELL=crimson; pending=amber (dotted)
       const entryCol = pending ? "#f59e0b" : (p.type === "BUY" ? "#3b82f6" : "#ef4444");
-      lineRefs.current.push(s.createPriceLine({
+      const entryLine = s.createPriceLine({
         price: p.openPrice, color: entryCol, lineWidth: 2,
         lineStyle: pending ? LineStyle.Dotted : LineStyle.Solid, axisLabelVisible: true,
         title: `${p.kind ? p.kind + " " : ""}${p.type} ${p.lots}${!pending && p.pnl != null ? " " + (p.pnl >= 0 ? "+" : "") + Number(p.pnl).toFixed(2) : ""}`,
-      }));
+      });
+      lineRefs.current.push(entryLine);
+      if (!pending) posLinesRef.current.push({ line: entryLine, p }); // track for live P&L label updates
       // SL = rose red; TP = emerald green — same for all trade types so they're always recognizable
       if (p.sl) lineRefs.current.push(s.createPriceLine({ price: p.sl, color: "#f43f5e", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "SL" }));
       if (p.tp) lineRefs.current.push(s.createPriceLine({ price: p.tp, color: "#10b981", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "TP" }));
