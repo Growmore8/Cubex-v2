@@ -108,6 +108,11 @@ export default function ClientTerminal() {
   const [indicators, setIndicators] = useState<string[]>([]);
   function toggleInd(id: string) { setIndicators((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]); }
   const [histRange, setHistRange] = useState<"all" | "today" | "week" | "month">("all");
+  // Per-table column sort (1st click asc, 2nd desc, 3rd clears).
+  const [sortBy, setSortBy] = useState<Record<string, { k: string; d: 1 | -1 }>>({});
+  const toggleSort = (tbl: string, k: string) => setSortBy((s) => { const cur = s[tbl]; if (!cur || cur.k !== k) return { ...s, [tbl]: { k, d: 1 } }; if (cur.d === 1) return { ...s, [tbl]: { k, d: -1 } }; const n = { ...s }; delete n[tbl]; return n; });
+  const sortRows = (tbl: string, rows: any[], acc: Record<string, (r: any) => any>) => { const cfg = sortBy[tbl]; if (!cfg || !acc[cfg.k]) return rows; const get = acc[cfg.k]; return [...rows].sort((a, b) => { const va = get(a), vb = get(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; if (typeof va === "number" && typeof vb === "number") return (va - vb) * cfg.d; return String(va).localeCompare(String(vb), undefined, { numeric: true }) * cfg.d; }); };
+  const Sth = ({ tbl, k, label, align, cls }: { tbl: string; k: string; label: any; align?: "right"; cls?: string }) => { const cfg = sortBy[tbl]; const active = !!cfg && cfg.k === k; return (<th className={(cls || "px-2 py-1 font-normal") + (align === "right" ? " text-right" : " text-left") + " cursor-pointer select-none"} onClick={() => toggleSort(tbl, k)}><span className={"inline-flex items-center gap-1 " + (align === "right" ? "flex-row-reverse" : "")}>{label}<i className={"fa-solid text-[8px] " + (active ? (cfg!.d === 1 ? "fa-arrow-up-long" : "fa-arrow-down-long") : "fa-sort")} style={{ opacity: active ? 1 : 0.3 }} /></span></th>); };
   useEffect(() => { if (rightTab === "NEWS" && news.length === 0) { fetch("/api/client/news?category=forex").then((r) => r.json()).then((dd) => { if (dd.ok) setNews(dd.items || []); }).catch(() => {}); } }, [rightTab]);
   const [avatarUrl, setAvatarUrl] = useState("");
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -700,9 +705,9 @@ export default function ClientTerminal() {
           )}
           {botTab === "positions" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Name</th><th className="px-2 py-1 font-normal">Date</th><th className="px-2 py-1 font-normal text-right">Qty</th><th className="px-2 py-1 font-normal text-right">Open</th><th className="px-2 py-1 font-normal text-right">Current</th><th className="px-2 py-1 font-normal text-right">TP</th><th className="px-2 py-1 font-normal text-right">SL</th><th className="px-2 py-1 font-normal text-right">Swap</th><th className="px-2 py-1 font-normal text-right">Gross P/L</th><th className="px-2 py-1 font-normal text-right">Net P/L</th><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /><Sth tbl="pos" k="pnl" label="Net P/L" align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
               <tbody>
-                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={11}>No open positions.</td></tr> : positions.map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
+                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={11}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
                   <tr key={p.id} className="border-t border-[var(--border)]">
                     <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span></td>
                     <td className="px-2 py-1 text-[var(--muted)]">{new Date(p.openedAt).toLocaleDateString()}</td>
@@ -762,9 +767,9 @@ export default function ClientTerminal() {
           )}
           {botTab === "history" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Name</th><th className="px-2 py-1 font-normal">Opened</th><th className="px-2 py-1 font-normal">Closed</th><th className="px-2 py-1 font-normal text-right">Qty</th><th className="px-2 py-1 font-normal text-right">Open</th><th className="px-2 py-1 font-normal text-right">Close</th><th className="px-2 py-1 font-normal">Reason</th><th className="px-2 py-1 font-normal text-right">P/L</th></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><Sth tbl="chist" k="name" label="Name" /><Sth tbl="chist" k="opened" label="Opened" /><Sth tbl="chist" k="closed" label="Closed" /><Sth tbl="chist" k="qty" label="Qty" align="right" /><Sth tbl="chist" k="open" label="Open" align="right" /><Sth tbl="chist" k="close" label="Close" align="right" /><Sth tbl="chist" k="reason" label="Reason" /><Sth tbl="chist" k="pnl" label="P/L" align="right" /></tr></thead>
               <tbody>
-                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={8}>No history.</td></tr> : histShown.map((h) => {
+                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={8}>No history.</td></tr> : sortRows("chist", histShown, { name: (h) => h.symbol, opened: (h) => h.openedAt ? new Date(h.openedAt).getTime() : null, closed: (h) => h.closedAt ? new Date(h.closedAt).getTime() : null, qty: (h) => Number(h.lots), open: (h) => Number(h.openPrice), close: (h) => Number(h.closePrice), reason: (h) => h.closeReason || "MANUAL", pnl: (h) => Number(h.pnl) }).map((h) => {
                   const r = h.closeReason || "MANUAL";
                   const rc = r === "TP" ? "#10b981" : r === "SL" ? "#f43f5e" : r === "MC" ? "#f59e0b" : "var(--muted)";
                   return (
