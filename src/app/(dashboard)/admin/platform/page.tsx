@@ -1178,7 +1178,7 @@ export default function AdminDeskPage() {
                         {cliRows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No clients.</td></tr> : sortRows("cli", cliRows, {
                           login: (c) => c.login, name: (c) => c.name, email: (c) => c.user?.email || c.email,
                           phone: (c) => c.phone, country: (c) => c.country, manager: (c) => c.manager?.name,
-                          type: (c) => c.type, balance: (c) => balOf(c), online: (c) => (c.user?.online ? 1 : 0),
+                          type: (c) => c.type, balance: (c) => balOf(c), online: (c) => (presenceOnline(c.user?.lastSeenAt) ? 1 : 0),
                           ip: (c) => c.user?.lastLoginIp, status: (c) => (c.deactivated ? "Inactive" : c.locked ? "Locked" : "Active"),
                         }).map((c: any) => {
                           const email = c.user?.email || c.email || "-";
@@ -1199,7 +1199,7 @@ export default function AdminDeskPage() {
                               <td className="px-2 py-1 text-[var(--muted)]">{c.manager?.name || "-"}</td>
                               <td className="px-2 py-1">{c.type}</td>
                               <td className="px-2 py-1 text-right" style={{ color: bal >= 0 ? BUY : SELL }}>{bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="px-2 py-1 text-center"><span className={"inline-block h-1.5 w-1.5 rounded-full " + (c.isOnline ? "bg-green-400" : "bg-gray-600")} /></td>
+                              <td className="px-2 py-1 text-center">{(() => { const on = presenceOnline(c.user?.lastSeenAt); const ls = c.user?.lastSeenAt ? new Date(c.user.lastSeenAt).toLocaleString() : "never"; return <span title={on ? "Online" : "Last seen " + ls} className={"inline-block h-2 w-2 rounded-full " + (on ? "bg-green-400" : "bg-gray-600")} style={on ? { boxShadow: "0 0 5px #4ade80" } : undefined} />; })()}</td>
                               <td className="px-2 py-1 text-[var(--muted)]">{lastIp}</td>
                               <td className="px-2 py-1" style={{ color: statusCol }}>{statusLabel}</td>
                               <td className="px-2 py-1 text-right whitespace-nowrap">

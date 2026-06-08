@@ -42,7 +42,14 @@ export async function notifyStaff(
 ) {
   const or: any[] = [{ role: "ADMIN" }];
   if (managerId) or.push({ id: managerId, role: "MANAGER" });
-  const recipients = await prisma.user.findMany({ where: { tenantId, OR: or }, select: { id: true } });
+  // Tenant admins + the owning manager...
+  const staff = await prisma.user.findMany({ where: { tenantId, OR: or }, select: { id: true } });
+  // ...plus ALL SuperAdmins (tenantId null) so the platform owner sees every
+  // tenant's activity in their notification panel. The row keeps the event's
+  // tenantId for context; listNotifications filters by userId only.
+  const supers = await prisma.user.findMany({ where: { role: "SUPERADMIN" }, select: { id: true } });
+  const seen = new Set<string>();
+  const recipients = [...staff, ...supers].filter((u) => (seen.has(u.id) ? false : seen.add(u.id)));
   if (!recipients.length) return null;
   await prisma.notification.createMany({
     data: recipients.map((u) => ({ tenantId, userId: u.id, title: opts.title, body: opts.body || null, type: opts.type || "NOTICE" })),

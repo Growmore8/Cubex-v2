@@ -291,6 +291,22 @@ function calcPnl(symbol, type, openPrice, price, lots) {
 const liquidating = new Set(); // guard: prevent double-liquidation of same account
 const closing = new Set();    // guard: prevent double-close of same trade (TP/SL)
 
+// Mirror of notification.service.notifyStaff for the server runtime (CommonJS):
+// tenant admins + the owning manager + ALL SuperAdmins. Realtime delivery rides
+// the existing io.emit("refresh") which makes open desks reload their notifs.
+async function notifyStaffRaw(tenantId, opts, managerId) {
+  try {
+    const or = [{ role: "ADMIN" }];
+    if (managerId) or.push({ id: managerId, role: "MANAGER" });
+    const staff = await prisma.user.findMany({ where: { tenantId, OR: or }, select: { id: true } });
+    const supers = await prisma.user.findMany({ where: { role: "SUPERADMIN" }, select: { id: true } });
+    const seen = new Set();
+    const recips = [...staff, ...supers].filter((u) => (seen.has(u.id) ? false : seen.add(u.id)));
+    if (!recips.length) return;
+    await prisma.notification.createMany({ data: recips.map((u) => ({ tenantId, userId: u.id, title: opts.title, body: opts.body || null, type: opts.type || "NOTICE" })) });
+  } catch (e) { console.error("[notifyStaffRaw]", e); }
+}
+
 async function closeTpSl(t, reason, price, io) {
   if (closing.has(t.id.toString())) return;
   closing.add(t.id.toString());
@@ -303,6 +319,8 @@ async function closeTpSl(t, reason, price, io) {
       const title = reason === "TP" ? "Take Profit hit ✓" : "Stop Loss hit";
       const body = `${t.symbol} ${t.type} closed @ ${price} | P/L ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}`;
       await prisma.notification.create({ data: { tenantId: t.account.tenantId, userId: t.account.userId, title, body, type: "TRADE" } }).catch(() => {});
+      await notifyStaffRaw(t.account.tenantId, { title: (reason === "TP" ? "TP hit" : "SL hit") + " — " + (t.account.login || ""), body, type: "TRADE" }, t.account.managerId);
+      await prisma.auditLog.create({ data: { tenantId: t.account.tenantId, action: "trade." + (reason === "TP" ? "tp" : "sl"), detail: (t.account.login || "") + " " + body, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
     }
     io.emit("refresh", {});
     console.log("[" + reason + "]", t.symbol, t.type, Number(t.lots) + "L @ " + price, "P/L", calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots)).toFixed(2));
@@ -324,6 +342,7 @@ async function liquidate(acc, list, io) {
     await prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: total } } });
     const body = acc.login + " margin call — " + list.length + " trade(s) closed, P/L " + total.toFixed(2);
     if (acc.userId) await prisma.notification.create({ data: { tenantId: acc.tenantId, userId: acc.userId, title: "Stop out", body: "Positions liquidated at margin call", type: "TRADE" } }).catch(() => {});
+    await notifyStaffRaw(acc.tenantId, { title: "⚠ Margin call — " + acc.login, body, type: "TRADE" }, acc.managerId);
     await prisma.auditLog.create({ data: { tenantId: acc.tenantId, action: "account.liquidated", detail: body, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
     io.emit("liquidation", { accountId: acc.id, login: acc.login });
     io.emit("refresh", {});
@@ -395,7 +414,10 @@ async function checkPending(io) {
       const ticket = await nextTicket(o.account.tenantId);
       await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: px, sl: o.sl, tp: o.tp } });
       await prisma.pendingOrder.delete({ where: { id: o.id } });
-      if (o.account && o.account.userId) await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + px, type: "TRADE" } }).catch(() => {});
+      const pbody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + px;
+      if (o.account && o.account.userId) await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: pbody, type: "TRADE" } }).catch(() => {});
+      await notifyStaffRaw(o.account.tenantId, { title: "Pending filled — " + (o.account.login || ""), body: pbody, type: "TRADE" }, o.account.managerId);
+      await prisma.auditLog.create({ data: { tenantId: o.account.tenantId, action: "order.filled", detail: (o.account.login || "") + " " + pbody, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
       io.emit("refresh", {});
     }
   } catch (e) { console.error("[checkPending]", e); }

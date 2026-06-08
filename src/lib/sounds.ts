@@ -16,7 +16,7 @@ export function setMuted(m: boolean) {
   try { localStorage.setItem(MUTE_KEY, m ? "1" : "0"); } catch {}
 }
 export function getVol() {
-  try { const v = Number(localStorage.getItem(VOL_KEY)); return isFinite(v) && v > 0 ? Math.min(1, v) : 0.5; } catch { return 0.5; }
+  try { const v = Number(localStorage.getItem(VOL_KEY)); return isFinite(v) && v > 0 ? Math.min(1, v) : 0.75; } catch { return 0.75; }
 }
 export function setVol(v: number) {
   try { localStorage.setItem(VOL_KEY, String(Math.max(0, Math.min(1, v)))); } catch {}
@@ -48,10 +48,10 @@ function blip(freq: number, start: number, dur: number, vol: number, type: Oscil
 
 // Distinct patterns per category so they're recognizable by ear.
 const PATTERNS: Record<SoundType, () => void> = {
-  trade: () => { const v = getVol() * 0.35; blip(660, 0, 0.09, v, "triangle"); blip(880, 0.09, 0.11, v, "triangle"); },
-  funds: () => { const v = getVol() * 0.4; blip(523, 0, 0.1, v); blip(659, 0.1, 0.1, v); blip(784, 0.2, 0.16, v); },
-  login: () => { const v = getVol() * 0.3; blip(440, 0, 0.16, v, "sine"); },
-  notice: () => { const v = getVol() * 0.35; blip(880, 0, 0.14, v, "sine"); },
+  trade: () => { const v = getVol() * 0.55; blip(660, 0, 0.09, v, "triangle"); blip(880, 0.09, 0.11, v, "triangle"); },
+  funds: () => { const v = getVol() * 0.6; blip(523, 0, 0.1, v); blip(659, 0.1, 0.1, v); blip(784, 0.2, 0.16, v); },
+  login: () => { const v = getVol() * 0.5; blip(440, 0, 0.16, v, "sine"); },
+  notice: () => { const v = getVol() * 0.55; blip(880, 0, 0.14, v, "sine"); },
 };
 
 export function playSound(type: SoundType) {
