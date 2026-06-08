@@ -14,6 +14,13 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         ["--brand-accent" as any]: brand.accentColor,
       }}
     >
+      {/* Fixed full-viewport backdrop so no white body shows below the 100dvh
+          container on mobile webviews (address-bar collapse, safe-area gaps). */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{ background: "linear-gradient(135deg, #0a0f1c 0%, #0f1a2e 55%, #0a0f1c 100%)" }}
+      />
       {/* Ambient brand glows + animated market lines */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div

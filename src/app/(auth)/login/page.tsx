@@ -65,13 +65,13 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <label className="flex cursor-pointer select-none items-center gap-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
+      <div className="flex items-center justify-between gap-2">
+        <label className="flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-xs" style={{ color: "var(--muted-foreground)" }}>
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
-            className="h-4 w-4 rounded" style={{ accentColor: "var(--brand-primary)" }} />
-          Keep me signed in for 30 days
+            className="h-3.5 w-3.5 rounded" style={{ accentColor: "var(--brand-primary)" }} />
+          Keep me signed in
         </label>
-        <a href="/forgot-password" className="text-xs font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}>
+        <a href="/forgot-password" className="whitespace-nowrap text-xs font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}>
           Forgot password?
         </a>
       </div>
@@ -82,7 +82,7 @@ export default function LoginPage() {
         {loading ? <><i className="fa-solid fa-circle-notch fa-spin" /> Signing in…</> : <>Sign in <i className="fa-solid fa-arrow-right text-xs" /></>}
       </button>
 
-      <p className="text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+      <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
         Don&apos;t have an account?{" "}
         <a href="/register" className="font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}>
           Open a Live or Demo account

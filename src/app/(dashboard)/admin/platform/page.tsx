@@ -303,8 +303,8 @@ export default function AdminDeskPage() {
     });
     // Single timer clears the up/down flash for all symbols (cheap vs per-symbol timers)
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
-    socket.on("liquidation", () => loadAll());
-    socket.on("refresh", () => loadAll());
+    socket.on("liquidation", () => { loadAll(); loadNotifs(); });
+    socket.on("refresh", () => { loadAll(); loadNotifs(); });
     const t = setInterval(() => fetch("/api/desk/trades").then((r) => r.json()).then((d) => d.ok && setOpen(d.trades)).catch(() => {}), 7000);
     return () => { socket.disconnect(); clearInterval(t); clearInterval(clr); if (raf) cancelAnimationFrame(raf); };
   }, []);
