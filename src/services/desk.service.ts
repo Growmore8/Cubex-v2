@@ -118,15 +118,16 @@ export async function deleteOpen(s: any, tradeId: string) {
   return { tenantId: trade.account.tenantId };
 }
 
-export async function forceClose(s: any, tradeId: string) {
+export async function forceClose(s: any, tradeId: string, opts?: { price?: number; closedAt?: Date }) {
   const trade = await prisma.trade.findFirst({ where: { id: BigInt(tradeId), account: accountWhere(s) }, include: { account: true } });
   if (!trade) throw new Error("Position not found");
-  const price = await getPrice(trade.symbol);
+  // Manual close: use the supplied price (else live market price).
+  const price = (opts?.price != null && opts.price > 0) ? opts.price : await getPrice(trade.symbol);
   if (price == null) throw new Error("No price");
   const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
   await prisma.$transaction(async (tx) => {
     await tx.tradeHistory.create({
-      data: { ticket: trade.ticket, accountId: trade.accountId, symbol: trade.symbol, side: trade.type, lots: trade.lots, openPrice: trade.openPrice, closePrice: new Prisma.Decimal(price), sl: trade.sl, tp: trade.tp, pnl: new Prisma.Decimal(pnl), openedAt: trade.openedAt },
+      data: { ticket: trade.ticket, accountId: trade.accountId, symbol: trade.symbol, side: trade.type, lots: trade.lots, openPrice: trade.openPrice, closePrice: new Prisma.Decimal(price), sl: trade.sl, tp: trade.tp, pnl: new Prisma.Decimal(pnl), openedAt: trade.openedAt, ...(opts?.closedAt ? { closedAt: opts.closedAt } : {}) },
     });
     await tx.account.update({ where: { id: trade.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnl) } } });
     await tx.trade.delete({ where: { id: trade.id } });

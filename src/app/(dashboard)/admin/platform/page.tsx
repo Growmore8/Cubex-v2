@@ -399,11 +399,18 @@ export default function AdminDeskPage() {
   async function modifyTrade(id: string, fields: any) { const r = await fetch("/api/desk/trades/" + id + "/modify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Modify failed"); return; } setInlineEdit((e) => { const n = { ...e }; delete n[id]; return n; }); loadAll(); }
   async function uploadKyc() { setErr(""); setKycUpMsg(""); if (!kycUploadFor || !kycUploadFile) { setErr("Select the front side"); return; } if (!kycBackFile) { setErr("Select the back side — both front and back are required"); return; } const fd = new FormData(); fd.append("login", kycUploadFor.login); fd.append("docType", kycUploadType); fd.append("file", kycUploadFile); fd.append("back", kycBackFile); const r = await fetch("/api/admin/kyc/upload", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); if (!r.ok) { setErr(r.error || "Upload failed"); return; } setKycUpMsg("Uploaded successfully"); setKycUploadFile(null); setKycBackFile(null); setTimeout(() => { setKycUploadFor(null); setKycUpMsg(""); }, 1500); loadAll(); }
 
-  function openPos(kind: string, t: any) { setPosMenu(null); setErr(""); setPform(kind === "modify" ? { sl: t.sl || 0, tp: t.tp || 0 } : { lots: Number((Number(t.lots) / 2).toFixed(2)) || 0.01 }); setPos({ kind, t }); }
+  function openPos(kind: string, t: any) {
+    setPosMenu(null); setErr("");
+    if (kind === "modify") setPform({ sl: t.sl || 0, tp: t.tp || 0 });
+    else if (kind === "manual") { const now = new Date(); const tz = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16); setPform({ closePrice: prices[t.symbol] ?? Number(t.openPrice), closedAt: tz, follow: true }); }
+    else setPform({ lots: Number((Number(t.lots) / 2).toFixed(2)) || 0.01 });
+    setPos({ kind, t });
+  }
   async function submitPos() {
     if (!pos) return; setErr("");
     const t = pos.t; let url = ""; let body: any = {};
     if (pos.kind === "modify") { url = "/api/desk/trades/" + t.id + "/modify"; body = { sl: Number(pform.sl) || 0, tp: Number(pform.tp) || 0 }; }
+    else if (pos.kind === "manual") { url = "/api/desk/trades/" + t.id + "/close"; body = { price: Number(pform.closePrice) || (prices[t.symbol] ?? Number(t.openPrice)), closedAt: pform.closedAt ? new Date(pform.closedAt).toISOString() : undefined }; }
     else { const lots = Number(pform.lots); if (!lots || lots <= 0 || lots >= Number(t.lots)) { setErr("Enter lots between 0 and " + t.lots); return; } url = "/api/desk/trades/" + t.id + "/partial"; body = { lots, price: prices[t.symbol] ?? t.openPrice }; }
     const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
@@ -991,7 +998,7 @@ export default function AdminDeskPage() {
                             <button onClick={() => close(p.id)} title="Close at market (instant)" className="mr-1 rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "rgba(224,82,96,0.15)", color: SELL, border: "1px solid rgba(224,82,96,0.3)" }}>
                               Close ×
                             </button>
-                            <button onClick={() => openPos("partial", p)} title="Manual / partial close (choose lots)" className="mr-1 rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "var(--soft)", color: "var(--accent)", border: "1px solid var(--border)" }}>
+                            <button onClick={() => openPos("manual", p)} title="Manual close (set close price & time)" className="mr-1 rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "var(--soft)", color: "var(--accent)", border: "1px solid var(--border)" }}>
                               Manual
                             </button>
                             {can("deleteTrades") && <button onClick={() => askConfirm("Delete this open trade entirely? No P/L is realized.", () => delTrade(p.id))} title="Delete trade" className="rounded px-1.5 py-0.5 text-[9px]" style={{ background: "var(--soft)", color: SELL }}><i className="fa-solid fa-trash" style={{ fontSize: 8 }} /></button>}
@@ -1379,18 +1386,34 @@ export default function AdminDeskPage() {
       {pos && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="ui-pop w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="text-sm font-semibold">{pos.kind === "modify" ? "Modify S/L - T/P" : "Partial Close"}</div>
-            <div className="mb-2 text-[10px] text-[var(--muted)]">{pos.t.symbol} {pos.t.type} {pos.t.lots} @ {pos.t.openPrice}</div>
+            <div className="text-sm font-semibold">{pos.kind === "modify" ? "Modify S/L - T/P" : pos.kind === "manual" ? "Manual Close" : "Partial Close"}</div>
+            <div className="mb-2 text-[10px] text-[var(--muted)]">#{pos.t.ticket} · {pos.t.symbol} · {pos.t.type} · {Number(pos.t.lots).toFixed(2)}L</div>
             {pos.kind === "modify" ? (<>
               <div className={lab}>Stop Loss</div><input type="number" className={inp} value={pform.sl} onChange={(e) => setPform({ ...pform, sl: e.target.value })} autoFocus />
               <div className={lab + " mt-2"}>Take Profit</div><input type="number" className={inp} value={pform.tp} onChange={(e) => setPform({ ...pform, tp: e.target.value })} />
-            </>) : (<>
+            </>) : pos.kind === "manual" ? (() => {
+              const live = prices[pos.t.symbol];
+              const cp = Number(pform.closePrice) || live || Number(pos.t.openPrice);
+              const est = pnlOf({ symbol: pos.t.symbol, type: pos.t.type, lots: Number(pos.t.lots), openPrice: Number(pos.t.openPrice) }, cp, csz(pos.t.symbol));
+              return (<>
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--soft)] px-3 py-2 text-center"><div className="text-[9px] uppercase tracking-wide text-[var(--muted)]">Live Price</div><div className="text-sm font-bold" style={{ color: "var(--accent)" }}>{live != null ? live.toFixed(dg(pos.t.symbol)) : "…"}</div></div>
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--soft)] px-3 py-2 text-center"><div className="text-[9px] uppercase tracking-wide text-[var(--muted)]">Est. P/L</div><div className="text-sm font-bold" style={{ color: est >= 0 ? BUY : SELL }}>{est >= 0 ? "+" : ""}{est.toFixed(2)}</div></div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><div className="flex items-center justify-between"><span className={lab}>Close Price *</span>{pform.follow ? <span className="text-[9px]" style={{ color: GOLD }}>live</span> : <button onClick={() => setPform({ ...pform, follow: true, closePrice: live ?? pform.closePrice })} className="text-[9px] underline" style={{ color: "var(--accent)" }}>use live</button>}</div><input type="number" className={inp} value={pform.follow ? (live != null ? live.toFixed(dg(pos.t.symbol)) : pform.closePrice) : pform.closePrice} onChange={(e) => setPform({ ...pform, closePrice: e.target.value, follow: false })} autoFocus /></div>
+                  <div><div className={lab}>Close Date & Time</div><input type="datetime-local" className={inp} value={pform.closedAt} onChange={(e) => setPform({ ...pform, closedAt: e.target.value })} /></div>
+                </div>
+              </>);
+            })() : (<>
               <div className={lab}>Lots to close (max {pos.t.lots})</div><input type="number" step="0.01" className={inp} value={pform.lots} onChange={(e) => setPform({ ...pform, lots: e.target.value })} autoFocus />
               <div className="mt-1 text-[10px] text-[var(--muted)]">At price {prices[pos.t.symbol] != null ? prices[pos.t.symbol].toFixed(dg(pos.t.symbol)) : pos.t.openPrice}</div>
             </>)}
             {err && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
-            <button onClick={submitPos} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Confirm</button>
-            <button onClick={() => setPos(null)} className="mt-2 w-full rounded border border-[var(--border)] py-1.5 text-xs">Cancel</button>
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => setPos(null)} className="flex-1 rounded border border-[var(--border)] py-2 text-xs">Cancel</button>
+              <button onClick={submitPos} className="flex-1 rounded py-2 text-xs font-semibold" style={{ background: pos.kind === "manual" ? SELL : BUY, color: "#fff" }}>{pos.kind === "manual" ? "Close Trade" : "Confirm"}</button>
+            </div>
           </div>
         </div>
       )}
