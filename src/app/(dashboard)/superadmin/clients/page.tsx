@@ -434,7 +434,7 @@ export default function SAClientsPage() {
 
       {/* ── STATEMENT / REPORT MODAL ── */}
       {repRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40" onClick={() => setRepRow(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
           <div className="ui-card ui-pop w-[380px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Statement / Report</div>
             <div className="mb-3 text-xs text-gray-500">{repRow.login} — {repRow.name}</div>

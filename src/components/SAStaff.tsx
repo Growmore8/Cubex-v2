@@ -194,7 +194,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── CREATE MODAL ── */}
       {createOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={() => setCreateOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
           <div className="ui-card ui-pop max-h-[90vh] w-[400px] overflow-y-auto p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <div className="font-semibold text-lg">{newLabel}</div>
@@ -223,7 +223,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── EDIT MODAL ── */}
       {editRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={() => setEditRow(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
           <div className="ui-card ui-pop max-h-[90vh] w-[440px] overflow-y-auto p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center justify-between">
               <div className="font-semibold text-lg">Edit {role === "ADMIN" ? "Admin" : "Manager"}</div>

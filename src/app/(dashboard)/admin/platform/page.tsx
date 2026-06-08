@@ -445,7 +445,9 @@ export default function AdminDeskPage() {
       const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
       setMt(null); loadPending(); loadAll(); return;
     }
-    const body = { accountId: mt.acc.id, symbol: mt.symbol, type: mt.type, lots: Number(mt.lots), sl: Number(mt.sl) || 0, tp: Number(mt.tp) || 0, openPrice: Number(mt.openPrice) || (prices[mt.symbol] ?? 0), openedAt: mt.date ? new Date(mt.date).toISOString() : undefined };
+    // Market manual trades always open at the current live price (not a stale manual value).
+    const marketPrice = prices[mt.symbol] ?? Number(mt.openPrice) ?? 0;
+    const body = { accountId: mt.acc.id, symbol: mt.symbol, type: mt.type, lots: Number(mt.lots), sl: Number(mt.sl) || 0, tp: Number(mt.tp) || 0, openPrice: marketPrice, openedAt: mt.date ? new Date(mt.date).toISOString() : undefined };
     const r = await fetch("/api/desk/manual-trade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
     setMt(null); loadAll();
@@ -677,7 +679,7 @@ export default function AdminDeskPage() {
       <div className="flex min-h-0 flex-1">
         {panels.nav && (<>
           <aside className="flex flex-col border-r border-[var(--border)] bg-[var(--panel)]" style={{ width: navW }}>
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">NAVIGATOR<button onClick={() => togglePanel("nav")} aria-label="hide">x</button></div>
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">NAVIGATOR<button onClick={() => togglePanel("nav")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
             {/* Live / Demo tabs */}
             <div className="flex border-b border-[var(--border)] text-[10px]">
               <button onClick={() => setNavTab("live")} className="flex-1 py-1.5 font-semibold" style={navTab === "live" ? { color: BUY, borderBottom: `2px solid ${BUY}` } : { color: "var(--muted)" }}>LIVE ({liveAccs.length})</button>
@@ -837,7 +839,7 @@ export default function AdminDeskPage() {
         {panels.mw && (<>
           <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide">x</button></div>
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
             <div className="border-b border-[var(--border)] px-1.5 py-1">
               <div className="relative">
                 <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-[var(--muted)]" />
@@ -865,7 +867,7 @@ export default function AdminDeskPage() {
         </>)}
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[10px]" style={{ color: GOLD }}>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "var(--text)" }}>
         <span>Balance: <span className="text-[var(--text)]">{selAcc ? fmt(balance) : "--"}</span></span>
         <span>Flt P/L: <span style={{ color: floating >= 0 ? BUY : SELL }}>{selAcc ? fmt(floating) : "--"}</span></span>
         <span>Equity: <span className="text-[var(--text)]">{selAcc ? fmt(equity) : "--"}</span></span>
@@ -884,7 +886,7 @@ export default function AdminDeskPage() {
             <div className="flex flex-1 gap-1 overflow-auto">
               {TABS.filter(([k]) => tabState[k] && (k !== "audit" || can("viewAudit"))).map(([k, lbl]) => (
                 <span key={k} className="flex items-center">
-                  <button onClick={() => setTab(k)} className="px-3 py-1.5 text-xs" style={tab === k ? { color: "var(--accent)" } : { color: "var(--muted)" }}>{lbl}{k === "trade" ? " (" + accOpen.length + (accPending.length ? " + " + accPending.length + "p" : "") + ")" : ""}</button>
+                  <button onClick={() => setTab(k)} className="px-3 py-1.5 text-xs font-bold" style={tab === k ? { color: "var(--accent)" } : { color: "var(--text)" }}>{lbl}{k === "trade" ? " (" + accOpen.length + (accPending.length ? " + " + accPending.length + "p" : "") + ")" : ""}</button>
                   <button onClick={() => setTabState((s) => ({ ...s, [k]: false }))} className="text-[var(--muted)]">{"\u00D7"}</button>
                 </span>
               ))}
@@ -1624,7 +1626,12 @@ export default function AdminDeskPage() {
               <div><div className={lab}>Stop Loss (0=OFF)</div><input type="number" className={inp} value={mt.sl} onChange={(e) => setMt({ ...mt, sl: e.target.value })} /></div>
               <div><div className={lab}>Take Profit (0=OFF)</div><input type="number" className={inp} value={mt.tp} onChange={(e) => setMt({ ...mt, tp: e.target.value })} /></div>
             </div>
-            <div className="mt-2 rounded bg-[var(--soft)] px-2 py-1.5 text-[10px] text-[var(--muted)]">Live: {prices[mt.symbol] != null ? prices[mt.symbol].toFixed(dg(mt.symbol)) : "..."} | PnL Preview: <span style={{ color: BUY }}>0.00</span></div>
+            <div className="mt-2 rounded bg-[var(--soft)] px-2 py-1.5 text-[10px] text-[var(--muted)]">{(() => {
+              const cur = prices[mt.symbol];
+              const op = mt.follow ? (cur ?? Number(mt.openPrice)) : Number(mt.openPrice);
+              const pv = (cur != null && op) ? pnlOf({ symbol: mt.symbol, type: mt.type, lots: Number(mt.lots) || 0, openPrice: op }, cur, csz(mt.symbol)) : 0;
+              return <>Live: {cur != null ? cur.toFixed(dg(mt.symbol)) : "..."} | PnL Preview: <span style={{ color: pv >= 0 ? BUY : SELL, fontWeight: 700 }}>{pv.toFixed(2)}</span></>;
+            })()}</div>
             {err && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
             <div className="mt-3 flex gap-2">
               <button onClick={() => setMt(null)} className="flex-1 rounded border border-[var(--border)] py-2 text-xs">Cancel</button>
@@ -1747,7 +1754,7 @@ export default function AdminDeskPage() {
 
       {/* PDF Statement Date Filter Modal */}
       {stmtModal && selAcc && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setStmtModal(false)}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="ui-pop w-[340px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 text-sm font-semibold">Export PDF Statement</div>
             <div className="mb-4 text-[10px]" style={{ color: "var(--muted)" }}>{selAcc.login} — {selAcc.name}</div>
@@ -1799,7 +1806,7 @@ export default function AdminDeskPage() {
       {/* Email Statement Modal (separate from download). The visible recipient is
           the confirmation — no browser dialog. */}
       {stmtEmailModal && selAcc && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setStmtEmailModal(false)}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="ui-pop w-[340px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 text-sm font-semibold">Email Statement</div>
             <div className="mb-4 text-[10px]" style={{ color: "var(--muted)" }}>{selAcc.login} — {selAcc.name}</div>

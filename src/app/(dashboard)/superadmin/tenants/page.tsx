@@ -261,7 +261,7 @@ export default function SATenantsPage() {
 
       {/* Create Tenant Modal */}
       {createOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setCreateOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="ui-card ui-pop w-[480px] max-h-[90vh] overflow-auto bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <div className="font-semibold text-lg">New Tenant</div>
@@ -371,7 +371,7 @@ export default function SATenantsPage() {
 
       {/* Edit Tenant Modal */}
       {editFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setEditFor(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="ui-card ui-pop w-[500px] max-h-[90vh] overflow-auto bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <div className="font-semibold text-lg">Edit Tenant — {editFor.name}</div>
