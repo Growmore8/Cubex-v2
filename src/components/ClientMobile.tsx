@@ -234,7 +234,7 @@ export default function ClientMobile({ t }: { t: any }) {
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", inset: 0, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation",
       // Frosted-glass design: faint brand-tinted glows behind the content so the
       // .glass-card surfaces have colour to blur (design "A").
-      background: "radial-gradient(560px 320px at 0% 2%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%), radial-gradient(560px 320px at 100% 12%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%), var(--bg)" }} className="flex flex-col overflow-hidden text-[var(--text)]">
+      background: "radial-gradient(620px 380px at -5% -2%, rgba(124,58,237,0.34), transparent 60%), radial-gradient(620px 380px at 105% 8%, rgba(37,99,235,0.30), transparent 58%), radial-gradient(520px 320px at 50% 112%, rgba(16,199,132,0.14), transparent 60%), var(--bg)" }} className="flex flex-col overflow-hidden text-[var(--text)]">
       <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarRef} onChange={uploadAvatar} />
 
       {/* TOP HEADER — iOS glass */}
