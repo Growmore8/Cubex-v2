@@ -385,12 +385,15 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── DASHBOARD ───────── */}
         <KeepAlive active={tab === "dashboard"}>{(
           <div className="space-y-4 p-3">
-            {/* premium account card (Visa/Mastercard style) — swipe left/right to switch accounts */}
+            {/* premium glass account card — swipe left/right to switch accounts */}
             <div className="relative overflow-hidden rounded-[18px] p-5 text-white" style={{
               background: account?.type === "LIVE"
-                ? `linear-gradient(135deg, ${brand?.primaryColor || "#1e3a8a"} 0%, #0b1220 78%)`
-                : `linear-gradient(135deg, #5b4410 0%, #0d0f16 78%)`,
-              boxShadow: "0 16px 34px -14px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08)",
+                ? `linear-gradient(150deg, color-mix(in srgb, ${brand?.primaryColor || "#3b82f6"} 60%, transparent) 0%, color-mix(in srgb, ${brand?.accentColor || brand?.primaryColor || "#1e3a8a"} 22%, transparent) 55%, rgba(255,255,255,0.04) 100%)`
+                : `linear-gradient(150deg, color-mix(in srgb, ${brand?.primaryColor || "#7c3aed"} 50%, transparent) 0%, color-mix(in srgb, ${brand?.accentColor || "#a16207"} 20%, transparent) 55%, rgba(255,255,255,0.04) 100%)`,
+              backdropFilter: "blur(22px) saturate(180%)",
+              WebkitBackdropFilter: "blur(22px) saturate(180%)",
+              border: "1px solid rgba(255,255,255,0.18)",
+              boxShadow: "0 22px 48px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.28)",
               touchAction: "pan-y",
             }}
               onTouchStart={(e) => { (e.currentTarget as any)._sx = e.touches[0].clientX; }}
