@@ -251,39 +251,52 @@ export default function SATenantsPage() {
 
       {/* Create Tenant Modal */}
       {createOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setCreateOpen(false)}>
           <div className="ui-card ui-pop w-[480px] max-h-[90vh] overflow-auto bg-white p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 font-semibold">New Tenant</div>
-            <div className="grid grid-cols-2 gap-2">
-              <input className={inp} placeholder="Company name *" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <input className={inp} placeholder="subdomain — e.g. infinity *" value={form.subdomain || ""} onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} />
-              <p className="col-span-2 -mt-1 text-[11px] text-gray-400">Short ID only (letters, numbers, hyphens) — used for <b>infinity.{typeof window !== "undefined" ? window.location.host.replace(/^[^.]+\./, "") : "yourplatform.com"}</b>.</p>
-              <input className={inp + " col-span-2"} placeholder="Custom domain — e.g. trade.infinity.com (optional)" value={form.customDomain || ""} onChange={(e) => setForm({ ...form, customDomain: e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\s/g, "") })} />
-              <p className="col-span-2 -mt-1 text-[11px] text-gray-400">The broker&apos;s own domain their traders use. Leave blank now and set it later — point its DNS at this server, HTTPS is automatic.</p>
-              <input className={inp + " col-span-2"} placeholder="Support email (optional)" value={form.supportEmail || ""} onChange={(e) => setForm({ ...form, supportEmail: e.target.value })} />
-              <input className={inp + " col-span-2"} placeholder="Brand name (shown on portal)" value={form.brandName || ""} onChange={(e) => setForm({ ...form, brandName: e.target.value })} />
-              <input className={inp} placeholder="Admin name *" value={form.adminName || ""} onChange={(e) => setForm({ ...form, adminName: e.target.value })} />
-              <input className={inp} placeholder="Admin email *" value={form.adminEmail || ""} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} />
-              <PasswordInput wrap="relative col-span-2" className={inp} placeholder="Admin password (min 6) *" value={form.adminPassword || ""} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} />
+            <div className="mb-4 flex items-center justify-between">
+              <div className="font-semibold text-lg">New Tenant</div>
+              <button onClick={() => setCreateOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
+            </div>
+            {/* Section: Tenant Identity */}
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tenant Details</div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <input className={inp} placeholder="Company name *" autoComplete="off" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <input className={inp} placeholder="Brand name (portal)" autoComplete="off" value={form.brandName || ""} onChange={(e) => setForm({ ...form, brandName: e.target.value })} />
+              <input className={inp} placeholder="Subdomain * — e.g. infinity" autoComplete="off" value={form.subdomain || ""} onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} />
+              <input className={inp} placeholder="Custom domain (optional)" autoComplete="off" value={form.customDomain || ""} onChange={(e) => setForm({ ...form, customDomain: e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\s/g, "") })} />
+              <input className={inp + " col-span-2"} placeholder="Slogan / Tagline" autoComplete="off" value={form.slogan || ""} onChange={(e) => setForm({ ...form, slogan: e.target.value })} />
+              <input className={inp + " col-span-2"} placeholder="Company / Brokerage Info (footer)" autoComplete="off" value={form.companyInfo || ""} onChange={(e) => setForm({ ...form, companyInfo: e.target.value })} />
+              <input className={inp + " col-span-2"} placeholder="Support email (optional)" autoComplete="off" value={form.supportEmail || ""} onChange={(e) => setForm({ ...form, supportEmail: e.target.value })} />
               <div className="col-span-2"><label className="text-xs text-gray-500 mb-1 block">Logo</label><LogoField value={form.logoUrl} which="create" /></div>
-              <input className={inp + " col-span-2"} placeholder="Slogan / Tagline" value={form.slogan || ""} onChange={(e) => setForm({ ...form, slogan: e.target.value })} />
-              <input className={inp + " col-span-2"} placeholder="Company / Brokerage Info (footer)" value={form.companyInfo || ""} onChange={(e) => setForm({ ...form, companyInfo: e.target.value })} />
-              <div className="col-span-2">
-                <label className="text-xs text-gray-500 mb-1 block">Plan (sets the account limit)</label>
-                <select className={inp + " w-full"} value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })}>
+            </div>
+            {/* Section: Admin Credentials */}
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Admin Account</div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <input className={inp} placeholder="Admin name *" autoComplete="off" value={form.adminName || ""} onChange={(e) => setForm({ ...form, adminName: e.target.value })} />
+              <input className={inp} placeholder="Admin email *" autoComplete="off" value={form.adminEmail || ""} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} />
+              <PasswordInput wrap="relative col-span-2" className={inp} placeholder="Admin password (min 6) *" autoComplete="new-password" value={form.adminPassword || ""} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} />
+            </div>
+            {/* Section: Plan & Branding */}
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Plan & Branding</div>
+            <div className="space-y-2">
+              <div>
+                <select className={inp} value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })}>
                   {PLAN_KEYS.map((k) => <option key={k} value={k}>{pkgs[k]?.name || PACKAGES[k].name} — up to {seatsOf(k)} accounts (${pkgs[k]?.price ?? PACKAGES[k].price}/mo)</option>)}
                 </select>
                 <p className="mt-1 text-[11px] text-gray-400">The tenant can create up to <b>{seatsOf(form.plan || "STARTER")} accounts</b> on this plan. Manage plans in Packages &amp; Pricing.</p>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Primary Color</label>
-                <input type="color" className="rounded-md border h-9 w-full cursor-pointer" value={form.primaryColor} onChange={(e) => setForm({ ...form, primaryColor: e.target.value })} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Accent Color</label>
-                <input type="color" className="rounded-md border h-9 w-full cursor-pointer" value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Primary Color</label>
+                  <input type="color" className="rounded-md border h-9 w-full cursor-pointer" value={form.primaryColor} onChange={(e) => setForm({ ...form, primaryColor: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Accent Color</label>
+                  <input type="color" className="rounded-md border h-9 w-full cursor-pointer" value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} />
+                </div>
               </div>
             </div>
+            {err && <div className="mt-3 text-sm text-red-600">{err}</div>}
             <div className="mt-4 flex justify-end gap-2">
               <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setCreateOpen(false)}>Cancel</button>
               <button className="ui-btn px-3 py-1.5 text-sm text-white" style={{ background: "#d97706", borderColor: "transparent" }} onClick={create}>Create Tenant</button>
@@ -294,9 +307,12 @@ export default function SATenantsPage() {
 
       {/* Subscription Modal */}
       {subFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setSubFor(null)}>
           <div className="ui-card ui-pop w-[360px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 font-semibold">Subscription — {subFor.brandName || subFor.name}</div>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="font-semibold">Subscription — {subFor.brandName || subFor.name}</div>
+              <button onClick={() => setSubFor(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
+            </div>
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Plan (sets the account limit)</label>
@@ -332,9 +348,12 @@ export default function SATenantsPage() {
 
       {/* Edit Tenant Modal */}
       {editFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setEditFor(null)}>
           <div className="ui-card ui-pop w-[500px] max-h-[90vh] overflow-auto bg-white p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 font-semibold text-lg">Edit Tenant — {editFor.name}</div>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="font-semibold text-lg">Edit Tenant — {editFor.name}</div>
+              <button onClick={() => setEditFor(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className="text-xs text-gray-500 block mb-1">Company Name *</label><input className={inp} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
               <div><label className="text-xs text-gray-500 block mb-1">Brand Name</label><input className={inp} value={editForm.brandName} onChange={(e) => setEditForm({ ...editForm, brandName: e.target.value })} /></div>
@@ -358,9 +377,12 @@ export default function SATenantsPage() {
 
       {/* Permissions Modal */}
       {permFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setPermFor(null)}>
           <div className="ui-card ui-pop max-h-[80vh] w-[520px] overflow-auto bg-white p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-1 font-semibold">Tenant Permissions — {permFor.brandName || permFor.name}</div>
+            <div className="mb-1 flex items-center justify-between">
+              <div className="font-semibold">Tenant Permissions — {permFor.brandName || permFor.name}</div>
+              <button onClick={() => setPermFor(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
+            </div>
             <div className="mb-3 text-xs text-gray-500">If a permission is OFF, no one under this tenant can use it regardless of personal settings.</div>
             {PERM_GROUPS.map((g) => (
               <div key={g.sec} className="mb-3">

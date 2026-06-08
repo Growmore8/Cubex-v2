@@ -194,13 +194,16 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── CREATE MODAL ── */}
       {createOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={() => setCreateOpen(false)}>
           <div className="ui-card ui-pop w-[400px] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 font-semibold text-lg">{newLabel}</div>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="font-semibold text-lg">{newLabel}</div>
+              <button onClick={() => setCreateOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
+            </div>
             <div className="space-y-3">
-              <div><label className="text-xs font-medium text-gray-500 block mb-1">FULL NAME</label><input className={inp} placeholder="Full name" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div><label className="text-xs font-medium text-gray-500 block mb-1">EMAIL</label><input className={inp} type="email" placeholder="Email address" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div><label className="text-xs font-medium text-gray-500 block mb-1">PASSWORD</label><PasswordInput className={inp} placeholder="Min 6 characters" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
+              <div><label className="text-xs font-medium text-gray-500 block mb-1">FULL NAME</label><input className={inp} placeholder="Full name" autoComplete="off" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div><label className="text-xs font-medium text-gray-500 block mb-1">EMAIL</label><input className={inp} placeholder="Email address" autoComplete="off" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+              <div><label className="text-xs font-medium text-gray-500 block mb-1">PASSWORD</label><PasswordInput className={inp} placeholder="Min 6 characters" autoComplete="new-password" value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">ASSIGN TO TENANT</label>
                 <select className={inp} value={form.tenantId || ""} onChange={(e) => setForm({ ...form, tenantId: e.target.value })}>
@@ -220,13 +223,16 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── EDIT MODAL ── */}
       {editRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={() => setEditRow(null)}>
           <div className="ui-card ui-pop w-[440px] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-1 font-semibold text-lg">Edit {role === "ADMIN" ? "Admin" : "Manager"}</div>
+            <div className="mb-1 flex items-center justify-between">
+              <div className="font-semibold text-lg">Edit {role === "ADMIN" ? "Admin" : "Manager"}</div>
+              <button onClick={() => setEditRow(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
+            </div>
             <div className="mb-4 text-xs text-gray-400">{editRow.email}</div>
             <div className="space-y-3">
-              <div><label className="text-xs font-medium text-gray-500 block mb-1">FULL NAME</label><input className={inp} value={ef.name} onChange={(e) => setEf({ ...ef, name: e.target.value })} /></div>
-              <div><label className="text-xs font-medium text-gray-500 block mb-1">EMAIL</label><input className={inp} type="email" value={ef.email} onChange={(e) => setEf({ ...ef, email: e.target.value })} /></div>
+              <div><label className="text-xs font-medium text-gray-500 block mb-1">FULL NAME</label><input className={inp} autoComplete="off" value={ef.name} onChange={(e) => setEf({ ...ef, name: e.target.value })} /></div>
+              <div><label className="text-xs font-medium text-gray-500 block mb-1">EMAIL</label><input className={inp} autoComplete="off" value={ef.email} onChange={(e) => setEf({ ...ef, email: e.target.value })} /></div>
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">TENANT ASSIGNMENT</label>
                 <select className={inp} value={ef.tenantId} onChange={(e) => setEf({ ...ef, tenantId: e.target.value })}>
@@ -247,9 +253,12 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── PASSWORD MODAL ── */}
       {pwRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={() => setPwRow(null)}>
           <div className="ui-card ui-pop w-[360px] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-1 font-semibold">Reset Password</div>
+            <div className="mb-1 flex items-center justify-between">
+              <div className="font-semibold">Reset Password</div>
+              <button onClick={() => setPwRow(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
+            </div>
             <div className="mb-3 text-xs text-gray-500">{pwRow.name} — {pwRow.email}</div>
             <div className="relative">
               <input type={pwShow ? "text" : "password"} className={inp} placeholder="New password (min 6)" value={pwVal} onChange={(e) => setPwVal(e.target.value)} autoFocus />
@@ -268,9 +277,12 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── PERMISSIONS MODAL ── */}
       {permFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={() => setPermFor(null)}>
           <div className="ui-card ui-pop max-h-[80vh] w-[500px] overflow-auto p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-0.5 font-semibold text-lg">Permissions — {permFor.name}</div>
+            <div className="mb-0.5 flex items-center justify-between">
+              <div className="font-semibold text-lg">Permissions — {permFor.name}</div>
+              <button onClick={() => setPermFor(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
+            </div>
             <div className="mb-4 text-xs text-gray-500">Personal permissions (still gated by the tenant-level permissions).</div>
             {PERM_GROUPS.map((g) => (
               <div key={g.sec} className="mb-4">
@@ -296,9 +308,12 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── DELETE CONFIRM ── */}
       {delRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={() => setDelRow(null)}>
           <div className="ui-card ui-pop w-[380px] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-1 font-semibold text-red-600">Delete {role === "ADMIN" ? "Admin" : "Manager"}</div>
+            <div className="mb-1 flex items-center justify-between">
+              <div className="font-semibold text-red-600">Delete {role === "ADMIN" ? "Admin" : "Manager"}</div>
+              <button onClick={() => setDelRow(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
+            </div>
             <p className="mb-4 text-sm text-gray-600">Delete <span className="font-semibold">{delRow.name}</span> ({delRow.email})? This cannot be undone.</p>
             {err && <div className="mb-2 text-sm text-red-600">{err}</div>}
             <div className="flex justify-end gap-2">
