@@ -231,7 +231,10 @@ export default function ClientMobile({ t }: { t: any }) {
   };
 
   return (
-    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", inset: 0, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation" }} className="flex flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", inset: 0, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation",
+      // Frosted-glass design: faint brand-tinted glows behind the content so the
+      // .glass-card surfaces have colour to blur (design "A").
+      background: "radial-gradient(560px 320px at 0% 2%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%), radial-gradient(560px 320px at 100% 12%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%), var(--bg)" }} className="flex flex-col overflow-hidden text-[var(--text)]">
       <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarRef} onChange={uploadAvatar} />
 
       {/* TOP HEADER — iOS glass */}
@@ -438,7 +441,7 @@ export default function ClientMobile({ t }: { t: any }) {
             )}
 
             {/* market movers */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-3">
+            <div className="glass-card p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-[11px] font-bold tracking-wide"><i className="fa-solid fa-arrow-trend-up mr-1.5" style={{ color: BUY }} />MARKET MOVERS</div>
                 <span className="text-[9px] text-[var(--muted)]">LIVE</span>
@@ -753,7 +756,7 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
             )}
             {/* header block */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+            <div className="glass-card p-4">
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <Avatar size={64} />
@@ -768,7 +771,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
 
             {/* balance summary */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+            <div className="glass-card p-4">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-[11px] font-bold tracking-wide">BALANCE SUMMARY</div>
                 <select value={accId} onChange={(e) => switchAcc(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text)]">
@@ -788,7 +791,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
 
             {/* running trade summary */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+            <div className="glass-card p-4">
               <div className="mb-2 text-[11px] font-bold tracking-wide">RUNNING TRADE SUMMARY</div>
               <div className="mb-2 text-[10px] text-[var(--muted)]">Showing: {account?.login} · {account?.type} · {(positions || []).length} open</div>
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Floating P/L</span><span style={{ color: floating >= 0 ? BUY : SELL }}>${fmt(floating)}</span></div>
@@ -799,7 +802,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
 
             {/* by direction */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+            <div className="glass-card p-4">
               <div className="mb-2 text-[11px] font-bold tracking-wide">BY DIRECTION</div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-xl p-3" style={{ background: "rgba(22,163,74,.1)" }}>
@@ -819,7 +822,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
             {/* by symbol */}
             {Object.keys(bySym).length > 0 && (
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+              <div className="glass-card p-4">
                 <div className="mb-2 text-[11px] font-bold tracking-wide">BY SYMBOL</div>
                 {Object.entries(bySym).map(([sym, arr]) => {
                   const buyL = sumLots(arr.filter((p: any) => p.type === "BUY")); const sellL = sumLots(arr.filter((p: any) => p.type === "SELL"));
@@ -838,7 +841,7 @@ export default function ClientMobile({ t }: { t: any }) {
             )}
 
             {/* live accounts */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+            <div className="glass-card p-4">
               <div className="mb-2 text-[11px] font-bold tracking-wide"><i className="fa-solid fa-bolt mr-1.5" style={{ color: GOLD }} />LIVE ACCOUNTS {liveAccts.length}</div>
               {liveAccts.map((a: any) => (
                 <button key={a.id} onClick={() => a.id !== accId && switchAcc(a.id)} className="flex w-full items-center gap-2 py-2 text-left">
@@ -856,7 +859,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
 
             {/* demo accounts */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+            <div className="glass-card p-4">
               <div className="mb-2 text-[11px] font-bold tracking-wide"><i className="fa-solid fa-vial mr-1.5" style={{ color: GOLD }} />DEMO ACCOUNTS {demoAccts.length}</div>
               {demoAccts.map((a: any) => (
                 <button key={a.id} onClick={() => a.id !== accId && switchAcc(a.id)} className="flex w-full items-center gap-2 py-2 text-left">
@@ -878,7 +881,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
 
             {/* security */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+            <div className="glass-card p-4">
               <div className="mb-2 text-[11px] font-bold tracking-wide">SECURITY & SIGN-IN</div>
               {/* PIN — toggle (on = set, off = remove) */}
               <button onClick={() => { if (pin?.pinHasPin) pin?.disablePin?.(); else openPin?.(); }} className="flex w-full items-center gap-3 py-2.5 text-left">
@@ -917,7 +920,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
 
             {/* export */}
-            <button onClick={() => { setStmtPreset("month"); setStmtFrom(""); setStmtTo(""); setStmtOpen(true); }} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left">
+            <button onClick={() => { setStmtPreset("month"); setStmtFrom(""); setStmtTo(""); setStmtOpen(true); }} className="flex w-full items-center gap-3 glass-card p-4 text-left">
               <i className="fa-solid fa-file-pdf" style={{ color: SELL }} />
               <div className="flex-1"><div className="text-[12px] font-semibold">Export PDF Statement</div><div className="text-[10px] text-[var(--muted)]">Choose a period — download or email</div></div>
               <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
