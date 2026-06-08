@@ -7,6 +7,8 @@ import { deviceFromUA } from "@/lib/presence";
 import { sendTenantMail, noReplyAddress } from "@/lib/mailer";
 import { verificationEmail, resetPasswordEmail, type BrandInfo } from "@/lib/email-templates";
 import { Prisma } from "@prisma/client";
+import { audit } from "@/lib/audit";
+import { notifyStaff } from "@/services/notification.service";
 import type { SessionPayload } from "@/types";
 import type { Role } from "@/config/roles";
 
@@ -119,6 +121,10 @@ export async function registerClient(
     return { sub: user.id, role: "CLIENT" as Role, tenantId: tenant!.id, email: lowerEmail, name };
   });
 
+  // Audit the self-signup + alert staff/superadmin that a new client registered.
+  audit(tenant!.id, "client.register", name + " <" + lowerEmail + "> (" + (type || "LIVE") + ")", lowerEmail, "CLIENT").catch(() => {});
+  notifyStaff(tenant!.id, { title: "New client registered", body: name + " (" + lowerEmail + ")", type: "NOTICE" }).catch(() => {});
+
   if (hasSmtp && emailToken) {
     const brand: BrandInfo = { brandName: tenant.brandName || tenant.name, primaryColor: tenant.primaryColor, accentColor: tenant.accentColor, logoUrl: tenant.logoUrl };
     // Send the verification code and WAIT for it. If delivery fails we must not
@@ -191,4 +197,5 @@ export async function resetPassword(host: string | null, email: string, token: s
   if (!u2?.emailToken || u2.emailToken !== `reset:${token}`) throw new Error("Invalid or expired reset link");
   const passwordHash = await hashPassword(newPassword);
   await (prisma.user.update as any)({ where: { id: u2.id }, data: { passwordHash, emailToken: null } });
+  audit(tenant.id, "auth.passwordReset", lowerEmail + " (self-service)", lowerEmail, (u2.role || "CLIENT")).catch(() => {});
 }

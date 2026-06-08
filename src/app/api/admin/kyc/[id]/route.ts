@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
-import { notify } from "@/services/notification.service";
+import { notify, notifyStaff } from "@/services/notification.service";
 import { syncAccountKyc } from "@/services/kyc.service";
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -42,6 +42,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const msg = status === "APPROVED" ? "Your KYC has been approved ✓" : "Your KYC was rejected" + (b.note ? ": " + b.note : "");
       await notify(rec.account.tenantId, rec.account.userId, "KYC " + (status === "APPROVED" ? "Approved" : "Rejected"), msg, "NOTICE").catch(() => {});
     }
+    // Confirmation to staff + superadmin.
+    notifyStaff(s.tenantId as string, { title: "KYC " + (status === "APPROVED" ? "approved" : "rejected") + " — " + rec.account.login, body: rec.docType + " by " + (s.email || "admin"), type: "NOTICE" }, rec.account.managerId).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

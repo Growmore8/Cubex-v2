@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { assertCan } from "@/lib/perms";
 import { Prisma } from "@prisma/client";
-import { notify } from "@/services/notification.service";
+import { notify, notifyStaff } from "@/services/notification.service";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,12 +31,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await audit(s.tenantId as string, "payment." + status.toLowerCase(), rec.kind + " " + rec.amount + " " + (rec.method || ""), s.email || "admin");
     // Notify the client of the decision
     try {
-      const acc = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true } });
+      const acc = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true, login: true, managerId: true } });
+      const t = rec.kind === "DEPOSIT" ? "Deposit" : "Withdrawal";
       if (acc?.userId) {
-        const t = rec.kind === "DEPOSIT" ? "Deposit" : "Withdrawal";
         const msg = `${t} of ${rec.amount} ${approve ? "approved ✓" : "rejected"}`;
         await notify(s.tenantId as string, acc.userId, `${t} ${approve ? "Approved" : "Rejected"}`, msg, "FUNDS").catch(() => {});
       }
+      // Confirmation to staff + superadmin that the request was actioned.
+      notifyStaff(s.tenantId as string, { title: `${t} ${approve ? "approved" : "rejected"} — ${acc?.login || ""}`, body: `${rec.amount} ${rec.method || ""} by ${s.email || "admin"}`, type: "FUNDS" }, acc?.managerId).catch(() => {});
     } catch {}
     return NextResponse.json({ ok: true });
   } catch (e: any) {
