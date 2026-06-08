@@ -940,7 +940,7 @@ export default function AdminDeskPage() {
               const oid = (p: any) => p.ticket ?? p.orderId ?? p.order ?? p.id;
               const thc = "px-2 py-1.5 text-left font-semibold text-[var(--text)]";
               return (
-                <table className="w-full text-[10px]">
+                <table className="w-full border-collapse text-[10px] [&_td]:border [&_td]:border-[var(--border)] [&_th]:border [&_th]:border-[var(--border)] [&_td]:px-2.5 [&_th]:px-2.5">
                   <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
                     <th className={thc}><input type="checkbox" checked={tAllOn} onChange={tToggleAll} /></th>
                     <th className={thc}>Date Time</th><th className={thc}>Order ID</th><th className={thc}>Symbol</th><th className={thc}>Type</th>
@@ -1060,7 +1060,7 @@ export default function AdminDeskPage() {
                     <span className="text-[var(--muted)]">Type</span><select value={hfType} onChange={(e) => setHfType(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All</option><option value="BUY">Buy</option><option value="SELL">Sell</option></select>{Object.keys(histSel).filter((k) => histSel[k]).length > 0 && <button onClick={delHistBulk} className="ml-auto rounded px-2 py-0.5" style={{ background: SELL, color: "#1a0606" }}>Delete Selected ({Object.keys(histSel).filter((k) => histSel[k]).length})</button>}
                   </div>
                   <div className="flex-1 overflow-auto">
-                    <table className="w-full">
+                    <table className="w-full border-collapse [&_td]:border [&_td]:border-[var(--border)] [&_th]:border [&_th]:border-[var(--border)] [&_td]:px-2.5 [&_th]:px-2.5">
                       <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
                         <th className={thc}><input type="checkbox" checked={hAllOn} onChange={hToggleAll} /></th>
                         <th className={thc}>Date/Time</th><th className={thc}>Order/Ref</th><th className={thc}>Type</th><th className={thc}>Symbol</th><th className={thc}>Desc</th>
@@ -1121,7 +1121,7 @@ export default function AdminDeskPage() {
                     <span className="text-[var(--muted)]">{cliRows.length} clients</span>
                   </div>
                   <div className="flex-1 overflow-auto">
-                    <table className="w-full">
+                    <table className="w-full border-collapse [&_td]:border [&_td]:border-[var(--border)] [&_th]:border [&_th]:border-[var(--border)] [&_td]:px-2.5 [&_th]:px-2.5">
                       <thead><tr className="border-b border-[var(--border)] sticky top-0 bg-[var(--panel)] z-10">
                         <th className={thc}>Login</th><th className={thc}>Name</th><th className={thc}>Email</th>
                         <th className={thc}>Phone</th><th className={thc}>Country</th><th className={thc}>Manager</th>
