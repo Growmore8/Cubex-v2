@@ -79,6 +79,7 @@ export default function AdminDeskPage() {
   const [aform, setAform] = useState<any>({});
   const [topMenu, setTopMenu] = useState<string>("");
   const [modal, setModal] = useState<"" | "client" | "manager" | "group" | "notify">("");
+  const [modalMin, setModalMin] = useState(false);
   useEffect(() => { if (modal === "notify") fetch("/api/admin/notify").then((r) => r.json()).then((d) => { if (d.ok) setNrecent(d.recent || []); }).catch(() => {}); }, [modal]);
   const [form, setForm] = useState<any>({ type: "LIVE", leverage: 100, currency: "USD" });
   const [err, setErr] = useState("");
@@ -407,7 +408,7 @@ export default function AdminDeskPage() {
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
     setPos(null); loadAll();
   }
-  function openModal(kind: any) { setTopMenu(""); setErr(""); setOk(""); setForm({ type: "LIVE", leverage: 100, currency: "USD" }); setModal(kind); }
+  function openModal(kind: any) { setTopMenu(""); setErr(""); setOk(""); setForm({ type: "LIVE", leverage: 100, currency: "USD" }); setModalMin(false); setModal(kind); }
   async function submit(url: string, body: any, label: string) { setErr(""); setOk(""); const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; } setOk(label + " created"); setModal(""); loadAll(); }
   const f = (k: string, v: any) => setForm((o: any) => ({ ...o, [k]: v }));
   async function saveGroup() {
@@ -1509,10 +1510,23 @@ export default function AdminDeskPage() {
         );
       })()}
 
-      {modal && (
+      {modal && modalMin && (
+        <div className="fixed bottom-3 right-3 z-50 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+          <span className="font-semibold">{modal === "client" ? "New Client" : modal === "manager" ? "New Manager" : modal === "group" ? "Manage Groups" : "Send Notification"}</span>
+          <button onClick={() => setModalMin(false)} title="Restore" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--text)]"><i className="fa-solid fa-up-right-and-down-left-from-center" /></button>
+          <button onClick={() => { setModal(""); setModalMin(false); }} title="Close" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+        </div>
+      )}
+      {modal && !modalMin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="ui-pop w-[330px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 text-sm font-semibold">{modal === "client" && "New Client"}{modal === "manager" && "New Manager"}{modal === "group" && "Manage Groups"}{modal === "notify" && "Send Notification"}</div>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold">{modal === "client" && "New Client"}{modal === "manager" && "New Manager"}{modal === "group" && "Manage Groups"}{modal === "notify" && "Send Notification"}</div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setModalMin(true)} title="Minimize" className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-window-minimize text-[10px]" /></button>
+                <button onClick={() => setModal("")} title="Close" className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+              </div>
+            </div>
             {modal === "client" && (<>
               <div className="flex gap-1">
                 <button onClick={() => f("type", "LIVE")} className="flex-1 rounded py-1.5 text-xs" style={form.type === "LIVE" ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Live</button>

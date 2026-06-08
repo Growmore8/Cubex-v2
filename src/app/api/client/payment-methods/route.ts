@@ -5,11 +5,18 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const s = await requireClient();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  // global defaults (tenantId null) + this tenant's own methods
-  const all = await prisma.cryptoWallet.findMany({
-    where: { active: true, OR: [{ tenantId: null }, { tenantId: s.tenantId! }] },
+  // If this tenant has configured its OWN methods, show only those (globals are
+  // hidden for that tenant). Otherwise fall back to the global defaults.
+  const own = await prisma.cryptoWallet.findMany({
+    where: { active: true, tenantId: s.tenantId! },
     orderBy: { createdAt: "asc" },
   });
+  const all = own.length > 0
+    ? own
+    : await prisma.cryptoWallet.findMany({
+        where: { active: true, tenantId: null },
+        orderBy: { createdAt: "asc" },
+      });
   const crypto = all.filter((w) => w.type === "CRYPTO").map((w) => ({ id: w.id, network: w.network, asset: w.asset, address: w.address }));
   const upi = all.filter((w) => w.type === "UPI").map((w) => ({ id: w.id, label: w.label || "UPI", address: w.address }));
   const links = all.filter((w) => w.type === "LINK" && w.url).map((w) => ({ id: w.id, label: w.label || "Local Payment", url: w.url }));

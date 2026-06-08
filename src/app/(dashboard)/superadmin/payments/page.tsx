@@ -62,7 +62,7 @@ export default function SAPayments() {
         <option value="global">All tenants (global default)</option>
         {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
       </select>
-      <p className="mt-1 text-xs text-gray-400">Global methods show to every tenant&apos;s clients. Tenant methods show only to that tenant, in addition to globals.</p>
+      <p className="mt-1 text-xs text-gray-400">Global methods are the fallback for tenants with none of their own. Once a tenant configures its own methods, that tenant&apos;s clients see only those — the global methods are hidden for them.</p>
     </div>
 
     {/* Methods list */}
