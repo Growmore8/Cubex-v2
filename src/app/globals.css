@@ -100,6 +100,17 @@
 .auth-ghost { transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease; }
 .auth-ghost:hover { background: var(--secondary); }
 .auth-ghost:active { transform: translateY(1px) scale(0.99); }
+/* passwordless (Face ID / PIN) buttons — premium frosted */
+.auth-alt {
+  background: color-mix(in srgb, var(--brand-primary) 5%, transparent);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease, box-shadow 0.2s ease;
+}
+.auth-alt:hover {
+  background: color-mix(in srgb, var(--brand-primary) 11%, transparent);
+  border-color: color-mix(in srgb, var(--brand-primary) 45%, var(--border)) !important;
+  box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--brand-primary) 60%, transparent);
+}
+.auth-alt:active { transform: translateY(1px) scale(0.99); }
 @media (prefers-reduced-motion: reduce) {
   .auth-card, .auth-stagger > *, .auth-glow { animation: none !important; }
 }

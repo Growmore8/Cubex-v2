@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "next-themes";
 import { getBrand } from "@/lib/brand";
+import UpdateWatcher from "@/components/UpdateWatcher";
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -60,6 +61,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="light" storageKey="sa_theme">
           {children}
+          <UpdateWatcher />
           <Toaster
             position="top-right"
             toastOptions={{

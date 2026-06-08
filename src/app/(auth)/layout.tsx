@@ -9,10 +9,8 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           Scoped to while this layout is mounted; removed on navigating away. */}
       <style>{`html,body{background:#0a0f1c !important;}`}</style>
     <div
-      className="fixed inset-0 flex items-center justify-center overflow-y-auto px-4 py-6"
+      className="fixed inset-0 overflow-y-auto"
       style={{
-        paddingTop: "max(1.5rem, env(safe-area-inset-top))",
-        paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
         background: "linear-gradient(135deg, #0a0f1c 0%, #0f1a2e 55%, #0a0f1c 100%)",
         ["--brand-primary" as any]: brand.primaryColor,
         ["--brand-accent" as any]: brand.accentColor,
@@ -39,21 +37,27 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         </svg>
       </div>
 
-      <div className="auth-card relative w-full max-w-[330px]">
+      {/* min-h-full centers the card when it fits, but lets it scroll from the
+          TOP when taller than the viewport (items-center alone clips the top). */}
+      <div
+        className="relative flex min-h-full items-center justify-center px-4 py-6"
+        style={{ paddingTop: "max(1.5rem, env(safe-area-inset-top))", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+      >
+      <div className="auth-card relative w-full max-w-[340px]">
         {/* Thin brand gradient accent on top of the card */}
         <div
           className="mx-auto h-1 w-20 rounded-full"
           style={{ background: `linear-gradient(90deg, ${brand.primaryColor}, ${brand.accentColor})` }}
         />
         <div
-          className="mt-2.5 rounded-2xl border p-6 backdrop-blur-sm"
+          className="mt-2.5 rounded-2xl border p-5 backdrop-blur-xl"
           style={{
-            background: "var(--card)",
-            borderColor: "var(--border)",
-            boxShadow: "0 24px 60px -24px rgba(0,0,0,0.45), 0 2px 8px -4px rgba(0,0,0,0.3)",
+            background: "color-mix(in srgb, var(--card) 92%, transparent)",
+            borderColor: "color-mix(in srgb, var(--border) 80%, transparent)",
+            boxShadow: "0 30px 70px -28px rgba(0,0,0,0.55), 0 4px 14px -6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)",
           }}
         >
-          <div className="mb-5 text-center">
+          <div className="mb-4 text-center">
             {brand.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -98,6 +102,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
     </>

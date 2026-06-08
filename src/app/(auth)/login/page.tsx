@@ -36,6 +36,8 @@ export default function LoginPage() {
     if (!d.ok) { setErr(d.error || "Login failed"); return; }
     if (remember) localStorage.setItem("cubex-remember", "1");
     else localStorage.removeItem("cubex-remember");
+    // Just authenticated — don't make the app's PIN lock re-prompt immediately.
+    try { sessionStorage.setItem("cubex-pin-ok", "1"); } catch {}
     window.location.href = d.redirect;
   }
 
@@ -50,6 +52,7 @@ export default function LoginPage() {
       const vr = await fetch("/api/auth/passkey/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(asResp) }).then((r) => r.json());
       if (!vr.ok) throw new Error(vr.error || "Sign-in failed");
       localStorage.setItem("cubex-remember", "1");
+      try { sessionStorage.setItem("cubex-pin-ok", "1"); } catch {}
       window.location.href = vr.redirect;
     } catch (e: any) {
       if (e?.name !== "NotAllowedError" && e?.name !== "AbortError") setErr(e?.message || "Passkey sign-in failed");
@@ -64,16 +67,17 @@ export default function LoginPage() {
       const r = await fetch("/api/auth/pin-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }) }).then((x) => x.json());
       if (!r.ok) throw new Error(r.error || "PIN sign-in failed");
       localStorage.setItem("cubex-remember", "1");
+      try { sessionStorage.setItem("cubex-pin-ok", "1"); } catch {}
       window.location.href = r.redirect;
     } catch (e: any) { setErr(e?.message || "PIN sign-in failed"); }
     finally { setPinBusy(false); }
   }
 
   const base = "w-full rounded-xl border bg-transparent py-2.5 pl-10 text-sm text-[var(--foreground)] auth-field";
-  const altBtn = "flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold transition-colors disabled:opacity-60";
+  const altBtn = "auth-alt flex w-full items-center justify-center gap-2 rounded-xl border py-2 text-[13px] font-semibold transition-colors disabled:opacity-60";
 
   return (
-    <form onSubmit={submit} className="auth-stagger space-y-4">
+    <form onSubmit={submit} className="auth-stagger space-y-3">
       <div>
         <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Welcome back</h1>
         <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Sign in to your trading account</p>
@@ -118,19 +122,19 @@ export default function LoginPage() {
       </button>
 
       {/* Passwordless options */}
-      <div className="flex items-center gap-3 py-0.5">
+      <div className="flex items-center gap-3">
         <div className="h-px flex-1" style={{ background: "var(--border)" }} />
         <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>or sign in with</span>
         <div className="h-px flex-1" style={{ background: "var(--border)" }} />
       </div>
 
       {!pinMode ? (
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={signInPasskey} disabled={bioBusy} className={altBtn} style={{ borderColor: "var(--border)", color: "var(--foreground)" }}>
-            {bioBusy ? <i className="fa-solid fa-circle-notch fa-spin" /> : <i className="fa-solid fa-fingerprint" style={{ color: "var(--brand-primary)" }} />} Face ID / Fingerprint
+            {bioBusy ? <i className="fa-solid fa-circle-notch fa-spin" /> : <i className="fa-solid fa-fingerprint" style={{ color: "var(--brand-primary)" }} />} Face ID
           </button>
           <button type="button" onClick={() => { setErr(""); setPin(""); setPinMode(true); }} className={altBtn} style={{ borderColor: "var(--border)", color: "var(--foreground)" }}>
-            <i className="fa-solid fa-shield-halved" style={{ color: "var(--brand-primary)" }} /> Sign in with PIN
+            <i className="fa-solid fa-shield-halved" style={{ color: "var(--brand-primary)" }} /> PIN
           </button>
         </div>
       ) : (
