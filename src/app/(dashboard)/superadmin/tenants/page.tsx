@@ -268,7 +268,7 @@ export default function SATenantsPage() {
               <button onClick={() => setCreateOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
             </div>
             {/* Section: Tenant Identity */}
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tenant Details</div>
+            <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tenant Details</div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <input className={inp} placeholder="Company name *" autoComplete="off" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               <input className={inp} placeholder="Brand name (portal)" autoComplete="off" value={form.brandName || ""} onChange={(e) => setForm({ ...form, brandName: e.target.value })} />
@@ -280,20 +280,20 @@ export default function SATenantsPage() {
               <div className="col-span-2"><label className="text-xs text-gray-500 mb-1 block">Logo</label><LogoField value={form.logoUrl} which="create" /></div>
             </div>
             {/* Section: Admin Credentials */}
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Admin Account</div>
+            <div className="mb-2 mt-4 border-t border-gray-200 pt-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Admin Account</div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <input className={inp} placeholder="Admin name *" autoComplete="off" value={form.adminName || ""} onChange={(e) => setForm({ ...form, adminName: e.target.value })} />
               <input className={inp} placeholder="Admin email *" autoComplete="off" value={form.adminEmail || ""} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} />
               <PasswordInput wrap="relative col-span-2" className={inp} placeholder="Admin password (min 6) *" autoComplete="new-password" value={form.adminPassword || ""} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} />
             </div>
             {/* Section: Tenant Contact (SuperAdmin only) */}
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tenant Contact <span className="text-gray-300 normal-case font-normal">(SuperAdmin only — never shown publicly)</span></div>
+            <div className="mb-2 mt-4 border-t border-gray-200 pt-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tenant Contact <span className="text-gray-300 normal-case font-normal">(SuperAdmin only — never shown publicly)</span></div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <input className={inp} placeholder="Contact person" autoComplete="off" value={form.contactName || ""} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
               <input className={inp} placeholder="Contact phone (with country code, e.g. +94 77…)" autoComplete="off" value={form.contactPhone || ""} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} />
             </div>
             {/* Section: Email / SMTP */}
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Email Settings <span className="text-gray-300 normal-case font-normal">(for verification & password reset emails)</span></div>
+            <div className="mb-2 mt-4 border-t border-gray-200 pt-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Email Settings <span className="text-gray-300 normal-case font-normal">(for verification & password reset emails)</span></div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <input className={inp} placeholder="SMTP email (e.g. info@yourbrand.com)" autoComplete="off" type="email" value={form.smtpEmail || ""} onChange={(e) => setForm({ ...form, smtpEmail: e.target.value })} />
               <PasswordInput wrap="relative" className={inp} placeholder="Email / App password" autoComplete="new-password" value={form.smtpPassword || ""} onChange={(e) => setForm({ ...form, smtpPassword: e.target.value })} />
@@ -301,7 +301,7 @@ export default function SATenantsPage() {
               <p className="col-span-2 text-[10px] text-gray-400">Gmail/Outlook/Zoho auto-detected. For a custom-domain mailbox set the host (Namecheap Private Email = <b>mail.privateemail.com</b>). Gmail needs an App Password.</p>
             </div>
             {/* Section: Plan & Branding */}
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Plan & Branding</div>
+            <div className="mb-2 mt-4 border-t border-gray-200 pt-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Plan & Branding</div>
             <div className="space-y-2">
               <div>
                 <select className={inp} value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })}>

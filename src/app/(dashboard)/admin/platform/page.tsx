@@ -76,6 +76,7 @@ export default function AdminDeskPage() {
   const [menu, setMenu] = useState<{ x: number; y: number; acc: any } | null>(null);
   const [menuSub, setMenuSub] = useState("");
   const [act, setAct] = useState<any>(null);
+  const [actMin, setActMin] = useState(false);
   const [aform, setAform] = useState<any>({});
   const [topMenu, setTopMenu] = useState<string>("");
   const [modal, setModal] = useState<"" | "client" | "manager" | "group" | "notify">("");
@@ -336,7 +337,7 @@ export default function AdminDeskPage() {
   function unlinkSub(c: any) { askConfirm(`Unlink sub-account ${c.login} from its parent? It becomes a standalone account.`, async () => { const r = await fetch("/api/admin/clients/" + c.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "unlinkSub" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else { setOk("Sub-account unlinked"); loadAll(); } }, false); }
   function delClient(acc: any) { setMenu(null); askConfirm(`Delete ${acc.login} - ${acc.name}? This cannot be undone.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }); }
 
-  function openAct(kind: string, acc: any, finType?: string, label?: string) { setMenu(null); setMenuSub(""); setErr(""); setAform({}); setAct({ kind, acc, finType, label }); }
+  function openAct(kind: string, acc: any, finType?: string, label?: string) { setMenu(null); setMenuSub(""); setErr(""); setAform({}); setActMin(false); setAct({ kind, acc, finType, label }); }
   function actTitle() { if (!act) return ""; const m: any = { money: act.label, manualpnl: "Manual P/L", transfer: "Transfer Between Accounts", rename: "Client Details", accountid: "Change Account ID", password: "Change Password", assignmgr: "Assign Manager", assign: "Assign Manager & Group", settings: "Account Settings", subaccount: "Create Sub-Account", assigngroup: "Assign Group", leverage: "Change Leverage", mclevel: "Margin Call Level" }; return m[act.kind] || "Action"; }
   function actIcon() { if (!act) return "fa-circle"; const m: any = { money: "fa-dollar-sign", manualpnl: "fa-chart-line", transfer: "fa-right-left", rename: "fa-user-pen", accountid: "fa-id-card", password: "fa-key", assignmgr: "fa-user-tie", assign: "fa-user-tie", settings: "fa-sliders", subaccount: "fa-sitemap", assigngroup: "fa-layer-group", leverage: "fa-gauge-high", mclevel: "fa-triangle-exclamation" }; return m[act.kind] || "fa-circle"; }
   function actPrimary() {
@@ -1398,11 +1399,20 @@ export default function AdminDeskPage() {
         const linked = clients.filter((c: any) => act.acc.user?.email && c.user?.email === act.acc.user?.email);
         const LEVS = [50, 100, 200, 300, 500, 1000];
         return (
+        actMin ? (
+          <div className="fixed bottom-3 right-3 z-[60] flex items-center gap-2 rounded-lg border px-3 py-2 text-xs shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+            <i className={"fa-solid " + actIcon()} style={{ color: "var(--accent)" }} />
+            <span className="font-semibold">{actTitle()} — {act.acc.login}</span>
+            <button onClick={() => setActMin(false)} title="Restore" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--text)]"><i className="fa-solid fa-up-right-and-down-left-from-center" /></button>
+            <button onClick={() => setAct(null)} title="Close" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+          </div>
+        ) : (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="ui-pop w-[470px] max-w-[95vw] max-h-[90vh] overflow-auto rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent2)" }}><i className={"fa-solid " + actIcon()} /></span>
               <div className="min-w-0 flex-1"><div className="text-sm font-semibold">{actTitle()}</div><div className="truncate text-[11px] text-[var(--muted)]">{act.acc.login} - {act.acc.name}</div></div>
+              <button onClick={() => setActMin(true)} title="Minimize" className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-window-minimize text-[10px]" /></button>
               <button onClick={() => setAct(null)} className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
             </div>
             <div className="space-y-3 px-4 py-3 text-xs">
@@ -1507,6 +1517,7 @@ export default function AdminDeskPage() {
             </div>
           </div>
         </div>
+        )
         );
       })()}
 
