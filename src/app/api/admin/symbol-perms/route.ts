@@ -3,6 +3,7 @@ import { requireAdminOrManager } from "@/lib/guard";
 import { listEnabled } from "@/services/globalSymbol.service";
 import { getTenantDisabled, setTenantDisabled, getManagerDisabled, setManagerDisabled } from "@/services/symbolPerms.service";
 import { audit } from "@/lib/audit";
+import { emitRefresh } from "@/lib/realtime";
 
 // GET: list all enabled symbols + the disabled set for the caller's scope.
 export async function GET() {
@@ -28,6 +29,10 @@ export async function POST(req: Request) {
     const list = Array.from(set);
     if (isMgr) await setManagerDisabled(s.sub, list); else await setTenantDisabled(s.tenantId!, list);
     await audit(s.tenantId, "symbol.perm", `${symbol} ${b.disabled ? "off" : "on"} (${isMgr ? "manager" : "tenant"})`, s.email);
+    // Realtime: tell open apps/desks to reload their (correctly-scoped) symbol list
+    // immediately. Admin change reflects to all tenant clients; a manager change
+    // only changes the set for that manager's own clients (resolved server-side).
+    emitRefresh({ kind: "symbols", scope: isMgr ? "manager" : "tenant", managerId: isMgr ? s.sub : undefined, tenantId: s.tenantId });
     return NextResponse.json({ ok: true, disabled: list });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
