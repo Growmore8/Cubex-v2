@@ -91,6 +91,16 @@ export default function ClientMobile({ t }: { t: any }) {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [bioOn, setBioOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [myReqs, setMyReqs] = useState<any[]>([]);
+  const [myReqsLoaded, setMyReqsLoaded] = useState(false);
+  useEffect(() => {
+    if (tab === "profile" && !myReqsLoaded) {
+      fetch("/api/client/payments").then((r) => r.json()).then((d) => {
+        if (d.ok) setMyReqs(d.requests || []);
+        setMyReqsLoaded(true);
+      }).catch(() => setMyReqsLoaded(true));
+    }
+  }, [tab, myReqsLoaded]);
   useEffect(() => { try { setBioOn(localStorage.getItem("cubex-bio") === "1"); } catch {} }, []);
   // Await the enable/disable, THEN read the real subscription state (the old inline
   // handler raced the check before subscribe() finished, so the toggle never flipped).
@@ -941,6 +951,36 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="flex-1"><div className="text-[12px] font-semibold">{theme === "dark" ? "Light mode" : "Dark mode"}</div></div>
                 <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
               </button>
+            </div>
+
+            {/* my requests */}
+            <div className="glass-card p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-[11px] font-bold tracking-wide"><i className="fa-solid fa-clock-rotate-left mr-1.5" style={{ color: GOLD }} />MY REQUESTS</div>
+                <span className="text-[9px] text-[var(--muted)]">{myReqs.length} total</span>
+              </div>
+              {!myReqsLoaded ? (
+                <div className="py-3 text-center text-[11px] text-[var(--muted)]">Loading…</div>
+              ) : myReqs.length === 0 ? (
+                <div className="py-3 text-center text-[11px] text-[var(--muted)]">No deposit or withdrawal requests yet.</div>
+              ) : (
+                <div className="space-y-2">
+                  {myReqs.map((req: any) => (
+                    <div key={req.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] px-3 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: req.kind === "DEPOSIT" ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)" }}>
+                          <i className={"fa-solid text-sm " + (req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up")} style={{ color: req.kind === "DEPOSIT" ? BUY : SELL }} />
+                        </div>
+                        <div>
+                          <div className="text-[12px] font-semibold">{req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} <span className="font-bold">${Number(req.amount).toFixed(2)}</span></div>
+                          <div className="text-[10px] text-[var(--muted)]">{req.method || "—"} · {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : "—"}</div>
+                        </div>
+                      </div>
+                      <span className="rounded-full px-2.5 py-1 text-[9px] font-bold" style={{ background: req.status === "APPROVED" ? "rgba(22,163,74,0.15)" : req.status === "REJECTED" ? "rgba(220,38,38,0.15)" : "rgba(227,168,85,0.18)", color: req.status === "APPROVED" ? BUY : req.status === "REJECTED" ? SELL : GOLD }}>{req.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* export */}

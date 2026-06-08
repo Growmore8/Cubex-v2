@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 // Shared deposit / withdraw / KYC panel used by the full wallet page, the client
 // desktop terminal modal, and the mobile app. Premium method-list -> QR-detail
-// deposit flow, tabbed withdraw, and a separate Requests section.
+// deposit flow and tabbed withdraw. My Requests is shown in the Profile section.
 export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: { initialTab?: "deposit" | "withdraw" | "kyc"; onClose?: () => void; tabs?: ("deposit" | "withdraw" | "kyc")[] }) {
   const shown: ("deposit" | "withdraw" | "kyc")[] = tabs && tabs.length ? tabs : ["deposit", "withdraw", "kyc"];
   const panelTitle = shown.length === 1
@@ -13,7 +13,6 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
   const [crypto, setCrypto] = useState<any[]>([]);
   const [upi, setUpi] = useState<any[]>([]);
   const [links, setLinks] = useState<any[]>([]);
-  const [reqs, setReqs] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
   const [err, setErr] = useState(""); const [msg, setMsg] = useState("");
@@ -31,14 +30,12 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
   const [wNote, setWNote] = useState("");
 
   async function load() {
-    const [pm, p, k, ac] = await Promise.all([
+    const [pm, k, ac] = await Promise.all([
       fetch("/api/client/payment-methods").then((r) => r.json()).catch(() => ({})),
-      fetch("/api/client/payments").then((r) => r.json()).catch(() => ({})),
       fetch("/api/client/kyc").then((r) => r.json()).catch(() => ({})),
       fetch("/api/client/account").then((r) => r.json()).catch(() => ({})),
     ]);
     if (pm.ok) { setCrypto(pm.crypto || pm.wallets || []); setUpi(pm.upi || []); setLinks(pm.links || []); }
-    if (p.ok) setReqs(p.requests || []);
     if (k.ok) setDocs(k.docs || []);
     if (ac.ok && ac.account) setWithdrawable(typeof ac.withdrawable === "number" ? ac.withdrawable : Math.max(0, Number(ac.account.pnl || 0)));
   }
@@ -91,7 +88,6 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
 
   const input = "ui-input w-full px-3 py-2 text-sm";
   const lbl = "text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1";
-  const badge = (s: string) => "rounded-full px-2 py-0.5 text-xs font-medium " + (s === "APPROVED" ? "bg-green-100 text-green-700" : s === "REJECTED" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700");
   const tabBtn = (t: string) => "px-4 py-2 text-sm transition-colors duration-200 " + (tab === t ? "border-b-2 border-blue-600 font-semibold text-blue-600" : "text-[var(--muted)] hover:text-[var(--text)]");
   const netBadge = (n: string) => (<span className="rounded px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: netColor(n) }}>{n}</span>);
 
@@ -194,16 +190,5 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
       </div>);
     })()}
 
-    {/* ── REQUESTS (separate section) ── */}
-    {tab !== "kyc" && (
-      <div className="ui-card ui-fade-up p-4">
-        <div className="mb-2 flex items-center justify-between"><div className="text-sm font-semibold">My Requests</div><span className="text-[10px] text-[var(--muted)]">{reqs.length} total</span></div>
-        <div className="space-y-1.5">{reqs.length === 0 ? <div className="py-2 text-center text-sm text-[var(--muted)]">No requests yet.</div> : reqs.map((p) => (
-          <div key={p.id} className="ui-row flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-sm" style={{ borderColor: "var(--border)" }}>
-            <div className="flex items-center gap-2"><i className={"fa-solid " + (p.kind === "DEPOSIT" ? "fa-arrow-down text-emerald-500" : "fa-arrow-up text-red-500")} /><span className="font-medium">{p.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} {Number(p.amount).toFixed(2)}</span><span className="text-[10px] text-[var(--muted)]">{p.method}</span></div>
-            <span className={badge(p.status)}>{p.status}</span>
-          </div>))}</div>
-      </div>
-    )}
   </div>);
 }
