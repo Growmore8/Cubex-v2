@@ -63,6 +63,25 @@ export async function authenticate(host: string | null, email: string, password:
   return { sub: user.id, role: user.role as Role, tenantId: user.tenantId, email: user.email, name: user.name, ...(sid ? { sid } : {}) };
 }
 
+// Build a session for a user who has been authenticated by a SECOND factor
+// (passkey / device-bound PIN) rather than a password. Used by the passwordless
+// sign-in routes. CLIENT-only (staff must use password + single-device sid).
+export async function sessionForUser(userId: string, ip?: string, ua?: string): Promise<SessionPayload> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error("Account not found");
+  if (user.role !== "CLIENT") throw new Error("Passwordless sign-in is only available for client accounts");
+  if (user.status === "SUSPENDED") throw new Error("Your account has been deactivated. Please contact support.");
+  if (user.tenantId) {
+    const tenant = await prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { status: true } });
+    if (tenant && tenant.status === "SUSPENDED") throw new Error("This brokerage has been suspended. Please contact support.");
+  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date(), lastSeenAt: new Date(), ...(ip ? { lastLoginIp: ip } : {}), ...(ua ? { lastDevice: deviceFromUA(ua) } : {}) },
+  });
+  return { sub: user.id, role: user.role as Role, tenantId: user.tenantId, email: user.email, name: user.name };
+}
+
 export type RegisterResult =
   | { needsVerification: true; email: string }
   | (SessionPayload & { needsVerification: false });

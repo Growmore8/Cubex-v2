@@ -37,7 +37,7 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const tenantSlug = searchParams.get("tenant") ?? undefined;
 
-  const [type, setType] = useState<"DEMO" | "LIVE">("DEMO");
+  const [type, setType] = useState<"DEMO" | "LIVE">(searchParams.get("type") === "LIVE" ? "LIVE" : "DEMO");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [dialCode, setDialCode] = useState("LK");

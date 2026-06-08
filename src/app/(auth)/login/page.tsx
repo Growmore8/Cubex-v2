@@ -9,6 +9,10 @@ export default function LoginPage() {
   const [err, setErr] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
+  const [pinMode, setPinMode] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinBusy, setPinBusy] = useState(false);
 
   useEffect(() => {
     const reason = new URLSearchParams(window.location.search).get("reason");
@@ -35,13 +39,44 @@ export default function LoginPage() {
     window.location.href = d.redirect;
   }
 
+  // Passwordless sign-in with a registered passkey (Face ID / Fingerprint).
+  async function signInPasskey() {
+    setErr(""); setBioBusy(true);
+    try {
+      const mod: any = await import("@simplewebauthn/browser");
+      const optRes = await fetch("/api/auth/passkey/options", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }).then((r) => r.json());
+      if (!optRes.ok) throw new Error(optRes.error || "No passkey available on this device");
+      const asResp = await mod.startAuthentication(optRes.options);
+      const vr = await fetch("/api/auth/passkey/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(asResp) }).then((r) => r.json());
+      if (!vr.ok) throw new Error(vr.error || "Sign-in failed");
+      localStorage.setItem("cubex-remember", "1");
+      window.location.href = vr.redirect;
+    } catch (e: any) {
+      if (e?.name !== "NotAllowedError" && e?.name !== "AbortError") setErr(e?.message || "Passkey sign-in failed");
+    } finally { setBioBusy(false); }
+  }
+
+  // Passwordless PIN sign-in (device-bound).
+  async function signInPin(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(""); setPinBusy(true);
+    try {
+      const r = await fetch("/api/auth/pin-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }) }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "PIN sign-in failed");
+      localStorage.setItem("cubex-remember", "1");
+      window.location.href = r.redirect;
+    } catch (e: any) { setErr(e?.message || "PIN sign-in failed"); }
+    finally { setPinBusy(false); }
+  }
+
   const base = "w-full rounded-xl border bg-transparent py-2.5 pl-10 text-sm text-[var(--foreground)] auth-field";
+  const altBtn = "flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold transition-colors disabled:opacity-60";
 
   return (
     <form onSubmit={submit} className="auth-stagger space-y-4">
       <div>
         <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Welcome back</h1>
-        <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Sign in to your account to continue</p>
+        <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Sign in to your trading account</p>
       </div>
 
       {notice && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{notice}</p>}
@@ -82,12 +117,50 @@ export default function LoginPage() {
         {loading ? <><i className="fa-solid fa-circle-notch fa-spin" /> Signing in…</> : <>Sign in <i className="fa-solid fa-arrow-right text-xs" /></>}
       </button>
 
-      <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
-        Don&apos;t have an account?{" "}
-        <a href="/register" className="font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}>
-          Open a Live or Demo account
-        </a>
-      </p>
+      {/* Passwordless options */}
+      <div className="flex items-center gap-3 py-0.5">
+        <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>or sign in with</span>
+        <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+      </div>
+
+      {!pinMode ? (
+        <div className="space-y-2">
+          <button type="button" onClick={signInPasskey} disabled={bioBusy} className={altBtn} style={{ borderColor: "var(--border)", color: "var(--foreground)" }}>
+            {bioBusy ? <i className="fa-solid fa-circle-notch fa-spin" /> : <i className="fa-solid fa-fingerprint" style={{ color: "var(--brand-primary)" }} />} Face ID / Fingerprint
+          </button>
+          <button type="button" onClick={() => { setErr(""); setPin(""); setPinMode(true); }} className={altBtn} style={{ borderColor: "var(--border)", color: "var(--foreground)" }}>
+            <i className="fa-solid fa-shield-halved" style={{ color: "var(--brand-primary)" }} /> Sign in with PIN
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="relative">
+            <i className="fa-solid fa-shield-halved pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }} />
+            <input type="password" inputMode="numeric" autoFocus value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onKeyDown={(e) => { if (e.key === "Enter") signInPin(e as any); }}
+              className={base + " pr-3 tracking-[0.3em]"} style={{ borderColor: "var(--border)" }} placeholder="• • • •" />
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setPinMode(false)} className={altBtn + " flex-1"} style={{ borderColor: "var(--border)", color: "var(--muted-foreground)" }}>Back</button>
+            <button type="button" onClick={signInPin as any} disabled={pinBusy || pin.length < 4}
+              style={{ background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))` }}
+              className="auth-btn flex flex-[2] items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+              {pinBusy ? <><i className="fa-solid fa-circle-notch fa-spin" /> Unlocking…</> : <>Unlock <i className="fa-solid fa-arrow-right text-xs" /></>}
+            </button>
+          </div>
+          <p className="text-center text-[10px]" style={{ color: "var(--muted-foreground)" }}>Works on devices where you&apos;ve signed in with your password before.</p>
+        </div>
+      )}
+
+      <div className="space-y-1 pt-1 text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
+        <div>New here?{" "}
+          <a href="/register?type=DEMO" className="font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}><i className="fa-solid fa-circle-play mr-1 text-[10px]" />Open Demo Account</a>
+        </div>
+        <div>Ready to trade?{" "}
+          <a href="/register?type=LIVE" className="font-semibold hover:underline" style={{ color: "var(--brand-accent)" }}><i className="fa-solid fa-bolt mr-1 text-[10px]" />Open Live Account</a>
+        </div>
+      </div>
     </form>
   );
 }

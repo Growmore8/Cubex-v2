@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { authenticate } from "@/services/auth.service";
-import { signSession, SESSION_COOKIE } from "@/lib/jwt";
+import { signSession, SESSION_COOKIE, signDeviceToken, DEVICE_COOKIE } from "@/lib/jwt";
 import { ROLE_HOME } from "@/config/roles";
 import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
@@ -46,6 +46,14 @@ export async function POST(req: Request) {
       // beacon additionally covers tab-close logout best-effort for non-remembered sessions.
       ...(remember ? { maxAge: 60 * 60 * 24 * 30 } : {}),
     });
+    // Mark this device as trusted so the user can later sign in with their PIN
+    // (device-bound passwordless). CLIENT only; staff always use password.
+    if (session.role === "CLIENT") {
+      res.cookies.set(DEVICE_COOKIE, await signDeviceToken(session.sub), {
+        httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
+        path: "/", maxAge: 60 * 60 * 24 * 180,
+      });
+    }
     return res;
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Login failed" }, { status: 401 });

@@ -25,3 +25,26 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
     return null;
   }
 }
+
+// Device-bound token for passwordless PIN sign-in. Set (httpOnly) after a
+// successful password login so a PIN can only sign in on a device that has
+// already authenticated with the full password at least once.
+export const DEVICE_COOKIE = "cubex_device";
+
+export async function signDeviceToken(userId: string) {
+  return await new SignJWT({ uid: userId, kind: "device" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("180d")
+    .sign(getSecret());
+}
+
+export async function verifyDeviceToken(token: string): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    if ((payload as any).kind !== "device") return null;
+    return (payload as any).uid as string;
+  } catch {
+    return null;
+  }
+}
