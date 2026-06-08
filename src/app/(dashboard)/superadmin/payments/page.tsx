@@ -51,7 +51,7 @@ export default function SAPayments() {
         : { type, label: "Local Payment", url: "", active: true });
   }
 
-  return (<div className="max-w-3xl space-y-4 ui-fade-up">
+  return (<div className="max-w-5xl space-y-4 ui-fade-up">
     <div><h1 className="text-2xl font-bold">Payment Methods</h1><p className="text-sm text-gray-500">Configure deposit methods clients see — globally or per tenant</p></div>
     {err && <div className="text-sm text-red-600">{err}</div>}{msg && <div className="text-sm text-green-600">{msg}</div>}
 

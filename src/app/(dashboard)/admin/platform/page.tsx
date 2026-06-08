@@ -101,6 +101,7 @@ export default function AdminDeskPage() {
   const [pos, setPos] = useState<any>(null);
   const [symOv, setSymOv] = useState<any>(null);
   const [mt, setMt] = useState<any>(null);
+  const [mtMin, setMtMin] = useState(false);
   const [hEdit, setHEdit] = useState<any>(null);
   const [pform, setPform] = useState<any>({});
   const [tradeSel, setTradeSel] = useState<Record<string, boolean>>({});
@@ -435,7 +436,7 @@ export default function AdminDeskPage() {
     setHEdit(null); loadAll();
   }
   async function openMT(acc: any) {
-    setMenu(null);
+    setMenu(null); setMtMin(false);
     const sym = selSym || (symbols[0] && symbols[0].symbol) || "";
     const now = new Date(); const tz = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     setMt({ acc, symbol: sym, type: "BUY", lots: 0.01, sl: 0, tp: 0, openPrice: prices[sym] ?? 0, follow: true, date: tz });
@@ -907,10 +908,10 @@ export default function AdminDeskPage() {
               const tSelIds = accOpen.filter((p) => tradeSel[p.id]).map((p) => p.id);
               const odt = (p: any) => { const v = p.openTime || p.openedAt || p.createdAt || p.time; return v ? new Date(v).toLocaleString() : "-"; };
               const oid = (p: any) => p.ticket ?? p.orderId ?? p.order ?? p.id;
-              const thc = "px-2 py-1 text-left font-normal text-[var(--muted)]";
+              const thc = "px-2 py-1.5 text-left font-semibold text-[var(--text)]";
               return (
                 <table className="w-full text-[10px]">
-                  <thead><tr className="border-b border-[var(--border)]">
+                  <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
                     <th className={thc}><input type="checkbox" checked={tAllOn} onChange={tToggleAll} /></th>
                     <th className={thc}>Date Time</th><th className={thc}>Order ID</th><th className={thc}>Symbol</th><th className={thc}>Type</th>
                     <th className={thc + " text-right"}>Lots</th><th className={thc + " text-right"}>Open Price</th><th className={thc + " text-right"}>S/L</th><th className={thc + " text-right"}>T/P</th>
@@ -1003,7 +1004,7 @@ export default function AdminDeskPage() {
             })()}
             {tab === "history" && (() => {
               if (!selAcc) return <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>Please select an account first.</div>;
-              const thc = "px-2 py-1 text-left font-normal text-[var(--muted)]";
+              const thc = "px-2 py-1.5 text-left font-semibold text-[var(--text)]";
               const presets: [string, string][] = [["ALL", "All Time"], ["TODAY", "Today"], ["WEEK", "This Week"], ["MONTH", "This Month"]];
               const hdt = (h: any) => h.closeTime || h.closedAt || h.closeDate || h.createdAt || h.date || h.time;
               const inRange = (h: any) => {
@@ -1030,7 +1031,7 @@ export default function AdminDeskPage() {
                   </div>
                   <div className="flex-1 overflow-auto">
                     <table className="w-full">
-                      <thead><tr className="border-b border-[var(--border)]">
+                      <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
                         <th className={thc}><input type="checkbox" checked={hAllOn} onChange={hToggleAll} /></th>
                         <th className={thc}>Date/Time</th><th className={thc}>Order/Ref</th><th className={thc}>Type</th><th className={thc}>Symbol</th><th className={thc}>Desc</th>
                         <th className={thc + " text-right"}>Open Px</th><th className={thc + " text-right"}>Close Px</th><th className={thc + " text-right"}>S/L</th><th className={thc + " text-right"}>T/P</th>
@@ -1080,7 +1081,7 @@ export default function AdminDeskPage() {
                 if (cliQ) { const q = cliQ.toLowerCase(); if (!((c.login || "").toLowerCase().includes(q) || (c.name || "").toLowerCase().includes(q) || ((c.user?.email || c.email || "").toLowerCase().includes(q)))) return false; }
                 return true;
               });
-              const thc = "px-2 py-1 text-left font-normal text-[var(--muted)] whitespace-nowrap";
+              const thc = "px-2 py-1.5 text-left font-semibold text-[var(--text)] whitespace-nowrap";
               return (
                 <div className="flex h-full flex-col text-[10px]">
                   <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-2 py-1">
@@ -1610,10 +1611,24 @@ export default function AdminDeskPage() {
         </div>
         );
       })()}
-      {mt && (
+      {mt && mtMin && (
+        <div className="fixed bottom-3 right-3 z-[60] flex items-center gap-2 rounded-lg border px-3 py-2 text-xs shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+          <i className="fa-solid fa-bolt" style={{ color: "var(--accent)" }} />
+          <span className="font-semibold">Manual Trade — {mt.acc.login}</span>
+          <button onClick={() => setMtMin(false)} title="Restore" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--text)]"><i className="fa-solid fa-up-right-and-down-left-from-center" /></button>
+          <button onClick={() => { setMt(null); setMtMin(false); }} title="Close" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+        </div>
+      )}
+      {mt && !mtMin && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="ui-pop w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 text-sm font-semibold">Manual Trade - <span style={{ color: "var(--accent)" }}>{mt.acc.login} - {mt.acc.name}</span></div>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold">Manual Trade - <span style={{ color: "var(--accent)" }}>{mt.acc.login} - {mt.acc.name}</span></div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setMtMin(true)} title="Minimize" className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-window-minimize text-[10px]" /></button>
+                <button onClick={() => setMt(null)} title="Close" className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+              </div>
+            </div>
             <div className={lab}>Symbol</div>
             <select className={inp} value={mt.symbol} onChange={(e) => setMt({ ...mt, symbol: e.target.value, openPrice: mt.follow ? (prices[e.target.value] ?? 0) : mt.openPrice })}>{symbols.map((s) => <option key={s.symbol} value={s.symbol}>{s.symbol}</option>)}</select>
             <div className="mt-2"><div className={lab}>Order Kind</div>
