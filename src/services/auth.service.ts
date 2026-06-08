@@ -18,23 +18,22 @@ export async function authenticate(host: string | null, email: string, password:
   const tenant = await resolveTenant(host);
   const tenantId = tenant?.id ?? null;
 
-  const user = tenantId
-    ? await prisma.user.findFirst({
-        where: { tenantId, email: email.toLowerCase() },
-      })
-    : await prisma.user.findFirst({
-        where: { email: email.toLowerCase() },
-        orderBy: { createdAt: "asc" },
-      });
+  const lower = email.toLowerCase();
+  // Several users can share an email under one tenant (e.g. a CLIENT trader who is
+  // also a MANAGER), so match the password across all candidates with that email.
+  const candidates = tenantId
+    ? await prisma.user.findMany({ where: { tenantId, email: lower }, orderBy: { createdAt: "asc" } })
+    : await prisma.user.findMany({ where: { email: lower }, orderBy: { createdAt: "asc" } });
 
+  let user: (typeof candidates)[number] | null = null;
+  for (const c of candidates) {
+    if (await verifyPassword(password, c.passwordHash)) { user = c; break; }
+  }
   if (!user) throw new Error("Invalid email or password");
   // SUSPENDED = deactivated -> cannot sign in. LOCKED = read-only -> allowed (banner shown).
   if (user.status === "SUSPENDED") throw new Error("Your account has been deactivated. Please contact support.");
   // Tenant SUSPENDED = read-only (allowed). PENDING = not yet activated (blocked).
   if (tenant && tenant.status === "PENDING") throw new Error("This workspace is not active yet");
-
-  const ok = await verifyPassword(password, user.passwordHash);
-  if (!ok) throw new Error("Invalid email or password");
 
   // Pending email verification: emailToken is set and is NOT a password-reset token.
   // Checked only after password is confirmed so we don't leak account existence.
@@ -91,7 +90,7 @@ export async function registerClient(
   const emailToken = hasSmtp ? makeCode() : null;
 
   const session = await prisma.$transaction(async (tx) => {
-    const exists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail } });
+    const exists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail, role: "CLIENT" } });
     if (exists) throw new Error("Email already registered");
     // Only LIVE accounts consume a seat
     await assertSeatAvailable(tx, tenant!.id, type);

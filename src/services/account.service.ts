@@ -39,7 +39,8 @@ export async function createClient(tenantId: string, input: any, actor = "admin"
   const acc = await prisma.$transaction(async (tx) => {
     await assertSeatAvailable(tx, tenantId, type); // enforce the plan's account limit (live only)
     const email = input.email.toLowerCase();
-    let user = await tx.user.findFirst({ where: { tenantId, email } });
+    // Scope to CLIENT so a manager/admin sharing the email isn't reused as the owner.
+    let user = await tx.user.findFirst({ where: { tenantId, email, role: "CLIENT" } });
     if (!user) {
       const passwordHash = await hashPassword(input.password);
       user = await tx.user.create({ data: { tenantId, email, name: input.name, passwordHash, role: "CLIENT" } });
@@ -65,6 +66,20 @@ export async function createClient(tenantId: string, input: any, actor = "admin"
   });
   await audit(tenantId, "client.create", acc.login + " " + input.email, actor);
   return acc;
+}
+
+// Give a staff member (MANAGER / ADMIN) their own LIVE trading account so they can
+// trade like a client. Idempotent — returns the existing account if they have one.
+// No seat check: staff accounts are not client onboarding.
+export async function createStaffAccount(tenantId: string, userId: string, name: string) {
+  const existing = await prisma.account.findFirst({ where: { userId } });
+  if (existing) return existing;
+  const login = await nextLogin(prisma, tenantId, "LIVE");
+  return prisma.account.create({
+    // managerId = self so a MANAGER sees their own account within their scoped
+    // client list (admins see all accounts regardless).
+    data: { tenantId, login, userId, name, type: "LIVE", leverage: 100, currency: "USD", managerId: userId },
+  });
 }
 
 export function getClient(tenantId: string, id: string) {

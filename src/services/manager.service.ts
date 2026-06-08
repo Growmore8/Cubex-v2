@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { assertManagerAvailable } from "@/services/tenant.service";
+import { createStaffAccount } from "@/services/account.service";
 
 export function listManagers(tenantId: string) {
   return prisma.user.findMany({
@@ -15,16 +16,19 @@ export function listManagers(tenantId: string) {
 
 export async function createManager(tenantId: string, input: any) {
   await assertManagerAvailable(prisma, tenantId);
-  const existing = await prisma.user.findFirst({ where: { tenantId, email: input.email.toLowerCase() } });
-  if (existing) throw new Error("Email already in use");
+  const existing = await prisma.user.findFirst({ where: { tenantId, email: input.email.toLowerCase(), role: "MANAGER" } });
+  if (existing) throw new Error("Email already in use by another manager");
   const passwordHash = await hashPassword(input.password);
-  return prisma.user.create({
+  const manager = await prisma.user.create({
     data: {
       tenantId, email: input.email.toLowerCase(), name: input.name, passwordHash,
       role: "MANAGER", perms: input.perms || {},
     },
     select: { id: true, name: true, email: true, status: true, perms: true },
   });
+  // Managers get their own trading account too (they trade like a client).
+  await createStaffAccount(tenantId, manager.id, input.name).catch(() => {});
+  return manager;
 }
 
 export async function updateManager(tenantId: string, id: string, data: any) {
@@ -36,8 +40,8 @@ export async function updateManager(tenantId: string, id: string, data: any) {
   if (data.perms !== undefined) patch.perms = data.perms;
   if (data.email) {
     const emailLower = String(data.email).toLowerCase();
-    const clash = await prisma.user.findFirst({ where: { tenantId, email: emailLower, NOT: { id } } });
-    if (clash) throw new Error("Email already in use");
+    const clash = await prisma.user.findFirst({ where: { tenantId, email: emailLower, role: "MANAGER", NOT: { id } } });
+    if (clash) throw new Error("Email already in use by another manager");
     patch.email = emailLower;
   }
   if (data.password) {

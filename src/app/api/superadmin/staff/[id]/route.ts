@@ -17,8 +17,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (b.name) data.name = b.name;
       if (b.email) {
         const emailLower = b.email.toLowerCase();
-        const clash = await prisma.user.findFirst({ where: { email: emailLower, tenantId: u.tenantId, NOT: { id: u.id } } });
-        if (clash) throw new Error("Email already in use");
+        const clash = await prisma.user.findFirst({ where: { email: emailLower, tenantId: u.tenantId, role: u.role, NOT: { id: u.id } } });
+        if (clash) throw new Error("Email already in use by another " + String(u.role).toLowerCase());
         data.email = emailLower;
       }
       if (b.tenantId !== undefined) data.tenantId = b.tenantId || null;

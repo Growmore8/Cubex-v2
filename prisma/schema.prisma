@@ -87,8 +87,11 @@ model User {
   accounts        Account[]  @relation("AccountOwner")
   managedAccounts Account[]  @relation("ManagerAccounts")
   managedGroups   TradeGroup[] @relation("ManagerGroups")
-  @@unique([tenantId, email])
+  // Email is unique per (tenant, role) so the same person can be e.g. both a
+  // CLIENT (trader) and a MANAGER under one tenant. Login disambiguates by password.
+  @@unique([tenantId, email, role])
   @@index([role])
+  @@index([tenantId, email])
 }
 model Account {
   id              String             @id @default(uuid())
