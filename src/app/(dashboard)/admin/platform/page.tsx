@@ -6,6 +6,7 @@ import PriceCell from "@/components/PriceCell";
 import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds";
 import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
+import ManagersModal from "@/components/admin/ManagersModal";
 import PasswordInput from "@/components/ui/PasswordInput";
 import CountrySelect from "@/components/ui/CountrySelect";
 import { isOnline as presenceOnline } from "@/components/ui/Presence";
@@ -50,6 +51,7 @@ export default function AdminDeskPage() {
   }, [clients]);
   const isSubAcc = (c: any) => !!c.parentId || subAccIds.has(c.id);
   const [managers, setManagers] = useState<any[]>([]);
+  const [mgrModal, setMgrModal] = useState(false);
   const [tradeGroups, setTradeGroups] = useState<any[]>([]);
   const [nrecent, setNrecent] = useState<any[]>([]);
   const NOTI_TEMPLATES: any = { Maintenance: { title: "Scheduled Maintenance", body: "Our platform will undergo scheduled maintenance. Trading may be briefly unavailable. We apologize for any inconvenience." }, Promotion: { title: "Special Promotion", body: "A new promotion is now available. Contact your account manager to learn more." }, News: { title: "Market News", body: "Stay informed with the latest market updates and analysis." }, Notice: { title: "Important Notice", body: "Please review this important notice regarding your trading account." }, Custom: { title: "", body: "" } };
@@ -572,6 +574,9 @@ export default function AdminDeskPage() {
   const mi = "flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)] transition-colors";
   const subi = "flex w-full items-center gap-2 px-3 py-1 text-left hover:bg-[var(--soft)] transition-colors";
   const mIco = (icon: string, color?: string) => <i className={"fa-solid " + icon} style={{ width: 13, fontSize: 11, textAlign: "center", color: color || "var(--muted)" }} />;
+  // Right-side flyout submenu (opens to the right of the trigger, not below).
+  const flyCls = "absolute left-full top-0 ml-1 min-w-[210px] overflow-hidden rounded-xl border py-1 z-[70]";
+  const flySty: React.CSSProperties = { background: "color-mix(in srgb, var(--panel) 96%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", boxShadow: "0 20px 50px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.12s cubic-bezier(.16,1,.3,1)" };
   const tgl = (on: boolean) => "rounded border border-[var(--border)] px-2 py-1 " + (on ? "" : "opacity-50");
   function toggleCat(c: string) { setCollapsed((o) => ({ ...o, [c]: !o[c] })); }
   function togglePanel(k: "nav" | "mw" | "toolbox") { setPanels((p) => ({ ...p, [k]: !p[k] })); }
@@ -660,7 +665,7 @@ export default function AdminDeskPage() {
                     {dHead("Create")}
                     {can("createClients") && dItem(() => openModal("client"), "fa-user-plus", "New Client", BUY)}
                     {!isManager && can("manageManagers") && dItem(() => openModal("manager"), "fa-user-tie", "New Manager")}
-                    {!isManager && can("manageManagers") && dItem(() => { window.location.href = "/admin/managers"; }, "fa-users-gear", "Manage Managers")}
+                    {!isManager && can("manageManagers") && dItem(() => { setMgrModal(true); }, "fa-users-gear", "Manage Managers")}
                     {!isManager && dItem(() => openModal("group"), "fa-layer-group", "Groups")}
                     {dDivider}
                     {can("sendNotifications") && dItem(() => openModal("notify"), "fa-paper-plane", "Send Notification", GOLD)}
@@ -1255,9 +1260,11 @@ export default function AdminDeskPage() {
         </div>
       </>)}
 
+      {mgrModal && <ManagersModal onClose={() => { setMgrModal(false); loadAll(); }} />}
+
       {menu && (<>
         <div className="fixed inset-0 z-40" onClick={() => { setMenu(null); setMenuSub(""); }} />
-        <div className="ui-pop fixed z-50 w-60 overflow-hidden rounded-2xl border py-1 text-[11px]" style={{ left: menu.x, top: menu.y, background: "color-mix(in srgb, var(--panel) 92%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.14s cubic-bezier(.16,1,.3,1)" }}>
+        <div className="ui-pop fixed z-50 w-60 rounded-2xl border py-1 text-[11px]" style={{ left: menu.x, top: menu.y, background: "color-mix(in srgb, var(--panel) 92%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.14s cubic-bezier(.16,1,.3,1)" }}>
           {/* Header */}
           <div className="mx-1.5 mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 5%, transparent))" }}>
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm" style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
@@ -1276,24 +1283,26 @@ export default function AdminDeskPage() {
           </div>
 
           {/* Money accordion */}
-          {(can("processDeposits") || can("processWithdrawals") || can("creditBonus") || can("editFinancial") || can("transferFunds")) && <>
-            <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className="flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)]">
-              {mIco("fa-coins", GOLD)}<span className="flex-1">Money</span>
-              <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "money" ? "fa-chevron-down rotate-0" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
-            </button>
-            <div style={{ maxHeight: menuSub === "money" ? "280px" : "0", overflow: "hidden", transition: "max-height 0.2s ease" }}>
-              <div className="mx-1 mb-1 overflow-hidden rounded-lg" style={{ background: "var(--soft)" }}>
-                {can("processDeposits") && <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>{mIco("fa-arrow-down-to-bracket", BUY)}Deposit</button>}
-                {can("processWithdrawals") && <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>{mIco("fa-arrow-up-from-bracket", GOLD)}Withdrawal</button>}
-                {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-plus", BUY)}Credit In</button>}
-                {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-minus", GOLD)}Credit Out</button>}
-                {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus")} className={subi} style={{ color: BUY }}>{mIco("fa-gift", BUY)}Bonus</button>}
-                {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>{mIco("fa-shield-halved")}Insurance</button>}
-                {can("editFinancial") && <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>{mIco("fa-chart-line")}Manual P/L</button>}
-                {can("transferFunds") && <button onClick={() => openAct("transfer", menu.acc)} className={subi}>{mIco("fa-right-left")}Transfer Between Accounts</button>}
-              </div>
+          {(can("processDeposits") || can("processWithdrawals") || can("creditBonus") || can("editFinancial") || can("transferFunds")) && (
+            <div className="relative">
+              <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (menuSub === "money" ? "bg-[var(--soft)]" : "")}>
+                {mIco("fa-coins", GOLD)}<span className="flex-1">Money</span>
+                <i className="fa-solid fa-chevron-right text-[8px]" style={{ color: menuSub === "money" ? "var(--accent)" : "var(--muted)" }} />
+              </button>
+              {menuSub === "money" && (
+                <div className={flyCls} style={flySty}>
+                  {can("processDeposits") && <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>{mIco("fa-arrow-down-to-bracket", BUY)}Deposit</button>}
+                  {can("processWithdrawals") && <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>{mIco("fa-arrow-up-from-bracket", GOLD)}Withdrawal</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-plus", BUY)}Credit In</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-minus", GOLD)}Credit Out</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus")} className={subi} style={{ color: BUY }}>{mIco("fa-gift", BUY)}Bonus</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>{mIco("fa-shield-halved")}Insurance</button>}
+                  {can("editFinancial") && <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>{mIco("fa-chart-line")}Manual P/L</button>}
+                  {can("transferFunds") && <button onClick={() => openAct("transfer", menu.acc)} className={subi}>{mIco("fa-right-left")}Transfer Between Accounts</button>}
+                </div>
+              )}
             </div>
-          </>}
+          )}
 
           {can("manualTrade") && <button onClick={() => openMT(menu.acc)} className={mi}>{mIco("fa-bolt", "var(--accent)")}Manual Trade</button>}
           <button onClick={() => openAct("subaccount", menu.acc)} className={mi}>{mIco("fa-sitemap")}Create Sub-Account</button>
@@ -1303,18 +1312,20 @@ export default function AdminDeskPage() {
           {/* Edit Client / KYC — available on every account (live or demo). Detail
               edits propagate to all of the client's connected accounts server-side. */}
           {(<>
-            {/* Edit Client accordion */}
-            <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)]">
-              {mIco("fa-pen-to-square")}<span className="flex-1">Edit Client</span>
-              <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "edit" ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
-            </button>
-            <div style={{ maxHeight: menuSub === "edit" ? "200px" : "0", overflow: "hidden", transition: "max-height 0.2s ease" }}>
-              <div className="mx-1 mb-1 overflow-hidden rounded-lg" style={{ background: "var(--soft)" }}>
-                <button onClick={() => openAct("rename", menu.acc)} className={subi}>{mIco("fa-user-pen")}Edit Details</button>
-                <button onClick={() => openAct("accountid", menu.acc)} className={subi}>{mIco("fa-id-card")}Change Account ID</button>
-                <button onClick={() => openAct("assign", menu.acc)} className={subi}>{mIco("fa-user-tie")}Assign Manager &amp; Group</button>
-                <button onClick={() => doClearPin(menu.acc)} className={subi}>{mIco("fa-unlock-keyhole")}Reset PIN</button>
-              </div>
+            {/* Edit Client flyout */}
+            <div className="relative">
+              <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (menuSub === "edit" ? "bg-[var(--soft)]" : "")}>
+                {mIco("fa-pen-to-square")}<span className="flex-1">Edit Client</span>
+                <i className="fa-solid fa-chevron-right text-[8px]" style={{ color: menuSub === "edit" ? "var(--accent)" : "var(--muted)" }} />
+              </button>
+              {menuSub === "edit" && (
+                <div className={flyCls} style={flySty}>
+                  <button onClick={() => openAct("rename", menu.acc)} className={subi}>{mIco("fa-user-pen")}Edit Details</button>
+                  <button onClick={() => openAct("accountid", menu.acc)} className={subi}>{mIco("fa-id-card")}Change Account ID</button>
+                  <button onClick={() => openAct("assign", menu.acc)} className={subi}>{mIco("fa-user-tie")}Assign Manager &amp; Group</button>
+                  <button onClick={() => doClearPin(menu.acc)} className={subi}>{mIco("fa-unlock-keyhole")}Reset PIN</button>
+                </div>
+              )}
             </div>
 
             {/* KYC */}
@@ -1331,18 +1342,20 @@ export default function AdminDeskPage() {
             )}
           </>)}
 
-          {/* Settings accordion */}
-          <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className="flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)]">
-            {mIco("fa-gear")}<span className="flex-1">Settings</span>
-            <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "settings" ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
-          </button>
-          <div style={{ maxHeight: menuSub === "settings" ? "160px" : "0", overflow: "hidden", transition: "max-height 0.2s ease" }}>
-            <div className="mx-1 mb-1 overflow-hidden rounded-lg" style={{ background: "var(--soft)" }}>
-              <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
-              <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
-              <button onClick={() => openSymOv(menu.acc)} className={subi}>{mIco("fa-ban")}Disable Symbols</button>
-              <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
-            </div>
+          {/* Settings flyout */}
+          <div className="relative">
+            <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (menuSub === "settings" ? "bg-[var(--soft)]" : "")}>
+              {mIco("fa-gear")}<span className="flex-1">Settings</span>
+              <i className="fa-solid fa-chevron-right text-[8px]" style={{ color: menuSub === "settings" ? "var(--accent)" : "var(--muted)" }} />
+            </button>
+            {menuSub === "settings" && (
+              <div className={flyCls} style={flySty}>
+                <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
+                <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
+                <button onClick={() => openSymOv(menu.acc)} className={subi}>{mIco("fa-ban")}Disable Symbols</button>
+                <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
+              </div>
+            )}
           </div>
 
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
@@ -1613,16 +1626,16 @@ export default function AdminDeskPage() {
                 <button onClick={() => f("type", "DEMO")} className="flex-1 rounded py-1.5 text-xs" style={form.type === "DEMO" ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Demo</button>
               </div>
               <div className={lab + " mt-2"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
+              <div className={lab + " mt-2"}>Phone</div><input className={inp} value={form.phone || ""} onChange={(e) => f("phone", e.target.value)} />
               <div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} onChange={(e) => f("email", e.target.value)} />
               <div className={lab + " mt-2"}>Password</div><PasswordInput className={inp} value={form.password || ""} onChange={(e) => f("password", e.target.value)} />
+              <div className={lab + " mt-2"}>Country</div><CountrySelect className={inp} value={form.country || ""} onChange={(v) => f("country", v)} />
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div><div className={lab}>Leverage</div><input type="number" className={inp} value={form.leverage} onChange={(e) => f("leverage", Number(e.target.value))} /></div>
                 <div><div className={lab}>Currency</div><select className={inp} value={form.currency} onChange={(e) => f("currency", e.target.value)}><option>USD</option><option>EUR</option><option>GBP</option></select></div>
               </div>
               <div className={lab + " mt-2"}>Manager (optional)</div>
               <select className={inp} value={form.managerId || ""} onChange={(e) => f("managerId", e.target.value || null)}><option value="">- none -</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-              <div className={lab + " mt-2"}>Phone</div><input className={inp} value={form.phone || ""} onChange={(e) => f("phone", e.target.value)} />
-              <div className={lab + " mt-2"}>Country</div><CountrySelect className={inp} value={form.country || ""} onChange={(v) => f("country", v)} />
               <label className="mt-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--muted)" }}><input type="checkbox" checked={!!form.isPool} onChange={(e) => f("isPool", e.target.checked)} /> Pool account</label>
               {err && modal === "client" && <div className="mt-2 rounded border px-2 py-1.5 text-[10px]" style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.3)", color: SELL }}><i className="fa-solid fa-circle-exclamation mr-1" />{err}</div>}
               <button onClick={() => submit("/api/admin/clients", { name: form.name, email: form.email, password: form.password, type: form.type, leverage: Number(form.leverage) || 100, currency: form.currency, managerId: form.managerId || null, phone: form.phone, country: form.country, isPool: !!form.isPool }, "Client")} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Create {form.type} Client</button>

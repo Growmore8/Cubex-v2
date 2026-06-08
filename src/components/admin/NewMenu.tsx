@@ -49,9 +49,9 @@ export default function NewMenu({ onCreated }: { onCreated: () => void }) {
               <button onClick={() => f("type", "DEMO")} className="ui-transition flex-1 rounded-xl py-1.5 text-xs" style={form.type === "DEMO" ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Demo</button>
             </div>
             <div className={lab + " mt-2"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
+            <div className={lab + " mt-2"}>Phone</div><input className={inp} value={form.phone || ""} onChange={(e) => f("phone", e.target.value)} />
             <div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} onChange={(e) => f("email", e.target.value)} />
             <div className={lab + " mt-2"}>Password</div><PasswordInput className={inp} value={form.password || ""} onChange={(e) => f("password", e.target.value)} />
-            <div className={lab + " mt-2"}>Phone</div><input className={inp} value={form.phone || ""} onChange={(e) => f("phone", e.target.value)} />
             <div className={lab + " mt-2"}>Country</div><CountrySelect className={inp} value={form.country || ""} onChange={(v) => f("country", v)} />
             <label className="mt-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--muted)" }}><input type="checkbox" checked={!!form.isPool} onChange={(e) => f("isPool", e.target.checked)} /> Pool account</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
