@@ -7,6 +7,7 @@ import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds
 import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
 import ManagersModal from "@/components/admin/ManagersModal";
+import DeskMarketWatch from "@/components/DeskMarketWatch";
 import PasswordInput from "@/components/ui/PasswordInput";
 import CountrySelect from "@/components/ui/CountrySelect";
 import { isOnline as presenceOnline } from "@/components/ui/Presence";
@@ -756,119 +757,8 @@ export default function AdminDeskPage() {
         {panels.nav && (<>
           <aside className="flex flex-col border-r border-[var(--border)] bg-[var(--panel)]" style={{ width: navW }}>
             <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">NAVIGATOR<button onClick={() => togglePanel("nav")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
-            {/* Live / Demo tabs */}
-            <div className="flex border-b border-[var(--border)] text-[10px]">
-              <button onClick={() => setNavTab("live")} className="flex-1 py-1.5 font-semibold" style={navTab === "live" ? { color: BUY, borderBottom: `2px solid ${BUY}` } : { color: "var(--muted)" }}>LIVE ({liveAccs.length})</button>
-              <button onClick={() => setNavTab("demo")} className="flex-1 py-1.5 font-semibold" style={navTab === "demo" ? { color: "var(--accent)", borderBottom: `2px solid var(--accent)` } : { color: "var(--muted)" }}>DEMO ({demoAccs.length})</button>
-            </div>
-            <div className="border-b border-[var(--border)] px-1.5 py-1">
-              <input value={navSearch} onChange={(e) => setNavSearch(e.target.value)} placeholder="Client ID / Name / Email" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[10px] text-[var(--text)]" />
-            </div>
-            <div className="flex-1 overflow-auto p-1 text-[11px]">
-              {(() => {
-                const base = navTab === "live" ? liveAccs : demoAccs;
-                const list = navSearch ? base.filter((c: any) => (c.login + " " + c.name + " " + (c.user?.email || c.email || "")).toLowerCase().includes(navSearch.toLowerCase())) : base;
-                if (!list.length) return <div className="px-2 py-3 text-center text-[var(--muted)]">No {navTab} accounts.</div>;
-
-                // Group by userId: the oldest account per user is the root; all others nest under it.
-                // This works even for accounts without parentId set (legacy / created before auto-link).
-                const userGroups: Record<string, any[]> = {};
-                list.forEach((c: any) => { const uid = c.userId || c.id; (userGroups[uid] || (userGroups[uid] = [])).push(c); });
-                const childMap: Record<string, any[]> = {};
-                const primaryIdForUser: Record<string, string> = {};
-                Object.entries(userGroups).forEach(([uid, accs]) => {
-                  if (accs.length <= 1) return;
-                  const sorted = [...accs].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-                  primaryIdForUser[uid] = sorted[0].id;
-                  childMap[sorted[0].id] = sorted.slice(1);
-                });
-                const isRoot = (c: any) => { const uid = c.userId || c.id; return !primaryIdForUser[uid] || primaryIdForUser[uid] === c.id; };
-
-                // Render a root account + its nested sub-accounts (no nesting when searching)
-                const acctBlock = (c: any) => {
-                  const kids = !navSearch ? (childMap[c.id] || []) : [];
-                  if (!kids.length) return acctRow(c);
-                  const key = "par-" + c.id;
-                  return (
-                    <div key={c.id}>
-                      <div className="flex items-center">
-                        <button onClick={(e) => { e.stopPropagation(); toggleCat(key); }} className="flex w-5 shrink-0 items-center justify-center self-stretch" style={{ color: "var(--muted)" }}>
-                          <i className={"fa-solid " + (collapsed[key] ? "fa-chevron-right" : "fa-chevron-down")} style={{ fontSize: 7 }} />
-                        </button>
-                        <div className="min-w-0 flex-1">{acctRow(c)}</div>
-                      </div>
-                      {!collapsed[key] && (
-                        <div className="ml-5 flex flex-col gap-0.5 border-l pl-1" style={{ borderColor: "var(--border)" }}>
-                          {kids.map((ch: any) => acctRow(ch))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                };
-
-                // 3-level hierarchy: manager > group > client (same as before, now with sub-account nesting)
-                const direct = list.filter((c: any) => !c.manager && !c.group);
-                const grpOwner: Record<string, string | null> = {};
-                tradeGroups.forEach((g: any) => { grpOwner[g.id] = g.managerId || null; });
-                const grpRows: Record<string, any[]> = {};
-                const mgrDirect: Record<string, any[]> = {};
-                list.forEach((c: any) => {
-                  if (c.group) { (grpRows[c.group.id] || (grpRows[c.group.id] = [])).push(c); }
-                  else if (c.manager) { (mgrDirect[c.manager.id] || (mgrDirect[c.manager.id] = [])).push(c); }
-                });
-                const grpName = (gid: string) => (tradeGroups.find((g: any) => g.id === gid)?.name) || (grpRows[gid]?.[0]?.group?.name) || "Group";
-                const mgrName: Record<string, string> = {};
-                list.forEach((c: any) => { if (c.manager) mgrName[c.manager.id] = c.manager.name; });
-                managers.forEach((m: any) => { if (!mgrName[m.id]) mgrName[m.id] = m.name; });
-                const groupIdsWithRows = Object.keys(grpRows);
-                const adminGroups = groupIdsWithRows.filter((gid) => !grpOwner[gid]);
-                const mgrGroups: Record<string, string[]> = {};
-                groupIdsWithRows.forEach((gid) => { const mid = grpOwner[gid]; if (mid) (mgrGroups[mid] || (mgrGroups[mid] = [])).push(gid); });
-                const managerIds = Array.from(new Set([...Object.keys(mgrDirect), ...Object.keys(mgrGroups)]));
-
-                const header = (key: string, label: string, icon: string, color: string, count: number, pad = "") => (
-                  <button onClick={() => toggleCat(key)} className={"flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-[10px] font-semibold " + pad} style={{ color }}>
-                    <i className={"fa-solid " + (collapsed[key] ? "fa-chevron-right" : "fa-chevron-down")} style={{ fontSize: 8 }} />
-                    <i className={"fa-solid " + icon} style={{ fontSize: 10 }} />
-                    <span className="flex-1 truncate text-left">{label}</span>
-                    <span className="rounded px-1.5" style={{ background: color + "22" }}>{count}</span>
-                  </button>
-                );
-                // Count roots only for header badge (sub-accounts counted under parent)
-                const rootCount = (arr: any[]) => arr.filter(isRoot).length;
-                const groupSection = (gid: string, nested = false) => (
-                  <div key={"grp-" + gid} className={nested ? "" : "mt-0.5"}>
-                    {header("grp-" + gid, grpName(gid), "fa-folder", "var(--accent)", grpRows[gid].length)}
-                    {!collapsed["grp-" + gid] && <div className="flex flex-col gap-0.5 pl-2">{grpRows[gid].filter(isRoot).map(acctBlock)}</div>}
-                  </div>
-                );
-                return (
-                  <div className="flex flex-col gap-0.5">
-                    {direct.length > 0 && (<>
-                      <div className="px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{navTab === "live" ? "Live" : "Demo"} Accounts</div>
-                      {direct.filter(isRoot).map(acctBlock)}
-                    </>)}
-                    {adminGroups.map((gid) => groupSection(gid))}
-                    {managerIds.map((mid) => {
-                      const groups = mgrGroups[mid] || [];
-                      const loose = mgrDirect[mid] || [];
-                      const count = groups.reduce((n, gid) => n + grpRows[gid].length, 0) + loose.length;
-                      return (
-                        <div key={"mgr-" + mid} className="mt-0.5">
-                          {header("mgr-" + mid, mgrName[mid] || "Manager", "fa-user-tie", GOLD, count)}
-                          {!collapsed["mgr-" + mid] && (
-                            <div className="flex flex-col gap-0.5 pl-2">
-                              {groups.map((gid) => groupSection(gid, true))}
-                              {loose.filter(isRoot).map(acctBlock)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
+            {/* Isolated, self-updating market watch — own socket + price state so it ticks pip-by-pip independent of the heavy desk re-render. */}
+            <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile} />
           </aside>
           <div onMouseDown={(e) => dragX(e, "nav")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
         </>)}
