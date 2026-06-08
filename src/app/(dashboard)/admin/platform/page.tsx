@@ -1665,14 +1665,13 @@ export default function AdminDeskPage() {
                   <div key={g.id} className="flex items-center gap-1 border-b border-[var(--border)] px-2 py-1 text-[11px] last:border-0" style={form.editId === g.id ? { background: "var(--soft)" } : undefined}>
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{g.name}</div>
-                      <div className="truncate text-[9px] text-[var(--muted)]">spread {Number(g.spread) || 0} · {mgr ? mgr.name : "Admin-level"}</div>
+                      <div className="truncate text-[9px] text-[var(--muted)]">{mgr ? mgr.name : "Admin-level"}</div>
                     </div>
                     <button title="Edit" onClick={() => editGroup(g)} className="rounded px-1.5 py-0.5" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen" /></button>
                     <button title="Delete" onClick={() => delGroup(g)} className="rounded px-1.5 py-0.5" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
                   </div>); })}
               </div>)}
               <div className={lab + " mt-1"}>{form.editId ? "Edit group name" : "New group name"}</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
-              <div className={lab + " mt-2"}>Spread (points)</div><input type="number" className={inp} value={form.spread || ""} onChange={(e) => f("spread", Number(e.target.value))} />
               <div className={lab + " mt-2"}>Manager (owns this group)</div>
               <select className={inp} value={form.managerId || ""} onChange={(e) => f("managerId", e.target.value || null)}><option value="">Admin-level (no manager)</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
               <div className="mt-3 flex gap-2">

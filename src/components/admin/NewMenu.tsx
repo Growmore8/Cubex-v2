@@ -72,8 +72,7 @@ export default function NewMenu({ onCreated }: { onCreated: () => void }) {
 
           {modal === "group" && (<>
             <div className={lab + " mt-1"}>Group name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
-            <div className={lab + " mt-2"}>Spread (points)</div><input type="number" className={inp} value={form.spread || ""} onChange={(e) => f("spread", Number(e.target.value))} />
-            <button onClick={() => submit("/api/admin/groups", { name: form.name, spread: Number(form.spread) || 0 })} className="ui-btn mt-3 w-full py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Create Group</button>
+            <button onClick={() => submit("/api/admin/groups", { name: form.name, spread: 0 })} className="ui-btn mt-3 w-full py-2 text-xs" style={{ background: "var(--accent)", color: "#fff" }}>Create Group</button>
           </>)}
 
           {modal === "notify" && (<>
