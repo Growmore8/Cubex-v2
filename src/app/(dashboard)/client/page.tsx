@@ -76,7 +76,7 @@ export default function ClientTerminal() {
   const [trail, setTrail] = useState("");
   const [rightTab, setRightTab] = useState("TRADE");
   const [ctx, setCtx] = useState<{ x: number; y: number; sym: string } | null>(null);
-  const [botTab, setBotTab] = useState<"positions" | "pending" | "history">("positions");
+  const [botTab, setBotTab] = useState<"positions" | "pending" | "history" | "summary">("positions");
   const [err, setErr] = useState("");
   const [pinLock, setPinLock] = useState(false);
   const [pinHasPin, setPinHasPin] = useState(false);
@@ -651,6 +651,7 @@ export default function ClientTerminal() {
         <div className="flex gap-1 border-b border-[var(--border)] px-2">
           <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length}{pending.length ? <span className="ml-1 rounded-full px-1.5 text-[9px]" style={{ background: "rgba(90,169,255,0.2)", color: "#5aa9ff" }}>{pending.length} pending</span> : ""}</button>
           <button onClick={() => setBotTab("history")} className={tab(botTab === "history")} style={botTab === "history" ? { color: BUY } : undefined}>History</button>
+          <button onClick={() => setBotTab("summary")} className={tab(botTab === "summary")} style={botTab === "summary" ? { color: BUY } : undefined}>Summary</button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
           {botTab === "positions" && positions.length > 0 && (
@@ -711,14 +712,94 @@ export default function ClientTerminal() {
           )}
           {botTab === "history" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Name</th><th className="px-2 py-1 font-normal">Closed</th><th className="px-2 py-1 font-normal text-right">Qty</th><th className="px-2 py-1 font-normal text-right">Open</th><th className="px-2 py-1 font-normal text-right">Close</th><th className="px-2 py-1 font-normal text-right">P/L</th></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Name</th><th className="px-2 py-1 font-normal">Opened</th><th className="px-2 py-1 font-normal">Closed</th><th className="px-2 py-1 font-normal text-right">Qty</th><th className="px-2 py-1 font-normal text-right">Open</th><th className="px-2 py-1 font-normal text-right">Close</th><th className="px-2 py-1 font-normal">Reason</th><th className="px-2 py-1 font-normal text-right">P/L</th></tr></thead>
               <tbody>
-                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={6}>No history.</td></tr> : histShown.map((h) => (
-                  <tr key={h.id} className="border-t border-[var(--border)]"><td className="px-2 py-1">{h.symbol} {h.side}</td><td className="px-2 py-1 text-[var(--muted)]">{new Date(h.closedAt).toLocaleString()}</td><td className="px-2 py-1 text-right">{h.lots}</td><td className="px-2 py-1 text-right">{h.openPrice.toFixed(dg(h.symbol))}</td><td className="px-2 py-1 text-right">{h.closePrice.toFixed(dg(h.symbol))}</td><td className="px-2 py-1 text-right" style={{ color: h.pnl >= 0 ? BUY : SELL }}>{(h.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(h.pnl))}</td></tr>
-                ))}
+                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={8}>No history.</td></tr> : histShown.map((h) => {
+                  const r = h.closeReason || "MANUAL";
+                  const rc = r === "TP" ? "#10b981" : r === "SL" ? "#f43f5e" : r === "MC" ? "#f59e0b" : "var(--muted)";
+                  return (
+                  <tr key={h.id} className="border-t border-[var(--border)]">
+                    <td className="px-2 py-1">{h.symbol} <span style={{ color: h.side === "BUY" ? BUY : SELL }}>{h.side}</span></td>
+                    <td className="px-2 py-1 text-[var(--muted)]">{h.openedAt ? new Date(h.openedAt).toLocaleString() : "—"}</td>
+                    <td className="px-2 py-1 text-[var(--muted)]">{new Date(h.closedAt).toLocaleString()}</td>
+                    <td className="px-2 py-1 text-right">{h.lots}</td>
+                    <td className="px-2 py-1 text-right">{h.openPrice.toFixed(dg(h.symbol))}</td>
+                    <td className="px-2 py-1 text-right">{h.closePrice.toFixed(dg(h.symbol))}</td>
+                    <td className="px-2 py-1"><span style={{ color: rc, fontWeight: r !== "MANUAL" ? 600 : "normal" }}>{r}</span></td>
+                    <td className="px-2 py-1 text-right" style={{ color: h.pnl >= 0 ? BUY : SELL }}>{(h.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(h.pnl))}</td>
+                  </tr>); })}
               </tbody>
             </table>
           )}
+          {botTab === "summary" && (() => {
+            // By direction
+            const buys = positions.filter((p) => p.type === "BUY");
+            const sells = positions.filter((p) => p.type === "SELL");
+            const buyPnl = buys.reduce((a: number, p: any) => a + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
+            const sellPnl = sells.reduce((a: number, p: any) => a + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
+            const buyLots = buys.reduce((a: number, p: any) => a + Number(p.lots), 0);
+            const sellLots = sells.reduce((a: number, p: any) => a + Number(p.lots), 0);
+            // By symbol
+            const symMap: Record<string, { buy: number; sell: number; lots: number; pnl: number }> = {};
+            for (const p of positions) {
+              const s = p.symbol; if (!symMap[s]) symMap[s] = { buy: 0, sell: 0, lots: 0, pnl: 0 };
+              const pl = pnlOf(p, prices[s] ?? p.openPrice, csz(s));
+              symMap[s].lots += Number(p.lots); symMap[s].pnl += pl;
+              if (p.type === "BUY") symMap[s].buy += Number(p.lots);
+              else symMap[s].sell += Number(p.lots);
+            }
+            const symRows = Object.entries(symMap).sort((a, b) => Math.abs(b[1].pnl) - Math.abs(a[1].pnl));
+            return (
+              <div className="p-3 text-[10px]">
+                <div className="mb-3">
+                  <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>By Direction</div>
+                  <table className="w-full">
+                    <thead><tr className="text-[var(--muted)]"><th className="py-1 pr-3 text-left font-normal">Direction</th><th className="py-1 pr-3 text-right font-normal">Trades</th><th className="py-1 pr-3 text-right font-normal">Lots</th><th className="py-1 text-right font-normal">Floating P/L</th></tr></thead>
+                    <tbody>
+                      <tr className="border-t border-[var(--border)]">
+                        <td className="py-1 pr-3 font-semibold" style={{ color: BUY }}>BUY</td>
+                        <td className="py-1 pr-3 text-right">{buys.length}</td>
+                        <td className="py-1 pr-3 text-right">{buyLots.toFixed(2)}</td>
+                        <td className="py-1 text-right font-semibold" style={{ color: buyPnl >= 0 ? BUY : SELL }}>{(buyPnl >= 0 ? "+$" : "-$") + fmt(Math.abs(buyPnl))}</td>
+                      </tr>
+                      <tr className="border-t border-[var(--border)]">
+                        <td className="py-1 pr-3 font-semibold" style={{ color: SELL }}>SELL</td>
+                        <td className="py-1 pr-3 text-right">{sells.length}</td>
+                        <td className="py-1 pr-3 text-right">{sellLots.toFixed(2)}</td>
+                        <td className="py-1 text-right font-semibold" style={{ color: sellPnl >= 0 ? BUY : SELL }}>{(sellPnl >= 0 ? "+$" : "-$") + fmt(Math.abs(sellPnl))}</td>
+                      </tr>
+                      <tr className="border-t-2 border-[var(--border)]">
+                        <td className="py-1 pr-3 font-semibold">Total</td>
+                        <td className="py-1 pr-3 text-right">{positions.length}</td>
+                        <td className="py-1 pr-3 text-right">{(buyLots + sellLots).toFixed(2)}</td>
+                        <td className="py-1 text-right font-semibold" style={{ color: floating >= 0 ? BUY : SELL }}>{(floating >= 0 ? "+$" : "-$") + fmt(Math.abs(floating))}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                {symRows.length > 0 && (
+                  <div>
+                    <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>By Symbol</div>
+                    <table className="w-full">
+                      <thead><tr className="text-[var(--muted)]"><th className="py-1 pr-3 text-left font-normal">Symbol</th><th className="py-1 pr-3 text-right font-normal">Buy L</th><th className="py-1 pr-3 text-right font-normal">Sell L</th><th className="py-1 pr-3 text-right font-normal">Total L</th><th className="py-1 text-right font-normal">Floating P/L</th></tr></thead>
+                      <tbody>
+                        {symRows.map(([sym, v]) => (
+                          <tr key={sym} className="border-t border-[var(--border)]">
+                            <td className="py-1 pr-3 font-medium">{sym}</td>
+                            <td className="py-1 pr-3 text-right" style={{ color: BUY }}>{v.buy > 0 ? v.buy.toFixed(2) : "—"}</td>
+                            <td className="py-1 pr-3 text-right" style={{ color: SELL }}>{v.sell > 0 ? v.sell.toFixed(2) : "—"}</td>
+                            <td className="py-1 pr-3 text-right">{v.lots.toFixed(2)}</td>
+                            <td className="py-1 text-right font-semibold" style={{ color: v.pnl >= 0 ? BUY : SELL }}>{(v.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(v.pnl))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {positions.length === 0 && <div className="py-4 text-center" style={{ color: "var(--muted)" }}>No open positions to summarize.</div>}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

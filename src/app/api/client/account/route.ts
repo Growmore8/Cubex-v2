@@ -97,7 +97,7 @@ export async function GET(req: Request) {
     history: account ? account.history.map((h) => ({
       id: h.id.toString(), symbol: h.symbol, side: h.side, lots: Number(h.lots),
       openPrice: Number(h.openPrice), closePrice: Number(h.closePrice), pnl: Number(h.pnl),
-      closeReason: h.closeReason, closedAt: h.closedAt,
+      closeReason: h.closeReason, openedAt: h.openedAt, closedAt: h.closedAt,
     })) : [],
     symbols,
   });

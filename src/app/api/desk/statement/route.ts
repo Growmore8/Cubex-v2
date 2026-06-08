@@ -15,8 +15,17 @@ export async function GET(req: Request) {
   if (!s) return new Response("Forbidden", { status: 403 });
   try {
     await assertCan(s, "exportPdf");
-    const accountId = new URL(req.url).searchParams.get("accountId");
+    const url = new URL(req.url);
+    const accountId = url.searchParams.get("accountId");
+    const fromStr = url.searchParams.get("from");
+    const toStr = url.searchParams.get("to");
     if (!accountId) return new Response("accountId required", { status: 400 });
+
+    const fromDate = fromStr ? new Date(fromStr) : undefined;
+    const toDate = toStr ? new Date(toStr + "T23:59:59") : undefined;
+    const histWhere: any = {};
+    if (fromDate) histWhere.closedAt = { ...(histWhere.closedAt || {}), gte: fromDate };
+    if (toDate) histWhere.closedAt = { ...(histWhere.closedAt || {}), lte: toDate };
 
     // scope to the staff member's tenant (and a manager's own clients)
     const where: any = { id: accountId, tenantId: s.tenantId };
@@ -25,8 +34,8 @@ export async function GET(req: Request) {
       where,
       include: {
         user: { select: { name: true, email: true } },
-        history: { orderBy: { closedAt: "desc" }, take: 100 },
-        financials: { orderBy: { appliedAt: "desc" }, take: 100 },
+        history: { where: Object.keys(histWhere).length ? histWhere : undefined, orderBy: { closedAt: "desc" }, take: 500 },
+        financials: { orderBy: { appliedAt: "desc" }, take: 200 },
         trades: { orderBy: { openedAt: "desc" } },
       },
     });
@@ -39,9 +48,20 @@ export async function GET(req: Request) {
     const credit = Number(account.credit), bonus = Number(account.bonus), pnl = Number(account.pnl);
     const balance = deposit - withdrawal + credit + bonus + pnl;
 
+    const reasonColor = (r: string) => r === "TP" ? "#16a34a" : r === "SL" ? "#dc2626" : r === "MC" ? "#d97706" : "#6b7280";
+    const openTradeRows = account.trades.map((o) => `<tr>
+      <td>${esc(o.ticket.toString())}</td><td>${esc(o.symbol)}</td>
+      <td style="color:${o.type === "BUY" ? "#16a34a" : "#dc2626"}">${esc(o.type)}</td>
+      <td class="r">${Number(o.lots).toFixed(2)}</td><td class="r">${Number(o.openPrice)}</td>
+      <td class="r">${Number(o.sl) || "—"}</td><td class="r">${Number(o.tp) || "—"}</td>
+      <td>${o.openedAt ? new Date(o.openedAt).toLocaleString() : ""}</td></tr>`).join("");
     const histRows = account.history.map((h) => `<tr>
-      <td>${esc(h.ticket.toString())}</td><td>${esc(h.symbol)}</td><td>${esc(h.side)}</td>
-      <td class="r">${Number(h.lots).toFixed(2)}</td><td class="r">${Number(h.openPrice)}</td><td class="r">${Number(h.closePrice)}</td>
+      <td>${esc(h.ticket.toString())}</td><td>${esc(h.symbol)}</td>
+      <td style="color:${h.side === "BUY" ? "#16a34a" : "#dc2626"}">${esc(h.side)}</td>
+      <td class="r">${Number(h.lots).toFixed(2)}</td>
+      <td class="r">${h.openedAt ? new Date(h.openedAt).toLocaleString() : "—"}</td>
+      <td class="r">${Number(h.openPrice)}</td><td class="r">${Number(h.closePrice)}</td>
+      <td><span style="color:${reasonColor(h.closeReason || "")};font-weight:600">${esc(h.closeReason || "MANUAL")}</span></td>
       <td class="r ${Number(h.pnl) >= 0 ? "pos" : "neg"}">${money(Number(h.pnl))}</td>
       <td>${h.closedAt ? new Date(h.closedAt).toLocaleString() : ""}</td></tr>`).join("");
     const finRows = account.financials.map((f) => `<tr>
@@ -90,9 +110,12 @@ export async function GET(req: Request) {
     <div class="card"><div class="l">Bonus</div><div class="v">${money(bonus)}</div></div>
     <div class="card"><div class="l">Balance</div><div class="v">${money(balance)}</div></div>
   </div>
-  <h2>Closed Trades</h2>
-  <table><thead><tr><th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open</th><th class="r">Close</th><th class="r">P/L</th><th>Closed</th></tr></thead>
-  <tbody>${histRows || `<tr><td colspan="8">No closed trades.</td></tr>`}</tbody></table>
+  <h2>Running Trades</h2>
+  <table><thead><tr><th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open Price</th><th class="r">S/L</th><th class="r">T/P</th><th>Opened</th></tr></thead>
+  <tbody>${openTradeRows || `<tr><td colspan="8">No open positions.</td></tr>`}</tbody></table>
+  <h2>Closed Trades${fromStr || toStr ? ` (${fromStr || "—"} to ${toStr || "—"})` : ""}</h2>
+  <table><thead><tr><th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th>Opened</th><th class="r">Open Price</th><th class="r">Close Price</th><th>Reason</th><th class="r">P/L</th><th>Closed</th></tr></thead>
+  <tbody>${histRows || `<tr><td colspan="10">No closed trades.</td></tr>`}</tbody></table>
   <h2>Financial History</h2>
   <table><thead><tr><th>Type</th><th class="r">Amount</th><th>Description</th><th>Date</th></tr></thead>
   <tbody>${finRows || `<tr><td colspan="4">No transactions.</td></tr>`}</tbody></table>

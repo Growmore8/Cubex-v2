@@ -105,6 +105,10 @@ export default function AdminDeskPage() {
   const [cliStatus, setCliStatus] = useState("ALL");
   const [auditCat, setAuditCat] = useState("ALL");
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
+  const [stmtModal, setStmtModal] = useState(false);
+  const [stmtPreset, setStmtPreset] = useState("all");
+  const [stmtFrom, setStmtFrom] = useState("");
+  const [stmtTo, setStmtTo] = useState("");
   const [navSearch, setNavSearch] = useState("");
   const [mwSearch, setMwSearch] = useState("");
   const [showOC, setShowOC] = useState(true); // chart buy/sell strip visibility
@@ -456,8 +460,8 @@ export default function AdminDeskPage() {
   function removeChart(i: number) { setOpenCharts((prev) => prev.filter((_, j) => j !== i)); setActiveChart((a) => a >= i && a > 0 ? a - 1 : a); }
   function openTicket(sym: string) { setTicket(sym); setTform({ vol: lot, sl: 0, tp: 0, type: "Market", price: 0 }); }
 
-  const accOpen = selAcc ? open.filter((o) => o.accountLogin === selAcc.login) : open;
-  const accPending = selAcc ? pendingOrders.filter((o) => o.accountLogin === selAcc.login) : pendingOrders;
+  const accOpen = selAcc ? open.filter((o) => o.accountLogin === selAcc.login) : [];
+  const accPending = selAcc ? pendingOrders.filter((o) => o.accountLogin === selAcc.login) : [];
   const balOfFn = (a: any) => a ? Number(a.deposit) - Number(a.withdrawal) + Number(a.credit) + Number(a.bonus) + Number(a.pnl) : 0;
   const floating = accOpen.reduce((s, p) => s + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
   const balance = balOfFn(selAcc);
@@ -631,7 +635,7 @@ export default function AdminDeskPage() {
                 {topMenu === "report" && (<><div className="fixed inset-0 z-40" onClick={closeTm} />
                   <div className={panel} style={panelStyle}>
                     {dHead("Account Reports")}
-                    {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } window.open("/api/desk/statement?accountId=" + selAcc.id, "_blank"); }, "fa-file-pdf", "Export PDF Statement", "#ef4444")}
+                    {can("exportPdf") && dItem(() => { if (!selAcc) { setErr("Select an account first"); return; } setStmtPreset("all"); setStmtFrom(""); setStmtTo(""); setStmtModal(true); }, "fa-file-pdf", "Export PDF Statement", "#ef4444")}
                   </div></>)}
               </div>
             </>);
@@ -875,6 +879,7 @@ export default function AdminDeskPage() {
           </div>
           <div className="min-h-0 flex-1 overflow-auto">
             {tab === "trade" && (() => {
+              if (!selAcc) return <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>Please select an account first.</div>;
               const tAllOn = accOpen.length > 0 && accOpen.every((p) => tradeSel[p.id]);
               const tToggleAll = () => { if (tAllOn) setTradeSel({}); else { const n: Record<string, boolean> = {}; accOpen.forEach((p) => (n[p.id] = true)); setTradeSel(n); } };
               const tSelIds = accOpen.filter((p) => tradeSel[p.id]).map((p) => p.id);
@@ -972,6 +977,7 @@ export default function AdminDeskPage() {
               );
             })()}
             {tab === "history" && (() => {
+              if (!selAcc) return <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>Please select an account first.</div>;
               const thc = "px-2 py-1 text-left font-normal text-[var(--muted)]";
               const presets: [string, string][] = [["ALL", "All Time"], ["TODAY", "Today"], ["WEEK", "This Week"], ["MONTH", "This Month"]];
               const hdt = (h: any) => h.closeTime || h.closedAt || h.closeDate || h.createdAt || h.date || h.time;
@@ -986,7 +992,7 @@ export default function AdminDeskPage() {
                 return true;
               };
               const hType = (h: any) => String(h.side || h.type || "").toUpperCase();
-              const rows = history.filter((h) => (hfType === "ALL" || hType(h) === hfType)).filter(inRange);
+              const rows = history.filter((h) => h.accountLogin === selAcc.login).filter((h) => (hfType === "ALL" || hType(h) === hfType)).filter(inRange);
               const hAllOn = rows.length > 0 && rows.every((h) => histSel[h.id]);
               const hToggleAll = () => { if (hAllOn) setHistSel({}); else { const n: Record<string, boolean> = {}; rows.forEach((h) => (n[h.id] = true)); setHistSel(n); } };
               return (
@@ -1013,7 +1019,7 @@ export default function AdminDeskPage() {
                             <td className="px-2 py-1">{h.ticket ?? h.orderId ?? h.id}</td>
                             <td className="px-2 py-1" style={{ color: hType(h) === "BUY" ? BUY : SELL }}>{h.side || h.type || "-"}</td>
                             <td className="px-2 py-1">{h.symbol}</td>
-                            <td className="px-2 py-1 text-[var(--muted)]">{h.description || h.desc || h.closeReason || "-"}</td>
+                            <td className="px-2 py-1">{(() => { const r = h.closeReason || h.description || h.desc; const col = r === "TP" ? "#10b981" : r === "SL" ? "#f43f5e" : r === "MC" ? "#f59e0b" : "var(--muted)"; return <span style={{ color: col, fontWeight: r && r !== "MANUAL" ? 600 : "normal" }}>{r || "—"}</span>; })()}</td>
                             <td className="px-2 py-1 text-right">{h.openPrice != null && Number(h.openPrice) !== 0 ? pxFmt(h.symbol, h.openPrice) : "-"}</td>
                             <td className="px-2 py-1 text-right">{h.closePrice != null && Number(h.closePrice) !== 0 ? pxFmt(h.symbol, h.closePrice) : "-"}</td>
                             <td className="px-2 py-1 text-right">{h.sl ? Number(h.sl).toFixed(dg(h.symbol)) : "-"}</td>
@@ -1029,7 +1035,10 @@ export default function AdminDeskPage() {
                 </div>
               );
             })()}
-            {tab === "summary" && (
+            {tab === "summary" && !selAcc && (
+              <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>Please select an account first.</div>
+            )}
+            {tab === "summary" && selAcc && (
               <div className="flex flex-wrap gap-2 p-3 text-[11px]">
                 {([["TOTAL DEPOSITS", fmt(Number(selAcc?.deposit || 0)), BUY], ["TOTAL WITHDRAWALS", "-" + fmt(Number(selAcc?.withdrawal || 0)), SELL], ["NET DEPOSITS", fmt(Number(selAcc?.deposit || 0) - Number(selAcc?.withdrawal || 0)), "var(--text)"], ["CREDIT/BONUS", fmt(Number(selAcc?.credit || 0) + Number(selAcc?.bonus || 0)), BUY], ["CLOSED TRADE P/L", fmt(Number(selAcc?.pnl || 0)), Number(selAcc?.pnl || 0) >= 0 ? BUY : SELL], ["CURRENT BALANCE", fmt(balance), "var(--text)"], ["MC LEVEL", Number(selAcc?.mcLevel || 0) > 0 ? selAcc?.mcLevel + "%" : "Off", GOLD], ["NET BALANCE", fmt(equity), "var(--accent)"]] as [string, string, string][]).map(([k, v, c]) => (
                   <div key={k as string} className="min-w-[120px] flex-1 rounded-lg border border-[var(--border)] bg-[var(--soft)] px-3 py-2"><div className="text-[10px] text-[var(--muted)]">{k}</div><div className="mt-1 text-base font-semibold" style={{ color: c }}>{v}</div></div>
@@ -1717,6 +1726,57 @@ export default function AdminDeskPage() {
             <div className="mt-4 flex gap-2">
               <button onClick={() => setKycUploadFor(null)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
               <button onClick={uploadKyc} className="flex-1 rounded py-2 text-[11px] font-semibold" style={{ background: BUY, color: "#04140e" }}>Upload</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Statement Date Filter Modal */}
+      {stmtModal && selAcc && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setStmtModal(false)}>
+          <div className="ui-pop w-[340px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 text-sm font-semibold">Export PDF Statement</div>
+            <div className="mb-4 text-[10px]" style={{ color: "var(--muted)" }}>{selAcc.login} — {selAcc.name}</div>
+            <div className="mb-3 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Date Range</div>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {(["day","month","year","all","custom"] as const).map((p) => (
+                <button key={p} onClick={() => {
+                  setStmtPreset(p);
+                  if (p !== "custom") {
+                    const now = new Date();
+                    if (p === "day") { const d = now.toISOString().slice(0,10); setStmtFrom(d); setStmtTo(d); }
+                    else if (p === "month") { const y = now.getFullYear(), m = now.getMonth(); setStmtFrom(new Date(y,m,1).toISOString().slice(0,10)); setStmtTo(new Date(y,m+1,0).toISOString().slice(0,10)); }
+                    else if (p === "year") { const y = now.getFullYear(); setStmtFrom(`${y}-01-01`); setStmtTo(`${y}-12-31`); }
+                    else { setStmtFrom(""); setStmtTo(""); }
+                  }
+                }} className="rounded-lg px-3 py-1.5 text-[11px] font-semibold capitalize transition-colors" style={{ background: stmtPreset === p ? "var(--accent, #3b82f6)" : "var(--soft)", color: stmtPreset === p ? "#fff" : "var(--text)", border: "1px solid " + (stmtPreset === p ? "transparent" : "var(--border)") }}>
+                  {p === "all" ? "All Time" : p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
+            {stmtPreset === "custom" && (
+              <div className="mb-3 flex gap-2">
+                <div className="flex-1">
+                  <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>From</div>
+                  <input type="date" value={stmtFrom} onChange={(e) => setStmtFrom(e.target.value)} className="w-full rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+                </div>
+                <div className="flex-1">
+                  <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>To</div>
+                  <input type="date" value={stmtTo} onChange={(e) => setStmtTo(e.target.value)} className="w-full rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setStmtModal(false)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
+              <button onClick={() => {
+                const params = new URLSearchParams({ accountId: selAcc.id });
+                if (stmtFrom) params.set("from", stmtFrom);
+                if (stmtTo) params.set("to", stmtTo);
+                window.open("/api/desk/statement?" + params.toString(), "_blank");
+                setStmtModal(false);
+              }} className="flex-1 rounded py-2 text-[11px] font-semibold" style={{ background: "#ef4444", color: "#fff" }}>
+                <i className="fa-solid fa-file-pdf mr-1" /> Generate PDF
+              </button>
             </div>
           </div>
         </div>
