@@ -577,7 +577,7 @@ export default function ClientTerminal() {
             <b className="font-medium">{selSym}</b>
             <div className="ml-auto flex gap-1">{TFS.map((t) => <button key={t} onClick={() => setTf(t)} className="rounded px-1.5 py-0.5 text-[10px]" style={tf === t ? { background: BUY, color: "#04140e" } : { color: "var(--muted)" }}>{t}</button>)}</div>
           </div>
-          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><LWChart symbol={selSym} tf={tf} theme={theme} digits={d} positions={[
+          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><LWChart symbol={selSym} tf={tf} theme={theme} digits={d} topTools positions={[
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
           ]} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} /></div>

@@ -34,6 +34,10 @@ export default function SAClientsPage() {
   const [delRow, setDelRow] = useState<any>(null);
   const [moneyRow, setMoneyRow] = useState<any>(null);
   const [moneyForm, setMoneyForm] = useState<any>({ type: "DEPOSIT", amount: "", description: "" });
+  const [repRow, setRepRow] = useState<any>(null);
+  const [repEmail, setRepEmail] = useState("");
+  const [repMsg, setRepMsg] = useState("");
+  const [repSending, setRepSending] = useState(false);
 
   async function load() {
     try {
@@ -280,6 +284,9 @@ export default function SAClientsPage() {
                       <i className={"fa-solid text-xs " + (r.deactivated ? "fa-circle-check" : "fa-ban")} style={{ color: "#b45309" }} />
                     </button>
                     {/* Delete */}
+                    <button title="Statement / Report" style={btnStyle("#eff6ff")} onClick={() => { setRepEmail(r.email || ""); setRepMsg(""); setRepRow(r); }} className="mr-0.5">
+                      <i className="fa-solid fa-file-invoice text-xs" style={{ color: "#2563eb" }} />
+                    </button>
                     <button title="Delete" style={btnStyle("#fff1f2")} onClick={() => setDelRow(r)}>
                       <i className="fa-solid fa-trash text-xs" style={{ color: "#dc2626" }} />
                     </button>
@@ -420,6 +427,35 @@ export default function SAClientsPage() {
             <div className="mt-3 flex justify-end gap-2">
               <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setMgrRow(null)}>Cancel</button>
               <button className="ui-btn px-3 py-1.5 text-sm text-white" style={{ background: "#16a34a", borderColor: "transparent" }} onClick={async () => { const ok = await act(mgrRow.id, "assignManager", { managerId: mgrVal || null }); if (ok) setMgrRow(null); }}>Assign</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── STATEMENT / REPORT MODAL ── */}
+      {repRow && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40" onClick={() => setRepRow(null)}>
+          <div className="ui-card ui-pop w-[380px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 font-semibold">Statement / Report</div>
+            <div className="mb-3 text-xs text-gray-500">{repRow.login} — {repRow.name}</div>
+            <button className="ui-btn ui-btn-primary mb-3 w-full px-3 py-2 text-sm" onClick={() => window.open("/api/superadmin/statement?accountId=" + encodeURIComponent(repRow.id), "_blank")}>
+              <i className="fa-solid fa-file-pdf mr-1.5" /> Download PDF
+            </button>
+            <div className="mb-1 text-xs font-medium text-gray-500">Email statement to</div>
+            <input type="email" className={inp} value={repEmail} onChange={(e) => { setRepEmail(e.target.value); setRepMsg(""); }} placeholder="Leave blank to use client's registered email" />
+            {repMsg && <div className="mt-2 text-xs" style={{ color: repMsg.startsWith("✓") ? "#16a34a" : "#dc2626" }}>{repMsg}</div>}
+            <div className="mt-3 flex justify-end gap-2">
+              <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setRepRow(null)}>Close</button>
+              <button disabled={repSending} className="ui-btn px-3 py-1.5 text-sm text-white disabled:opacity-60" style={{ background: "#2563eb", borderColor: "transparent" }} onClick={async () => {
+                const dest = repEmail.trim() || "the client's registered email";
+                if (!confirm(`Email this statement (PDF) to ${dest}?`)) return;
+                setRepSending(true); setRepMsg("");
+                const r = await fetch("/api/superadmin/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: repRow.id, email: repEmail.trim() || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+                setRepSending(false);
+                setRepMsg(r.ok ? "✓ Sent to " + r.to : (r.error || "Failed to send"));
+              }}>
+                <i className="fa-solid fa-envelope mr-1.5" /> {repSending ? "Sending…" : "Email"}
+              </button>
             </div>
           </div>
         </div>

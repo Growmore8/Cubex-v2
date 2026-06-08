@@ -77,6 +77,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           }
         }
         await prisma.account.update({ where: { id: acc.id }, data });
+        // Profile details are shared across ALL of a client's accounts (live + demo)
+        // so an edit reflects everywhere — no matter which account (or which is the
+        // oldest "parent") was edited, and regardless of live/demo type.
+        if (acc.userId) {
+          const shared: any = { name };
+          if (b.phone !== undefined) shared.phone = b.phone || null;
+          if (b.country !== undefined) shared.country = b.country || null;
+          await prisma.account.updateMany({ where: { tenantId, userId: acc.userId, NOT: { id: acc.id } }, data: shared });
+        }
         await audit(tenantId, "client.rename", acc.login + " -> " + name, actor);
         break;
       }

@@ -98,7 +98,7 @@ export type ChartPosition = {
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
 export default function LWChart({
-  symbol, tf, theme, positions, digits = 2, showTools = true,
+  symbol, tf, theme, positions, digits = 2, showTools = true, topTools = false,
 }: {
   symbol: string;
   tf: string;
@@ -107,6 +107,8 @@ export default function LWChart({
   digits?: number;
   onClose?: (id: string) => void;
   showTools?: boolean;
+  /** Render the indicator/drawing tools as a horizontal top bar (desktop) instead of the left sidebar. */
+  topTools?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
@@ -447,31 +449,46 @@ export default function LWChart({
     outline: active ? "1.5px solid rgba(90,169,255,0.4)" : "none",
   });
   const bord = theme === "dark" ? "#242a38" : "#e2e8f0";
+  const panelBg = theme === "dark" ? "rgba(14,18,28,0.96)" : "rgba(246,248,252,0.97)";
+  // Drawing + indicator buttons, shared between the left sidebar (mobile) and the
+  // top header bar (desktop, when topTools is set).
+  const toolBtns = (
+    <>
+      <button style={tbV(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line">
+        <i className="fa-solid fa-minus" style={{ fontSize: 12 }} />
+      </button>
+      <button style={tbV(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line">
+        <i className="fa-solid fa-arrow-trend-up" style={{ fontSize: 12 }} />
+      </button>
+      {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && (
+        <button style={tbV(false)} onClick={clearDrawings} title="Clear drawings">
+          <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
+        </button>
+      )}
+      <button style={{ ...tbV(sma), fontSize: 9, fontWeight: 700 }} onClick={() => setSma((v) => !v)} title="SMA 20">SMA</button>
+      <button style={{ ...tbV(ema), fontSize: 9, fontWeight: 700 }} onClick={() => setEma((v) => !v)} title="EMA 20">EMA</button>
+      <button style={{ ...tbV(bb), fontSize: 8, fontWeight: 700 }} onClick={() => setBb((v) => !v)} title="Bollinger Bands (20,2)">BB</button>
+      <button style={{ ...tbV(rsi), fontSize: 9, fontWeight: 700 }} onClick={() => setRsi((v) => !v)} title="RSI 14">RSI</button>
+      <button style={{ ...tbV(macd), fontSize: 7, fontWeight: 700 }} onClick={() => setMacd((v) => !v)} title="MACD (12,26,9)">MACD</button>
+    </>
+  );
   return (
-    <div style={{ display: "flex", height: "100%", width: "100%" }}>
-      {/* Left sidebar — TradingView-style tool panel (hidden when showTools=false) */}
-      {showTools && (
-        <div style={{ width: 42, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 5px", gap: 4, background: theme === "dark" ? "rgba(14,18,28,0.96)" : "rgba(246,248,252,0.97)", borderRight: `1px solid ${bord}` }}>
-          <button style={tbV(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line">
-            <i className="fa-solid fa-minus" style={{ fontSize: 12 }} />
-          </button>
-          <button style={tbV(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line">
-            <i className="fa-solid fa-arrow-trend-up" style={{ fontSize: 12 }} />
-          </button>
-          {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && (
-            <button style={tbV(false)} onClick={clearDrawings} title="Clear drawings">
-              <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
-            </button>
-          )}
-          <button style={{ ...tbV(sma), fontSize: 9, fontWeight: 700 }} onClick={() => setSma((v) => !v)} title="SMA 20">SMA</button>
-          <button style={{ ...tbV(ema), fontSize: 9, fontWeight: 700 }} onClick={() => setEma((v) => !v)} title="EMA 20">EMA</button>
-          <button style={{ ...tbV(bb), fontSize: 8, fontWeight: 700 }} onClick={() => setBb((v) => !v)} title="Bollinger Bands (20,2)">BB</button>
-          <button style={{ ...tbV(rsi), fontSize: 9, fontWeight: 700 }} onClick={() => setRsi((v) => !v)} title="RSI 14">RSI</button>
-          <button style={{ ...tbV(macd), fontSize: 7, fontWeight: 700 }} onClick={() => setMacd((v) => !v)} title="MACD (12,26,9)">MACD</button>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
+      {/* Top toolbar (desktop) — indicators on the chart header, next to the timeframe */}
+      {showTools && topTools && (
+        <div style={{ flexShrink: 0, display: "flex", flexDirection: "row", alignItems: "center", gap: 4, padding: "4px 8px", background: panelBg, borderBottom: `1px solid ${bord}` }}>
+          {toolBtns}
         </div>
       )}
-      {/* Chart column */}
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+      <div style={{ display: "flex", flexDirection: "row", flex: 1, minHeight: 0, width: "100%" }}>
+        {/* Left sidebar — TradingView-style tool panel (mobile / default; hidden when showTools=false or topTools=true) */}
+        {showTools && !topTools && (
+          <div style={{ width: 42, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 5px", gap: 4, background: panelBg, borderRight: `1px solid ${bord}` }}>
+            {toolBtns}
+          </div>
+        )}
+        {/* Chart column */}
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
         {/* Main price chart */}
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
           <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
@@ -499,6 +516,7 @@ export default function LWChart({
             </span>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

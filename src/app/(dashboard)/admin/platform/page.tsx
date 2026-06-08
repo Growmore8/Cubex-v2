@@ -814,7 +814,7 @@ export default function AdminDeskPage() {
               <div key={sym + i} className="relative min-h-0 bg-[var(--bg)]" onClick={() => setActive(i)}>
                 
                 {ocStrip(sym)}
-                <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} positions={[
+                <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} topTools positions={[
                   ...open.filter((o) => o.symbol === sym && (!selAcc || o.accountLogin === selAcc.login)).map((o) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...pendingOrders.filter((o) => o.symbol === sym && (!selAcc || o.accountLogin === selAcc.login)).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} />
@@ -1217,7 +1217,6 @@ export default function AdminDeskPage() {
               <div className="mx-1 mb-1 overflow-hidden rounded-lg" style={{ background: "var(--soft)" }}>
                 <button onClick={() => openAct("rename", menu.acc)} className={subi}>{mIco("fa-user-pen")}Edit Details</button>
                 <button onClick={() => openAct("accountid", menu.acc)} className={subi}>{mIco("fa-id-card")}Change Account ID</button>
-                <button onClick={() => openAct("password", menu.acc)} className={subi}>{mIco("fa-key")}Change Password</button>
                 <button onClick={() => openAct("assign", menu.acc)} className={subi}>{mIco("fa-user-tie")}Assign Manager &amp; Group</button>
                 <button onClick={() => doClearPin(menu.acc)} className={subi}>{mIco("fa-unlock-keyhole")}Reset PIN</button>
               </div>
