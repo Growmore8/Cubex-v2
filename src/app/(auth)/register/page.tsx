@@ -27,24 +27,6 @@ const DIAL_CODES = [
   { code: "GH", dial: "+233" },
 ];
 
-const COUNTRIES = [
-  "Afghanistan", "Albania", "Algeria", "Angola", "Argentina", "Armenia", "Australia",
-  "Austria", "Azerbaijan", "Bahrain", "Bangladesh", "Belarus", "Belgium", "Bolivia",
-  "Bosnia and Herzegovina", "Botswana", "Brazil", "Bulgaria", "Cambodia", "Cameroon",
-  "Canada", "Chile", "China", "Colombia", "Congo", "Croatia", "Cuba", "Cyprus",
-  "Czech Republic", "Denmark", "Ecuador", "Egypt", "Ethiopia", "Finland", "France",
-  "Georgia", "Germany", "Ghana", "Greece", "Guatemala", "Hungary", "India", "Indonesia",
-  "Iran", "Iraq", "Ireland", "Israel", "Italy", "Japan", "Jordan", "Kazakhstan", "Kenya",
-  "Kuwait", "Kyrgyzstan", "Lebanon", "Libya", "Lithuania", "Malaysia", "Mexico", "Moldova",
-  "Morocco", "Mozambique", "Myanmar", "Netherlands", "New Zealand", "Nigeria", "Norway",
-  "Oman", "Pakistan", "Palestine", "Panama", "Peru", "Philippines", "Poland", "Portugal",
-  "Qatar", "Romania", "Russia", "Rwanda", "Saudi Arabia", "Senegal", "Serbia", "Singapore",
-  "Slovakia", "Slovenia", "Somalia", "South Africa", "South Korea", "Spain", "Sri Lanka",
-  "Sudan", "Sweden", "Switzerland", "Syria", "Taiwan", "Tanzania", "Thailand", "Tunisia",
-  "Turkey", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States",
-  "Uruguay", "Uzbekistan", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe",
-];
-
 const inputStyle: React.CSSProperties = {
   borderColor: "var(--border)",
   background: "var(--card)",
@@ -64,6 +46,12 @@ function RegisterForm() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Email verification state
+  const [verifyEmail, setVerifyEmail] = useState("");
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [verifyErr, setVerifyErr] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,11 +73,74 @@ function RegisterForm() {
     const d = await r.json();
     setLoading(false);
     if (!d.ok) { setErr(d.error || "Registration failed"); return; }
+    if (d.needsVerification) {
+      setVerifyEmail(d.email);
+      return;
+    }
     window.location.href = d.redirect;
+  }
+
+  async function verifySubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setVerifying(true); setVerifyErr("");
+    const r = await fetch("/api/auth/verify-email", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: verifyEmail, token: verifyCode }),
+    });
+    const d = await r.json();
+    setVerifying(false);
+    if (!d.ok) { setVerifyErr(d.error || "Verification failed"); return; }
+    window.location.href = d.redirect;
+  }
+
+  async function resendCode() {
+    setVerifyErr("");
+    const dc = DIAL_CODES.find((d) => d.code === dialCode);
+    const fullPhone = phone ? (dc ? dc.dial + phone : phone) : undefined;
+    await fetch("/api/auth/register", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email: verifyEmail, password, phone: fullPhone, country: country || undefined, type, tenantSlug }),
+    });
+    setVerifyErr("A new code has been sent.");
   }
 
   const fieldCls = "w-full rounded-xl border px-3 py-2.5 text-sm auth-field";
 
+  // — Verification step —
+  if (verifyEmail) return (
+    <form onSubmit={verifySubmit} className="auth-stagger space-y-4">
+      <div className="text-center">
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full" style={{ background: "rgba(37,99,235,.12)" }}>
+          <i className="fa-solid fa-envelope-open-text text-2xl" style={{ color: "var(--brand-primary)" }} />
+        </div>
+        <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Check your email</h1>
+        <p className="mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
+          We sent a 6-digit code to <strong>{verifyEmail}</strong>. Enter it below to activate your account.
+        </p>
+      </div>
+      {verifyErr && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{verifyErr}</p>}
+      <input
+        type="text" inputMode="numeric" maxLength={6} required
+        value={verifyCode} onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ""))}
+        className={fieldCls + " text-center text-2xl tracking-[0.5em] font-bold"}
+        style={inputStyle} placeholder="000000"
+        autoFocus
+      />
+      <button type="submit" disabled={verifying || verifyCode.length < 6}
+        style={{ background: "linear-gradient(135deg, var(--brand-primary), var(--brand-accent))" }}
+        className="auth-btn flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+        {verifying ? <><i className="fa-solid fa-circle-notch fa-spin" /> Verifying…</> : <>Verify & activate account</>}
+      </button>
+      <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
+        Didn&apos;t receive the code?{" "}
+        <button type="button" onClick={resendCode} className="font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}>
+          Resend
+        </button>
+      </p>
+    </form>
+  );
+
+  // — Registration form —
   return (
     <form onSubmit={submit} className="auth-stagger space-y-4">
       <div>

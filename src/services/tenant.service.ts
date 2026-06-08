@@ -72,6 +72,7 @@ export async function createTenant(input: {
   name: string; subdomain: string; adminEmail: string; adminName: string; adminPassword: string;
   plan?: any; seats?: number; brandName?: string; primaryColor?: string; accentColor?: string;
   logoUrl?: string; slogan?: string; companyInfo?: string; customDomain?: string; supportEmail?: string;
+  smtpEmail?: string; smtpPassword?: string;
 }) {
   const sub = input.subdomain.trim().toLowerCase();
   const exists = await prisma.tenant.findUnique({ where: { subdomain: sub } });
@@ -95,6 +96,8 @@ export async function createTenant(input: {
       logoUrl: input.logoUrl || null,
       ...(customDomain ? { customDomain } as any : {}),
       ...(input.supportEmail ? { supportEmail: input.supportEmail } as any : {}),
+      ...(input.smtpEmail ? { smtpEmail: input.smtpEmail } as any : {}),
+      ...(input.smtpPassword ? { smtpPassword: input.smtpPassword } as any : {}),
       ...(input.slogan ? { slogan: input.slogan } as any : {}),
       ...(input.companyInfo ? { companyInfo: input.companyInfo } as any : {}),
       subscription: { create: { plan: input.plan || "STARTER", status: "ACTIVE", seats } },

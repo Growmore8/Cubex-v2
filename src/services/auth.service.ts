@@ -4,9 +4,14 @@ import { resolveTenant } from "@/lib/tenant";
 import { nextLogin } from "@/services/account.service";
 import { assertSeatAvailable } from "@/services/tenant.service";
 import { deviceFromUA } from "@/lib/presence";
+import { sendTenantMail } from "@/lib/mailer";
 import { Prisma } from "@prisma/client";
 import type { SessionPayload } from "@/types";
 import type { Role } from "@/config/roles";
+
+function makeCode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
 export async function authenticate(host: string | null, email: string, password: string, ip?: string, ua?: string): Promise<SessionPayload> {
   const tenant = await resolveTenant(host);
@@ -49,6 +54,10 @@ export async function authenticate(host: string | null, email: string, password:
   return { sub: user.id, role: user.role as Role, tenantId: user.tenantId, email: user.email, name: user.name, ...(sid ? { sid } : {}) };
 }
 
+export type RegisterResult =
+  | { needsVerification: true; email: string }
+  | (SessionPayload & { needsVerification: false });
+
 export async function registerClient(
   host: string | null,
   name: string,
@@ -58,8 +67,8 @@ export async function registerClient(
   country?: string,
   type: "DEMO" | "LIVE" = "LIVE",
   tenantSlug?: string,
-): Promise<SessionPayload> {
-  let tenant = await resolveTenant(host);
+): Promise<RegisterResult> {
+  let tenant: any = await resolveTenant(host);
   if (!tenant && tenantSlug) {
     tenant = await prisma.tenant.findFirst({
       where: { OR: [{ slug: tenantSlug }, { subdomain: tenantSlug }] },
@@ -67,33 +76,109 @@ export async function registerClient(
   }
   if (!tenant) throw new Error("Registration is only available on a brand site");
 
+  const lowerEmail = email.toLowerCase();
   const passwordHash = await hashPassword(password);
+
+  // If tenant has SMTP configured, send a verification email before creating the session
+  const hasSmtp = !!(tenant.smtpEmail && tenant.smtpPassword);
+  const emailToken = hasSmtp ? makeCode() : null;
+
   const session = await prisma.$transaction(async (tx) => {
-    const lowerEmail = email.toLowerCase();
     const exists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail } });
     if (exists) throw new Error("Email already registered");
-    // The client chooses Live or Demo at registration. Only live consumes a seat.
+    // Only LIVE accounts consume a seat
     await assertSeatAvailable(tx, tenant!.id, type);
 
-    const user = await tx.user.create({
-      data: { tenantId: tenant!.id, email: lowerEmail, name, passwordHash, role: "CLIENT" },
+    const user = await (tx.user.create as any)({
+      data: {
+        tenantId: tenant!.id, email: lowerEmail, name, passwordHash, role: "CLIENT",
+        ...(emailToken ? { emailToken } : {}),
+      },
     });
     const login = await nextLogin(tx, tenant!.id, type);
     await tx.account.create({
       data: {
-        tenantId: tenant!.id,
-        login,
-        userId: user.id,
-        name,
-        type,
-        leverage: 100,
-        currency: "USD",
-        phone: phone || null,
-        country: country || null,
+        tenantId: tenant!.id, login, userId: user.id, name, type,
+        leverage: 100, currency: "USD",
+        phone: phone || null, country: country || null,
         deposit: type === "DEMO" ? new Prisma.Decimal(10000) : new Prisma.Decimal(0),
       },
     });
     return { sub: user.id, role: "CLIENT" as Role, tenantId: tenant!.id, email: lowerEmail, name };
   });
-  return session;
+
+  if (hasSmtp && emailToken) {
+    // Send verification email — non-blocking so registration succeeds even if SMTP fails
+    sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
+      to: lowerEmail,
+      subject: "Verify your email address",
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+          <h2 style="margin:0 0 8px">Welcome to ${tenant.brandName || tenant.name}</h2>
+          <p style="color:#555;margin:0 0 24px">Enter the code below to verify your email address and activate your trading account.</p>
+          <div style="text-align:center;margin:32px 0">
+            <span style="font-size:40px;font-weight:800;letter-spacing:12px;color:#1a2332">${emailToken}</span>
+          </div>
+          <p style="color:#888;font-size:12px">This code expires in 15 minutes. If you didn't register, you can ignore this email.</p>
+        </div>
+      `,
+    }).catch(() => {});
+    return { needsVerification: true, email: lowerEmail };
+  }
+
+  return { ...session, needsVerification: false };
+}
+
+export async function verifyEmail(
+  host: string | null,
+  email: string,
+  token: string,
+): Promise<SessionPayload> {
+  const tenant = await resolveTenant(host);
+  if (!tenant) throw new Error("Tenant not found");
+  const lowerEmail = email.toLowerCase();
+  const user = await prisma.user.findFirst({
+    where: { tenantId: tenant.id, email: lowerEmail },
+  });
+  const u = user as any;
+  if (!u || !u.emailToken) throw new Error("Verification not pending");
+  if (u.emailToken !== token.trim()) throw new Error("Incorrect code — please try again");
+  await (prisma.user.update as any)({ where: { id: u.id }, data: { emailToken: null } });
+  return { sub: u.id, role: u.role as Role, tenantId: tenant.id, email: lowerEmail, name: u.name };
+}
+
+export async function sendForgotPassword(host: string | null, email: string): Promise<void> {
+  const tenant: any = await resolveTenant(host);
+  if (!tenant) throw new Error("Tenant not found");
+  if (!tenant.smtpEmail || !tenant.smtpPassword) throw new Error("Password reset emails are not configured for this broker. Please contact support.");
+  const lowerEmail = email.toLowerCase();
+  const user = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: lowerEmail } });
+  // Always return success (don't reveal if email exists)
+  if (!user) return;
+  const token = makeCode() + makeCode(); // 12-digit reset token
+  await (prisma.user.update as any)({ where: { id: user.id }, data: { emailToken: "reset:" + token } });
+  const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || `https://${tenant.subdomain}.cubexenterprises.com`}/reset-password?email=${encodeURIComponent(lowerEmail)}&token=${token}`;
+  await sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
+    to: lowerEmail,
+    subject: "Reset your password",
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+        <h2 style="margin:0 0 8px">Password Reset</h2>
+        <p style="color:#555;margin:0 0 24px">Click the button below to reset your password. This link expires in 15 minutes.</p>
+        <a href="${resetLink}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">Reset Password</a>
+        <p style="color:#888;font-size:12px;margin-top:24px">If you didn't request this, ignore this email. Your password won't change.</p>
+      </div>
+    `,
+  });
+}
+
+export async function resetPassword(host: string | null, email: string, token: string, newPassword: string): Promise<void> {
+  const tenant = await resolveTenant(host);
+  if (!tenant) throw new Error("Tenant not found");
+  const lowerEmail = email.toLowerCase();
+  const user = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: lowerEmail } });
+  const u2 = user as any;
+  if (!u2?.emailToken || u2.emailToken !== `reset:${token}`) throw new Error("Invalid or expired reset link");
+  const passwordHash = await hashPassword(newPassword);
+  await (prisma.user.update as any)({ where: { id: u2.id }, data: { passwordHash, emailToken: null } });
 }

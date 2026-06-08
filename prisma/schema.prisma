@@ -20,6 +20,8 @@ model Tenant {
   primaryColor String?       @default("#2563eb")
   accentColor  String?       @default("#22c55e")
   supportEmail String?
+  smtpEmail    String?
+  smtpPassword String?
   permissions  Json          @default("{}")
   subscription Subscription?
   invoices     Invoice[]
@@ -66,6 +68,7 @@ model User {
   email           String
   passwordHash    String
   pinHash         String?
+  emailToken      String?
   webauthnChallenge String?
   avatarUrl       String?
   name            String

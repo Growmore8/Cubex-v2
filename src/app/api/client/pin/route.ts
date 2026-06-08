@@ -10,6 +10,13 @@ export async function GET() {
   return NextResponse.json({ ok: true, hasPin: !!(u && u.pinHash) });
 }
 
+export async function DELETE() {
+  const s = await requireClient();
+  if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  await prisma.user.update({ where: { id: s.sub }, data: { pinHash: null } });
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(req: Request) {
   const s = await requireClient();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });

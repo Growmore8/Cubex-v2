@@ -846,10 +846,17 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="mb-2 text-[11px] font-bold tracking-wide">SECURITY & SIGN-IN</div>
               <button onClick={openPin} className="flex w-full items-center gap-3 py-2.5 text-left">
                 <i className="fa-solid fa-shield-halved text-[var(--muted)]" />
-                <div className="flex-1"><div className="text-[12px] font-semibold">PIN Access</div><div className="text-[10px] text-[var(--muted)]">{pin?.pinHasPin ? "PIN is set — tap to change or remove" : "Set a PIN"}</div></div>
+                <div className="flex-1"><div className="text-[12px] font-semibold">PIN Access</div><div className="text-[10px] text-[var(--muted)]">{pin?.pinHasPin ? "PIN is set — tap to change" : "Set a PIN"}</div></div>
                 {pin?.pinHasPin && <span className="rounded px-1.5 py-0.5 text-[8px] font-bold" style={{ background: "rgba(22,163,74,.15)", color: BUY }}>ENABLED</span>}
                 <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
               </button>
+              {pin?.pinHasPin && (
+                <button onClick={pin?.disablePin} className="flex w-full items-center gap-3 py-2.5 text-left">
+                  <i className="fa-solid fa-shield-slash" style={{ color: SELL }} />
+                  <div className="flex-1"><div className="text-[12px] font-semibold" style={{ color: SELL }}>Disable PIN</div><div className="text-[10px] text-[var(--muted)]">Remove PIN lock from this app</div></div>
+                  <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
+                </button>
+              )}
               <button onClick={addPasskey} className="flex w-full items-center gap-3 py-2.5 text-left">
                 <i className="fa-solid fa-fingerprint text-[var(--muted)]" />
                 <div className="flex-1"><div className="text-[12px] font-semibold">Face ID / Fingerprint</div><div className="text-[10px] text-[var(--muted)]">Tap to enable a passkey</div></div>

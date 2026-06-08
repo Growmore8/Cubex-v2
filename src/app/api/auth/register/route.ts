@@ -25,9 +25,12 @@ export async function POST(req: Request) {
     if (!rateLimit(`register:${ip}`, 5, 60_000)) {
       return NextResponse.json({ ok: false, error: "Too many attempts. Please wait a minute." }, { status: 429 });
     }
-    const session = await registerClient(host, name, email.toLowerCase(), password, phone, country, type, tenantSlug);
-    const token = await signSession(session);
-    const res = NextResponse.json({ ok: true, redirect: ROLE_HOME[session.role] });
+    const result = await registerClient(host, name, email.toLowerCase(), password, phone, country, type, tenantSlug);
+    if (result.needsVerification) {
+      return NextResponse.json({ ok: true, needsVerification: true, email: result.email });
+    }
+    const token = await signSession(result);
+    const res = NextResponse.json({ ok: true, redirect: ROLE_HOME[result.role], needsVerification: false });
     res.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
       path: "/", maxAge: 60 * 60 * 8,

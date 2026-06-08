@@ -30,6 +30,8 @@ const createSchema = z.object({
   companyInfo: z.string().optional(),
   customDomain: z.string().optional(),
   supportEmail: z.string().email().or(z.literal("")).optional(),
+  smtpEmail: z.string().email().or(z.literal("")).optional(),
+  smtpPassword: z.string().optional(),
 });
 
 export async function POST(req: Request) {

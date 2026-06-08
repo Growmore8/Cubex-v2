@@ -29,6 +29,8 @@ export default function LoginPage() {
     const d = await r.json();
     setLoading(false);
     if (!d.ok) { setErr(d.error || "Login failed"); return; }
+    if (remember) localStorage.setItem("cubex-remember", "1");
+    else localStorage.removeItem("cubex-remember");
     window.location.href = d.redirect;
   }
 
@@ -62,11 +64,16 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <label className="flex cursor-pointer select-none items-center gap-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
-        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
-          className="h-4 w-4 rounded" style={{ accentColor: "var(--brand-primary)" }} />
-        Keep me signed in for 30 days
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="flex cursor-pointer select-none items-center gap-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
+            className="h-4 w-4 rounded" style={{ accentColor: "var(--brand-primary)" }} />
+          Keep me signed in for 30 days
+        </label>
+        <a href="/forgot-password" className="text-xs font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}>
+          Forgot password?
+        </a>
+      </div>
 
       <button type="submit" disabled={loading}
         style={{ background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))` }}

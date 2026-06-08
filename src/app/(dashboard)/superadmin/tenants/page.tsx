@@ -100,6 +100,7 @@ export default function SATenantsPage() {
       slogan: t.slogan || "", companyInfo: t.companyInfo || "", logoUrl: t.logoUrl || "",
       primaryColor: t.primaryColor || "#2563eb", accentColor: t.accentColor || "#22c55e",
       plan: t.subscription?.plan || "STARTER",
+      smtpEmail: t.smtpEmail || "", smtpPassword: "",
     });
     setEditFor(t);
   }
@@ -163,7 +164,7 @@ export default function SATenantsPage() {
               <th className="px-2 py-1 font-normal">Plan</th>
               <th className="px-2 py-1 font-normal">Subscription</th>
               <th className="px-2 py-1 font-normal">Expires</th>
-              <th className="px-2 py-1 font-normal text-right">Users / Accs</th>
+              <th className="px-2 py-1 font-normal text-center">Accounts</th>
               <th className="px-2 py-1 font-normal text-right">Actions</th>
             </tr>
           </thead>
@@ -192,7 +193,15 @@ export default function SATenantsPage() {
                     ? new Date(t.subscription.endsAt).toLocaleDateString()
                     : <span className="text-gray-400">No expiry</span>}
                 </td>
-                <td className="px-2 py-2 text-right">{t.users} / {t.accounts}</td>
+                <td className="px-2 py-2 text-center">
+                  <div className="flex flex-col gap-0.5 text-[11px]">
+                    <span><span className="font-semibold text-green-700">{t.liveCnt ?? "?"}</span> <span className="text-gray-400">live</span> / <span className="font-semibold text-blue-600">{t.demoCnt ?? "?"}</span> <span className="text-gray-400">demo</span></span>
+                    <span><span className="font-semibold text-purple-600">{t.managerCnt ?? "?"}</span> <span className="text-gray-400">mgr</span> · <span className="font-semibold text-gray-600">{t.groupCnt ?? "?"}</span> <span className="text-gray-400">grp</span></span>
+                    <span className="text-[10px]" style={{ color: (t.seatsLeft ?? 99) <= 0 ? "#ef4444" : (t.seatsLeft ?? 99) <= 2 ? "#f59e0b" : "#6b7280" }}>
+                      {t.seatsLeft ?? "?"} seat{t.seatsLeft !== 1 ? "s" : ""} left / {t.seatsLimit ?? "?"}
+                    </span>
+                  </div>
+                </td>
                 <td className="px-2 py-2 space-x-1 text-right whitespace-nowrap">
                   <button
                     title="Edit tenant info"
@@ -275,6 +284,13 @@ export default function SATenantsPage() {
               <input className={inp} placeholder="Admin name *" autoComplete="off" value={form.adminName || ""} onChange={(e) => setForm({ ...form, adminName: e.target.value })} />
               <input className={inp} placeholder="Admin email *" autoComplete="off" value={form.adminEmail || ""} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} />
               <PasswordInput wrap="relative col-span-2" className={inp} placeholder="Admin password (min 6) *" autoComplete="new-password" value={form.adminPassword || ""} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} />
+            </div>
+            {/* Section: Email / SMTP */}
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Email Settings <span className="text-gray-300 normal-case font-normal">(for verification & password reset emails)</span></div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <input className={inp} placeholder="SMTP email (e.g. info@yourbrand.com)" autoComplete="off" type="email" value={form.smtpEmail || ""} onChange={(e) => setForm({ ...form, smtpEmail: e.target.value })} />
+              <PasswordInput wrap="relative" className={inp} placeholder="Email / App password" autoComplete="new-password" value={form.smtpPassword || ""} onChange={(e) => setForm({ ...form, smtpPassword: e.target.value })} />
+              <p className="col-span-2 text-[10px] text-gray-400">Gmail: use an App Password (Google Account → Security → App passwords). Leave blank to skip email verification.</p>
             </div>
             {/* Section: Plan & Branding */}
             <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Plan & Branding</div>
@@ -364,6 +380,13 @@ export default function SATenantsPage() {
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Logo</label><LogoField value={editForm.logoUrl} which="edit" /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Slogan / Tagline</label><input className={inp} placeholder="Trade smarter" value={editForm.slogan} onChange={(e) => setEditForm({ ...editForm, slogan: e.target.value })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Company / Brokerage Info (footer)</label><input className={inp} placeholder="Acme Markets Ltd · Reg# 12345 · London" value={editForm.companyInfo} onChange={(e) => setEditForm({ ...editForm, companyInfo: e.target.value })} /></div>
+              <div className="col-span-2 border-t pt-3 mt-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Email Settings <span className="text-gray-300 normal-case font-normal">(verification & password reset)</span></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-xs text-gray-500 block mb-1">SMTP Email</label><input className={inp} type="email" autoComplete="off" placeholder="info@yourbrand.com" value={editForm.smtpEmail} onChange={(e) => setEditForm({ ...editForm, smtpEmail: e.target.value })} /></div>
+                  <div><label className="text-xs text-gray-500 block mb-1">Email / App Password {editFor?.smtpEmail ? <span className="text-gray-400">(leave blank to keep current)</span> : null}</label><PasswordInput wrap="relative" className={inp} autoComplete="new-password" placeholder={editFor?.smtpEmail ? "Leave blank to keep" : "App password"} value={editForm.smtpPassword} onChange={(e) => setEditForm({ ...editForm, smtpPassword: e.target.value })} /></div>
+                </div>
+              </div>
               <div><label className="text-xs text-gray-500 block mb-1">Primary Color</label><div className="flex gap-2"><input type="color" className="rounded border h-9 w-12 cursor-pointer" value={editForm.primaryColor} onChange={(e) => setEditForm({ ...editForm, primaryColor: e.target.value })} /><input className={inp} value={editForm.primaryColor} onChange={(e) => setEditForm({ ...editForm, primaryColor: e.target.value })} /></div></div>
               <div><label className="text-xs text-gray-500 block mb-1">Accent Color</label><div className="flex gap-2"><input type="color" className="rounded border h-9 w-12 cursor-pointer" value={editForm.accentColor} onChange={(e) => setEditForm({ ...editForm, accentColor: e.target.value })} /><input className={inp} value={editForm.accentColor} onChange={(e) => setEditForm({ ...editForm, accentColor: e.target.value })} /></div></div>
             </div>

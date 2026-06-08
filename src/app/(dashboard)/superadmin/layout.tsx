@@ -4,6 +4,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 
+const IDLE_MS = 15 * 60 * 1000;
+const WARN_MS = 13 * 60 * 1000;
+
 type Item = { href: string; label: string; icon: string; sub?: boolean; section?: string };
 const NAV: Item[] = [
   { href: "/superadmin", label: "Dashboard", icon: "fa-gauge-high" },
@@ -134,6 +137,11 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   const ac = useRef<any>(null);
   const prev = useRef<number>(-1);
   const volRef = useRef(1.5);
+  const [idleWarn, setIdleWarn] = useState(false);
+  const [idleSecs, setIdleSecs] = useState(120);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleWarnRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleCountRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function beep(f: number, d: number, g: number) {
     try {
@@ -159,7 +167,49 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   useEffect(() => {
     setMounted(true);
     try { const v = parseFloat(localStorage.getItem("sa_notifVol") || "1.5"); volRef.current = v; setVol(v); } catch (e) {}
-    loadNotifs(); const t = setInterval(loadNotifs, 30000); return () => clearInterval(t);
+    loadNotifs(); const t = setInterval(loadNotifs, 30000);
+
+    // Tab/browser close = logout (if not remembered)
+    function onPageHide() {
+      if (!localStorage.getItem("cubex-remember")) {
+        navigator.sendBeacon("/api/auth/logout");
+      }
+    }
+    window.addEventListener("pagehide", onPageHide);
+
+    // 15-minute idle auto-logout
+    function resetIdle() {
+      if (idleWarnRef.current) clearTimeout(idleWarnRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (idleCountRef.current) clearInterval(idleCountRef.current);
+      setIdleWarn(false);
+
+      idleWarnRef.current = setTimeout(() => {
+        setIdleWarn(true);
+        setIdleSecs(120);
+        idleCountRef.current = setInterval(() => setIdleSecs((s) => Math.max(0, s - 1)), 1000);
+      }, WARN_MS);
+
+      idleTimerRef.current = setTimeout(async () => {
+        if (idleCountRef.current) clearInterval(idleCountRef.current);
+        localStorage.removeItem("cubex-remember");
+        await fetch("/api/auth/logout", { method: "POST" });
+        window.location.href = "/login?reason=expired";
+      }, IDLE_MS);
+    }
+
+    const actEvents = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    actEvents.forEach((e) => window.addEventListener(e, resetIdle, { passive: true }));
+    resetIdle();
+
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("pagehide", onPageHide);
+      actEvents.forEach((e) => window.removeEventListener(e, resetIdle));
+      if (idleWarnRef.current) clearTimeout(idleWarnRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (idleCountRef.current) clearInterval(idleCountRef.current);
+    };
   }, []);
  function toggleTheme() { setTheme(dark ? "light" : "dark"); }
   function setVolume(v: number) { volRef.current = v; setVol(v); try { localStorage.setItem("sa_notifVol", String(v)); } catch (e) {} beep(880, 0.08, 0.25); }
@@ -198,7 +248,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
             <span className="sb-vol-val">{Math.round((vol / 5) * 100)}%</span>
           </div>
           <div className="sb-user">CubeX</div>
-          <button className="sb-logout" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }}>
+          <button className="sb-logout" onClick={async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }}>
             <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 4 }}></i>Logout
           </button>
         </div>
@@ -220,6 +270,24 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
       </div>
 
       <main className="sa-main">{children}</main>
+
+      {idleWarn && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: dark ? "#152238" : "#fff", border: dark ? "1px solid #27344c" : "1px solid #dde3ec", borderRadius: 14, padding: "28px 32px", maxWidth: 360, width: "90%", textAlign: "center", boxShadow: "0 12px 40px rgba(0,0,0,0.4)", color: dark ? "#e6ecf5" : "#1a2332" }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>⏱</div>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Session expiring soon</div>
+            <div style={{ fontSize: 13, color: dark ? "#9aa8c0" : "#5a6a82", marginBottom: 18 }}>
+              You will be logged out in <strong style={{ color: "#ef4444" }}>{idleSecs}s</strong> due to inactivity.
+            </div>
+            <button
+              onClick={() => setIdleWarn(false)}
+              style={{ background: "#1565c0", color: "#fff", border: "none", borderRadius: 8, padding: "9px 28px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+            >
+              Stay signed in
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
