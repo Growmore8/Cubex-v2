@@ -15,24 +15,36 @@ export interface LoadStatementOpts {
   tenantId: string;
   accountId: string;
   userId?: string;   // when set, also scope to this client (security)
-  since?: Date;       // when set, closed-trades / financials / requests are limited to >= since
+  since?: Date;       // closed-trades / financials / requests limited to >= since
+  until?: Date;       // ... and <= until (together they form a date range)
+}
+
+function rangeFilter(since?: Date, until?: Date): any {
+  if (!since && !until) return undefined;
+  const r: any = {};
+  if (since) r.gte = since;
+  if (until) r.lte = until;
+  return r;
 }
 
 export async function loadStatement(opts: LoadStatementOpts) {
   const where: any = { id: opts.accountId, tenantId: opts.tenantId, deactivated: false };
   if (opts.userId) where.userId = opts.userId;
+  const closedRange = rangeFilter(opts.since, opts.until);
+  const appliedRange = rangeFilter(opts.since, opts.until);
+  const createdRange = rangeFilter(opts.since, opts.until);
   const account = await prisma.account.findFirst({
     where,
     include: {
       user: { select: { name: true, email: true } },
       trades: { orderBy: { openedAt: "desc" } },
-      history: { where: opts.since ? { closedAt: { gte: opts.since } } : undefined, orderBy: { closedAt: "desc" }, take: 500 },
-      financials: { where: opts.since ? { appliedAt: { gte: opts.since } } : undefined, orderBy: { appliedAt: "desc" }, take: 500 },
+      history: { where: closedRange ? { closedAt: closedRange } : undefined, orderBy: { closedAt: "desc" }, take: 500 },
+      financials: { where: appliedRange ? { appliedAt: appliedRange } : undefined, orderBy: { appliedAt: "desc" }, take: 500 },
     },
   });
   if (!account) return null;
   const requests = await prisma.paymentRequest.findMany({
-    where: { accountId: account.id, ...(opts.since ? { createdAt: { gte: opts.since } } : {}) },
+    where: { accountId: account.id, ...(createdRange ? { createdAt: createdRange } : {}) },
     orderBy: { createdAt: "desc" }, take: 200,
   });
   const tenant = await prisma.tenant.findUnique({ where: { id: opts.tenantId } });
@@ -200,8 +212,8 @@ function summaryOf(data: StatementData, periodLabel: string, pdfFileName: string
 export interface SendStatementResult { ok: boolean; to?: string; error?: string }
 
 // Build + email a statement PDF for one account (no-reply, from the tenant's SMTP).
-export async function sendStatementEmail(opts: { tenantId: string; accountId: string; userId?: string; to?: string; since?: Date; periodLabel?: string }): Promise<SendStatementResult> {
-  const data = await loadStatement({ tenantId: opts.tenantId, accountId: opts.accountId, userId: opts.userId, since: opts.since });
+export async function sendStatementEmail(opts: { tenantId: string; accountId: string; userId?: string; to?: string; since?: Date; until?: Date; periodLabel?: string }): Promise<SendStatementResult> {
+  const data = await loadStatement({ tenantId: opts.tenantId, accountId: opts.accountId, userId: opts.userId, since: opts.since, until: opts.until });
   if (!data) return { ok: false, error: "Account not found" };
   const t: any = data.tenant;
   if (!t?.smtpEmail || !t?.smtpPassword) return { ok: false, error: "Email is not configured for this broker." };
@@ -209,7 +221,8 @@ export async function sendStatementEmail(opts: { tenantId: string; accountId: st
   if (!to) return { ok: false, error: "No recipient email on file." };
 
   const brand = brandOf(t);
-  const periodLabel = opts.periodLabel || "Full account history";
+  const fmtD = (d?: Date) => d ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
+  const periodLabel = opts.periodLabel || ((opts.since || opts.until) ? `${fmtD(opts.since) || "start"} – ${fmtD(opts.until) || "now"}` : "Full account history");
   const pdfFileName = `Statement-${data.account.login}-${new Date().toISOString().slice(0, 10)}.pdf`;
   const pdf = await buildStatementPdf(data, periodLabel);
   const summary = summaryOf(data, periodLabel, pdfFileName);

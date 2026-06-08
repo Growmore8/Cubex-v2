@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useEffect, useRef, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
 import LWChart from "@/components/LWChart";
@@ -170,7 +170,7 @@ export default function ClientTerminal() {
       prevRef.current[symbol] = price;
       pP[symbol] = price;
     });
-    // Initial price snapshot on connect â€” seeds prices for frozen/closed markets so
+    // Initial price snapshot on connect — seeds prices for frozen/closed markets so
     // open positions show their last P&L immediately.
     socket.on("prices", (snap: Record<string, number>) => {
       if (snap && typeof snap === "object") {
@@ -282,7 +282,7 @@ export default function ClientTerminal() {
   async function savePin() {
     setPinErr("");
     const pin = String(pinForm.pin || "");
-    if (!/^\d{4,6}$/.test(pin)) { setPinErr("PIN must be 4â€“6 digits"); return; }
+    if (!/^\d{4,6}$/.test(pin)) { setPinErr("PIN must be 4–6 digits"); return; }
     const r = await fetch("/api/client/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, current: pinForm.current }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { setPinErr(r.error || "Failed"); return; }
     setPinHasPin(true); setPinModal(false); setPinForm({}); sessionStorage.setItem("cubex-pin-ok", "1");
@@ -301,7 +301,7 @@ export default function ClientTerminal() {
     if (account?.locked) { setErr("Your account is read-only. Closing is disabled."); return; }
     const r = await fetch("/api/client/orders/" + id + "/close", { method: "POST" });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Close failed"); return; }
-    pushToast({ title: "Trade closed" + (d.pnl != null ? ` Â· P/L $${Number(d.pnl).toFixed(2)}` : ""), type: "TRADE" }); load();
+    pushToast({ title: "Trade closed" + (d.pnl != null ? ` · P/L $${Number(d.pnl).toFixed(2)}` : ""), type: "TRADE" }); load();
   }
   function switchAcc(id: string) { accIdRef.current = id; setAccId(id); load(); }
   async function doTransfer() {
@@ -316,7 +316,7 @@ export default function ClientTerminal() {
   async function openAccount(type: "DEMO" | "LIVE") {
     setErr("");
     if (account?.locked) { toast.error("Your account is read-only. Cannot create new accounts."); return; }
-    const tid = toast.loading(`Opening ${type === "LIVE" ? "live" : "demo"} accountâ€¦`);
+    const tid = toast.loading(`Opening ${type === "LIVE" ? "live" : "demo"} account…`);
     const r = await fetch("/api/client/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { toast.error(r.error || "Failed to open account", { id: tid }); setErr(r.error || "Failed"); return; }
     toast.success(`${type === "LIVE" ? "Live" : "Demo"} account ${r.account?.login || ""} created`, { id: tid });
@@ -355,7 +355,7 @@ export default function ClientTerminal() {
   const balance = account ? account.deposit - account.withdrawal + account.credit + account.bonus + account.pnl : 0;
   const equity = balance + floating;
   const used = account ? (() => {
-    // hedged (net) margin: net BUYâˆ’SELL lots per symbol, charge margin on |net| only
+    // hedged (net) margin: net BUY−SELL lots per symbol, charge margin on |net| only
     const net: Record<string, number> = {};
     for (const p of positions) net[p.symbol] = (net[p.symbol] || 0) + (p.type === "BUY" ? 1 : -1) * Number(p.lots);
     let m = 0;
@@ -387,9 +387,9 @@ export default function ClientTerminal() {
         </div>
       )}
       <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm">
-        <div className="flex items-center gap-2"><input type="file" accept="image/*" style={{ display: "none" }} ref={avatarInputRef} onChange={uploadAvatar} /><button onClick={() => avatarInputRef.current && avatarInputRef.current.click()} title="Change photo" className="h-6 w-6 overflow-hidden rounded-full border border-[var(--border)]">{avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : brand.logoUrl ? <img src={brand.logoUrl} alt="" className="h-full w-full object-contain" /> : <span className="inline-block h-full w-full bg-[#3b82f6]" />}</button><b className="font-medium">{brand.name || "Â "}</b>{curAcct && <span className="rounded px-2 py-0.5 text-[11px]" style={{ background: "var(--soft)", color: curAcct.type === "DEMO" ? GOLD : BUY }}>{curAcct.login} Â· {curAcct.type}</span>}</div>
+        <div className="flex items-center gap-2"><input type="file" accept="image/*" style={{ display: "none" }} ref={avatarInputRef} onChange={uploadAvatar} /><button onClick={() => avatarInputRef.current && avatarInputRef.current.click()} title="Change photo" className="h-6 w-6 overflow-hidden rounded-full border border-[var(--border)]">{avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : brand.logoUrl ? <img src={brand.logoUrl} alt="" className="h-full w-full object-contain" /> : <span className="inline-block h-full w-full bg-[#3b82f6]" />}</button><b className="font-medium">{brand.name || " "}</b>{curAcct && <span className="rounded px-2 py-0.5 text-[11px]" style={{ background: "var(--soft)", color: curAcct.type === "DEMO" ? GOLD : BUY }}>{curAcct.login} · {curAcct.type}</span>}</div>
         <div className="flex items-center gap-1.5 text-[11px]">
-          {/* Account switcher â€” icon dropdown */}
+          {/* Account switcher — icon dropdown */}
           <div className="relative">
             <button onClick={() => setAcctSwitchOpen((o) => !o)} title="Switch account" className="flex items-center gap-1 rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-arrow-right-arrow-left" /><i className="fa-solid fa-chevron-down text-[8px] opacity-60" /></button>
             {acctSwitchOpen && (<><div className="fixed inset-0 z-[80]" onClick={() => setAcctSwitchOpen(false)} />
@@ -457,7 +457,7 @@ export default function ClientTerminal() {
 
       {readOnly && (
         <div className="flex items-center justify-center gap-2 py-1.5 text-[11px] font-semibold" style={{ background: "rgba(224,82,96,0.16)", color: SELL, borderBottom: "1px solid rgba(224,82,96,0.35)" }}>
-          <i className="fa-solid fa-lock" /> READ ONLY ACCESS â€” You can view everything, but all actions are disabled.
+          <i className="fa-solid fa-lock" /> READ ONLY ACCESS — You can view everything, but all actions are disabled.
         </div>
       )}
 
@@ -594,7 +594,7 @@ export default function ClientTerminal() {
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
         <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: rtW }}>
-          <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-semibold tracking-wide" style={{ color: BUY }}>NEW ORDER Â· <span className="text-[var(--text)]">{selSym}</span></div>
+          <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-semibold tracking-wide" style={{ color: BUY }}>NEW ORDER · <span className="text-[var(--text)]">{selSym}</span></div>
           <div className="min-h-0 flex-1 overflow-auto">
           {rightTab === "NEWS" ? (
             <div className="p-2 text-[11px]">
@@ -625,7 +625,7 @@ export default function ClientTerminal() {
               {/* Volume */}
               <div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Volume (lots)</div>
               <div className="mb-1 flex items-center gap-1.5">
-                <button onClick={() => setVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--soft)]">âˆ’</button>
+                <button onClick={() => setVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--soft)]">−</button>
                 <input type="number" step="0.01" value={vol} onChange={(e) => setVol(Number(e.target.value))} className="h-8 flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-center text-[13px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" />
                 <button onClick={() => setVol((v) => +(v + 0.01).toFixed(2))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--soft)]">+</button>
               </div>
@@ -633,8 +633,8 @@ export default function ClientTerminal() {
 
               {/* SL / TP */}
               <div className="mb-2 grid grid-cols-2 gap-2">
-                <div><div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Stop Loss</div><input value={sl} onChange={(e) => setSl(e.target.value)} placeholder="â€”" className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[11px] tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" /></div>
-                <div><div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Take Profit</div><input value={tp} onChange={(e) => setTp(e.target.value)} placeholder="â€”" className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[11px] tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" /></div>
+                <div><div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Stop Loss</div><input value={sl} onChange={(e) => setSl(e.target.value)} placeholder="—" className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[11px] tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" /></div>
+                <div><div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Take Profit</div><input value={tp} onChange={(e) => setTp(e.target.value)} placeholder="—" className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[11px] tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" /></div>
               </div>
 
               {/* Margin */}
@@ -644,10 +644,10 @@ export default function ClientTerminal() {
               {entryTab === "trade" ? (
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: SELL }}>
-                    <span className="text-[10px] uppercase tracking-wide opacity-90">Sell</span><span className="text-[14px] tabular-nums">{bid?.toFixed(d) ?? "â€¦"}</span>
+                    <span className="text-[10px] uppercase tracking-wide opacity-90">Sell</span><span className="text-[14px] tabular-nums">{bid?.toFixed(d) ?? "…"}</span>
                   </button>
                   <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "#2f81f7" }}>
-                    <span className="text-[10px] uppercase tracking-wide opacity-90">Buy</span><span className="text-[14px] tabular-nums">{ask?.toFixed(d) ?? "â€¦"}</span>
+                    <span className="text-[10px] uppercase tracking-wide opacity-90">Buy</span><span className="text-[14px] tabular-nums">{ask?.toFixed(d) ?? "…"}</span>
                   </button>
                 </div>
               ) : (
@@ -666,7 +666,7 @@ export default function ClientTerminal() {
         </aside>
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[10px]" style={{ color: GOLD }}>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "#facc15" }}>
         <span>Balance: <span className="text-[var(--text)]">{account ? fmt(balance) : "--"}</span></span>
         <span>Flt P/L: <span style={{ color: floating >= 0 ? BUY : SELL }}>{account ? fmt(floating) : "--"}</span></span>
         <span>Equity: <span className="text-[var(--text)]">{account ? fmt(equity) : "--"}</span></span>
@@ -726,7 +726,7 @@ export default function ClientTerminal() {
           {botTab === "positions" && pending.length > 0 && (
             <table className="w-full text-[10px]">
               <thead>
-                <tr><th colSpan={9} className="border-t-2 px-2 pb-1 pt-2 text-left text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#5aa9ff", borderColor: "rgba(90,169,255,0.35)" }}><i className="fa-regular fa-clock mr-1" />Pending Orders ({pending.length}) â€” waiting to trigger</th></tr>
+                <tr><th colSpan={9} className="border-t-2 px-2 pb-1 pt-2 text-left text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#5aa9ff", borderColor: "rgba(90,169,255,0.35)" }}><i className="fa-regular fa-clock mr-1" />Pending Orders ({pending.length}) — waiting to trigger</th></tr>
                 <tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Order</th><th className="px-2 py-1 font-normal">Type</th><th className="px-2 py-1 font-normal text-right">Lots</th><th className="px-2 py-1 font-normal text-right">Trigger</th><th className="px-2 py-1 font-normal text-right">Current</th><th className="px-2 py-1 font-normal text-right">Distance</th><th className="px-2 py-1 font-normal text-right">SL</th><th className="px-2 py-1 font-normal text-right">TP</th><th className="px-2 py-1 font-normal text-right"></th></tr>
               </thead>
               <tbody>
@@ -739,8 +739,8 @@ export default function ClientTerminal() {
                     <td className="px-2 py-1"><span className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: c + "22", color: c }}>{label}</span></td>
                     <td className="px-2 py-1 text-right">{o.lots}</td>
                     <td className="px-2 py-1 text-right font-semibold">{trig.toFixed(d)}</td>
-                    <td className="px-2 py-1 text-right text-[var(--muted)]">{cur != null ? cur.toFixed(d) : "â€¦"}</td>
-                    <td className="px-2 py-1 text-right text-[var(--muted)]">{dist != null ? dist.toFixed(d) : "â€”"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{cur != null ? cur.toFixed(d) : "…"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{dist != null ? dist.toFixed(d) : "—"}</td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">{o.sl ? Number(o.sl).toFixed(d) : "-"}</td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">{o.tp ? Number(o.tp).toFixed(d) : "-"}</td>
                     <td className="px-2 py-1 text-right"><button title="Cancel order" style={{ color: SELL }} onClick={() => cancelPending(o.id)}><i className="fa-solid fa-xmark" /></button></td>

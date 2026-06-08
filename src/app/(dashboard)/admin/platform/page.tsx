@@ -875,7 +875,7 @@ export default function AdminDeskPage() {
         </>)}
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "var(--text)" }}>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "#facc15" }}>
         <span>Balance: <span className="text-[var(--text)]">{selAcc ? fmt(balance) : "--"}</span></span>
         <span>Flt P/L: <span style={{ color: floating >= 0 ? BUY : SELL }}>{selAcc ? fmt(floating) : "--"}</span></span>
         <span>Equity: <span className="text-[var(--text)]">{selAcc ? fmt(equity) : "--"}</span></span>
