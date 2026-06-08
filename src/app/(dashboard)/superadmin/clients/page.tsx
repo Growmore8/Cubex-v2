@@ -208,17 +208,17 @@ export default function SAClientsPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="sa-table sa-grid">
             <thead>
-              <tr className="border-b text-left" style={{ borderColor: "var(--border)", background: "var(--bg2)" }}>
+              <tr>
                 {["ID","NAME / EMAIL / PHONE","COUNTRY","COMPANY / MANAGER","TYPE","BALANCE","ONLINE","IP","JOINED","STATUS","ACTIONS"].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-[11px] font-semibold text-gray-500">{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {paged.map((r) => (
-                <tr key={r.id} className="ui-row border-b" style={{ borderColor: "var(--border)" }}>
+                <tr key={r.id}>
                   <td className="px-3 py-2.5">
                     <button className="font-mono text-blue-600 font-semibold hover:underline text-sm" onClick={() => openEdit(r)}>{r.login}</button>
                     {r.isPool && <div className="mt-0.5 text-[10px] font-medium" style={{ color: "#b45309" }}>POOL</div>}

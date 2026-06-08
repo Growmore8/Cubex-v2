@@ -145,30 +145,30 @@ export default function SABillingPage() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead style={{ background: "#f8fafc" }}>
-              <tr className="border-b text-left" style={{ borderColor: "#e2e8f0" }}>
+          <table className="sa-table sa-grid">
+            <thead>
+              <tr className="text-left">
                 {["Invoice #","Tenant","Period","Plan","Amount","Status","Due Date","Paid Date","Actions"].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-[11px] font-semibold text-gray-500">{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {invoices.map((inv) => (
-                <tr key={inv.id} className="ui-row border-b" style={{ borderColor: "#f0f4f8" }}>
-                  <td className="px-3 py-2.5 font-mono text-xs font-medium text-blue-600">{inv.number}</td>
-                  <td className="px-3 py-2.5 font-medium">{inv.tenant?.brandName || inv.tenant?.name || "—"}</td>
-                  <td className="px-3 py-2.5 text-gray-600">{inv.period}</td>
-                  <td className="px-3 py-2.5">
+                <tr key={inv.id}>
+                  <td className="font-mono text-xs font-medium text-blue-600">{inv.number}</td>
+                  <td className="font-medium">{inv.tenant?.brandName || inv.tenant?.name || "—"}</td>
+                  <td className="text-gray-600">{inv.period}</td>
+                  <td>
                     <span className="font-medium" style={{ color: PACKAGES[inv.plan as keyof typeof PACKAGES]?.color || "#666" }}>
                       {PACKAGES[inv.plan as keyof typeof PACKAGES]?.name || inv.plan}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 font-semibold">{fmt(Number(inv.amount))}</td>
-                  <td className="px-3 py-2.5"><span className={"sab " + (STATUS_COLORS[inv.status] || "sab-amber")}>{inv.status}</span></td>
-                  <td className="px-3 py-2.5 text-xs text-gray-500">{new Date(inv.dueAt).toLocaleDateString()}</td>
-                  <td className="px-3 py-2.5 text-xs text-gray-500">{inv.paidAt ? new Date(inv.paidAt).toLocaleDateString() : "—"}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
+                  <td className="font-semibold">{fmt(Number(inv.amount))}</td>
+                  <td><span className={"sab " + (STATUS_COLORS[inv.status] || "sab-amber")}>{inv.status}</span></td>
+                  <td className="text-xs text-gray-500">{new Date(inv.dueAt).toLocaleDateString()}</td>
+                  <td className="text-xs text-gray-500">{inv.paidAt ? new Date(inv.paidAt).toLocaleDateString() : "—"}</td>
+                  <td className="whitespace-nowrap">
                     {inv.status === "PENDING" && (
                       <button onClick={() => act(inv.id, "markPaid")} className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#dcfce7", color: "#15803d" }}>
                         <i className="fa-solid fa-check mr-1" />Paid
@@ -193,7 +193,7 @@ export default function SABillingPage() {
                   </td>
                 </tr>
               ))}
-              {invoices.length === 0 && <tr><td className="px-3 py-8 text-center text-gray-400" colSpan={9}>No invoices found.</td></tr>}
+              {invoices.length === 0 && <tr><td className="text-center text-gray-400 py-8" colSpan={9}>No invoices found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -282,27 +282,27 @@ export default function SABillingPage() {
                   <div className="text-sm text-gray-600">Status: <span className="font-medium">{printInv.status}</span></div>
                 </div>
               </div>
-              <table className="w-full mb-6 border-collapse">
+              <table className="sa-table sa-grid mb-6">
                 <thead>
-                  <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                    <th className="py-2 px-3 text-left text-xs font-semibold text-gray-500">Description</th>
-                    <th className="py-2 px-3 text-right text-xs font-semibold text-gray-500">Amount</th>
+                  <tr>
+                    <th className="text-left">Description</th>
+                    <th className="text-right">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
-                    <td className="py-3 px-3">
+                  <tr>
+                    <td>
                       <div className="font-medium">{PACKAGES[printInv.plan as keyof typeof PACKAGES]?.name || printInv.plan} Plan — Monthly Subscription</div>
                       <div className="text-xs text-gray-500">Billing period: {printInv.period}</div>
                       {printInv.notes && <div className="text-xs text-gray-400 mt-0.5">{printInv.notes}</div>}
                     </td>
-                    <td className="py-3 px-3 text-right font-semibold">{fmt(Number(printInv.amount))}</td>
+                    <td className="text-right font-semibold">{fmt(Number(printInv.amount))}</td>
                   </tr>
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td className="py-3 px-3 text-right font-bold text-gray-700">Total Due:</td>
-                    <td className="py-3 px-3 text-right text-xl font-bold">{fmt(Number(printInv.amount))}</td>
+                    <td className="text-right font-bold text-gray-700">Total Due:</td>
+                    <td className="text-right text-xl font-bold">{fmt(Number(printInv.amount))}</td>
                   </tr>
                 </tfoot>
               </table>

@@ -139,6 +139,14 @@ export default function SATenantsPage() {
   }
 
   const inp = "ui-input rounded-md border px-2 py-1.5 text-sm w-full";
+  const [q, setQ] = useState("");
+
+  const filteredRows = q.trim()
+    ? rows.filter((t: any) => {
+        const s = q.toLowerCase();
+        return (t.name || "").toLowerCase().includes(s) || (t.brandName || "").toLowerCase().includes(s);
+      })
+    : rows;
 
   return (
     <div className="space-y-4 ui-fade-up">
@@ -156,22 +164,36 @@ export default function SATenantsPage() {
       {err && <div className="text-sm text-red-600">{err}</div>}
 
       <div className="ui-card bg-white p-4" style={{ borderColor: "var(--border)" }}>
-        <table className="w-full text-sm">
-          <thead className="text-left text-gray-500">
+        <div className="mb-3 flex items-center gap-2">
+          <div className="relative flex-1 max-w-xs">
+            <i className="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+            <input
+              className="ui-input rounded border pl-7 pr-3 py-1.5 text-sm w-full"
+              placeholder="Search tenants…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          {q && (
+            <span className="text-xs text-gray-400">{filteredRows.length} of {rows.length}</span>
+          )}
+        </div>
+        <table className="sa-table sa-grid">
+          <thead>
             <tr>
-              <th className="px-2 py-1 font-normal">Tenant</th>
-              <th className="px-2 py-1 font-normal">Subdomain</th>
-              <th className="px-2 py-1 font-normal">Status</th>
-              <th className="px-2 py-1 font-normal">Plan</th>
-              <th className="px-2 py-1 font-normal">Subscription</th>
-              <th className="px-2 py-1 font-normal">Expires</th>
-              <th className="px-2 py-1 font-normal text-center">Accounts</th>
-              <th className="px-2 py-1 font-normal text-right">Actions</th>
+              <th>Tenant</th>
+              <th>Subdomain</th>
+              <th>Status</th>
+              <th>Plan</th>
+              <th>Subscription</th>
+              <th>Expires</th>
+              <th className="text-center">Accounts</th>
+              <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((t: any) => (
-              <tr key={t.id} className="ui-row border-t" style={{ borderColor: "var(--border)" }}>
+            {filteredRows.map((t: any) => (
+              <tr key={t.id} className="ui-row">
                 <td className="px-2 py-2 font-medium">
                   {t.brandName || t.name}
                   <div className="text-xs text-gray-400">{t.name}</div>
@@ -252,8 +274,8 @@ export default function SATenantsPage() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && (
-              <tr><td className="px-2 py-4 text-gray-400" colSpan={8}>No tenants found.</td></tr>
+            {filteredRows.length === 0 && (
+              <tr><td className="px-2 py-4 text-gray-400" colSpan={8}>{q ? "No tenants match your search." : "No tenants found."}</td></tr>
             )}
           </tbody>
         </table>

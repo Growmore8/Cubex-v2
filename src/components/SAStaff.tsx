@@ -99,7 +99,17 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
     setPermFor(null);
   }
 
-  const filtered = rows.filter((u: any) => !q || (u.name + u.email).toLowerCase().includes(q.toLowerCase()));
+  const roleLabel = role === "ADMIN" ? "admin" : "manager";
+  const filtered = rows.filter((u: any) => {
+    if (!q) return true;
+    const ql = q.toLowerCase();
+    return (
+      (u.name || "").toLowerCase().includes(ql) ||
+      (u.email || "").toLowerCase().includes(ql) ||
+      (u.company || "").toLowerCase().includes(ql) ||
+      (u.tenantId || "").toLowerCase().includes(ql)
+    );
+  });
   const inp = "ui-input px-2 py-1.5 text-sm w-full";
   const btnStyle = (bg: string, color: string) => ({ background: bg, color, padding: "4px 10px", borderRadius: 5, border: "none", cursor: "pointer", fontSize: 12 });
 
@@ -120,21 +130,21 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
       <div className="ui-card overflow-hidden p-0">
         <div className="flex items-center gap-2 border-b px-4 py-2.5" style={{ borderColor: "var(--border)" }}>
           <i className="fa-solid fa-magnifying-glass text-[11px] text-gray-400" />
-          <input className="flex-1 border-none bg-transparent text-sm outline-none" placeholder="Search name / email" value={q} onChange={(e) => setQ(e.target.value)} />
-          <span className="text-xs text-gray-400">{filtered.length} rows</span>
+          <input className="flex-1 border-none bg-transparent text-sm outline-none" placeholder="Search name / email / company" value={q} onChange={(e) => setQ(e.target.value)} />
+          <span className="text-xs text-gray-400">{filtered.length} {roleLabel}{filtered.length !== 1 ? "s" : ""}</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead style={{ background: "var(--bg2)" }}>
-              <tr className="border-b text-left" style={{ borderColor: "var(--border)" }}>
+          <table className="sa-table sa-grid">
+            <thead>
+              <tr>
                 {["Name / Email", "Tenant", "Status", "Last Login", "Last IP", "Permissions", "Actions"].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-[11px] font-semibold text-gray-500">{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((u: any) => (
-                <tr key={u.id} className="ui-row border-b" style={{ borderColor: "var(--border)" }}>
+                <tr key={u.id}>
                   <td className="px-3 py-2.5">
                     <div className="flex items-start gap-2">
                       <span className="mt-1.5"><PresenceDot online={u.online} /></span>
