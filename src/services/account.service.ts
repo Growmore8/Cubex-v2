@@ -22,9 +22,16 @@ export async function nextLogin(tx: any, tenantId: string, type: string) {
   const start = type === "DEMO" ? 100100 : 900000;
   let c = await tx.counter.findUnique({ where: { tenantId_name: { tenantId, name } } });
   if (!c) c = await tx.counter.create({ data: { tenantId, name, nextVal: BigInt(start) } });
-  const val = c.nextVal;
-  await tx.counter.update({ where: { id: c.id }, data: { nextVal: val + BigInt(1) } });
-  return type === "DEMO" ? "DEMO" + val.toString() : val.toString();
+  // Loop until we land on a login that doesn't already exist (handles gaps from
+  // deletions or accounts created outside this counter).
+  for (let i = 0; i < 200; i++) {
+    const val = c.nextVal;
+    c = await tx.counter.update({ where: { id: c.id }, data: { nextVal: val + BigInt(1) }, });
+    const candidate = type === "DEMO" ? "DEMO" + val.toString() : val.toString();
+    const taken = await tx.account.findFirst({ where: { tenantId, login: candidate }, select: { id: true } });
+    if (!taken) return candidate;
+  }
+  throw new Error("Could not allocate a unique account ID — please try again.");
 }
 
 export async function createClient(tenantId: string, input: any, actor = "admin") {
