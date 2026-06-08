@@ -11,7 +11,14 @@ export default function SAKyc() {
   async function act(id: string, action: string, note?: string) { setErr(""); const r = await fetch("/api/superadmin/kyc/" + id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, note }) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; } load(); }
   async function doReject(id: string) { const reason = await prompt({ title: "Reject KYC", message: "Reason for rejection (shown to the client)", placeholder: "e.g. document blurry / expired", confirmLabel: "Reject" }); if (reason) act(id, "reject", reason); }
   async function doReverse(id: string) { if (await confirm({ title: "Reverse decision", message: "Send this back to PENDING? The client will be asked to upload again.", confirmLabel: "Reverse" })) act(id, "reverse"); }
-  const filtered = items.filter((i: any) => (tab === "All" || i.status === tab) && (!q || (i.accountId + i.name + i.email).toLowerCase().includes(q.toLowerCase())));
+  const filteredRaw = items.filter((i: any) => (tab === "All" || i.status === tab) && (!q || (i.accountId + i.name + i.email).toLowerCase().includes(q.toLowerCase())));
+  const [sort, setSort] = useState<{ k: string; d: 1 | -1 } | null>(null);
+  const sacc: Record<string, (i: any) => any> = { date: (i) => new Date(i.date).getTime(), account: (i) => i.accountId, name: (i) => i.name, email: (i) => i.email, doc: (i) => i.docType, status: (i) => i.status };
+  const toggle = (k: string) => setSort((s) => (!s || s.k !== k ? { k, d: 1 } : s.d === 1 ? { k, d: -1 } : null));
+  const filtered = (() => { if (!sort || !sacc[sort.k]) return filteredRaw; const g = sacc[sort.k]; return [...filteredRaw].sort((a, b) => { const va = g(a), vb = g(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; if (typeof va === "number" && typeof vb === "number") return (va - vb) * sort.d; return String(va).localeCompare(String(vb), undefined, { numeric: true }) * sort.d; }); })();
+  const Sth = ({ k, label }: { k: string; label: string }) => (
+    <th className="cursor-pointer select-none px-2 py-1 font-normal" onClick={() => toggle(k)}><span className="inline-flex items-center gap-1">{label}<i className={"fa-solid text-[8px] " + (sort?.k === k ? (sort.d === 1 ? "fa-arrow-up-long" : "fa-arrow-down-long") : "fa-sort")} style={{ opacity: sort?.k === k ? 1 : 0.3 }} /></span></th>
+  );
   const inp = "ui-input rounded-md border px-2 py-1.5 text-sm";
   return (<div className="space-y-4 ui-fade-up">
     {node}
@@ -24,7 +31,7 @@ export default function SAKyc() {
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="text-left text-gray-500"><tr><th className="px-2 py-1 font-normal">Date</th><th className="px-2 py-1 font-normal">Account</th><th className="px-2 py-1 font-normal">Name</th><th className="px-2 py-1 font-normal">Email</th><th className="px-2 py-1 font-normal">Doc</th><th className="px-2 py-1 font-normal">Image</th><th className="px-2 py-1 font-normal">Status</th><th className="px-2 py-1 font-normal text-right">Action</th></tr></thead>
+          <thead className="text-left text-gray-500"><tr><Sth k="date" label="Date" /><Sth k="account" label="Account" /><Sth k="name" label="Name" /><Sth k="email" label="Email" /><Sth k="doc" label="Doc" /><th className="px-2 py-1 font-normal">Image</th><Sth k="status" label="Status" /><th className="px-2 py-1 font-normal text-right">Action</th></tr></thead>
           <tbody>
             {filtered.map((i: any) => (<tr key={i.id} className="ui-row border-t" style={{ borderColor: "#eef2f7" }}>
               <td className="px-2 py-2 text-xs text-gray-500">{new Date(i.date).toLocaleString()}</td>

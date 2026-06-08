@@ -9,6 +9,13 @@ export default function AdminPaymentsPage() {
   const [edit, setEdit] = useState<any>(null);
   const [confirmDel, setConfirmDel] = useState<any>(null);
   const [err, setErr] = useState("");
+  const [sort, setSort] = useState<{ k: string; d: 1 | -1 } | null>(null);
+  const sacc: Record<string, (p: any) => any> = { account: (p) => p.account?.login, type: (p) => p.kind, amount: (p) => Number(p.amount), method: (p) => p.method, status: (p) => p.status };
+  const toggle = (k: string) => setSort((s) => (!s || s.k !== k ? { k, d: 1 } : s.d === 1 ? { k, d: -1 } : null));
+  const sortedReqs = (() => { if (!sort || !sacc[sort.k]) return reqs; const g = sacc[sort.k]; return [...reqs].sort((a, b) => { const va = g(a), vb = g(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; if (typeof va === "number" && typeof vb === "number") return (va - vb) * sort.d; return String(va).localeCompare(String(vb), undefined, { numeric: true }) * sort.d; }); })();
+  const Sth = ({ k, label }: { k: string; label: string }) => (
+    <th className="cursor-pointer select-none px-3 py-2" onClick={() => toggle(k)}><span className="inline-flex items-center gap-1">{label}<i className={"fa-solid text-[8px] " + (sort?.k === k ? (sort.d === 1 ? "fa-arrow-up-long" : "fa-arrow-down-long") : "fa-sort")} style={{ opacity: sort?.k === k ? 1 : 0.3, color: sort?.k === k ? "var(--brand-primary)" : "#9ca3af" }} /></span></th>
+  );
 
   async function load() {
     const [d, m] = await Promise.all([
@@ -74,10 +81,10 @@ export default function AdminPaymentsPage() {
       <div className="ui-card overflow-x-auto p-0">
         <table className="w-full text-sm">
           <thead className="border-b bg-gray-50 text-left text-gray-600">
-            <tr><th className="px-3 py-2">Account</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Method</th><th className="px-3 py-2">Slip</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Action</th></tr>
+            <tr><Sth k="account" label="Account" /><Sth k="type" label="Type" /><Sth k="amount" label="Amount" /><Sth k="method" label="Method" /><th className="px-3 py-2">Slip</th><Sth k="status" label="Status" /><th className="px-3 py-2 text-right">Action</th></tr>
           </thead>
           <tbody>
-            {reqs.length === 0 ? <tr><td className="px-3 py-4" colSpan={7}>No requests.</td></tr> : reqs.map((p) => (
+            {reqs.length === 0 ? <tr><td className="px-3 py-4" colSpan={7}>No requests.</td></tr> : sortedReqs.map((p) => (
               <tr key={p.id} className="ui-row border-b last:border-0">
                 <td className="px-3 py-2">{p.account.login} <span className="text-gray-500">{p.account.name}</span></td>
                 <td className="px-3 py-2">{p.kind}</td>
