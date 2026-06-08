@@ -116,14 +116,22 @@ export async function registerClient(
 
   if (hasSmtp && emailToken) {
     const brand: BrandInfo = { brandName: tenant.brandName || tenant.name, primaryColor: tenant.primaryColor, accentColor: tenant.accentColor, logoUrl: tenant.logoUrl };
-    // Send verification email — non-blocking so registration succeeds even if SMTP fails
-    sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
-      to: lowerEmail,
-      subject: `Verify your email — ${brand.brandName}`,
-      fromName: brand.brandName,
-      replyTo: noReplyAddress(tenant.smtpEmail),
-      html: verificationEmail(brand, emailToken),
-    }).catch(() => {});
+    // Send the verification code and WAIT for it. If delivery fails we must not
+    // leave behind an account that can never be verified — roll it back and tell
+    // the user, instead of silently creating an account with no OTP delivered.
+    try {
+      await sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
+        to: lowerEmail,
+        subject: `Verify your email — ${brand.brandName}`,
+        fromName: brand.brandName,
+        replyTo: noReplyAddress(tenant.smtpEmail),
+        html: verificationEmail(brand, emailToken),
+      });
+    } catch (e: any) {
+      await prisma.account.deleteMany({ where: { userId: session.sub } }).catch(() => {});
+      await prisma.user.delete({ where: { id: session.sub } }).catch(() => {});
+      throw new Error("We couldn't send the verification code to your email. Please check the address and try again, or contact support.");
+    }
     return { needsVerification: true, email: lowerEmail };
   }
 

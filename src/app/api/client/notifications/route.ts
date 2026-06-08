@@ -5,7 +5,9 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const s = await requireClient();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  const raw = await prisma.notification.findMany({ where: { userId: s.sub }, orderBy: { createdAt: "desc" }, take: 60 });
+  // Clients only see account activity (funds, KYC), news/maintenance and staff
+  // messages — NOT automated trade events (TP/SL hit, stop out, pending filled).
+  const raw = await prisma.notification.findMany({ where: { userId: s.sub, NOT: { type: "TRADE" } }, orderBy: { createdAt: "desc" }, take: 60 });
   // Deduplicate: same title+body sent to same user (e.g. from multiple accounts) → keep newest only
   const seen = new Set<string>();
   const items = raw.filter((n) => {
