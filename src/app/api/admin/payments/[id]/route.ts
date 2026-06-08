@@ -24,6 +24,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const amt = new Prisma.Decimal(rec.amount as any);
       if (rec.kind === "DEPOSIT") ops.push(prisma.account.update({ where: { id: rec.accountId }, data: { deposit: { increment: amt } } }));
       else if (rec.kind === "WITHDRAWAL") ops.push(prisma.account.update({ where: { id: rec.accountId }, data: { withdrawal: { increment: amt } } }));
+      // Record it in financial history so the client sees the transaction.
+      ops.push(prisma.financialHistory.create({ data: { accountId: rec.accountId, type: rec.kind as any, amount: amt, description: rec.method ? `${rec.kind} via ${rec.method}` : rec.kind, mode: "REALTIME" as any, createdBy: s.email || "admin" } }));
     }
     await prisma.$transaction(ops);
     await audit(s.tenantId as string, "payment." + status.toLowerCase(), rec.kind + " " + rec.amount + " " + (rec.method || ""), s.email || "admin");

@@ -14,12 +14,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const warnRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Everything is managed inside the Platform — redirect other admin pages there
+  // Admin pages live inside the Platform; also allow the standalone manager-
+  // management page. Anything else redirects to the desk.
+  const allowed = path.startsWith("/admin/platform") || path.startsWith("/admin/managers");
   useEffect(() => {
-    if (!path.startsWith("/admin/platform")) {
-      router.replace("/admin/platform");
-    }
-  }, [path, router]);
+    if (!allowed) router.replace("/admin/platform");
+  }, [allowed, router]);
 
   // Tab/browser close = logout (if not remembered)
   useEffect(() => {
@@ -68,7 +68,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  if (!path.startsWith("/admin/platform")) return null;
+  if (!allowed) return null;
 
   return (
     <>

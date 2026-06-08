@@ -64,7 +64,8 @@ export default function AdminManagersPage() {
   const filtered = managers;
 
   return (
-    <div className="space-y-4 ui-fade-up">
+    <div className="space-y-4 ui-fade-up p-4 sm:p-6">
+      <button onClick={() => { window.location.href = "/admin/platform"; }} className="text-sm font-medium text-[var(--accent,#2563eb)] hover:underline"><i className="fa-solid fa-arrow-left mr-1.5" />Back to desk</button>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Managers</h1>
