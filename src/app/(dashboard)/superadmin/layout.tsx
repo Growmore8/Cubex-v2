@@ -156,11 +156,15 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   }
   async function loadNotifs() {
     try {
-      const d = await fetch("/api/superadmin/notify").then((r) => r.json());
+      // Received notifications (everything notifyStaff routes to this SuperAdmin —
+      // trades, funds, KYC, logins, liquidations across ALL tenants), not the
+      // sent-broadcast history.
+      const d = await fetch("/api/notifications").then((r) => r.json());
       if (d.ok) {
-        const items = d.recent || [];
-        if (prev.current >= 0 && items.length > prev.current) { beep(880, 0.12, 0.25); setUnread((u) => u + (items.length - prev.current)); }
+        const items = d.items || [];
+        if (prev.current >= 0 && items.length > prev.current) { beep(880, 0.12, 0.25); }
         prev.current = items.length; setNotifs(items);
+        setUnread(items.filter((n: any) => !n.read).length);
       }
     } catch (e) {}
   }
@@ -213,7 +217,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   }, []);
  function toggleTheme() { setTheme(dark ? "light" : "dark"); }
   function setVolume(v: number) { volRef.current = v; setVol(v); try { localStorage.setItem("sa_notifVol", String(v)); } catch (e) {} beep(880, 0.08, 0.25); }
-  function openPanel() { setPanel((p) => { const n = !p; if (n) setUnread(0); return n; }); }
+  function openPanel() { setPanel((p) => { const n = !p; if (n) { setUnread(0); fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {}); } return n; }); }
 
   return (
     <div className={"sa-shell" + (dark ? " dark" : "")}>

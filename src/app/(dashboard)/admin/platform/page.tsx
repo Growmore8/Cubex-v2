@@ -259,8 +259,9 @@ export default function AdminDeskPage() {
       const d = await fetch("/api/notifications").then((r) => r.json());
       if (!d.ok) return;
       const items = d.items || [];
-      // Activity (client/manager financial + trade + login) shows as a transient toast.
-      // The header bell keeps only Superadmin-sent / News / Maintenance notices.
+      // Activity (client/manager financial + trade + login) also pops a transient
+      // toast, but every notification is now ALSO kept in the header bell so nothing
+      // is missed if staff aren't watching the screen at that moment.
       const ACTIVITY = new Set(["TRADE", "FUNDS", "LOGIN"]);
       const isActivity = (n: any) => ACTIVITY.has(String(n.type || "").toUpperCase());
       if (notifPrimed.current) {
@@ -271,8 +272,7 @@ export default function AdminDeskPage() {
       }
       items.forEach((n: any) => notifSeen.current.add(String(n.id)));
       notifPrimed.current = true;
-      const bell = items.filter((n: any) => !isActivity(n));
-      setNotifs(bell); setNotifUnread(bell.filter((n: any) => !n.read).length);
+      setNotifs(items); setNotifUnread(items.filter((n: any) => !n.read).length);
     } catch {}
   }
   useEffect(() => { loadNotifs(); const t = setInterval(loadNotifs, 20000); return () => clearInterval(t); }, []);

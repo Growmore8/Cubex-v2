@@ -4,9 +4,8 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
   const brand = await getBrand();
   return (
     <div
-      className="relative flex items-center justify-center overflow-hidden px-4 py-6"
+      className="fixed inset-0 flex items-center justify-center overflow-y-auto px-4 py-6"
       style={{
-        minHeight: "100dvh",
         paddingTop: "max(1.5rem, env(safe-area-inset-top))",
         paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
         background: "linear-gradient(135deg, #0a0f1c 0%, #0f1a2e 55%, #0a0f1c 100%)",
@@ -14,13 +13,6 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         ["--brand-accent" as any]: brand.accentColor,
       }}
     >
-      {/* Fixed full-viewport backdrop so no white body shows below the 100dvh
-          container on mobile webviews (address-bar collapse, safe-area gaps). */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 -z-10"
-        style={{ background: "linear-gradient(135deg, #0a0f1c 0%, #0f1a2e 55%, #0a0f1c 100%)" }}
-      />
       {/* Ambient brand glows + animated market lines */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div

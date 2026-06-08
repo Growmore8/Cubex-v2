@@ -9,6 +9,7 @@ export default function SAClientsPage() {
 
   // Filters
   const [q, setQ] = useState("");
+  const [tenantF, setTenantF] = useState("All");
   const [typeF, setTypeF] = useState("All");
   const [statusF, setStatusF] = useState("All");
   const [kycF, setKycF] = useState("All");
@@ -118,6 +119,10 @@ export default function SAClientsPage() {
 
   // Filtering
   const filtered = rows.filter((r) => {
+    if (tenantF !== "All") {
+      if (tenantF === "__own__") { if (r.tenantId) return false; }
+      else if (r.tenantId !== tenantF) return false;
+    }
     if (typeF !== "All" && r.type !== typeF) return false;
     if (statusF !== "All") {
       if (statusF === "Active" && (r.locked || r.deactivated)) return false;
@@ -182,6 +187,14 @@ export default function SAClientsPage() {
               onChange={(e) => { setQ(e.target.value); setPage(1); }}
               style={{ borderColor: "var(--border)" }}
             />
+          </div>
+          <div>
+            <div className="mb-0.5 text-[10px] font-medium text-gray-400">TENANT</div>
+            <select className={selStyle} value={tenantF} onChange={(e) => { setTenantF(e.target.value); setPage(1); }} style={{ borderColor: "var(--border)" }}>
+              <option value="All">All Tenants</option>
+              <option value="__own__">Own (Main Admin)</option>
+              {tenants.map((t: any) => <option key={t.id} value={t.id}>{t.brandName || t.name}</option>)}
+            </select>
           </div>
           {[
             { label: "TYPE", val: typeF, set: setTypeF, opts: [["All","All"],["LIVE","Live"],["DEMO","Demo"]] },
