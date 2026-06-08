@@ -964,8 +964,11 @@ export default function AdminDeskPage() {
                                 <i className="fa-solid fa-pen" style={{ fontSize: 8 }} />
                               </button>
                             )}
-                            <button onClick={() => askConfirm("Close " + p.symbol + " " + p.type + " " + p.lots + "L at market?", () => close(p.id), false)} className="mr-1 rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "rgba(224,82,96,0.15)", color: SELL, border: "1px solid rgba(224,82,96,0.3)" }}>
+                            <button onClick={() => close(p.id)} title="Close at market (instant)" className="mr-1 rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "rgba(224,82,96,0.15)", color: SELL, border: "1px solid rgba(224,82,96,0.3)" }}>
                               Close ×
+                            </button>
+                            <button onClick={() => openPos("partial", p)} title="Manual / partial close (choose lots)" className="mr-1 rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "var(--soft)", color: "var(--accent)", border: "1px solid var(--border)" }}>
+                              Manual
                             </button>
                             {can("deleteTrades") && <button onClick={() => askConfirm("Delete this open trade entirely? No P/L is realized.", () => delTrade(p.id))} title="Delete trade" className="rounded px-1.5 py-0.5 text-[9px]" style={{ background: "var(--soft)", color: SELL }}><i className="fa-solid fa-trash" style={{ fontSize: 8 }} /></button>}
                           </td>
