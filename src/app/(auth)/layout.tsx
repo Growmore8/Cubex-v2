@@ -9,7 +9,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         minHeight: "100dvh",
         paddingTop: "max(1.5rem, env(safe-area-inset-top))",
         paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
-        background: "var(--background)",
+        background: "linear-gradient(135deg, #0a0f1c 0%, #0f1a2e 55%, #0a0f1c 100%)",
         ["--brand-primary" as any]: brand.primaryColor,
         ["--brand-accent" as any]: brand.accentColor,
       }}
@@ -35,38 +35,38 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         </svg>
       </div>
 
-      <div className="auth-card relative w-full max-w-sm">
+      <div className="auth-card relative w-full max-w-[330px]">
         {/* Thin brand gradient accent on top of the card */}
         <div
-          className="mx-auto h-1 w-24 rounded-full"
+          className="mx-auto h-1 w-20 rounded-full"
           style={{ background: `linear-gradient(90deg, ${brand.primaryColor}, ${brand.accentColor})` }}
         />
         <div
-          className="mt-3 rounded-2xl border p-7 sm:p-8 backdrop-blur-sm"
+          className="mt-2.5 rounded-2xl border p-6 backdrop-blur-sm"
           style={{
             background: "var(--card)",
             borderColor: "var(--border)",
-            boxShadow: "0 24px 60px -24px rgba(0,0,0,0.35), 0 2px 8px -4px rgba(0,0,0,0.2)",
+            boxShadow: "0 24px 60px -24px rgba(0,0,0,0.45), 0 2px 8px -4px rgba(0,0,0,0.3)",
           }}
         >
-          <div className="mb-7 text-center">
+          <div className="mb-5 text-center">
             {brand.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={brand.logoUrl}
                 alt={brand.name}
-                className="mx-auto mb-3 h-12 w-auto object-contain"
+                className="mx-auto mb-2 h-10 w-auto object-contain"
               />
             ) : (
               <div
-                className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl text-lg font-bold text-white"
+                className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl text-base font-bold text-white"
                 style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.accentColor})` }}
               >
                 {(brand.name || "?").trim().charAt(0).toUpperCase()}
               </div>
             )}
             <div
-              className="text-xl font-bold tracking-tight"
+              className="text-lg font-bold tracking-tight"
               style={{
                 background: `linear-gradient(90deg, ${brand.primaryColor}, ${brand.accentColor})`,
                 WebkitBackgroundClip: "text",
@@ -87,7 +87,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
 
           {(brand.companyInfo || brand.supportEmail) && (
             <div
-              className="mt-7 border-t pt-3 text-center text-[10px] leading-snug"
+              className="mt-5 border-t pt-3 text-center text-[10px] leading-snug"
               style={{ borderColor: "var(--border)", color: "var(--muted-foreground)" }}
             >
               {brand.companyInfo && <div>{brand.companyInfo}</div>}

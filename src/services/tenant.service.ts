@@ -72,6 +72,7 @@ export async function createTenant(input: {
   name: string; subdomain: string; adminEmail: string; adminName: string; adminPassword: string;
   plan?: any; seats?: number; brandName?: string; primaryColor?: string; accentColor?: string;
   logoUrl?: string; slogan?: string; companyInfo?: string; customDomain?: string; supportEmail?: string;
+  contactName?: string; contactPhone?: string;
   smtpEmail?: string; smtpPassword?: string;
 }) {
   const sub = input.subdomain.trim().toLowerCase();
@@ -100,6 +101,8 @@ export async function createTenant(input: {
       ...(input.smtpPassword ? { smtpPassword: input.smtpPassword } as any : {}),
       ...(input.slogan ? { slogan: input.slogan } as any : {}),
       ...(input.companyInfo ? { companyInfo: input.companyInfo } as any : {}),
+      ...(input.contactName ? { contactName: input.contactName } as any : {}),
+      ...(input.contactPhone ? { contactPhone: input.contactPhone } as any : {}),
       subscription: { create: { plan: input.plan || "STARTER", status: "ACTIVE", seats } },
       users: { create: { email: input.adminEmail.toLowerCase(), name: input.adminName, passwordHash, role: "ADMIN" } },
     },

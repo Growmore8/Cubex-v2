@@ -105,6 +105,7 @@ export default function AdminDeskPage() {
   const [cliStatus, setCliStatus] = useState("ALL");
   const [auditCat, setAuditCat] = useState("ALL");
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
+  const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false });
   const [stmtModal, setStmtModal] = useState(false);
   const [stmtEmailModal, setStmtEmailModal] = useState(false);
   const [stmtPreset, setStmtPreset] = useState("all");
@@ -501,7 +502,7 @@ export default function AdminDeskPage() {
   const lab = "text-[10px] text-[var(--muted)]";
   const flab = "mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]";
   const mi = "flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)] transition-colors";
-  const subi = "flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)] transition-colors";
+  const subi = "flex w-full items-center gap-2 px-3 py-1 text-left hover:bg-[var(--soft)] transition-colors";
   const mIco = (icon: string, color?: string) => <i className={"fa-solid " + icon} style={{ width: 13, fontSize: 11, textAlign: "center", color: color || "var(--muted)" }} />;
   const tgl = (on: boolean) => "rounded border border-[var(--border)] px-2 py-1 " + (on ? "" : "opacity-50");
   function toggleCat(c: string) { setCollapsed((o) => ({ ...o, [c]: !o[c] })); }
@@ -805,8 +806,17 @@ export default function AdminDeskPage() {
               ))}
               <button onClick={() => { const a = symbols.find((s) => openCharts.indexOf(s.symbol) === -1); if (a) addChart(a.symbol); }} className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[var(--muted)]">+</button>
             </div>
+            <div className="ml-auto flex items-center gap-0.5">
+              {(["sma", "ema", "bb", "rsi", "macd"] as const).map((k) => (
+                <button key={k} onClick={() => setChartInd((v) => ({ ...v, [k]: !v[k] }))} title={k.toUpperCase()}
+                  className="rounded px-1.5 py-0.5 text-[10px] font-bold"
+                  style={{ background: chartInd[k] ? "rgba(90,169,255,0.18)" : "transparent", color: chartInd[k] ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartInd[k] ? "rgba(90,169,255,0.4)" : "transparent") }}>
+                  {k.toUpperCase()}
+                </button>
+              ))}
+            </div>
             <span className="mx-1 h-3 w-px bg-[var(--border)]" />
-            <select value={tf} onChange={(e) => setTf(e.target.value)} className="ml-auto rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[11px] text-[var(--text)]" style={{ cursor: "pointer" }}>
+            <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[11px] text-[var(--text)]" style={{ cursor: "pointer" }}>
               {TFS.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
@@ -815,7 +825,7 @@ export default function AdminDeskPage() {
               <div key={sym + i} className="relative min-h-0 bg-[var(--bg)]" onClick={() => setActive(i)}>
                 
                 {ocStrip(sym)}
-                <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} topTools positions={[
+                <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} ind={chartInd} positions={[
                   ...open.filter((o) => o.symbol === sym && (!selAcc || o.accountLogin === selAcc.login)).map((o) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...pendingOrders.filter((o) => o.symbol === sym && (!selAcc || o.accountLogin === selAcc.login)).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} />
@@ -1159,10 +1169,10 @@ export default function AdminDeskPage() {
 
       {menu && (<>
         <div className="fixed inset-0 z-40" onClick={() => { setMenu(null); setMenuSub(""); }} />
-        <div className="ui-pop fixed z-50 w-64 overflow-hidden rounded-2xl border py-1 text-[11px]" style={{ left: menu.x, top: menu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 20px 48px rgba(0,0,0,0.55)", animation: "menuPop 0.12s ease-out" }}>
+        <div className="ui-pop fixed z-50 w-56 overflow-hidden rounded-xl border py-0.5 text-[11px]" style={{ left: menu.x, top: menu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 20px 48px rgba(0,0,0,0.55)", animation: "menuPop 0.12s ease-out" }}>
           {/* Header */}
-          <div className="mx-1 mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2.5" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ background: "var(--accent)", color: "#fff" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
+          <div className="mx-1 mb-1 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "var(--accent)", color: "#fff" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="truncate font-bold" style={{ color: GOLD }}>{menu.acc.login}</span>
@@ -1179,7 +1189,7 @@ export default function AdminDeskPage() {
 
           {/* Money accordion */}
           {(can("processDeposits") || can("processWithdrawals") || can("creditBonus") || can("editFinancial") || can("transferFunds")) && <>
-            <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-[var(--soft)]">
+            <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className="flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)]">
               {mIco("fa-coins", GOLD)}<span className="flex-1">Money</span>
               <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "money" ? "fa-chevron-down rotate-0" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
             </button>
@@ -1210,7 +1220,7 @@ export default function AdminDeskPage() {
             </div>
           ) : (<>
             {/* Edit Client accordion */}
-            <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-[var(--soft)]">
+            <button onClick={() => setMenuSub(menuSub === "edit" ? "" : "edit")} className="flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)]">
               {mIco("fa-pen-to-square")}<span className="flex-1">Edit Client</span>
               <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "edit" ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
             </button>
@@ -1238,7 +1248,7 @@ export default function AdminDeskPage() {
           </>)}
 
           {/* Settings accordion */}
-          <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-[var(--soft)]">
+          <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className="flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)]">
             {mIco("fa-gear")}<span className="flex-1">Settings</span>
             <i className={"fa-solid text-[8px] transition-transform duration-200 " + (menuSub === "settings" ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} />
           </button>

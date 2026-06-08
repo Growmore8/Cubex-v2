@@ -101,6 +101,7 @@ export default function SATenantsPage() {
       primaryColor: t.primaryColor || "#2563eb", accentColor: t.accentColor || "#22c55e",
       plan: t.subscription?.plan || "STARTER",
       smtpEmail: t.smtpEmail || "", smtpPassword: "",
+      contactName: t.contactName || "", contactPhone: t.contactPhone || "",
     });
     setEditFor(t);
   }
@@ -285,6 +286,12 @@ export default function SATenantsPage() {
               <input className={inp} placeholder="Admin email *" autoComplete="off" value={form.adminEmail || ""} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} />
               <PasswordInput wrap="relative col-span-2" className={inp} placeholder="Admin password (min 6) *" autoComplete="new-password" value={form.adminPassword || ""} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} />
             </div>
+            {/* Section: Tenant Contact (SuperAdmin only) */}
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tenant Contact <span className="text-gray-300 normal-case font-normal">(SuperAdmin only — never shown publicly)</span></div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <input className={inp} placeholder="Contact person" autoComplete="off" value={form.contactName || ""} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
+              <input className={inp} placeholder="Contact phone" autoComplete="off" value={form.contactPhone || ""} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} />
+            </div>
             {/* Section: Email / SMTP */}
             <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Email Settings <span className="text-gray-300 normal-case font-normal">(for verification & password reset emails)</span></div>
             <div className="mb-3 grid grid-cols-2 gap-2">
@@ -380,6 +387,8 @@ export default function SATenantsPage() {
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Logo</label><LogoField value={editForm.logoUrl} which="edit" /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Slogan / Tagline</label><input className={inp} placeholder="Trade smarter" value={editForm.slogan} onChange={(e) => setEditForm({ ...editForm, slogan: e.target.value })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Company / Brokerage Info (footer)</label><input className={inp} placeholder="Acme Markets Ltd · Reg# 12345 · London" value={editForm.companyInfo} onChange={(e) => setEditForm({ ...editForm, companyInfo: e.target.value })} /></div>
+              <div><label className="text-xs text-gray-500 block mb-1">Contact Person <span className="text-gray-400">(private)</span></label><input className={inp} autoComplete="off" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} /></div>
+              <div><label className="text-xs text-gray-500 block mb-1">Contact Phone <span className="text-gray-400">(private)</span></label><input className={inp} autoComplete="off" value={editForm.contactPhone} onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })} /></div>
               <div className="col-span-2 border-t pt-3 mt-1">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Email Settings <span className="text-gray-300 normal-case font-normal">(verification & password reset)</span></div>
                 <div className="grid grid-cols-2 gap-2">

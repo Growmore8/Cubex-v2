@@ -20,6 +20,8 @@ model Tenant {
   primaryColor String?       @default("#2563eb")
   accentColor  String?       @default("#22c55e")
   supportEmail String?
+  contactPhone String? // SuperAdmin-only contact phone for the tenant (never shown publicly)
+  contactName  String? // SuperAdmin-only primary contact person (never shown publicly)
   smtpEmail    String?
   smtpPassword String?
   permissions  Json          @default("{}")

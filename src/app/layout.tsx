@@ -25,7 +25,7 @@ const geistMono = localFont({
 export async function generateMetadata(): Promise<Metadata> {
   const brand = await getBrand();
   const name = brand.name || "Trading Platform";
-  const icon = brand.logoUrl || undefined;
+  const icon = brand.faviconUrl || brand.logoUrl || undefined;
   return {
     title: name,
     description: `${name} — trade global markets, fast and secure.`,

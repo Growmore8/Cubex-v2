@@ -9,10 +9,11 @@ export interface Brand {
   primaryColor: string;
   accentColor: string;
   logoUrl: string | null;
+  faviconUrl: string | null;
   tenantId: string | null;
 }
 
-const DEFAULT_BRAND: Brand = { name: process.env.APP_NAME || "Cubex", slogan: null, companyInfo: null, supportEmail: null, primaryColor: "#2563eb", accentColor: "#22c55e", logoUrl: null, tenantId: null };
+const DEFAULT_BRAND: Brand = { name: process.env.APP_NAME || "Cubex", slogan: null, companyInfo: null, supportEmail: null, primaryColor: "#2563eb", accentColor: "#22c55e", logoUrl: null, faviconUrl: null, tenantId: null };
 
 export async function getBrand(): Promise<Brand> {
   // Branding must never crash a page: if the DB is unreachable or not yet migrated,
@@ -29,6 +30,7 @@ export async function getBrand(): Promise<Brand> {
       primaryColor: tenant.primaryColor || "#2563eb",
       accentColor: tenant.accentColor || "#22c55e",
       logoUrl: tenant.logoUrl,
+      faviconUrl: (tenant as any).faviconUrl || null,
       tenantId: tenant.id,
     };
   } catch (e) {

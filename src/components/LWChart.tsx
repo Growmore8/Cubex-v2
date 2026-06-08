@@ -98,7 +98,7 @@ export type ChartPosition = {
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
 export default function LWChart({
-  symbol, tf, theme, positions, digits = 2, showTools = true, topTools = false,
+  symbol, tf, theme, positions, digits = 2, showTools = true, ind,
 }: {
   symbol: string;
   tf: string;
@@ -107,8 +107,9 @@ export default function LWChart({
   digits?: number;
   onClose?: (id: string) => void;
   showTools?: boolean;
-  /** Render the indicator/drawing tools as a horizontal top bar (desktop) instead of the left sidebar. */
-  topTools?: boolean;
+  /** Controlled indicators from a parent header (desktop). When set, the in-chart
+      left sidebar is hidden and the parent renders the SMA/EMA/BB/RSI/MACD buttons. */
+  ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean };
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
@@ -144,6 +145,13 @@ export default function LWChart({
   const [macd, setMacd] = useState(false);
   const macdWrapRef = useRef<HTMLDivElement | null>(null);
   const macdChartRef = useRef<any>(null), macdLineRef = useRef<any>(null), macdSignalRef = useRef<any>(null), macdHistRef = useRef<any>(null);
+
+  // When indicators are controlled by a parent header (desktop), sync them into
+  // the internal state so all the existing chart effects keep working unchanged.
+  useEffect(() => {
+    if (!ind) return;
+    setSma(ind.sma); setEma(ind.ema); setBb(ind.bb); setRsi(ind.rsi); setMacd(ind.macd);
+  }, [ind?.sma, ind?.ema, ind?.bb, ind?.rsi, ind?.macd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function clearDrawings() {
     for (const l of hlineRefs.current) { try { seriesRef.current?.removePriceLine(l); } catch {} }
@@ -473,22 +481,16 @@ export default function LWChart({
     </>
   );
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
-      {/* Top toolbar (desktop) — indicators on the chart header, next to the timeframe */}
-      {showTools && topTools && (
-        <div style={{ flexShrink: 0, display: "flex", flexDirection: "row", alignItems: "center", gap: 4, padding: "4px 8px", background: panelBg, borderBottom: `1px solid ${bord}` }}>
+    <div style={{ display: "flex", flexDirection: "row", height: "100%", width: "100%" }}>
+      {/* Left sidebar — TradingView-style tool panel (mobile / default). Hidden when
+          showTools=false, or when indicators are controlled by a parent header (`ind`). */}
+      {showTools && !ind && (
+        <div style={{ width: 42, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 5px", gap: 4, background: panelBg, borderRight: `1px solid ${bord}` }}>
           {toolBtns}
         </div>
       )}
-      <div style={{ display: "flex", flexDirection: "row", flex: 1, minHeight: 0, width: "100%" }}>
-        {/* Left sidebar — TradingView-style tool panel (mobile / default; hidden when showTools=false or topTools=true) */}
-        {showTools && !topTools && (
-          <div style={{ width: 42, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 5px", gap: 4, background: panelBg, borderRight: `1px solid ${bord}` }}>
-            {toolBtns}
-          </div>
-        )}
-        {/* Chart column */}
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+      {/* Chart column */}
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
         {/* Main price chart */}
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
           <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
@@ -518,6 +520,5 @@ export default function LWChart({
         )}
         </div>
       </div>
-    </div>
   );
 }
