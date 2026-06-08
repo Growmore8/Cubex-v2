@@ -541,7 +541,7 @@ export default function ClientTerminal() {
           <aside className="flex flex-col border-r border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
           <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">MARKET WATCH</div>
           
-          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[1fr_64px_64px] bg-[var(--panel)] px-2 py-1 text-[10px] text-[var(--muted)]"><span>Symbol</span><span className="text-right pr-2">Bid</span><span className="text-right pr-2">Ask</span></div>
+          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[1fr_64px_64px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-2">Bid</span><span className="text-right pr-2">Ask</span></div>
             {favs.length > 0 && (
               <div>
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>

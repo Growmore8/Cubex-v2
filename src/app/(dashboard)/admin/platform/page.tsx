@@ -854,7 +854,7 @@ export default function AdminDeskPage() {
               </div>
             </div>
             <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]">
-              <div className="sticky top-0 z-10 grid grid-cols-[1fr_72px_72px] bg-[var(--panel)] px-2 py-1 text-[10px] text-[var(--muted)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span></div>
+              <div className="sticky top-0 z-10 grid grid-cols-[1fr_72px_72px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span></div>
               {orderedGroups.map(([cat, list]) => (
                 <div key={cat}>
                   <div onClick={() => toggleCat(cat)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[cat] ? "\u25B8" : "\u25BE"} {cat.toUpperCase()}</div>
