@@ -98,6 +98,14 @@
 .dark .app-ambient::before { opacity: 0.22; }
 .dark .app-ambient::after  { opacity: 0.18; }
 
+/* premium desk modal: gradient top accent + deep shadow (uniform across modals) */
+.desk-modal { position: relative; box-shadow: 0 30px 70px -28px rgba(0,0,0,0.62), inset 0 1px 0 rgba(255,255,255,0.08); }
+.desk-modal::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  border-top-left-radius: 12px; border-top-right-radius: 12px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #7c3aed));
+}
+
 /* springy tab interactions */
 .nav-ios-item { transition: color .25s ease, transform .2s cubic-bezier(.34,1.56,.64,1); }
 .nav-ios-item:active { transform: scale(0.88); }

@@ -1,8 +1,11 @@
 "use client";
+import { memo } from "react";
 
 // MT5-style quote cell: colours the TEXT and shows an up/down caret on every price
 // change (driven by `dir`: 1 = up, -1 = down, 0 = unchanged). No background fill.
-export default function PriceCell({ value, dir }: { value: string; dir: number }) {
+// Memoized so during a tick burst only cells whose value/dir actually changed
+// re-render — the heavy desk market watch then updates as smoothly as the client.
+function PriceCell({ value, dir }: { value: string; dir: number }) {
   const up = dir > 0, down = dir < 0;
   const col = up ? "#16c784" : down ? "#e05260" : "var(--text)";
   return (
@@ -14,3 +17,4 @@ export default function PriceCell({ value, dir }: { value: string; dir: number }
     </span>
   );
 }
+export default memo(PriceCell);
