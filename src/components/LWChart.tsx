@@ -366,11 +366,17 @@ export default function LWChart({
       return tmp.reverse();
     }
 
+    // Instant open: seed the chart from the last cached bars for this symbol+tf so
+    // it renders immediately on refresh, then the live fetch below refreshes it.
+    const cacheKey = "cubex-candles:" + symbol + ":" + tf;
+    try { const cached = JSON.parse(localStorage.getItem(cacheKey) || "null"); if (cached && cached.length) seed(cached); } catch {}
+
     fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${tf}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
         if (!alive) return;
         const ok = d && d.ok && seed(d.candles);
+        if (ok && d.candles) { try { localStorage.setItem(cacheKey, JSON.stringify(d.candles.slice(-300))); } catch {} }
         // Fallback: the feed returned nothing for this symbol. Synthesize a full
         // 5000-bar history seeded from the first live price we receive.
         if (!ok) {
