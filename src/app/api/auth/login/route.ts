@@ -40,7 +40,11 @@ export async function POST(req: Request) {
     });
     res.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
-      path: "/", maxAge: remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8, // 30 days if "remember me"
+      path: "/",
+      // "Remember me" -> persistent 30-day cookie (survives browser/tab close, auto-login).
+      // Otherwise a SESSION cookie (no maxAge) the browser clears on close. The pagehide
+      // beacon additionally covers tab-close logout best-effort for non-remembered sessions.
+      ...(remember ? { maxAge: 60 * 60 * 24 * 30 } : {}),
     });
     return res;
   } catch (e: any) {
