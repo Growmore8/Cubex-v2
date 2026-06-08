@@ -1204,10 +1204,10 @@ export default function AdminDeskPage() {
 
       {menu && (<>
         <div className="fixed inset-0 z-40" onClick={() => { setMenu(null); setMenuSub(""); }} />
-        <div className="ui-pop fixed z-50 w-56 overflow-hidden rounded-xl border py-0.5 text-[11px]" style={{ left: menu.x, top: menu.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 20px 48px rgba(0,0,0,0.55)", animation: "menuPop 0.12s ease-out" }}>
+        <div className="ui-pop fixed z-50 w-60 overflow-hidden rounded-2xl border py-1 text-[11px]" style={{ left: menu.x, top: menu.y, background: "color-mix(in srgb, var(--panel) 92%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.14s cubic-bezier(.16,1,.3,1)" }}>
           {/* Header */}
-          <div className="mx-1 mb-1 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "var(--accent)", color: "#fff" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
+          <div className="mx-1.5 mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 5%, transparent))" }}>
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm" style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="truncate font-bold" style={{ color: GOLD }}>{menu.acc.login}</span>
@@ -1346,7 +1346,7 @@ export default function AdminDeskPage() {
 
       {ticket && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="ui-pop w-[300px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">Order - {ticket}</div>
             <div className={lab}>Type</div>
             <select className={inp} value={tform.type} onChange={(e) => setTform({ ...tform, type: e.target.value })}><option>Market</option><option>Buy Limit</option><option>Sell Limit</option><option>Buy Stop</option><option>Sell Stop</option></select>
@@ -1378,7 +1378,7 @@ export default function AdminDeskPage() {
       </>)}
       {pos && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="ui-pop w-[300px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold">{pos.kind === "modify" ? "Modify S/L - T/P" : "Partial Close"}</div>
             <div className="mb-2 text-[10px] text-[var(--muted)]">{pos.t.symbol} {pos.t.type} {pos.t.lots} @ {pos.t.openPrice}</div>
             {pos.kind === "modify" ? (<>
@@ -1408,7 +1408,7 @@ export default function AdminDeskPage() {
           </div>
         ) : (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="ui-pop w-[470px] max-w-[95vw] max-h-[90vh] overflow-auto rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[420px] max-w-[95vw] max-h-[90vh] overflow-auto rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent2)" }}><i className={"fa-solid " + actIcon()} /></span>
               <div className="min-w-0 flex-1"><div className="text-sm font-semibold">{actTitle()}</div><div className="truncate text-[11px] text-[var(--muted)]">{act.acc.login} - {act.acc.name}</div></div>
@@ -1530,7 +1530,7 @@ export default function AdminDeskPage() {
       )}
       {modal && !modalMin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="ui-pop w-[330px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-sm font-semibold">{modal === "client" && "New Client"}{modal === "manager" && "New Manager"}{modal === "group" && "Manage Groups"}{modal === "notify" && "Send Notification"}</div>
               <div className="flex items-center gap-1">
@@ -1708,7 +1708,7 @@ export default function AdminDeskPage() {
       )}
       {hEdit && (() => { const isFin = String(hEdit.id).startsWith("F"); return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="ui-pop w-[360px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">Edit {isFin ? "Transaction" : "Trade"} {hEdit.ticket}</div>
             {isFin ? (<>
               <div className={lab}>Amount</div><input type="number" className={inp} value={hEdit.amt} onChange={(e) => setHEdit({ ...hEdit, amt: e.target.value })} />
@@ -1725,7 +1725,7 @@ export default function AdminDeskPage() {
       ); })()}
       {confirmBox && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="ui-pop w-[340px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[420px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2 text-sm font-semibold" style={{ color: confirmBox.danger ? SELL : "var(--text)" }}>
               <i className={"fa-solid " + (confirmBox.danger ? "fa-triangle-exclamation" : "fa-circle-question")} /> Please confirm
             </div>
@@ -1783,7 +1783,7 @@ export default function AdminDeskPage() {
       {/* KYC Upload Modal */}
       {kycUploadFor && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="ui-pop w-[360px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[420px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 text-sm font-semibold">Upload KYC Document</div>
             <div className="mb-3 text-[10px]" style={{ color: "var(--muted)" }}>{kycUploadFor.login} — {kycUploadFor.name}</div>
             <div className="space-y-2">
@@ -1821,7 +1821,7 @@ export default function AdminDeskPage() {
       {/* PDF Statement Date Filter Modal */}
       {stmtModal && selAcc && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="ui-pop w-[340px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[420px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 text-sm font-semibold">Export PDF Statement</div>
             <div className="mb-4 text-[10px]" style={{ color: "var(--muted)" }}>{selAcc.login} — {selAcc.name}</div>
             <div className="mb-3 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Date Range</div>
@@ -1873,7 +1873,7 @@ export default function AdminDeskPage() {
           the confirmation — no browser dialog. */}
       {stmtEmailModal && selAcc && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="ui-pop w-[340px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="ui-pop w-[420px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 text-sm font-semibold">Email Statement</div>
             <div className="mb-3 text-[10px]" style={{ color: "var(--muted)" }}>{selAcc.login} — {selAcc.name}</div>
             <div className="mb-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Date Range</div>
