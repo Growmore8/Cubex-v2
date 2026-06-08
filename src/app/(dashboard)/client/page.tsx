@@ -399,7 +399,7 @@ export default function ClientTerminal() {
 
   if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast }} />;
   return (
-    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif", background: "radial-gradient(700px 400px at 0% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%), radial-gradient(700px 400px at 100% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 58%), var(--bg)" }} className="flex h-screen flex-col overflow-hidden text-[var(--text)]">
+    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {needKyc && (
         <div className="flex items-center gap-3 px-3 py-2 text-[12px] font-medium" style={{ background: "linear-gradient(90deg, rgba(240,180,41,0.22), rgba(240,180,41,0.08))", borderBottom: "1px solid rgba(240,180,41,0.4)", color: "#f0b829" }}>
           <i className="fa-solid fa-triangle-exclamation" />
@@ -407,7 +407,7 @@ export default function ClientTerminal() {
           <button onClick={() => setWalletModal("kyc")} className="rounded px-3 py-1 text-[11px] font-semibold text-white" style={{ background: "#f0b829" }}>Upload KYC</button>
         </div>
       )}
-      <div className="glass-card flex items-center justify-between !rounded-none border-b border-[var(--border)] px-3 py-2 text-sm">
+      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm">
         <div className="flex items-center gap-2"><input type="file" accept="image/*" style={{ display: "none" }} ref={avatarInputRef} onChange={uploadAvatar} /><button onClick={() => avatarInputRef.current && avatarInputRef.current.click()} title="Change photo" className="h-6 w-6 overflow-hidden rounded-full border border-[var(--border)]">{avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : brand.logoUrl ? <img src={brand.logoUrl} alt="" className="h-full w-full object-contain" /> : <span className="inline-block h-full w-full bg-[#3b82f6]" />}</button><b className="font-medium">{brand.name || " "}</b>{curAcct && <span className="rounded px-2 py-0.5 text-[11px]" style={{ background: "var(--soft)", color: curAcct.type === "DEMO" ? GOLD : BUY }}>{curAcct.login} · {curAcct.type}</span>}</div>
         <div className="flex items-center gap-1.5 text-[11px]">
           {/* Account switcher — icon dropdown */}
@@ -555,7 +555,7 @@ export default function ClientTerminal() {
               <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { toggleFav(ctx.sym); setCtx(null); }}>{favs.includes(ctx.sym) ? "Remove favourite" : "Add favourite"}</button>
             </div>
           </>)}
-          <aside className="glass-card flex flex-col !rounded-none border-r border-[var(--border)]" style={{ width: mwW }}>
+          <aside className="flex flex-col border-r border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
           <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">MARKET WATCH</div>
           
           <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[1fr_64px_64px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-2">Bid</span><span className="text-right pr-2">Ask</span></div>
@@ -589,7 +589,7 @@ export default function ClientTerminal() {
         <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="glass-card flex items-center gap-2 !rounded-none border-b border-[var(--border)] px-2 py-1 text-[11px]">
+          <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
             <b className="font-medium">{selSym}</b>
             <div className="ml-auto flex items-center gap-0.5">
               {(["sma", "ema", "bb", "rsi", "macd"] as const).map((k) => (
@@ -610,7 +610,7 @@ export default function ClientTerminal() {
         </div>
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
-        <aside className="glass-card flex flex-col !rounded-none border-l border-[var(--border)]" style={{ width: rtW }}>
+        <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: rtW }}>
           <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-semibold tracking-wide" style={{ color: BUY }}>NEW ORDER · <span className="text-[var(--text)]">{selSym}</span></div>
           <div className="min-h-0 flex-1 overflow-auto">
           {rightTab === "NEWS" ? (
@@ -683,7 +683,7 @@ export default function ClientTerminal() {
         </aside>
       </div>
 
-      <div className="glass-card flex flex-wrap gap-x-4 gap-y-1 !rounded-none border-y border-[var(--border)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "#facc15" }}>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "#facc15" }}>
         <span>Balance: <span className="text-[var(--text)]">{account ? fmt(balance) : "--"}</span></span>
         <span>Flt P/L: <span style={{ color: floating >= 0 ? BUY : SELL }}>{account ? fmt(floating) : "--"}</span></span>
         <span>Equity: <span className="text-[var(--text)]">{account ? fmt(equity) : "--"}</span></span>
@@ -694,7 +694,7 @@ export default function ClientTerminal() {
 
       <div onMouseDown={dragY} className="h-1 cursor-row-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
-      <div className="glass-card flex shrink-0 flex-col !rounded-none" style={{ height: tbH }}>
+      <div className="flex shrink-0 flex-col bg-[var(--panel)]" style={{ height: tbH }}>
         <div className="flex gap-1 border-b border-[var(--border)] px-2">
           <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length}{pending.length ? <span className="ml-1 rounded-full px-1.5 text-[9px]" style={{ background: "rgba(90,169,255,0.2)", color: "#5aa9ff" }}>{pending.length} pending</span> : ""}</button>
           <button onClick={() => setBotTab("history")} className={tab(botTab === "history")} style={botTab === "history" ? { color: BUY } : undefined}>History</button>
@@ -814,7 +814,7 @@ export default function ClientTerminal() {
               <div className="p-3 text-[10px]">
                 <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {([["BALANCE", fmt(balance), "var(--text)"], ["EQUITY", fmt(equity), "var(--text)"], ["FLOATING P/L", fmt(floating), floating >= 0 ? BUY : SELL], ["CLOSED P/L", fmt(Number(account?.pnl || 0)), Number(account?.pnl || 0) >= 0 ? BUY : SELL], ["DEPOSITS", fmt(Number(account?.deposit || 0)), BUY], ["WITHDRAWALS", "-" + fmt(Number(account?.withdrawal || 0)), SELL], ["FREE MARGIN", fmt(free), "var(--text)"], ["MARGIN LEVEL", level ? level.toFixed(1) + "%" : "—", GOLD]] as [string, string, string][]).map(([k, v, c]) => (
-                    <div key={k} className="glass-card px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{k}</div><div className="mt-1 text-sm font-bold tabular-nums" style={{ color: c }}>{v}</div></div>
+                    <div key={k} className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{k}</div><div className="mt-1 text-sm font-bold tabular-nums" style={{ color: c }}>{v}</div></div>
                   ))}
                 </div>
                 <div className="mb-3">
