@@ -85,13 +85,12 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
 
           {children}
 
-          {(brand.companyInfo || brand.supportEmail) && (
+          {brand.companyInfo && (
             <div
               className="mt-5 border-t pt-3 text-center text-[10px] leading-snug"
               style={{ borderColor: "var(--border)", color: "var(--muted-foreground)" }}
             >
-              {brand.companyInfo && <div>{brand.companyInfo}</div>}
-              {brand.supportEmail && <div className="mt-0.5">{brand.supportEmail}</div>}
+              <div>{brand.companyInfo}</div>
             </div>
           )}
         </div>

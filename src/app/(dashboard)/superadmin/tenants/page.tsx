@@ -276,7 +276,7 @@ export default function SATenantsPage() {
               <input className={inp} placeholder="Custom domain (optional)" autoComplete="off" value={form.customDomain || ""} onChange={(e) => setForm({ ...form, customDomain: e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\s/g, "") })} />
               <input className={inp + " col-span-2"} placeholder="Slogan / Tagline" autoComplete="off" value={form.slogan || ""} onChange={(e) => setForm({ ...form, slogan: e.target.value })} />
               <input className={inp + " col-span-2"} placeholder="Company / Brokerage Info (footer)" autoComplete="off" value={form.companyInfo || ""} onChange={(e) => setForm({ ...form, companyInfo: e.target.value })} />
-              <input className={inp + " col-span-2"} placeholder="Support email (optional)" autoComplete="off" value={form.supportEmail || ""} onChange={(e) => setForm({ ...form, supportEmail: e.target.value })} />
+              <input className={inp + " col-span-2"} placeholder="Contact email (private — not shown publicly)" autoComplete="off" value={form.supportEmail || ""} onChange={(e) => setForm({ ...form, supportEmail: e.target.value })} />
               <div className="col-span-2"><label className="text-xs text-gray-500 mb-1 block">Logo</label><LogoField value={form.logoUrl} which="create" /></div>
             </div>
             {/* Section: Admin Credentials */}
@@ -290,7 +290,7 @@ export default function SATenantsPage() {
             <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tenant Contact <span className="text-gray-300 normal-case font-normal">(SuperAdmin only — never shown publicly)</span></div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <input className={inp} placeholder="Contact person" autoComplete="off" value={form.contactName || ""} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
-              <input className={inp} placeholder="Contact phone" autoComplete="off" value={form.contactPhone || ""} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} />
+              <input className={inp} placeholder="Contact phone (with country code, e.g. +94 77…)" autoComplete="off" value={form.contactPhone || ""} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} />
             </div>
             {/* Section: Email / SMTP */}
             <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Email Settings <span className="text-gray-300 normal-case font-normal">(for verification & password reset emails)</span></div>
@@ -384,7 +384,7 @@ export default function SATenantsPage() {
               <div><label className="text-xs text-gray-500 block mb-1">Subdomain *</label><input className={inp} value={editForm.subdomain} onChange={(e) => setEditForm({ ...editForm, subdomain: e.target.value })} /></div>
               <div><label className="text-xs text-gray-500 block mb-1">Custom Domain</label><input className={inp} placeholder="e.g. trade.acme.com" value={editForm.customDomain} onChange={(e) => setEditForm({ ...editForm, customDomain: e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\s/g, "") })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Plan (sets the account limit)</label><select className={inp} value={editForm.plan} onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}>{PLAN_KEYS.map((k) => <option key={k} value={k}>{pkgs[k]?.name || PACKAGES[k].name} — up to {seatsOf(k)} accounts (${pkgs[k]?.price ?? PACKAGES[k].price}/mo)</option>)}</select></div>
-              <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Support Email</label><input className={inp} type="email" value={editForm.supportEmail} onChange={(e) => setEditForm({ ...editForm, supportEmail: e.target.value })} /></div>
+              <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Contact Email <span className="text-gray-400">(private — not shown publicly)</span></label><input className={inp} type="email" value={editForm.supportEmail} onChange={(e) => setEditForm({ ...editForm, supportEmail: e.target.value })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Logo</label><LogoField value={editForm.logoUrl} which="edit" /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Slogan / Tagline</label><input className={inp} placeholder="Trade smarter" value={editForm.slogan} onChange={(e) => setEditForm({ ...editForm, slogan: e.target.value })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Company / Brokerage Info (footer)</label><input className={inp} placeholder="Acme Markets Ltd · Reg# 12345 · London" value={editForm.companyInfo} onChange={(e) => setEditForm({ ...editForm, companyInfo: e.target.value })} /></div>
