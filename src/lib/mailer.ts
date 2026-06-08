@@ -6,8 +6,10 @@ function inferSmtpHost(email: string): string {
   if (domain === "outlook.com" || domain === "hotmail.com" || domain === "live.com") return "smtp.office365.com";
   if (domain === "yahoo.com" || domain === "yahoo.co.uk" || domain === "ymail.com") return "smtp.mail.yahoo.com";
   if (domain === "icloud.com" || domain === "me.com" || domain === "mac.com") return "smtp.mail.me.com";
-  if (domain === "zoho.com") return "smtp.zoho.com";
-  // Generic: smtp.<domain>
+  if (domain === "zoho.com" || domain === "zohomail.com") return "smtp.zoho.com";
+  if (domain === "privateemail.com") return "mail.privateemail.com"; // Namecheap Private Email
+  // Generic guess: smtp.<domain>. Custom-domain mailboxes (e.g. a Namecheap Private
+  // Email address on your own domain) usually need an explicit smtpHost instead.
   return `smtp.${domain}`;
 }
 
@@ -39,8 +41,9 @@ export async function sendTenantMail(
   smtpEmail: string,
   smtpPassword: string,
   opts: MailOptions,
+  smtpHost?: string | null,
 ) {
-  const host = inferSmtpHost(smtpEmail);
+  const host = (smtpHost && smtpHost.trim()) || inferSmtpHost(smtpEmail);
   const transporter = nodemailer.createTransport({
     host,
     port: 587,

@@ -30,6 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (b.accentColor) data.accentColor = b.accentColor;
       if (b.smtpEmail !== undefined) data.smtpEmail = b.smtpEmail || null;
       if (b.smtpPassword !== undefined) data.smtpPassword = b.smtpPassword || null;
+      if (b.smtpHost !== undefined) data.smtpHost = b.smtpHost || null;
       await prisma.tenant.update({ where: { id: t.id }, data });
       // Plan can also be changed here; seats follow the (live) package limit.
       if (b.plan) {

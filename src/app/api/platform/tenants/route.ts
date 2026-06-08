@@ -34,6 +34,7 @@ const createSchema = z.object({
   contactPhone: z.string().optional(),
   smtpEmail: z.string().email().or(z.literal("")).optional(),
   smtpPassword: z.string().optional(),
+  smtpHost: z.string().optional(),
 });
 
 export async function POST(req: Request) {

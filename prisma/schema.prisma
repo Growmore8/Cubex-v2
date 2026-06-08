@@ -24,6 +24,7 @@ model Tenant {
   contactName  String? // SuperAdmin-only primary contact person (never shown publicly)
   smtpEmail    String?
   smtpPassword String?
+  smtpHost     String? // explicit SMTP server (e.g. mail.privateemail.com); blank = auto-detect from email domain
   permissions  Json          @default("{}")
   subscription Subscription?
   invoices     Invoice[]

@@ -125,7 +125,7 @@ export async function registerClient(
         fromName: brand.brandName,
         replyTo: noReplyAddress(tenant.smtpEmail),
         html: verificationEmail(brand, emailToken),
-      });
+      }, (tenant as any).smtpHost);
     } catch (e: any) {
       await prisma.account.deleteMany({ where: { userId: session.sub } }).catch(() => {});
       await prisma.user.delete({ where: { id: session.sub } }).catch(() => {});
@@ -173,7 +173,7 @@ export async function sendForgotPassword(host: string | null, email: string): Pr
     fromName: brand.brandName,
     replyTo: noReplyAddress(tenant.smtpEmail),
     html: resetPasswordEmail(brand, resetLink),
-  });
+  }, (tenant as any).smtpHost);
 }
 
 export async function resetPassword(host: string | null, email: string, token: string, newPassword: string): Promise<void> {

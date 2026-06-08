@@ -100,7 +100,7 @@ export default function SATenantsPage() {
       slogan: t.slogan || "", companyInfo: t.companyInfo || "", logoUrl: t.logoUrl || "",
       primaryColor: t.primaryColor || "#2563eb", accentColor: t.accentColor || "#22c55e",
       plan: t.subscription?.plan || "STARTER",
-      smtpEmail: t.smtpEmail || "", smtpPassword: "",
+      smtpEmail: t.smtpEmail || "", smtpPassword: "", smtpHost: t.smtpHost || "",
       contactName: t.contactName || "", contactPhone: t.contactPhone || "",
     });
     setEditFor(t);
@@ -297,7 +297,8 @@ export default function SATenantsPage() {
             <div className="mb-3 grid grid-cols-2 gap-2">
               <input className={inp} placeholder="SMTP email (e.g. info@yourbrand.com)" autoComplete="off" type="email" value={form.smtpEmail || ""} onChange={(e) => setForm({ ...form, smtpEmail: e.target.value })} />
               <PasswordInput wrap="relative" className={inp} placeholder="Email / App password" autoComplete="new-password" value={form.smtpPassword || ""} onChange={(e) => setForm({ ...form, smtpPassword: e.target.value })} />
-              <p className="col-span-2 text-[10px] text-gray-400">Gmail: use an App Password (Google Account → Security → App passwords). Leave blank to skip email verification.</p>
+              <input className={inp + " col-span-2"} placeholder="SMTP host (optional — e.g. mail.privateemail.com)" autoComplete="off" value={form.smtpHost || ""} onChange={(e) => setForm({ ...form, smtpHost: e.target.value })} />
+              <p className="col-span-2 text-[10px] text-gray-400">Gmail/Outlook/Zoho auto-detected. For a custom-domain mailbox set the host (Namecheap Private Email = <b>mail.privateemail.com</b>). Gmail needs an App Password.</p>
             </div>
             {/* Section: Plan & Branding */}
             <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Plan & Branding</div>
@@ -394,6 +395,7 @@ export default function SATenantsPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div><label className="text-xs text-gray-500 block mb-1">SMTP Email</label><input className={inp} type="email" autoComplete="off" placeholder="info@yourbrand.com" value={editForm.smtpEmail} onChange={(e) => setEditForm({ ...editForm, smtpEmail: e.target.value })} /></div>
                   <div><label className="text-xs text-gray-500 block mb-1">Email / App Password {editFor?.smtpEmail ? <span className="text-gray-400">(leave blank to keep current)</span> : null}</label><PasswordInput wrap="relative" className={inp} autoComplete="new-password" placeholder={editFor?.smtpEmail ? "Leave blank to keep" : "App password"} value={editForm.smtpPassword} onChange={(e) => setEditForm({ ...editForm, smtpPassword: e.target.value })} /></div>
+                  <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">SMTP Host <span className="text-gray-400">(optional — custom domains, e.g. mail.privateemail.com)</span></label><input className={inp} autoComplete="off" placeholder="Blank = auto-detect from email domain" value={editForm.smtpHost} onChange={(e) => setEditForm({ ...editForm, smtpHost: e.target.value })} /></div>
                 </div>
               </div>
               <div><label className="text-xs text-gray-500 block mb-1">Primary Color</label><div className="flex gap-2"><input type="color" className="rounded border h-9 w-12 cursor-pointer" value={editForm.primaryColor} onChange={(e) => setEditForm({ ...editForm, primaryColor: e.target.value })} /><input className={inp} value={editForm.primaryColor} onChange={(e) => setEditForm({ ...editForm, primaryColor: e.target.value })} /></div></div>

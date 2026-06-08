@@ -221,7 +221,7 @@ export async function sendStatementEmail(opts: { tenantId: string; accountId: st
     replyTo: noReplyAddress(t.smtpEmail),
     html: statementEmail(brand, summary),
     attachments: [{ filename: pdfFileName, content: pdf, contentType: "application/pdf" }],
-  });
+  }, t.smtpHost);
   return { ok: true, to };
 }
 
