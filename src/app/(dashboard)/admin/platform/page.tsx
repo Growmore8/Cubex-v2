@@ -112,6 +112,36 @@ export default function AdminDeskPage() {
   const [cliQ, setCliQ] = useState("");
   const [cliType, setCliType] = useState("ALL");
   const [cliStatus, setCliStatus] = useState("ALL");
+  // Per-table sort state: first click asc, second desc, third clears. Shared across all toolbox tables.
+  const [sortBy, setSortBy] = useState<Record<string, { k: string; d: 1 | -1 }>>({});
+  const toggleSort = (tbl: string, k: string) => setSortBy((s) => {
+    const cur = s[tbl];
+    if (!cur || cur.k !== k) return { ...s, [tbl]: { k, d: 1 } };
+    if (cur.d === 1) return { ...s, [tbl]: { k, d: -1 } };
+    const n = { ...s }; delete n[tbl]; return n;
+  });
+  const sortRows = (tbl: string, rows: any[], acc: Record<string, (r: any) => any>) => {
+    const cfg = sortBy[tbl]; if (!cfg || !acc[cfg.k]) return rows;
+    const get = acc[cfg.k];
+    return [...rows].sort((a, b) => {
+      const va = get(a), vb = get(b);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1; if (vb == null) return -1;
+      if (typeof va === "number" && typeof vb === "number") return (va - vb) * cfg.d;
+      return String(va).localeCompare(String(vb), undefined, { numeric: true }) * cfg.d;
+    });
+  };
+  const SortTh = ({ tbl, k, label, align, cls }: { tbl: string; k: string; label: any; align?: "right"; cls: string }) => {
+    const cfg = sortBy[tbl]; const active = !!cfg && cfg.k === k;
+    return (
+      <th className={cls} onClick={() => toggleSort(tbl, k)} style={{ cursor: "pointer", userSelect: "none" }}>
+        <span className={"inline-flex items-center gap-1 " + (align === "right" ? "flex-row-reverse" : "")}>
+          {label}
+          <i className={"fa-solid text-[8px] " + (active ? (cfg!.d === 1 ? "fa-arrow-up-long" : "fa-arrow-down-long") : "fa-sort")} style={{ opacity: active ? 1 : 0.3, color: active ? "var(--accent)" : "var(--muted)" }} />
+        </span>
+      </th>
+    );
+  };
   const [auditCat, setAuditCat] = useState("ALL");
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false });
@@ -943,16 +973,21 @@ export default function AdminDeskPage() {
                 <table className="w-full border-collapse text-[10px] [&_td]:border [&_td]:border-[var(--border)] [&_th]:border [&_th]:border-[var(--border)] [&_td]:px-2.5 [&_th]:px-2.5">
                   <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
                     <th className={thc}><input type="checkbox" checked={tAllOn} onChange={tToggleAll} /></th>
-                    <th className={thc}>Date Time</th><th className={thc}>Order ID</th><th className={thc}>Symbol</th><th className={thc}>Type</th>
-                    <th className={thc + " text-right"}>Lots</th><th className={thc + " text-right"}>Open Price</th><th className={thc + " text-right"}>S/L</th><th className={thc + " text-right"}>T/P</th>
-                    <th className={thc + " text-right"}>Current</th><th className={thc + " text-right"}>PnL</th><th className={thc + " text-right"}>Action</th>
+                    <SortTh tbl="trade" k="date" label="Date Time" cls={thc} /><SortTh tbl="trade" k="oid" label="Order ID" cls={thc} /><SortTh tbl="trade" k="symbol" label="Symbol" cls={thc} /><SortTh tbl="trade" k="type" label="Type" cls={thc} />
+                    <SortTh tbl="trade" k="lots" label="Lots" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="openPrice" label="Open Price" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="sl" label="S/L" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="tp" label="T/P" align="right" cls={thc + " text-right"} />
+                    <SortTh tbl="trade" k="current" label="Current" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="pnl" label="PnL" align="right" cls={thc + " text-right"} /><th className={thc + " text-right"}>Action</th>
                   </tr></thead>
                   <tbody>
                     {tSelIds.length > 0 && (<tr><td colSpan={12} className="px-2 py-1 space-x-1">
                       <button onClick={() => askConfirm("Close " + tSelIds.length + " trade(s)?", () => { tSelIds.forEach((id) => close(id)); setTradeSel({}); })} className="rounded px-2 py-0.5 text-[9px] font-medium" style={{ background: SELL, color: "#fff" }}>Close Selected ({tSelIds.length})</button>
                       {can("deleteTrades") && <button onClick={() => askConfirm("Delete " + tSelIds.length + " open trade(s)? This removes them entirely (no P/L realized).", () => delTradesBulk(tSelIds))} className="rounded px-2 py-0.5 text-[9px] font-medium" style={{ background: "var(--soft)", color: SELL, border: "1px solid rgba(224,82,96,0.4)" }}>Delete Selected ({tSelIds.length})</button>}
                     </td></tr>)}
-                    {accOpen.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No open trades.</td></tr> : accOpen.map((p) => {
+                    {accOpen.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No open trades.</td></tr> : sortRows("trade", accOpen, {
+                      date: (p) => { const v = p.openedAt || p.createdAt || p.openTime || p.time; return v ? new Date(v).getTime() : null; },
+                      oid: (p) => oid(p), symbol: (p) => p.symbol, type: (p) => p.type, lots: (p) => Number(p.lots),
+                      openPrice: (p) => Number(p.openPrice), sl: (p) => Number(p.sl), tp: (p) => Number(p.tp),
+                      current: (p) => Number(prices[p.symbol] ?? p.openPrice), pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)),
+                    }).map((p) => {
                       const cur = prices[p.symbol] ?? p.openPrice;
                       const pl = pnlOf(p, cur, csz(p.symbol));
                       const ie = inlineEdit[p.id] || {};
@@ -1063,12 +1098,18 @@ export default function AdminDeskPage() {
                     <table className="w-full border-collapse [&_td]:border [&_td]:border-[var(--border)] [&_th]:border [&_th]:border-[var(--border)] [&_td]:px-2.5 [&_th]:px-2.5">
                       <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
                         <th className={thc}><input type="checkbox" checked={hAllOn} onChange={hToggleAll} /></th>
-                        <th className={thc}>Date/Time</th><th className={thc}>Order/Ref</th><th className={thc}>Type</th><th className={thc}>Symbol</th><th className={thc}>Desc</th>
-                        <th className={thc + " text-right"}>Open Px</th><th className={thc + " text-right"}>Close Px</th><th className={thc + " text-right"}>S/L</th><th className={thc + " text-right"}>T/P</th>
-                        <th className={thc}>Close Time</th><th className={thc + " text-right"}>P&amp;L</th><th className={thc + " text-right"}>Edit</th>
+                        <SortTh tbl="hist" k="date" label="Date/Time" cls={thc} /><SortTh tbl="hist" k="ref" label="Order/Ref" cls={thc} /><SortTh tbl="hist" k="type" label="Type" cls={thc} /><SortTh tbl="hist" k="symbol" label="Symbol" cls={thc} /><SortTh tbl="hist" k="desc" label="Desc" cls={thc} />
+                        <SortTh tbl="hist" k="openPx" label="Open Px" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="closePx" label="Close Px" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="sl" label="S/L" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="tp" label="T/P" align="right" cls={thc + " text-right"} />
+                        <SortTh tbl="hist" k="closeTime" label="Close Time" cls={thc} /><SortTh tbl="hist" k="pnl" label="P&L" align="right" cls={thc + " text-right"} /><th className={thc + " text-right"}>Edit</th>
                       </tr></thead>
                       <tbody>
-                        {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={13}>No history.</td></tr> : rows.map((h) => (
+                        {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={13}>No history.</td></tr> : sortRows("hist", rows, {
+                          date: (h) => { const v = h.openedAt || h.openTime || h.at || h.createdAt; return v ? new Date(v).getTime() : null; },
+                          ref: (h) => h.ticket ?? h.orderId ?? h.id,
+                          type: (h) => hType(h), symbol: (h) => h.symbol, desc: (h) => h.closeReason || h.description || h.desc,
+                          openPx: (h) => Number(h.openPrice), closePx: (h) => Number(h.closePrice), sl: (h) => Number(h.sl), tp: (h) => Number(h.tp),
+                          closeTime: (h) => { const v = hdt(h); return v ? new Date(v).getTime() : null; }, pnl: (h) => Number(h.pnl),
+                        }).map((h) => (
                           <tr key={h.id} className="border-b border-[var(--border)] hover:bg-[var(--soft)]">
                             <td className="px-2 py-1"><input type="checkbox" checked={!!histSel[h.id]} onChange={() => setHistSel((s) => ({ ...s, [h.id]: !s[h.id] }))} /></td>
                             <td className="px-2 py-1 text-[var(--muted)]">{(() => { const v = h.openedAt || h.openTime || h.at || h.createdAt; return v ? new Date(v).toLocaleString() : "-"; })()}</td>
@@ -1123,13 +1164,18 @@ export default function AdminDeskPage() {
                   <div className="flex-1 overflow-auto">
                     <table className="w-full border-collapse [&_td]:border [&_td]:border-[var(--border)] [&_th]:border [&_th]:border-[var(--border)] [&_td]:px-2.5 [&_th]:px-2.5">
                       <thead><tr className="border-b border-[var(--border)] sticky top-0 bg-[var(--panel)] z-10">
-                        <th className={thc}>Login</th><th className={thc}>Name</th><th className={thc}>Email</th>
-                        <th className={thc}>Phone</th><th className={thc}>Country</th><th className={thc}>Manager</th>
-                        <th className={thc}>Type</th><th className={thc}>Balance</th><th className={thc}>Online</th>
-                        <th className={thc}>Last IP</th><th className={thc}>Status</th><th className={thc + " text-right"}>Actions</th>
+                        <SortTh tbl="cli" k="login" label="Login" cls={thc} /><SortTh tbl="cli" k="name" label="Name" cls={thc} /><SortTh tbl="cli" k="email" label="Email" cls={thc} />
+                        <SortTh tbl="cli" k="phone" label="Phone" cls={thc} /><SortTh tbl="cli" k="country" label="Country" cls={thc} /><SortTh tbl="cli" k="manager" label="Manager" cls={thc} />
+                        <SortTh tbl="cli" k="type" label="Type" cls={thc} /><SortTh tbl="cli" k="balance" label="Balance" cls={thc} /><SortTh tbl="cli" k="online" label="Online" cls={thc} />
+                        <SortTh tbl="cli" k="ip" label="Last IP" cls={thc} /><SortTh tbl="cli" k="status" label="Status" cls={thc} /><th className={thc + " text-right"}>Actions</th>
                       </tr></thead>
                       <tbody>
-                        {cliRows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No clients.</td></tr> : cliRows.map((c: any) => {
+                        {cliRows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No clients.</td></tr> : sortRows("cli", cliRows, {
+                          login: (c) => c.login, name: (c) => c.name, email: (c) => c.user?.email || c.email,
+                          phone: (c) => c.phone, country: (c) => c.country, manager: (c) => c.manager?.name,
+                          type: (c) => c.type, balance: (c) => balOf(c), online: (c) => (c.user?.online ? 1 : 0),
+                          ip: (c) => c.user?.lastLoginIp, status: (c) => (c.deactivated ? "Inactive" : c.locked ? "Locked" : "Active"),
+                        }).map((c: any) => {
                           const email = c.user?.email || c.email || "-";
                           const lastIp = c.user?.lastLoginIp || "-";
                           const bal = balOf(c);
