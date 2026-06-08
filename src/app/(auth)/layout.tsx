@@ -3,6 +3,11 @@ import { getBrand } from "@/lib/brand";
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
   const brand = await getBrand();
   return (
+    <>
+      {/* Force the document background dark on auth pages so the home-screen (PWA
+          standalone) overscroll / safe-area below the card never shows white.
+          Scoped to while this layout is mounted; removed on navigating away. */}
+      <style>{`html,body{background:#0a0f1c !important;}`}</style>
     <div
       className="fixed inset-0 flex items-center justify-center overflow-y-auto px-4 py-6"
       style={{
@@ -95,5 +100,6 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -89,6 +89,36 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mTp, setMTp] = useState("");
   const [notisOpen, setNotisOpen] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
+  // Statement export/email range picker
+  const [stmtOpen, setStmtOpen] = useState(false);
+  const [stmtPreset, setStmtPreset] = useState("month");
+  const [stmtFrom, setStmtFrom] = useState("");
+  const [stmtTo, setStmtTo] = useState("");
+  const [stmtSending, setStmtSending] = useState(false);
+  function stmtRange(): { from?: string; to?: string } {
+    const now = new Date(); const iso = (d: Date) => d.toISOString().slice(0, 10);
+    if (stmtPreset === "all") return {};
+    if (stmtPreset === "custom") return { from: stmtFrom || undefined, to: stmtTo || undefined };
+    const f = new Date(now);
+    if (stmtPreset === "week") f.setDate(now.getDate() - 7);
+    else if (stmtPreset === "month") f.setMonth(now.getMonth() - 1);
+    else if (stmtPreset === "year") f.setFullYear(now.getFullYear() - 1);
+    return { from: iso(f), to: iso(now) };
+  }
+  function stmtDownload() {
+    const q = new URLSearchParams({ accountId: accId || "" });
+    const { from, to } = stmtRange(); if (from) q.set("from", from); if (to) q.set("to", to);
+    try { window.open("/api/client/statement?" + q.toString(), "_blank"); } catch { window.print(); }
+    setStmtOpen(false);
+  }
+  async function stmtEmail() {
+    setStmtSending(true);
+    const { from, to } = stmtRange();
+    pushToast?.({ id: "stmt-" + Date.now(), title: "Sending statement…", st: "funds" });
+    const r = await fetch("/api/client/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accId, from, to }) }).then((x: any) => x.json()).catch(() => ({ ok: false }));
+    setStmtSending(false); setStmtOpen(false);
+    pushToast?.({ id: "stmt-" + Date.now(), title: r.ok ? "Statement emailed to " + r.to : (r.error || "Failed to send"), st: "funds" });
+  }
   const { cToasts = [], pushToast } = t;
   useEffect(() => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
@@ -880,20 +910,9 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
 
             {/* export */}
-            <button onClick={() => { try { window.open("/api/client/statement?accountId=" + encodeURIComponent(accId || ""), "_blank"); } catch { window.print(); } }} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left">
+            <button onClick={() => { setStmtPreset("month"); setStmtFrom(""); setStmtTo(""); setStmtOpen(true); }} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left">
               <i className="fa-solid fa-file-pdf" style={{ color: SELL }} />
-              <div className="flex-1"><div className="text-[12px] font-semibold">Export PDF Statement</div><div className="text-[10px] text-[var(--muted)]">Download account history</div></div>
-              <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
-            </button>
-
-            {/* email statement */}
-            <button onClick={async () => {
-              pushToast?.({ id: "stmt-" + Date.now(), title: "Sending statement…", st: "funds" });
-              const r = await fetch("/api/client/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accId }) }).then((x: any) => x.json()).catch(() => ({ ok: false }));
-              pushToast?.({ id: "stmt-" + Date.now(), title: r.ok ? "Statement emailed to " + r.to : (r.error || "Failed to send"), st: "funds" });
-            }} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left">
-              <i className="fa-solid fa-envelope-open-text" style={{ color: BLUE }} />
-              <div className="flex-1"><div className="text-[12px] font-semibold">Email Statement</div><div className="text-[10px] text-[var(--muted)]">Send PDF to your registered email</div></div>
+              <div className="flex-1"><div className="text-[12px] font-semibold">Export PDF Statement</div><div className="text-[10px] text-[var(--muted)]">Choose a period — download or email</div></div>
               <i className="fa-solid fa-chevron-right text-[var(--muted)]" />
             </button>
 
@@ -1061,6 +1080,33 @@ export default function ClientMobile({ t }: { t: any }) {
               );
             })}
             <div className="h-16" />
+          </div>
+        </div>
+      )}
+
+      {/* Statement range picker */}
+      {stmtOpen && (
+        <div className="fixed inset-0 z-[110] flex items-end justify-center sm:items-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setStmtOpen(false)}>
+          <div className="w-full max-w-[400px] rounded-t-[22px] border p-4 sm:rounded-[22px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", paddingBottom: "max(16px, env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-sm font-semibold">Statement Period</div>
+              <button onClick={() => setStmtOpen(false)} aria-label="Close" className="-mr-1 flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {([["week", "This Week"], ["month", "This Month"], ["year", "This Year"], ["all", "All Time"], ["custom", "Custom"]] as [string, string][]).map(([k, lbl]) => (
+                <button key={k} onClick={() => setStmtPreset(k)} className="rounded-lg py-2 text-[11px] font-medium transition-colors" style={stmtPreset === k ? { background: BLUE, color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{lbl}</button>
+              ))}
+            </div>
+            {stmtPreset === "custom" && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div><div className="text-[10px] text-[var(--muted)]">From</div><input type="date" value={stmtFrom} onChange={(e) => setStmtFrom(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" /></div>
+                <div><div className="text-[10px] text-[var(--muted)]">To</div><input type="date" value={stmtTo} onChange={(e) => setStmtTo(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" /></div>
+              </div>
+            )}
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button onClick={stmtDownload} className="flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold text-white" style={{ background: SELL }}><i className="fa-solid fa-file-pdf" /> Download</button>
+              <button disabled={stmtSending} onClick={stmtEmail} className="flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold text-white disabled:opacity-60" style={{ background: BLUE }}><i className="fa-solid fa-envelope" /> {stmtSending ? "Sending…" : "Email"}</button>
+            </div>
           </div>
         </div>
       )}
