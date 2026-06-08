@@ -81,10 +81,10 @@ export async function GET(req: Request) {
   } catch { symbols = []; }
 
   // tenant branding for the app header (never "CubeX")
-  let brand: { name: string; logoUrl: string | null } = { name: "", logoUrl: null };
+  let brand: { name: string; logoUrl: string | null; primaryColor: string | null; accentColor: string | null } = { name: "", logoUrl: null, primaryColor: null, accentColor: null };
   try {
-    const t = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { name: true, brandName: true, logoUrl: true } });
-    if (t) brand = { name: t.brandName || t.name, logoUrl: t.logoUrl };
+    const t = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { name: true, brandName: true, logoUrl: true, primaryColor: true, accentColor: true } });
+    if (t) brand = { name: t.brandName || t.name, logoUrl: t.logoUrl, primaryColor: (t as any).primaryColor || null, accentColor: (t as any).accentColor || null };
   } catch {}
 
   return NextResponse.json({

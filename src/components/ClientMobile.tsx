@@ -251,7 +251,7 @@ export default function ClientMobile({ t }: { t: any }) {
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", inset: 0, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation",
       // Frosted-glass design: faint brand-tinted glows behind the content so the
       // .glass-card surfaces have colour to blur (design "A").
-      background: "radial-gradient(620px 380px at -5% -2%, rgba(124,58,237,0.34), transparent 60%), radial-gradient(620px 380px at 105% 8%, rgba(37,99,235,0.30), transparent 58%), radial-gradient(520px 320px at 50% 112%, rgba(16,199,132,0.14), transparent 60%), var(--bg)" }} className="flex flex-col overflow-hidden text-[var(--text)]">
+      background: `radial-gradient(620px 380px at -5% -2%, color-mix(in srgb, ${brand?.primaryColor || "#7c3aed"} 34%, transparent), transparent 60%), radial-gradient(620px 380px at 105% 8%, color-mix(in srgb, ${brand?.accentColor || "#2563eb"} 30%, transparent), transparent 58%), radial-gradient(520px 320px at 50% 112%, rgba(16,199,132,0.13), transparent 60%), var(--bg)` }} className="flex flex-col overflow-hidden text-[var(--text)]">
       <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarRef} onChange={uploadAvatar} />
 
       {/* TOP HEADER — iOS glass */}
@@ -395,6 +395,13 @@ export default function ClientMobile({ t }: { t: any }) {
                 else if (dx > 0 && cur > 0) switchAcc(ids[cur - 1]);
               }}
             >
+              {/* glowing brand accent bar across the top (mockup hero) */}
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-[4px]" style={{
+                background: account?.type === "LIVE"
+                  ? `linear-gradient(90deg, ${BUY}, ${brand?.accentColor || "#22d3ee"}, ${BUY})`
+                  : `linear-gradient(90deg, ${brand?.primaryColor || "#7c3aed"}, ${brand?.accentColor || "#2563eb"}, ${brand?.primaryColor || "#a78bfa"})`,
+                boxShadow: `0 0 16px 1px ${account?.type === "LIVE" ? "rgba(22,163,74,.7)" : "rgba(124,58,237,.7)"}`,
+              }} />
               {/* gloss + animated sheen */}
               <div className="card-sheen pointer-events-none absolute inset-0" />
               <div className="pointer-events-none absolute -right-14 -top-20 h-56 w-56 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%)" }} />
