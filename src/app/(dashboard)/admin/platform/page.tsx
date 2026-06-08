@@ -601,6 +601,7 @@ export default function AdminDeskPage() {
                     {dHead("Create")}
                     {can("createClients") && dItem(() => openModal("client"), "fa-user-plus", "New Client", BUY)}
                     {!isManager && can("manageManagers") && dItem(() => openModal("manager"), "fa-user-tie", "New Manager")}
+                    {!isManager && can("manageManagers") && dItem(() => { window.location.href = "/admin/managers"; }, "fa-users-gear", "Manage Managers")}
                     {!isManager && dItem(() => openModal("group"), "fa-layer-group", "Groups")}
                     {dDivider}
                     {can("sendNotifications") && dItem(() => openModal("notify"), "fa-paper-plane", "Send Notification", GOLD)}

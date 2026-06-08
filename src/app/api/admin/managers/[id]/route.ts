@@ -6,6 +6,8 @@ import { updateManager, deleteManager } from "@/services/manager.service";
 
 const schema = z.object({
   name: z.string().optional(),
+  email: z.string().email().optional(),
+  password: z.string().min(6).optional(),
   status: z.enum(["ACTIVE", "SUSPENDED", "LOCKED"]).optional(),
   perms: z.record(z.string(), z.boolean()).optional(),
 });

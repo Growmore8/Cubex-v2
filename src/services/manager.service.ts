@@ -34,6 +34,16 @@ export async function updateManager(tenantId: string, id: string, data: any) {
   if (data.name !== undefined) patch.name = data.name;
   if (data.status !== undefined) patch.status = data.status;
   if (data.perms !== undefined) patch.perms = data.perms;
+  if (data.email) {
+    const emailLower = String(data.email).toLowerCase();
+    const clash = await prisma.user.findFirst({ where: { tenantId, email: emailLower, NOT: { id } } });
+    if (clash) throw new Error("Email already in use");
+    patch.email = emailLower;
+  }
+  if (data.password) {
+    if (String(data.password).length < 6) throw new Error("Password must be at least 6 characters");
+    patch.passwordHash = await hashPassword(String(data.password));
+  }
   return prisma.user.update({ where: { id }, data: patch, select: { id: true, name: true, email: true, status: true, perms: true } });
 }
 
