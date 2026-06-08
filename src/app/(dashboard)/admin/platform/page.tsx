@@ -63,6 +63,12 @@ export default function AdminDeskPage() {
   const [tf, setTf] = useState("1M");
   const [selAcc, setSelAcc] = useState<any>(null);
   const [lot, setLot] = useState(0.01);
+  // Instant reflection: whenever the client list reloads (after a trade close,
+  // fund add, etc.) re-point selAcc at the fresh record so the summary ticker
+  // (balance / equity / realized P&L) updates immediately without a manual reload.
+  useEffect(() => {
+    setSelAcc((cur: any) => (cur ? (clients.find((c: any) => c.id === cur.id) || cur) : cur));
+  }, [clients]);
   const [sl, setSl] = useState(0);
   const [tp, setTp] = useState(0);
   const [tab, setTab] = useState("trade");
@@ -1031,7 +1037,7 @@ export default function AdminDeskPage() {
                         {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={13}>No history.</td></tr> : rows.map((h) => (
                           <tr key={h.id} className="border-b border-[var(--border)] hover:bg-[var(--soft)]">
                             <td className="px-2 py-1"><input type="checkbox" checked={!!histSel[h.id]} onChange={() => setHistSel((s) => ({ ...s, [h.id]: !s[h.id] }))} /></td>
-                            <td className="px-2 py-1 text-[var(--muted)]">{(h.openTime || h.createdAt) ? new Date(h.openTime || h.createdAt).toLocaleString() : "-"}</td>
+                            <td className="px-2 py-1 text-[var(--muted)]">{(() => { const v = h.openedAt || h.openTime || h.at || h.createdAt; return v ? new Date(v).toLocaleString() : "-"; })()}</td>
                             <td className="px-2 py-1">{h.ticket ?? h.orderId ?? h.id}</td>
                             <td className="px-2 py-1" style={{ color: hType(h) === "BUY" ? BUY : SELL }}>{h.side || h.type || "-"}</td>
                             <td className="px-2 py-1">{h.symbol}</td>

@@ -764,7 +764,7 @@ export default function ClientTerminal() {
                   <tr key={h.id} className="border-t border-[var(--border)]">
                     <td className="px-2 py-1">{h.symbol} <span style={{ color: h.side === "BUY" ? BUY : SELL }}>{h.side}</span></td>
                     <td className="px-2 py-1 text-[var(--muted)]">{h.openedAt ? new Date(h.openedAt).toLocaleString() : "—"}</td>
-                    <td className="px-2 py-1 text-[var(--muted)]">{new Date(h.closedAt).toLocaleString()}</td>
+                    <td className="px-2 py-1 text-[var(--muted)]">{h.closedAt ? new Date(h.closedAt).toLocaleString() : "—"}</td>
                     <td className="px-2 py-1 text-right">{h.lots}</td>
                     <td className="px-2 py-1 text-right">{h.openPrice.toFixed(dg(h.symbol))}</td>
                     <td className="px-2 py-1 text-right">{h.closePrice.toFixed(dg(h.symbol))}</td>
