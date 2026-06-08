@@ -29,12 +29,13 @@ export async function GET() {
       return NextResponse.json({ ok: false, reason: "other-device" });
     }
 
-    // Tenant status (read-only if suspended)
-    let tenantSuspended = false;
+    // Tenant suspended -> the brokerage is suspended: force an instant logout for
+    // every admin / manager / client of that tenant.
     if (user.tenantId) {
       const t = await prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { status: true } });
-      tenantSuspended = !!t && t.status === "SUSPENDED";
+      if (t && t.status === "SUSPENDED") return NextResponse.json({ ok: false, reason: "suspended" });
     }
+    const tenantSuspended = false;
 
     // Client: if they have NO active account -> deactivated logout
     if (user.role === "CLIENT") {

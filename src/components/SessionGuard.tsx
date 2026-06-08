@@ -22,7 +22,7 @@ export default function SessionGuard() {
         if (d && d.ok === false) {
           done.current = true;
           try { await fetch("/api/auth/logout", { method: "POST" }); } catch {}
-          const reason = d.reason === "other-device" ? "other-device" : d.reason === "deactivated" ? "deactivated" : "expired";
+          const reason = d.reason === "other-device" ? "other-device" : d.reason === "deactivated" ? "deactivated" : d.reason === "suspended" ? "suspended" : "expired";
           window.location.href = "/login?reason=" + reason;
           return;
         }

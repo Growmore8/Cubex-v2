@@ -14,6 +14,7 @@ export default function LoginPage() {
     const reason = new URLSearchParams(window.location.search).get("reason");
     if (reason === "other-device") setNotice("You were signed out because your account was logged in on another device.");
     else if (reason === "deactivated") setNotice("Your account has been deactivated. Please contact support.");
+    else if (reason === "suspended") setNotice("This brokerage has been suspended. Please contact support.");
     else if (reason === "expired") setNotice("Your session expired. Please sign in again.");
   }, []);
 
