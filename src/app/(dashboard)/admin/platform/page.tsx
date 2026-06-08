@@ -252,6 +252,26 @@ export default function AdminDeskPage() {
   }
   useEffect(() => { if (ok) toast(ok, "ok"); }, [ok]);
   useEffect(() => { if (symbols.length && openCharts.length === 0) { const init = symbols.slice(0, 4).map((s) => s.symbol); setOpenCharts(init); setSelSym(init[0]); } }, [symbols]);
+  // Remember the last market setup (open charts / timeframe / indicators / layout /
+  // panels) across refreshes. Restoring openCharts (non-empty) stops the default
+  // init effect above from overwriting it.
+  useEffect(() => {
+    try {
+      const sv = JSON.parse(localStorage.getItem("cubex-desk-setup") || "null");
+      if (sv) {
+        if (Array.isArray(sv.openCharts) && sv.openCharts.length) { setOpenCharts(sv.openCharts); setSelSym(sv.openCharts[Math.min(sv.activeChart || 0, sv.openCharts.length - 1)]); }
+        if (typeof sv.activeChart === "number") setActiveChart(sv.activeChart);
+        if (sv.tf) setTf(sv.tf);
+        if (sv.chartInd) setChartInd(sv.chartInd);
+        if (typeof sv.layout === "number") setLayout(sv.layout);
+        if (sv.panels) setPanels(sv.panels);
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    if (openCharts.length === 0) return; // don't persist the empty initial state
+    try { localStorage.setItem("cubex-desk-setup", JSON.stringify({ openCharts, activeChart, tf, chartInd, layout, panels })); } catch {}
+  }, [openCharts, activeChart, tf, chartInd, layout, panels]);
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });

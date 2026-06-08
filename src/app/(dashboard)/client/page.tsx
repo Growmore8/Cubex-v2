@@ -114,6 +114,11 @@ export default function ClientTerminal() {
 
   const selSymRef = useRef(selSym);
   useEffect(() => { selSymRef.current = selSym; }, [selSym]);
+  // Remember last symbol / timeframe / indicators across refreshes.
+  useEffect(() => {
+    try { const sv = JSON.parse(localStorage.getItem("cubex-client-setup") || "null"); if (sv) { if (sv.selSym) setSelSym(sv.selSym); if (sv.tf) setTf(sv.tf); if (sv.chartInd) setChartInd(sv.chartInd); } } catch {}
+  }, []);
+  useEffect(() => { if (!selSym) return; try { localStorage.setItem("cubex-client-setup", JSON.stringify({ selSym, tf, chartInd })); } catch {} }, [selSym, tf, chartInd]);
   const prevRef = useRef<Record<string, number>>({});
   const timersRef = useRef<Record<string, any>>({});
 
@@ -584,7 +589,7 @@ export default function ClientTerminal() {
               ))}
             </div>
             <span className="h-3 w-px bg-[var(--border)]" />
-            <div className="flex gap-1">{TFS.map((t) => <button key={t} onClick={() => setTf(t)} className="rounded px-1.5 py-0.5 text-[10px]" style={tf === t ? { background: BUY, color: "#04140e" } : { color: "var(--muted)" }}>{t}</button>)}</div>
+            <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[10px] text-[var(--text)]" style={{ cursor: "pointer" }}>{TFS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
           </div>
           <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><LWChart symbol={selSym} tf={tf} theme={theme} digits={d} ind={chartInd} positions={[
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),

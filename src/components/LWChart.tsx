@@ -480,6 +480,23 @@ export default function LWChart({
       <button style={{ ...tbV(macd), fontSize: 7, fontWeight: 700 }} onClick={() => setMacd((v) => !v)} title="MACD (12,26,9)">MACD</button>
     </>
   );
+  // Drawing tools only (H-line / trend / clear) — shown as a floating toolbar on the
+  // chart for desktop, where indicators live in the page header (`ind` controlled).
+  const drawBtns = (
+    <>
+      <button style={tbV(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line">
+        <i className="fa-solid fa-minus" style={{ fontSize: 12 }} />
+      </button>
+      <button style={tbV(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line">
+        <i className="fa-solid fa-arrow-trend-up" style={{ fontSize: 12 }} />
+      </button>
+      {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && (
+        <button style={tbV(false)} onClick={clearDrawings} title="Clear drawings">
+          <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
+        </button>
+      )}
+    </>
+  );
   return (
     <div style={{ display: "flex", flexDirection: "row", height: "100%", width: "100%" }}>
       {/* Left sidebar — TradingView-style tool panel (mobile / default). Hidden when
@@ -494,6 +511,12 @@ export default function LWChart({
         {/* Main price chart */}
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
           <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
+          {/* Desktop drawing tools (H-line / trend / clear) — floating top-left */}
+          {showTools && ind && (
+            <div style={{ position: "absolute", top: 6, left: 8, zIndex: 6, display: "flex", gap: 3, padding: "3px 5px", borderRadius: 8, background: panelBg, border: `1px solid ${bord}` }}>
+              {drawBtns}
+            </div>
+          )}
           {tool !== "none" && (
             <div style={{ position: "absolute", bottom: 6, left: 8, zIndex: 5, pointerEvents: "none" }}>
               <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 4, background: "rgba(90,169,255,0.85)", color: "#fff" }}>
