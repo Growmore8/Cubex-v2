@@ -4,6 +4,7 @@ import { clientAccount } from "@/services/kyc.service";
 import { listClientPayments, createPayment } from "@/services/payment.service";
 import { notifyStaff } from "@/services/notification.service";
 import { saveUpload } from "@/lib/upload";
+import { audit } from "@/lib/audit";
 import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
 
 export async function GET() {
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
     const file = form.get("file") as File | null;
     if (file && file.size > 0) slipUrl = await saveUpload(file, "slips/" + account.id);
     await createPayment(s.tenantId!, account.id, kind, amount, method, slipUrl, note);
+    await audit(s.tenantId!, "payment.request", account.login + " " + kind + " " + amount + (method ? " via " + method : ""), s.email || account.login, "CLIENT");
     await notifyStaff(s.tenantId!, { type: "FUNDS", title: kind === "DEPOSIT" ? "Deposit request" : "Withdrawal request", body: account.login + " requested " + amount }, (account as any).managerId);
     return NextResponse.json({ ok: true });
   } catch (e: any) {

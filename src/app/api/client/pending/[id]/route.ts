@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
+import { audit } from "@/lib/audit";
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -10,6 +11,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     if (!o) throw new Error("Not found");
     if (o.account.userId !== s.sub) throw new Error("Forbidden");
     await prisma.pendingOrder.delete({ where: { id: o.id } });
+    await audit(o.account.tenantId, "order.cancel", o.account.login + " cancelled " + o.symbol + " " + o.side + " " + o.kind + " @ " + o.price, s.email || o.account.login, "CLIENT");
     return NextResponse.json({ ok: true });
   } catch (e: any) { return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 }); }
 }
