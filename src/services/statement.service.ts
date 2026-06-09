@@ -53,6 +53,23 @@ export async function loadStatement(opts: LoadStatementOpts) {
 
 type StatementData = NonNullable<Awaited<ReturnType<typeof loadStatement>>>;
 
+// Resolve a statement date range + human label from a preset (week/month/year/
+// custom/all) — shared by the client, admin and SuperAdmin statement endpoints.
+export function statementRange(preset?: string, from?: string, to?: string): { since?: Date; until?: Date; label: string } {
+  const now = new Date();
+  const day = 86400000;
+  if (preset === "week") return { since: new Date(now.getTime() - 7 * day), until: now, label: "Last 7 Days" };
+  if (preset === "month") return { since: new Date(now.getTime() - 30 * day), until: now, label: "Last 30 Days" };
+  if (preset === "year") return { since: new Date(now.getTime() - 365 * day), until: now, label: "Last 12 Months" };
+  if (preset === "custom" && (from || to)) {
+    const since = from ? new Date(from) : undefined;
+    const until = to ? new Date(to + "T23:59:59") : undefined;
+    const f = (d?: Date) => (d ? d.toISOString().slice(0, 10) : "…");
+    return { since, until, label: `${f(since)} – ${f(until)}` };
+  }
+  return { label: "All Time" };
+}
+
 function brandOf(t: any): BrandInfo {
   return { brandName: t?.brandName || t?.name || "Statement", primaryColor: t?.primaryColor, accentColor: t?.accentColor, logoUrl: t?.logoUrl };
 }

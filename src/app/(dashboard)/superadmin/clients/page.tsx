@@ -39,6 +39,10 @@ export default function SAClientsPage() {
   const [repEmail, setRepEmail] = useState("");
   const [repMsg, setRepMsg] = useState("");
   const [repSending, setRepSending] = useState(false);
+  const [repPreset, setRepPreset] = useState("all");
+  const [repFrom, setRepFrom] = useState("");
+  const [repTo, setRepTo] = useState("");
+  const repParams = () => { const o: any = { preset: repPreset }; if (repPreset === "custom") { if (repFrom) o.from = repFrom; if (repTo) o.to = repTo; } return o; };
 
   async function load() {
     try {
@@ -451,7 +455,20 @@ export default function SAClientsPage() {
           <div className="ui-card ui-pop w-[380px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 font-semibold">Statement / Report</div>
             <div className="mb-3 text-xs text-gray-500">{repRow.login} — {repRow.name}</div>
-            <button className="ui-btn ui-btn-primary mb-3 w-full px-3 py-2 text-sm" onClick={() => window.open("/api/superadmin/statement?accountId=" + encodeURIComponent(repRow.id), "_blank")}>
+            {/* Period selector */}
+            <div className="mb-1 text-xs font-medium text-gray-500">Period</div>
+            <div className="mb-2 grid grid-cols-5 gap-1">
+              {[["week", "Week"], ["month", "Month"], ["year", "Year"], ["all", "All"], ["custom", "Custom"]].map(([k, l]) => (
+                <button key={k} onClick={() => setRepPreset(k)} className="rounded border px-1 py-1 text-[11px]" style={repPreset === k ? { background: "#2563eb", color: "#fff", borderColor: "transparent" } : { borderColor: "var(--border)", color: "var(--text2)" }}>{l}</button>
+              ))}
+            </div>
+            {repPreset === "custom" && (
+              <div className="mb-2 grid grid-cols-2 gap-2">
+                <div><div className="text-[10px] text-gray-400">From</div><input type="date" className={inp} value={repFrom} onChange={(e) => setRepFrom(e.target.value)} /></div>
+                <div><div className="text-[10px] text-gray-400">To</div><input type="date" className={inp} value={repTo} onChange={(e) => setRepTo(e.target.value)} /></div>
+              </div>
+            )}
+            <button className="ui-btn ui-btn-primary mb-3 w-full px-3 py-2 text-sm" onClick={() => window.open("/api/superadmin/statement?accountId=" + encodeURIComponent(repRow.id) + "&" + new URLSearchParams(repParams()).toString(), "_blank")}>
               <i className="fa-solid fa-file-pdf mr-1.5" /> Download PDF
             </button>
             <div className="mb-1 text-xs font-medium text-gray-500">Email statement to</div>
@@ -461,7 +478,7 @@ export default function SAClientsPage() {
               <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setRepRow(null)}>Close</button>
               <button disabled={repSending} className="ui-btn px-3 py-1.5 text-sm text-white disabled:opacity-60" style={{ background: "#2563eb", borderColor: "transparent" }} onClick={async () => {
                 setRepSending(true); setRepMsg("");
-                const r = await fetch("/api/superadmin/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: repRow.id, email: repEmail.trim() || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+                const r = await fetch("/api/superadmin/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: repRow.id, email: repEmail.trim() || undefined, ...repParams() }) }).then((x) => x.json()).catch(() => ({ ok: false }));
                 setRepSending(false);
                 setRepMsg(r.ok ? "✓ Sent to " + r.to : (r.error || "Failed to send"));
               }}>
