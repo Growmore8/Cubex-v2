@@ -12,9 +12,67 @@ const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
+const jwt = require("jsonwebtoken");
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || "";
 const FINNHUB_KEY = process.env.FINNHUB_KEY || "";
+
+// ── Realtime presence: derive identity from the session cookie on every socket
+// (all sockets a tab opens carry it). When the LAST socket for a client stays
+// gone past a short grace window we treat it as a real logout — works even when
+// the app is killed / network drops and the pagehide beacon never fires.
+const PRESENCE_GRACE_MS = 20000;
+const presence = new Map(); // userId -> { count, info, offTimer }
+function cookieVal(raw, name) {
+  if (!raw) return null;
+  for (const part of String(raw).split(";")) {
+    const i = part.indexOf("=");
+    if (i < 0) continue;
+    if (part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return null;
+}
+function sessionFromSocket(socket) {
+  try {
+    const token = cookieVal(socket.handshake && socket.handshake.headers && socket.handshake.headers.cookie, "cubex_session");
+    if (!token || !JWT_SECRET) return null;
+    return jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] });
+  } catch (e) { return null; }
+}
+async function presenceMarkOnline(info) {
+  await prisma.user.update({ where: { id: info.sub }, data: { lastSeenAt: new Date() } }).catch(() => {});
+}
+async function presenceMarkOffline(info) {
+  try {
+    // Flip the online dot off immediately by back-dating lastSeenAt past the window.
+    await prisma.user.update({ where: { id: info.sub }, data: { lastSeenAt: new Date(Date.now() - 10 * 60 * 1000) } }).catch(() => {});
+    const acc = await prisma.account.findFirst({ where: { tenantId: info.tenantId, userId: info.sub }, select: { login: true, managerId: true } });
+    await prisma.auditLog.create({
+      data: { tenantId: info.tenantId, action: "auth.disconnect", detail: `CLIENT "${info.name}" (${acc && acc.login || ""}) went offline (app / tab closed)`, performedBy: info.email || info.name || "client", category: "CLIENT" },
+    }).catch(() => {});
+    await notifyStaffRaw(info.tenantId, { title: "Client offline", body: `${info.name} (${acc && acc.login || ""}) closed the app`, type: "LOGIN" }, acc && acc.managerId);
+    if (global.__io) global.__io.emit("refresh", {});
+  } catch (e) { console.error("[presenceMarkOffline]", e); }
+}
+function presenceConnect(socket, info) {
+  socket.data = socket.data || {};
+  socket.data.presenceUid = info.sub;
+  const p = presence.get(info.sub);
+  if (p) { p.count++; if (p.offTimer) { clearTimeout(p.offTimer); p.offTimer = null; } }
+  else { presence.set(info.sub, { count: 1, info }); }
+  presenceMarkOnline(info);
+}
+function presenceDisconnect(socket) {
+  const uid = socket.data && socket.data.presenceUid;
+  if (!uid) return;
+  const p = presence.get(uid);
+  if (!p) return;
+  p.count--;
+  if (p.count > 0) return;
+  // Last socket gone — wait out the grace window (covers reloads / brief drops).
+  p.offTimer = setTimeout(() => { presence.delete(uid); presenceMarkOffline(p.info); }, PRESENCE_GRACE_MS);
+}
 const TD_KEY = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
 
 const CANDLE_MS = 5000, HISTORY = 300, MONITOR_MS = 2000;
@@ -507,6 +565,12 @@ app.prepare().then(async () => {
     // latest price immediately — open positions then show their real last P&L, not 0.
     const px = {}; for (const s of symbols) { const st = state[s]; if (st && st.price != null) px[s] = st.price; }
     socket.emit("prices", px);
+    // Presence tracking — only real CLIENT sessions count toward online/offline.
+    const sess = sessionFromSocket(socket);
+    if (sess && sess.role === "CLIENT" && sess.sub && sess.tenantId) {
+      presenceConnect(socket, sess);
+      socket.on("disconnect", () => presenceDisconnect(socket));
+    }
   });
   await seedFromRedis();        // resume last-known prices (survives restarts)
   connectFinnhub();

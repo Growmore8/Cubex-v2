@@ -9,7 +9,7 @@ export function listTenantPayments(tenantId: string) {
   return prisma.paymentRequest.findMany({
     where: { tenantId },
     orderBy: { createdAt: "desc" },
-    include: { account: { select: { login: true, name: true } } },
+    include: { account: { select: { login: true, name: true, type: true } } },
   });
 }
 

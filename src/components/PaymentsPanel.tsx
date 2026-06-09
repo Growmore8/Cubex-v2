@@ -23,7 +23,8 @@ export default function PaymentsPanel() {
 
   function g(p: any, keys: string[], d: any) { for (const k of keys) { if (p[k] != null && p[k] !== "") return p[k]; } return d; }
   function name(p: any) { return g(p, ["clientName", "client", "accountName", "name"], (p.account && p.account.name) || "-"); }
-  function login(p: any) { return g(p, ["accountLogin", "login", "accountId"], (p.account && p.account.login) || ""); }
+  function login(p: any) { return (p.account && p.account.login) || g(p, ["accountLogin", "login"], ""); }
+  function acctType(p: any) { return String((p.account && p.account.type) || g(p, ["accountType"], "")).toUpperCase(); }
   function kind(p: any) { return String(g(p, ["kind", "type", "direction"], "")).toUpperCase(); }
   function method(p: any) { return g(p, ["method", "channel", "gateway", "network"], ""); }
   function slip(p: any) { return g(p, ["slipUrl", "proofUrl", "slip", "receiptUrl"], ""); }
@@ -101,7 +102,10 @@ export default function PaymentsPanel() {
                   <td className={td}><input type="checkbox" checked={!!sel[p.id]} onChange={(e) => setSel((s) => ({ ...s, [p.id]: e.target.checked }))} /></td>
                   <td className={td}>{d ? <button onClick={() => setExpand(open ? "" : p.id)} className="text-[var(--muted)]">{open ? "\u25BE" : "\u25B8"}</button> : null}</td>
                   <td className={td + " font-medium"}>{name(p)}</td>
-                  <td className={td + " text-[var(--muted)]"}>{login(p)}</td>
+                  <td className={td + " text-[var(--muted)]"}>
+                    <span className="font-medium text-[var(--text)]">{login(p) || "-"}</span>
+                    {acctType(p) ? <span className="ml-1.5 rounded px-1 py-0.5 text-[8px] font-semibold" style={acctType(p) === "DEMO" ? { background: "rgba(155,89,182,0.18)", color: "#b07cd6" } : { background: "rgba(38,166,154,0.18)", color: BUY }}>{acctType(p)}</span> : null}
+                  </td>
                   <td className={td} style={{ color: isOut(p) ? SELL : BUY }}>{isOut(p) ? "Out" : "In"}</td>
                   <td className={td + " text-right"} style={{ color: isOut(p) ? SELL : BUY }}>{(isOut(p) ? "-" : "+") + "$" + Number(g(p, ["amount"], 0)).toFixed(2)}</td>
                   <td className={td}>{method(p)}</td>
