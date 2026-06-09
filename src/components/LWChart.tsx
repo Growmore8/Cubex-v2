@@ -192,14 +192,9 @@ function LWChart({
       upColor: "#26a69a", downColor: "#e05260", borderUpColor: "#26a69a", borderDownColor: "#e05260",
       wickUpColor: "#26a69a", wickDownColor: "#e05260",
       priceFormat: { type: "price", precision: digits, minMove: Math.pow(10, -digits) },
-      autoscaleInfoProvider: (orig: any) => {
-        const res = orig();
-        const ps = linePricesRef.current;
-        if (!res || !ps.length) return res;
-        let mn = res.priceRange.minValue, mx = res.priceRange.maxValue;
-        for (const p of ps) { if (isFinite(p)) { mn = Math.min(mn, p); mx = Math.max(mx, p); } }
-        return { ...res, priceRange: { minValue: mn, maxValue: mx } };
-      },
+      // Scale to the CANDLES only (MT4/MT5 behaviour). Open-trade entry/SL/TP
+      // lines still draw, but they no longer stretch the axis — a far-away entry
+      // price won't force the chart to zoom out and squash the price action.
     });
     chartRef.current = chart;
     seriesRef.current = series;
@@ -460,7 +455,6 @@ function LWChart({
     const lp: number[] = [];
     for (const p of positions || []) { lp.push(p.openPrice); if (p.sl) lp.push(p.sl); if (p.tp) lp.push(p.tp); }
     linePricesRef.current = lp;
-    try { s.priceScale().applyOptions({ autoScale: true }); } catch {} // force rescale to include the lines
     for (const p of positions || []) {
       const pending = !!p.kind;
       // Entry line: BUY=blue, SELL=crimson; pending=amber (dotted)

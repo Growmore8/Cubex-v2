@@ -1415,11 +1415,6 @@ export default function AdminDeskPage() {
                 DNL
               </button>
             </div>
-            {can("deleteClients") && (
-              <button onClick={() => delClient(menu.acc)} className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-[10px] font-semibold transition-opacity hover:opacity-75" style={{ background: SELL + "20", color: SELL }}>
-                <i className="fa-solid fa-trash text-[9px]" /> Delete Client (permanent)
-              </button>
-            )}
           </div>
 
           {/* Status section — all accounts of this user */}
