@@ -55,7 +55,7 @@ export default function SAAnalyticsPage() {
   }), { clients: 0, managers: 0, admins: 0, liveAccounts: 0, demoAccounts: 0, openTrades: 0, totalDeposits: 0, totalWithdrawals: 0 });
 
   const Th = ({ col, label }: { col: string; label: string }) => (
-    <th className="cursor-pointer select-none" onClick={() => toggleSort(col)}>
+    <th className="num sa-th-sort" onClick={() => toggleSort(col)}>
       {label} {sortBy === col ? (sortDir === "desc" ? "↓" : "↑") : ""}
     </th>
   );
@@ -140,19 +140,19 @@ export default function SAAnalyticsPage() {
                     </td>
                     <td>
                       {pkg ? (
-                        <span className="text-xs font-semibold" style={{ color: pkg.color }}>{pkg.name}</span>
+                        <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: pkg.color, background: `color-mix(in srgb, ${pkg.color} 14%, transparent)` }}>{pkg.name}</span>
                       ) : <span className="text-xs text-gray-400">—</span>}
                     </td>
-                    <td className="font-medium">{t.clients}</td>
-                    <td>{t.managers}</td>
-                    <td>{t.admins}</td>
-                    <td>{t.liveAccounts}</td>
-                    <td>{t.demoAccounts}</td>
-                    <td className="text-green-700">{t.activeAccounts}</td>
-                    <td className="text-red-600">{t.lockedAccounts}</td>
-                    <td>{t.openTrades}</td>
-                    <td className="text-green-700 font-medium">{fmt(t.totalDeposits)}</td>
-                    <td className="text-red-600">{fmt(t.totalWithdrawals)}</td>
+                    <td className="num font-semibold">{t.clients}</td>
+                    <td className="num">{t.managers}</td>
+                    <td className="num">{t.admins}</td>
+                    <td className="num">{t.liveAccounts}</td>
+                    <td className="num">{t.demoAccounts}</td>
+                    <td className="num text-green-700">{t.activeAccounts}</td>
+                    <td className="num text-red-600">{t.lockedAccounts}</td>
+                    <td className="num">{t.openTrades}</td>
+                    <td className="num text-green-700 font-medium">{fmt(t.totalDeposits)}</td>
+                    <td className="num text-red-600">{fmt(t.totalWithdrawals)}</td>
                   </tr>
                 );
               })}
@@ -160,18 +160,18 @@ export default function SAAnalyticsPage() {
             </tbody>
             {sorted.length > 0 && (
               <tfoot style={{ background: "#f8fafc", borderTop: "2px solid #e2e8f0" }}>
-                <tr className="font-semibold text-gray-700">
+                <tr className="font-bold text-gray-700">
                   <td colSpan={2}>TOTAL</td>
-                  <td>{totals.clients}</td>
-                  <td>{totals.managers}</td>
-                  <td>{totals.admins}</td>
-                  <td>{totals.liveAccounts}</td>
-                  <td>{totals.demoAccounts}</td>
+                  <td className="num">{totals.clients}</td>
+                  <td className="num">{totals.managers}</td>
+                  <td className="num">{totals.admins}</td>
+                  <td className="num">{totals.liveAccounts}</td>
+                  <td className="num">{totals.demoAccounts}</td>
                   <td></td>
                   <td></td>
-                  <td>{totals.openTrades}</td>
-                  <td className="text-green-700">{fmt(totals.totalDeposits)}</td>
-                  <td className="text-red-600">{fmt(totals.totalWithdrawals)}</td>
+                  <td className="num">{totals.openTrades}</td>
+                  <td className="num text-green-700">{fmt(totals.totalDeposits)}</td>
+                  <td className="num text-red-600">{fmt(totals.totalWithdrawals)}</td>
                 </tr>
               </tfoot>
             )}

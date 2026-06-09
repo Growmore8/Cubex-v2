@@ -14,20 +14,10 @@ export async function GET(req: Request) {
   const where: any = { role: role as any };
   if (tenantId) where.tenantId = tenantId;
   const users = await prisma.user.findMany({ where, orderBy: { createdAt: "desc" }, include: { tenant: { select: { name: true, brandName: true } } } });
-  // Fetch lastLoginIp via raw SQL to avoid Prisma cache issues
-  const userIds = users.map((u) => u.id);
-  const ipMap: Record<string, string | null> = {};
-  const seenMap: Record<string, Date | null> = {};
-  const devMap: Record<string, string | null> = {};
-  if (userIds.length) {
-    try {
-      const rows = await prisma.$queryRawUnsafe<{ id: string; lastLoginIp: string | null; lastSeenAt: Date | null; lastDevice: string | null }[]>(
-        `SELECT id, "lastLoginIp", "lastSeenAt", "lastDevice" FROM "User" WHERE id = ANY($1::uuid[])`, userIds,
-      );
-      rows.forEach((r) => { ipMap[r.id] = r.lastLoginIp; seenMap[r.id] = r.lastSeenAt; devMap[r.id] = r.lastDevice; });
-    } catch {}
-  }
-  const staff = users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, status: u.status, tenantId: u.tenantId, company: u.tenant ? (u.tenant.brandName || u.tenant.name) : null, perms: u.perms, lastLoginAt: u.lastLoginAt, lastLoginIp: ipMap[u.id] ?? null, lastSeenAt: seenMap[u.id] ?? null, device: devMap[u.id] ?? null, online: isOnline(seenMap[u.id]), createdAt: u.createdAt }));
+  // lastLoginIp / lastSeenAt / lastDevice are plain scalar columns returned by
+  // findMany — read them directly (the old raw-SQL fetch was throwing on the
+  // uuid[] cast and silently leaving every row "never" / IP "—").
+  const staff = users.map((u: any) => ({ id: u.id, name: u.name, email: u.email, role: u.role, status: u.status, tenantId: u.tenantId, company: u.tenant ? (u.tenant.brandName || u.tenant.name) : null, perms: u.perms, lastLoginAt: u.lastLoginAt, lastLoginIp: u.lastLoginIp ?? null, lastSeenAt: u.lastSeenAt ?? null, device: u.lastDevice ?? null, online: isOnline(u.lastSeenAt), createdAt: u.createdAt }));
   return NextResponse.json({ ok: true, users: staff, staff });
 }
 

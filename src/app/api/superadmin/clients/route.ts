@@ -10,29 +10,14 @@ export async function GET() {
   const accts = await prisma.account.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      user: { select: { id: true, email: true, name: true } },
+      user: { select: { id: true, email: true, name: true, lastLoginIp: true, lastSeenAt: true, lastDevice: true } },
       tenant: { select: { name: true, brandName: true } },
       manager: { select: { id: true, name: true } },
       kyc: { select: { status: true }, orderBy: { createdAt: "desc" }, take: 1 },
     },
   });
 
-  // Fetch lastLoginIp via raw SQL to avoid Prisma hot-reload cache issues
-  const userIds = accts.filter((a) => a.userId).map((a) => a.userId as string);
-  const ipMap: Record<string, string | null> = {};
-  const seenMap: Record<string, Date | null> = {};
-  const devMap: Record<string, string | null> = {};
-  if (userIds.length) {
-    try {
-      const rows = await prisma.$queryRawUnsafe<{ id: string; lastLoginIp: string | null; lastSeenAt: Date | null; lastDevice: string | null }[]>(
-        `SELECT id, "lastLoginIp", "lastSeenAt", "lastDevice" FROM "User" WHERE id = ANY($1::uuid[])`,
-        userIds,
-      );
-      rows.forEach((r) => { ipMap[r.id] = r.lastLoginIp; seenMap[r.id] = r.lastSeenAt; devMap[r.id] = r.lastDevice; });
-    } catch {}
-  }
-
-  const clients = accts.map((a) => ({
+  const clients = accts.map((a: any) => ({
     id: a.id,
     tenantId: a.tenantId,
     login: a.login,
@@ -48,10 +33,10 @@ export async function GET() {
     locked: a.locked,
     deactivated: a.deactivated,
     isPool: a.isPool,
-    isOnline: a.userId ? isOnline(seenMap[a.userId]) : false,
-    lastPing: (a.userId ? seenMap[a.userId] : null) ?? a.lastPing,
-    device: a.userId ? (devMap[a.userId] ?? null) : null,
-    lastLoginIp: a.userId ? (ipMap[a.userId] ?? null) : null,
+    isOnline: a.user ? isOnline(a.user.lastSeenAt) : false,
+    lastPing: (a.user ? a.user.lastSeenAt : null) ?? a.lastPing,
+    device: a.user ? (a.user.lastDevice ?? null) : null,
+    lastLoginIp: a.user ? (a.user.lastLoginIp ?? null) : null,
     kyc: a.kyc[0] ? a.kyc[0].status : null,
     joined: a.createdAt,
   }));

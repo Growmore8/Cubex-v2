@@ -99,7 +99,7 @@ export default function LoginPage() {
         <label className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>Password</label>
         <div className="relative">
           <i className="fa-solid fa-lock pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }} />
-          <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)}
+          <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" name="password"
             className={base} style={{ borderColor: "var(--border)" }} placeholder="••••••••" />
         </div>
       </div>
