@@ -1,6 +1,7 @@
 import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { statementHtml, esc } from "@/lib/statement-html";
+import { runningContext } from "@/lib/livePrices";
 
 // Branded, printable client account statement (browser Print -> Save as PDF).
 // Per-tenant brand (name, logo, colours) so a broker's traders never see "Cubex".
@@ -31,7 +32,8 @@ export async function GET(req: Request) {
     const requests = await prisma.paymentRequest.findMany({ where: { accountId: account.id }, orderBy: { createdAt: "desc" }, take: 100 });
     const tenant = await prisma.tenant.findUnique({ where: { id: s.tenantId! } });
 
-    const html = statementHtml({ account, tenant, variant: "client", pendings, requests });
+    const { prices, catOf } = await runningContext(s.tenantId!, account.trades.map((t) => t.symbol));
+    const html = statementHtml({ account, tenant, variant: "client", pendings, requests, prices, catOf });
     return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
   } catch (e: any) {
     return new Response(esc(e.message || "Failed"), { status: 400 });

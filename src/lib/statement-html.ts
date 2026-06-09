@@ -2,6 +2,8 @@
 // the staff (desk) statement routes. Keeps a single source of truth for the
 // layout/styles so the two routes no longer duplicate ~90 lines each.
 
+import { pnlFor } from "@/lib/trademath";
+
 export function esc(s: unknown): string {
   return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 }
@@ -19,6 +21,8 @@ export interface StatementHtmlInput {
   pendings?: any[];      // client variant only
   requests?: any[];      // client variant only
   dateLabel?: string;    // desk variant: appended to the Closed Trades heading
+  prices?: Record<string, number>;   // live prices for running-trade P&L
+  catOf?: Record<string, string>;    // symbol -> category (contract size)
 }
 
 export function statementHtml(input: StatementHtmlInput): string {
@@ -35,13 +39,27 @@ export function statementHtml(input: StatementHtmlInput): string {
   const sideColor = (s: string) => (s === "BUY" ? "#16a34a" : "#dc2626");
   const reasonColor = (r: string) => (r === "TP" ? "#16a34a" : r === "SL" ? "#dc2626" : r === "MC" ? "#d97706" : "#6b7280");
 
-  // Running trades (desk colours the side cell)
-  const openRows = account.trades.map((o: any) => `<tr>
+  // Running trades (desk colours the side cell) — now with live Current + P/L.
+  const prices = input.prices || {};
+  const catOf = input.catOf || {};
+  const runPnl = (o: any): number | null => {
+    const cur = prices[o.symbol];
+    if (cur == null) return null;
+    return pnlFor(o.symbol, o.type, Number(o.openPrice), cur, Number(o.lots), catOf[o.symbol]);
+  };
+  const floating = account.trades.reduce((s: number, o: any) => s + (runPnl(o) || 0), 0);
+  const openRows = account.trades.map((o: any) => {
+    const cur = prices[o.symbol];
+    const pl = runPnl(o);
+    return `<tr>
       <td>${esc(o.ticket.toString())}</td><td>${esc(o.symbol)}</td>
       <td${isDesk ? ` style="color:${sideColor(o.type)}"` : ""}>${esc(o.type)}</td>
       <td class="r">${Number(o.lots).toFixed(2)}</td><td class="r">${Number(o.openPrice)}</td>
+      <td class="r">${cur != null ? cur : "—"}</td>
       <td class="r">${Number(o.sl) || "—"}</td><td class="r">${Number(o.tp) || "—"}</td>
-      <td>${dt(o.openedAt)}</td></tr>`).join("");
+      <td class="r ${pl != null && pl >= 0 ? "pos" : "neg"}">${pl != null ? money(pl) : "—"}</td>
+      <td>${dt(o.openedAt)}</td></tr>`;
+  }).join("");
 
   // Closed trades — desk adds Opened + Reason columns
   const histRows = account.history.map((h: any) => {
@@ -77,8 +95,8 @@ export function statementHtml(input: StatementHtmlInput): string {
       <td>${dt(r.createdAt)}</td></tr>`).join("");
 
   const openHead = isDesk
-    ? `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open Price</th><th class="r">S/L</th><th class="r">T/P</th><th>Opened</th>`
-    : `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open</th><th class="r">SL</th><th class="r">TP</th><th>Opened</th>`;
+    ? `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open Price</th><th class="r">Current</th><th class="r">S/L</th><th class="r">T/P</th><th class="r">P/L</th><th>Opened</th>`
+    : `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open</th><th class="r">Current</th><th class="r">SL</th><th class="r">TP</th><th class="r">P/L</th><th>Opened</th>`;
   const histHead = isDesk
     ? `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th>Opened</th><th class="r">Open Price</th><th class="r">Close Price</th><th>Reason</th><th class="r">P/L</th><th>Closed</th>`
     : `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open</th><th class="r">Close</th><th class="r">P/L</th><th>Closed</th>`;
@@ -135,9 +153,9 @@ export function statementHtml(input: StatementHtmlInput): string {
     <div class="card"><div class="l">Bonus</div><div class="v">${money(bonus)}</div></div>
     <div class="card"><div class="l">Balance</div><div class="v">${money(balance)}</div></div>
   </div>
-  <h2>Running Trades</h2>
+  <h2>Running Trades${account.trades.length ? ` <span style="font-weight:400;font-size:11px;color:#6b7280">— Floating P/L <b class="${floating >= 0 ? "pos" : "neg"}">${money(floating)}</b></span>` : ""}</h2>
   <table><thead><tr>${openHead}</tr></thead>
-  <tbody>${openRows || `<tr><td colspan="8">No open trades.</td></tr>`}</tbody></table>${clientSections}
+  <tbody>${openRows || `<tr><td colspan="10">No open trades.</td></tr>`}</tbody></table>${clientSections}
   <h2>Closed Trades${isDesk && input.dateLabel ? ` ${input.dateLabel}` : ""}</h2>
   <table><thead><tr>${histHead}</tr></thead>
   <tbody>${histRows || `<tr><td colspan="${histCols}">No closed trades.</td></tr>`}</tbody></table>${requestSection}

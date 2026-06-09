@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { sendTenantMail, noReplyAddress } from "@/lib/mailer";
 import { statementEmail, type BrandInfo, type StatementSummary } from "@/lib/email-templates";
 import { codeForCountry } from "@/config/countries";
+import { pnlFor } from "@/lib/trademath";
+import { runningContext } from "@/lib/livePrices";
 
 function money(n: number): string {
   return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -48,7 +50,9 @@ export async function loadStatement(opts: LoadStatementOpts) {
     orderBy: { createdAt: "desc" }, take: 200,
   });
   const tenant = await prisma.tenant.findUnique({ where: { id: opts.tenantId } });
-  return { account, tenant: tenant as any, requests };
+  // Live prices + per-symbol category for the open trades (running-trade P&L).
+  const { prices, catOf } = await runningContext(opts.tenantId, account.trades.map((t) => t.symbol));
+  return { account, tenant: tenant as any, requests, prices, catOf };
 }
 
 type StatementData = NonNullable<Awaited<ReturnType<typeof loadStatement>>>;
@@ -169,10 +173,23 @@ export function buildStatementPdf(data: StatementData, periodLabel: string): Pro
         y += 8;
       };
 
-      heading("Running Trades");
+      const prices = data.prices || {};
+      const catOf = data.catOf || {};
+      const runPnlOf = (o: any): number | null => {
+        const cur = prices[o.symbol];
+        if (cur == null) return null;
+        return pnlFor(o.symbol, o.type, Number(o.openPrice), cur, Number(o.lots), catOf[o.symbol]);
+      };
+      const floating = account.trades.reduce((s, o) => s + (runPnlOf(o) || 0), 0);
+
+      heading(`Running Trades${account.trades.length ? `  —  Floating P/L ${money(floating)}` : ""}`);
       table(
-        [{ label: "Ticket", w: 70 }, { label: "Symbol", w: 70 }, { label: "Side", w: 45 }, { label: "Lots", w: 50, align: "right" }, { label: "Open", w: 70, align: "right" }, { label: "SL", w: 60, align: "right" }, { label: "TP", w: 60, align: "right" }, { label: "Opened", w: 90 }],
-        account.trades.map((o) => [o.ticket.toString(), o.symbol, o.type, Number(o.lots).toFixed(2), String(Number(o.openPrice)), Number(o.sl) ? String(Number(o.sl)) : "—", Number(o.tp) ? String(Number(o.tp)) : "—", dt(o.openedAt)]),
+        [{ label: "Ticket", w: 52 }, { label: "Symbol", w: 52 }, { label: "Side", w: 32 }, { label: "Lots", w: 36, align: "right" }, { label: "Open", w: 54, align: "right" }, { label: "Current", w: 54, align: "right" }, { label: "SL", w: 48, align: "right" }, { label: "TP", w: 48, align: "right" }, { label: "P/L", w: 55, align: "right" }, { label: "Opened", w: 88 }],
+        account.trades.map((o) => {
+          const cur = prices[o.symbol];
+          const pl = runPnlOf(o);
+          return [o.ticket.toString(), o.symbol, o.type, Number(o.lots).toFixed(2), String(Number(o.openPrice)), cur != null ? String(cur) : "—", Number(o.sl) ? String(Number(o.sl)) : "—", Number(o.tp) ? String(Number(o.tp)) : "—", pl != null ? money(pl) : "—", dt(o.openedAt)];
+        }),
         "No open trades.",
       );
 

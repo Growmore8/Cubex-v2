@@ -2,6 +2,7 @@ import { requireStaff } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/perms";
 import { statementHtml, esc } from "@/lib/statement-html";
+import { runningContext } from "@/lib/livePrices";
 
 // A branded, printable HTML account statement (use the browser's Print -> Save as PDF).
 export async function GET(req: Request) {
@@ -37,7 +38,8 @@ export async function GET(req: Request) {
     const tenant = await prisma.tenant.findUnique({ where: { id: s.tenantId! } });
 
     const dateLabel = fromStr || toStr ? `(${fromStr || "—"} to ${toStr || "—"})` : undefined;
-    const html = statementHtml({ account, tenant, variant: "desk", dateLabel });
+    const { prices, catOf } = await runningContext(s.tenantId!, account.trades.map((t) => t.symbol));
+    const html = statementHtml({ account, tenant, variant: "desk", dateLabel, prices, catOf });
     return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
   } catch (e: any) {
     return new Response(esc(e.message || "Failed"), { status: 400 });
