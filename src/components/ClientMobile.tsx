@@ -276,7 +276,10 @@ export default function ClientMobile({ t }: { t: any }) {
     : `linear-gradient(150deg, ${cardC1} 0%, ${cardC2} 70%, color-mix(in srgb, ${cardC2} 70%, #000) 100%)`;
 
   return (
-    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", inset: 0, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation",
+    <>
+    {/* Dark backdrop behind the phone-width app column (fills desktop sides). */}
+    <div style={{ position: "fixed", inset: 0, zIndex: 0, background: theme === "dark" ? "#06080f" : "#dfe5ee" }} />
+    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", top: 0, bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 540, zIndex: 1, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation", boxShadow: "0 0 60px rgba(0,0,0,0.45)",
       // Frosted-glass design: faint brand-tinted glows behind the content so the
       // .glass-card surfaces have colour to blur (design "A").
       background: `radial-gradient(620px 380px at -5% -2%, color-mix(in srgb, ${brand?.primaryColor || "#7c3aed"} 34%, transparent), transparent 60%), radial-gradient(620px 380px at 105% 8%, color-mix(in srgb, ${brand?.accentColor || "#2563eb"} 30%, transparent), transparent 58%), radial-gradient(520px 320px at 50% 112%, rgba(16,199,132,0.13), transparent 60%), var(--bg)` }} className="flex flex-col overflow-hidden text-[var(--text)]">
@@ -468,12 +471,15 @@ export default function ClientMobile({ t }: { t: any }) {
             {account?.type === "LIVE" ? (
               <div className="grid grid-cols-3 gap-2">
                 {([
-                  { label: "Deposit", icon: "fa-arrow-down", col: BUY, on: () => setWalletTab("deposit") },
-                  { label: "Withdraw", icon: "fa-arrow-up", col: SELL, on: () => setWalletTab("withdraw") },
+                  { label: "Deposit", icon: "fa-arrow-down-to-bracket", col: BUY, on: () => setWalletTab("deposit") },
+                  { label: "Withdraw", icon: "fa-arrow-up-from-bracket", col: SELL, on: () => setWalletTab("withdraw") },
                   { label: "Transfer", icon: "fa-right-left", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); } },
                 ]).map((b) => (
-                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-1.5 rounded-2xl py-3.5 font-semibold backdrop-blur-md" style={{ color: b.col, background: `linear-gradient(160deg, color-mix(in srgb, ${b.col} ${cardDark ? 22 : 16}%, transparent), color-mix(in srgb, ${b.col} ${cardDark ? 9 : 7}%, transparent))`, border: `1px solid color-mix(in srgb, ${b.col} 40%, transparent)` }}>
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: `color-mix(in srgb, ${b.col} 22%, transparent)`, boxShadow: `inset 0 1px 0 color-mix(in srgb, ${b.col} 40%, transparent)` }}><i className={"fa-solid " + b.icon} style={{ color: b.col }} /></span>
+                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, #ffffff, #eef1f6)", border: "1px solid var(--border)", boxShadow: cardDark ? "inset 0 1px 0 rgba(255,255,255,0.06)" : "0 1px 2px rgba(0,0,0,0.05)" }}>
+                    {/* metallic chrome icon chip (reference look) */}
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#f7f9fc,#cfd6e2 42%,#9aa3b4 72%,#eef1f6)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -2px 3px rgba(0,0,0,0.25), 0 2px 5px rgba(0,0,0,0.28)" }}>
+                      <i className={"fa-solid " + b.icon} style={{ color: b.col, fontSize: 15, filter: "drop-shadow(0 1px 0 rgba(255,255,255,0.6))" }} />
+                    </span>
                     <span className="text-[11px]">{b.label}</span>
                   </button>
                 ))}
@@ -483,8 +489,8 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="mb-1.5 text-[10px] font-semibold text-[var(--muted)]">Top up your demo balance</div>
                 <div className="grid grid-cols-3 gap-2">
                   {[1000, 5000, 10000].map((amt) => (
-                    <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-1.5 rounded-2xl py-3.5 font-semibold backdrop-blur-md" style={{ color: cardDark ? "#fcd34d" : "#b45309", background: `linear-gradient(160deg, color-mix(in srgb, #f59e0b ${cardDark ? 22 : 16}%, transparent), color-mix(in srgb, #f59e0b ${cardDark ? 9 : 7}%, transparent))`, border: "1px solid color-mix(in srgb, #f59e0b 40%, transparent)" }}>
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "color-mix(in srgb, #f59e0b 22%, transparent)" }}><i className="fa-solid fa-coins" style={{ color: cardDark ? "#fcd34d" : "#d97706" }} /></span>
+                    <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, #ffffff, #eef1f6)", border: "1px solid var(--border)" }}>
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#fde7b8,#e0b94e 45%,#b8860b 72%,#fbe9b0)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -2px 3px rgba(0,0,0,0.25), 0 2px 5px rgba(0,0,0,0.28)" }}><i className="fa-solid fa-coins" style={{ color: "#7a5b07", fontSize: 15 }} /></span>
                       <span className="text-[12px]">${amt.toLocaleString()}</span>
                     </button>
                   ))}
@@ -1236,5 +1242,6 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
       )}
     </div>
+    </>
   );
 }
