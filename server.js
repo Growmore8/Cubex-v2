@@ -13,6 +13,7 @@ const app = next({ dev });
 const handle = app.getRequestHandler();
 
 const jwt = require("jsonwebtoken");
+const webpush = require("web-push");
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "";
@@ -372,6 +373,15 @@ const closing = new Set();    // guard: prevent double-close of same trade (TP/S
 // Mirror of notification.service.notifyStaff for the server runtime (CommonJS):
 // tenant admins + the owning manager + ALL SuperAdmins. Realtime delivery rides
 // the existing io.emit("refresh") which makes open desks reload their notifs.
+// Housekeeping: keep only the last 7 days of notifications (delete older).
+async function purgeOldNotifications() {
+  try {
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const r = await prisma.notification.deleteMany({ where: { createdAt: { lt: cutoff } } });
+    if (r.count) console.log("[notif-cleanup] deleted", r.count, "notifications older than 7 days");
+  } catch (e) { console.error("[notif-cleanup]", e); }
+}
+
 async function notifyStaffRaw(tenantId, opts, managerId) {
   try {
     const or = [{ role: "ADMIN" }];
@@ -382,7 +392,29 @@ async function notifyStaffRaw(tenantId, opts, managerId) {
     const recips = [...staff, ...supers].filter((u) => (seen.has(u.id) ? false : seen.add(u.id)));
     if (!recips.length) return;
     await prisma.notification.createMany({ data: recips.map((u) => ({ tenantId, userId: u.id, title: opts.title, body: opts.body || null, type: opts.type || "NOTICE" })) });
+    for (const u of recips) pushToUser(u.id, { title: opts.title, body: opts.body });
   } catch (e) { console.error("[notifyStaffRaw]", e); }
+}
+
+// Web push (mirrors src/lib/push.ts) so clients/staff get TP/SL/MC/pending alerts
+// even when the app is fully CLOSED. No-op until VAPID keys are configured.
+let pushReady = false;
+function ensurePush() {
+  if (pushReady) return true;
+  const pub = process.env.VAPID_PUBLIC_KEY, priv = process.env.VAPID_PRIVATE_KEY;
+  if (!pub || !priv) return false;
+  try { webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:admin@cubex.io", pub, priv); pushReady = true; return true; } catch { return false; }
+}
+async function pushToUser(userId, payload) {
+  if (!userId || !ensurePush()) return;
+  try {
+    const subs = await prisma.pushSubscription.findMany({ where: { userId } });
+    const data = JSON.stringify({ title: payload.title, body: payload.body || "", url: payload.url || "/client" });
+    for (const sub of subs) {
+      try { await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, data); }
+      catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) await prisma.pushSubscription.delete({ where: { endpoint: sub.endpoint } }).catch(() => {}); }
+    }
+  } catch (e) { console.error("[push]", e); }
 }
 
 async function closeTpSl(t, reason, price, io) {
@@ -397,6 +429,7 @@ async function closeTpSl(t, reason, price, io) {
       const title = reason === "TP" ? "Take Profit hit ✓" : "Stop Loss hit";
       const body = `${t.symbol} ${t.type} closed @ ${price} | P/L ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}`;
       await prisma.notification.create({ data: { tenantId: t.account.tenantId, userId: t.account.userId, title, body, type: "TRADE" } }).catch(() => {});
+      pushToUser(t.account.userId, { title, body }); // push even if app is closed
       await notifyStaffRaw(t.account.tenantId, { title: (reason === "TP" ? "TP hit" : "SL hit") + " — " + (t.account.login || ""), body, type: "TRADE" }, t.account.managerId);
       await prisma.auditLog.create({ data: { tenantId: t.account.tenantId, action: "trade." + (reason === "TP" ? "tp" : "sl"), detail: (t.account.login || "") + " " + body, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
     }
@@ -420,7 +453,7 @@ async function liquidate(acc, list, io) {
     }
     await prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: total } } });
     const body = acc.login + " margin call — " + list.length + " trade(s) closed, P/L " + total.toFixed(2);
-    if (acc.userId) await prisma.notification.create({ data: { tenantId: acc.tenantId, userId: acc.userId, title: "Stop out", body: "Positions liquidated at margin call", type: "TRADE" } }).catch(() => {});
+    if (acc.userId) { await prisma.notification.create({ data: { tenantId: acc.tenantId, userId: acc.userId, title: "Stop out", body: "Positions liquidated at margin call", type: "TRADE" } }).catch(() => {}); pushToUser(acc.userId, { title: "Stop out", body: "Positions liquidated at margin call" }); }
     await notifyStaffRaw(acc.tenantId, { title: "⚠ Margin call — " + acc.login, body, type: "TRADE" }, acc.managerId);
     await prisma.auditLog.create({ data: { tenantId: acc.tenantId, action: "account.liquidated", detail: body, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
     io.emit("liquidation", { accountId: acc.id, login: acc.login });
@@ -495,7 +528,7 @@ async function checkPending(io) {
       await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: px, sl: o.sl, tp: o.tp } });
       await prisma.pendingOrder.delete({ where: { id: o.id } });
       const pbody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + px;
-      if (o.account && o.account.userId) await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: pbody, type: "TRADE" } }).catch(() => {});
+      if (o.account && o.account.userId) { await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: pbody, type: "TRADE" } }).catch(() => {}); pushToUser(o.account.userId, { title: "Pending order filled", body: pbody }); }
       await notifyStaffRaw(o.account.tenantId, { title: "Pending filled — " + (o.account.login || ""), body: pbody, type: "TRADE" }, o.account.managerId);
       await prisma.auditLog.create({ data: { tenantId: o.account.tenantId, action: "order.filled", detail: (o.account.login || "") + " " + pbody, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
       io.emit("refresh", {});
@@ -594,6 +627,8 @@ app.prepare().then(async () => {
   setInterval(() => monitor(io), MONITOR_MS);
   setInterval(() => checkPending(io), 2000);
   startStatementCron();
+  purgeOldNotifications();                                  // on boot
+  setInterval(purgeOldNotifications, 6 * 60 * 60 * 1000);   // + every 6h
   server.listen(port, () => console.log("> Ready on http://localhost:" + port));
 });
 
