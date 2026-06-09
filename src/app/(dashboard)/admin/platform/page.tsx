@@ -778,7 +778,7 @@ export default function AdminDeskPage() {
               <button onClick={() => setNavTab("demo")} className="flex-1 py-1.5 font-semibold" style={navTab === "demo" ? { color: "var(--accent)", borderBottom: `2px solid var(--accent)` } : { color: "var(--muted)" }}>DEMO ({demoAccs.length})</button>
             </div>
             <div className="border-b border-[var(--border)] px-1.5 py-1">
-              <input value={navSearch} onChange={(e) => setNavSearch(e.target.value)} name="nav-search" autoComplete="off" data-form-type="other" placeholder="Client ID / Name / Email" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[10px] text-[var(--text)]" />
+              <input value={navSearch} onChange={(e) => setNavSearch(e.target.value)} name="nav-search-field" autoComplete="off" data-form-type="other" data-lpignore="true" data-1p-ignore readOnly onFocus={(e) => e.currentTarget.removeAttribute("readonly")} placeholder="Client ID / Name / Email" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[10px] text-[var(--text)]" />
             </div>
             <div className="flex-1 overflow-auto p-1 text-[11px]">
               {(() => {
@@ -1665,8 +1665,8 @@ export default function AdminDeskPage() {
               </div>
               <div className={lab + " mt-2"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
               <div className={lab + " mt-2"}>Phone</div><input className={inp} value={form.phone || ""} onChange={(e) => f("phone", e.target.value)} />
-              <div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} onChange={(e) => f("email", e.target.value)} />
-              <div className={lab + " mt-2"}>Password</div><PasswordInput className={inp} value={form.password || ""} onChange={(e) => f("password", e.target.value)} />
+              <div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} autoComplete="off" data-lpignore="true" onChange={(e) => f("email", e.target.value)} />
+              <div className={lab + " mt-2"}>Password</div><PasswordInput className={inp} value={form.password || ""} autoComplete="new-password" onChange={(e) => f("password", e.target.value)} />
               <div className={lab + " mt-2"}>Country</div><CountrySelect className={inp} value={form.country || ""} onChange={(v) => f("country", v)} />
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div><div className={lab}>Leverage</div><input type="number" className={inp} value={form.leverage} onChange={(e) => f("leverage", Number(e.target.value))} /></div>
