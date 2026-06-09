@@ -899,7 +899,7 @@ export default function AdminDeskPage() {
             <div className="flex flex-1 items-center gap-1 overflow-auto">
               {openCharts.map((s, i) => (
                 <span key={s + "-" + i} onClick={() => setActive(i)} className="flex cursor-pointer items-center gap-1 rounded border px-2 py-0.5" style={i === activeChart ? { borderColor: "var(--accent)", color: "var(--text)" } : { borderColor: "var(--border)", color: "var(--muted)" }}>
-                  {s} <span style={{ color: i === activeChart ? "var(--text)" : "var(--accent)" }}>{px(s)}</span>
+                  <span className="font-medium">{s}</span>
                   <button onClick={(e) => { e.stopPropagation(); removeChart(i); }} className="text-[var(--muted)]">{"\u00D7"}</button>
                 </span>
               ))}

@@ -434,13 +434,6 @@ function LWChart({
           seriesRef.current.update(bar);
         }
       } catch { /* out-of-order tick during a reseed — ignore */ }
-      // Live P&L labels on each open-trade entry line, computed from the live price.
-      const calc = calcPnlRef.current;
-      if (calc && posLinesRef.current.length) {
-        for (const { line, p } of posLinesRef.current) {
-          try { const v = calc(p, close); line.applyOptions({ title: `${p.type} ${p.lots} ${v >= 0 ? "+" : ""}${v.toFixed(2)}` }); } catch {}
-        }
-      }
     };
     const iv = setInterval(apply, 80);
     return () => { socket.disconnect(); clearInterval(iv); };
@@ -459,16 +452,16 @@ function LWChart({
       const pending = !!p.kind;
       // Entry line: BUY=blue, SELL=crimson; pending=amber (dotted)
       const entryCol = pending ? "#f59e0b" : (p.type === "BUY" ? "#3b82f6" : "#ef4444");
+      // Thin dotted entry line; label shows side + lots only (no running P&L).
       const entryLine = s.createPriceLine({
-        price: p.openPrice, color: entryCol, lineWidth: 2,
-        lineStyle: pending ? LineStyle.Dotted : LineStyle.Solid, axisLabelVisible: true,
-        title: `${p.kind ? p.kind + " " : ""}${p.type} ${p.lots}${!pending && p.pnl != null ? " " + (p.pnl >= 0 ? "+" : "") + Number(p.pnl).toFixed(2) : ""}`,
+        price: p.openPrice, color: entryCol, lineWidth: 1,
+        lineStyle: LineStyle.Dotted, axisLabelVisible: true,
+        title: `${p.kind ? p.kind + " " : ""}${p.type} ${p.lots}`,
       });
       lineRefs.current.push(entryLine);
-      if (!pending) posLinesRef.current.push({ line: entryLine, p }); // track for live P&L label updates
-      // SL = rose red; TP = emerald green — same for all trade types so they're always recognizable
-      if (p.sl) lineRefs.current.push(s.createPriceLine({ price: p.sl, color: "#f43f5e", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "SL" }));
-      if (p.tp) lineRefs.current.push(s.createPriceLine({ price: p.tp, color: "#10b981", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "TP" }));
+      // SL = rose red; TP = emerald green — thin dotted, same for all trade types
+      if (p.sl) lineRefs.current.push(s.createPriceLine({ price: p.sl, color: "#f43f5e", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "SL" }));
+      if (p.tp) lineRefs.current.push(s.createPriceLine({ price: p.tp, color: "#10b981", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "TP" }));
     }
   }, [positions, theme, tf, symbol]);
 
