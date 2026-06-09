@@ -1322,27 +1322,27 @@ export default function AdminDeskPage() {
           {(can("processDeposits") || can("processWithdrawals") || can("creditBonus") || can("editFinancial") || can("transferFunds")) && (
             <div className="relative">
               <button onClick={() => setMenuSub(menuSub === "money" ? "" : "money")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (menuSub === "money" ? "bg-[var(--soft)]" : "")}>
-                {mIco("fa-coins", GOLD)}<span className="flex-1">Money</span>
+                {mIco("fa-sack-dollar", GOLD)}<span className="flex-1">Money</span>
                 <i className="fa-solid fa-chevron-right text-[8px]" style={{ color: menuSub === "money" ? "var(--accent)" : "var(--muted)" }} />
               </button>
               {menuSub === "money" && (
                 <div className={flyCls} style={flySty}>
                   {can("processDeposits") && <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>{mIco("fa-arrow-down-to-bracket", BUY)}Deposit</button>}
                   {can("processWithdrawals") && <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>{mIco("fa-arrow-up-from-bracket", GOLD)}Withdrawal</button>}
-                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-plus", BUY)}Credit In</button>}
-                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-minus", GOLD)}Credit Out</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-circle-plus", BUY)}Credit In</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-circle-minus", GOLD)}Credit Out</button>}
                   {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus")} className={subi} style={{ color: BUY }}>{mIco("fa-gift", BUY)}Bonus</button>}
-                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>{mIco("fa-shield-halved")}Insurance</button>}
-                  {can("editFinancial") && <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>{mIco("fa-chart-line")}Manual P/L</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>{mIco("fa-umbrella")}Insurance</button>}
+                  {can("editFinancial") && <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>{mIco("fa-money-bill-trend-up")}Manual P/L</button>}
                   {can("editFinancial") && <button onClick={() => reconcileAcc(menu.acc)} className={subi}>{mIco("fa-scale-balanced")}Recalculate Balance</button>}
-                  {can("transferFunds") && <button onClick={() => openAct("transfer", menu.acc)} className={subi}>{mIco("fa-right-left")}Transfer Between Accounts</button>}
+                  {can("transferFunds") && <button onClick={() => openAct("transfer", menu.acc)} className={subi}>{mIco("fa-money-bill-transfer")}Transfer Between Accounts</button>}
                 </div>
               )}
             </div>
           )}
 
           {can("manualTrade") && <button onClick={() => openMT(menu.acc)} className={mi}>{mIco("fa-bolt", "var(--accent)")}Manual Trade</button>}
-          <button onClick={() => openAct("subaccount", menu.acc)} className={mi}>{mIco("fa-sitemap")}Create Sub-Account</button>
+          <button onClick={() => openAct("subaccount", menu.acc)} className={mi}>{mIco("fa-code-branch")}Create Sub-Account</button>
 
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
 
@@ -1389,7 +1389,7 @@ export default function AdminDeskPage() {
               <div className={flyCls} style={flySty}>
                 <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
                 <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
-                <button onClick={() => openSymOv(menu.acc)} className={subi}>{mIco("fa-ban")}Disable Symbols</button>
+                <button onClick={() => openSymOv(menu.acc)} className={subi}>{mIco("fa-eye-slash")}Disable Symbols</button>
                 <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
               </div>
             )}

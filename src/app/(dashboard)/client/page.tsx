@@ -625,7 +625,13 @@ export default function ClientTerminal() {
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
         <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: rtW }}>
-          <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-semibold tracking-wide" style={{ color: BUY }}>NEW ORDER · <span className="text-[var(--text)]">{selSym}</span></div>
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2" style={{ background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent)" }}>
+            <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide" style={{ color: "var(--text)" }}><i className="fa-solid fa-bolt text-[10px]" style={{ color: "#2f81f7" }} />NEW ORDER</div>
+            <div className="flex items-center gap-1.5">
+              <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "var(--soft)", color: "#2f81f7" }}>{selSym}</span>
+              {price != null && <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{price.toFixed(d)}</span>}
+            </div>
+          </div>
           <div className="min-h-0 flex-1 overflow-auto">
           {rightTab === "NEWS" ? (
             <div className="p-2 text-[11px]">
@@ -674,11 +680,11 @@ export default function ClientTerminal() {
               {/* Action buttons */}
               {entryTab === "trade" ? (
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: SELL }}>
-                    <span className="text-[10px] uppercase tracking-wide opacity-90">Sell</span><span className="text-[14px] tabular-nums">{bid?.toFixed(d) ?? "…"}</span>
+                  <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg, #ff6b78, #e0394a 70%, #b9293a)" }}>
+                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down text-[9px]" />Sell</span><span className="text-[15px] tabular-nums">{bid?.toFixed(d) ?? "…"}</span>
                   </button>
-                  <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "#2f81f7" }}>
-                    <span className="text-[10px] uppercase tracking-wide opacity-90">Buy</span><span className="text-[14px] tabular-nums">{ask?.toFixed(d) ?? "…"}</span>
+                  <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg, #5aa0ff, #2f81f7 70%, #1e63cc)" }}>
+                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up text-[9px]" />Buy</span><span className="text-[15px] tabular-nums">{ask?.toFixed(d) ?? "…"}</span>
                   </button>
                 </div>
               ) : (
