@@ -370,7 +370,7 @@ export default function ClientMobile({ t }: { t: any }) {
                           <div className="text-[13px] font-semibold leading-tight text-[var(--text)]">{n.title}</div>
                           {!n.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: GOLD }} />}
                         </div>
-                        {n.body && <div className="mt-0.5 text-[12px] leading-snug" style={{ color: "var(--muted)" }}>{n.body}</div>}
+                        {n.body && <div className="mt-0.5 whitespace-pre-line text-[12px] leading-snug" style={{ color: "var(--muted)" }}>{n.body}</div>}
                         <div className="mt-1.5 text-[10px]" style={{ color: "var(--muted)" }}>{new Date(n.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
                       </div>
                     </div>

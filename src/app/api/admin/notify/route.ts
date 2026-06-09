@@ -20,7 +20,11 @@ export async function POST(req: Request) {
     const b = await req.json();
     const title = (b.title || "").trim();
     if (!title) throw new Error("Title required");
-    const body = b.body || null;
+    // Sign manually-sent notifications with the tenant's support footer.
+    const tenant = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { name: true, brandName: true } });
+    const brand = (tenant?.brandName || tenant?.name || "").trim();
+    const footer = `— ${brand ? brand + " " : ""}Support Team`;
+    const body = ((b.body || "").trim() ? (b.body.trim() + "\n\n") : "") + footer;
     const image = b.image || null;
     const target = b.target || "all_clients";
     let userIds: string[] = [];

@@ -113,13 +113,15 @@ export async function POST(req: Request) {
 
     const batchId = `sa-${Date.now()}`;
     const targetScope = scope + (b.tenantId ? ":tenant" : "") + (b.userId ? ":user" : "");
+    // Platform-level messages (maintenance / news) are signed simply "Support Team".
+    const signedBody = ((b.body || "").trim() ? b.body.trim() + "\n\n" : "") + "— Support Team";
 
     await prisma.notification.createMany({
       data: recipients.map((u) => ({
         tenantId: u.tenantId as string,
         userId: u.id,
         title,
-        body: b.body || null,
+        body: signedBody,
         image: b.image || null,
         batchId,
         targetScope,
