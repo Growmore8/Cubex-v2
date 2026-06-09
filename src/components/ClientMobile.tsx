@@ -607,22 +607,35 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── CHART ───────── */}
         <KeepAlive active={tab === "chart"}>{(
           <div className="flex h-full flex-col">
-            {/* Chart header — symbol picker + price + TF + expand */}
-            <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2">
-              <button onPointerDown={(e) => { e.preventDefault(); setSymSearch(""); setSymPickerOpen(true); }} className="flex max-w-[160px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1.5 text-sm font-bold text-[var(--text)]" style={{ touchAction: "manipulation" }}>
-                <i className="fa-solid fa-magnifying-glass text-[10px] opacity-60" />
-                <span className="truncate">{selSym || "Symbol"}</span>
-              </button>
-              <span className="text-[12px] font-semibold tabular-nums" style={{ color: BUY }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</span>
-              <div className="ml-auto flex items-center gap-1.5">
-                <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-1 text-[11px] text-[var(--text)]">
-                  {(TFS || []).map((x: string) => <option key={x} value={x}>{x}</option>)}
-                </select>
-                <button onPointerDown={(e) => { e.preventDefault(); setChartFull(true); }} className="flex h-7 w-7 items-center justify-center rounded border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
-                  <i className="fa-solid fa-expand text-[11px]" />
-                </button>
-              </div>
-            </div>
+            {/* Chart header — big price block (symbol + name · large price + change) */}
+            {(() => {
+              const disp = (symbols || []).find((x: any) => x.symbol === selSym)?.display;
+              const base = baselineRef.current[selSym]; const chg = (base != null && price != null) ? price - base : 0; const pct = pctOf(selSym); const upC = chg >= 0;
+              return (
+                <div className="border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <button onPointerDown={(e) => { e.preventDefault(); setSymSearch(""); setSymPickerOpen(true); }} className="flex items-center gap-1.5 text-left" style={{ touchAction: "manipulation" }}>
+                      <div>
+                        <div className="flex items-center gap-1.5 text-[16px] font-extrabold leading-none text-[var(--text)]">{selSym || "Symbol"}<i className="fa-solid fa-chevron-down text-[9px] opacity-50" /></div>
+                        {disp && disp !== selSym && <div className="mt-0.5 text-[10px] text-[var(--muted)]">{disp}</div>}
+                      </div>
+                    </button>
+                    <div className="text-right">
+                      <div className="text-[28px] font-extrabold leading-none tabular-nums text-[var(--text)]">{price != null ? price.toFixed(dg(selSym)) : "…"}</div>
+                      <div className="mt-1 text-[12px] font-semibold tabular-nums" style={{ color: upC ? BUY : SELL }}>{upC ? "▲" : "▼"} {chg >= 0 ? "+" : ""}{chg.toFixed(dg(selSym))} ({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    {(TFS || []).map((x: string) => (
+                      <button key={x} onClick={() => setTf(x)} className="rounded-md px-2 py-1 text-[10px] font-semibold transition-colors" style={tf === x ? { background: "#2f81f7", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{x}</button>
+                    ))}
+                    <button onPointerDown={(e) => { e.preventDefault(); setChartFull(true); }} className="ml-auto flex h-7 w-7 items-center justify-center rounded border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
+                      <i className="fa-solid fa-expand text-[11px]" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
             {/* Chart — no sidebar tools by default (use full-screen for tools) */}
             <div className="relative min-h-0 flex-1 bg-[var(--bg)]">
               <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={false}
