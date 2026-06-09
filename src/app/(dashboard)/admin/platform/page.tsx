@@ -684,8 +684,7 @@ export default function AdminDeskPage() {
                     {dDivider}
                     {dHead("Create")}
                     {can("createClients") && dItem(() => openModal("client"), "fa-user-plus", "New Client", BUY)}
-                    {!isManager && can("manageManagers") && dItem(() => openModal("manager"), "fa-user-tie", "New Manager")}
-                    {!isManager && can("manageManagers") && dItem(() => { setMgrModal(true); }, "fa-users-gear", "Manage Managers")}
+                    {!isManager && can("manageManagers") && dItem(() => { setMgrModal(true); }, "fa-users-gear", "Managers")}
                     {!isManager && dItem(() => { setPmModal(true); }, "fa-credit-card", "Payment Methods")}
                     {!isManager && dItem(() => openModal("group"), "fa-layer-group", "Groups")}
                     {dDivider}

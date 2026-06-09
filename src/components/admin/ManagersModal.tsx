@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import PasswordInput from "@/components/ui/PasswordInput";
-import CountrySelect from "@/components/ui/CountrySelect";
 
 interface Manager {
   id: string; name: string; email: string; status: string;
@@ -140,24 +139,10 @@ export default function ManagersModal({ onClose }: { onClose: () => void }) {
             <div className="mb-4 flex items-center justify-between"><div className="text-base font-semibold">New Manager</div><button onClick={() => setCreateOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button></div>
             <div className="space-y-3">
               <div><label className={lab}>FULL NAME</label><input className={inp} value={form.name} autoComplete="off" onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div><label className={lab}>PHONE</label><input className={inp} value={form.phone} autoComplete="off" onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
               <div><label className={lab}>EMAIL</label><input className={inp} value={form.email} autoComplete="off" onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
               <div><label className={lab}>PASSWORD</label><PasswordInput className={inp} autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Min 6 characters" /></div>
-              <div><label className={lab}>COUNTRY</label><CountrySelect className={inp} value={form.country} onChange={(v) => setForm({ ...form, country: v })} /></div>
-              <div>
-                <label className={lab}>PERMISSIONS</label>
-                {PERM_GROUPS.map((g) => (
-                  <div key={g.sec} className="mb-2">
-                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{g.sec}</div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {g.items.map(([k, lbl]) => (
-                        <label key={k} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.perms[k] !== false} onChange={(e) => setForm({ ...form, perms: { ...form.perms, [k]: e.target.checked } })} />{lbl}</label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
+            <p className="mt-2 text-[11px] text-[var(--muted)]">Permissions can be set after creating, from the manager list.</p>
             {err && <div className="mt-2 text-xs text-red-500">{err}</div>}
             <div className="mt-4 flex justify-end gap-2"><button className="ui-btn ui-btn-ghost px-3 py-2 text-sm" onClick={() => setCreateOpen(false)}>Cancel</button><button className="ui-btn ui-btn-primary px-4 py-2 text-sm font-medium" style={{ background: "var(--accent)", color: "#fff" }} onClick={create}>Create Manager</button></div>
           </div>
