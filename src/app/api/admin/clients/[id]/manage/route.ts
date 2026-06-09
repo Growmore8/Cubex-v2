@@ -93,6 +93,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const amt = Number(b.amount);
         if (!amt) throw new Error("Amount required");
         await prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: new Prisma.Decimal(amt) } } });
+        // Record in financial history (signed) so it shows in the client + desk History.
+        await prisma.financialHistory.create({ data: { accountId: acc.id, type: "PNL_ADJUST" as any, amount: new Prisma.Decimal(amt), description: b.description || "Manual P/L adjustment", mode: "MANUAL" as any, createdBy: actor } }).catch(() => {});
         await audit(tenantId, "client.manualPnl", acc.login + " " + amt, actor);
         break;
       }
