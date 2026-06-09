@@ -287,7 +287,7 @@ export default function ClientMobile({ t }: { t: any }) {
         <div className="flex items-center gap-2.5">
           <Avatar size={38} />
           <div className="leading-tight">
-            <div className="text-sm font-bold">{account?.ownerName || account?.name || "Trader"}</div>
+            <div className="text-sm font-bold">{titleCaseName(account?.ownerName || account?.name) || "Trader"}</div>
             <div className="text-[10px] text-[var(--muted)]">{account?.type === "LIVE" ? "Live" : "Demo"} #{account?.login} · 1:{account?.leverage}</div>
           </div>
         </div>
@@ -472,8 +472,9 @@ export default function ClientMobile({ t }: { t: any }) {
                   { label: "Withdraw", icon: "fa-arrow-up", col: SELL, on: () => setWalletTab("withdraw") },
                   { label: "Transfer", icon: "fa-right-left", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); } },
                 ]).map((b) => (
-                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-1 rounded-xl py-3 font-semibold backdrop-blur-md" style={{ color: b.col, background: `color-mix(in srgb, ${b.col} ${cardDark ? 18 : 14}%, transparent)`, border: `1px solid color-mix(in srgb, ${b.col} 45%, transparent)` }}>
-                    <i className={"fa-solid coin-bob " + b.icon} style={{ color: b.col }} /><span className="text-[11px]">{b.label}</span>
+                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-1.5 rounded-2xl py-3.5 font-semibold backdrop-blur-md" style={{ color: b.col, background: `linear-gradient(160deg, color-mix(in srgb, ${b.col} ${cardDark ? 22 : 16}%, transparent), color-mix(in srgb, ${b.col} ${cardDark ? 9 : 7}%, transparent))`, border: `1px solid color-mix(in srgb, ${b.col} 40%, transparent)` }}>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: `color-mix(in srgb, ${b.col} 22%, transparent)`, boxShadow: `inset 0 1px 0 color-mix(in srgb, ${b.col} 40%, transparent)` }}><i className={"fa-solid " + b.icon} style={{ color: b.col }} /></span>
+                    <span className="text-[11px]">{b.label}</span>
                   </button>
                 ))}
               </div>
@@ -482,8 +483,9 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="mb-1.5 text-[10px] font-semibold text-[var(--muted)]">Top up your demo balance</div>
                 <div className="grid grid-cols-3 gap-2">
                   {[1000, 5000, 10000].map((amt) => (
-                    <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-0.5 rounded-xl py-3 font-semibold backdrop-blur-md" style={{ color: cardDark ? "#fcd34d" : "#b45309", background: `color-mix(in srgb, #f59e0b ${cardDark ? 18 : 14}%, transparent)`, border: "1px solid color-mix(in srgb, #f59e0b 45%, transparent)" }}>
-                      <i className="fa-solid fa-coins coin-bob" style={{ color: cardDark ? "#fcd34d" : "#d97706" }} /><span className="text-[12px]">${amt.toLocaleString()}</span>
+                    <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-1.5 rounded-2xl py-3.5 font-semibold backdrop-blur-md" style={{ color: cardDark ? "#fcd34d" : "#b45309", background: `linear-gradient(160deg, color-mix(in srgb, #f59e0b ${cardDark ? 22 : 16}%, transparent), color-mix(in srgb, #f59e0b ${cardDark ? 9 : 7}%, transparent))`, border: "1px solid color-mix(in srgb, #f59e0b 40%, transparent)" }}>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "color-mix(in srgb, #f59e0b 22%, transparent)" }}><i className="fa-solid fa-coins" style={{ color: cardDark ? "#fcd34d" : "#d97706" }} /></span>
+                      <span className="text-[12px]">${amt.toLocaleString()}</span>
                     </button>
                   ))}
                 </div>
@@ -503,7 +505,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     {movers.gainers.map((s: any) => {
                       const p = s.pct;
                       return (
-                        <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 py-1.5">
+                        <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
                           <span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-up" /></span>
                           <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
                           <span className="text-[12px] font-semibold" style={{ color: BUY }}>{(p >= 0 ? "+" : "") + p.toFixed(2)}%</span>
@@ -516,7 +518,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     {movers.losers.map((s: any) => {
                       const p = s.pct;
                       return (
-                        <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 py-1.5">
+                        <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
                           <span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-down" /></span>
                           <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
                           <span className="text-[12px] font-semibold" style={{ color: SELL }}>{p.toFixed(2)}%</span>
