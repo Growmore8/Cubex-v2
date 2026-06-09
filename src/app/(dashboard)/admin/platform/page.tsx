@@ -1113,9 +1113,10 @@ export default function AdminDeskPage() {
                   {/* Period summary bar */}
                   {(() => {
                     const fin = (types: string[]) => rows.filter((r: any) => r.kind === "FIN" && types.includes(String(r.type))).reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
-                    const tr = rows.filter((r: any) => r.kind === "TRADE");
-                    const tradePL = tr.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
-                    const deposits = fin(["DEPOSIT"]); const withdrawals = fin(["WITHDRAWAL"]); const credit = fin(["CREDIT_IN", "CREDIT_OUT", "BONUS", "INSURANCE"]); const adj = fin(["PNL_ADJUST"]);
+                    // Trade P/L = closed trades + manual P/L adjustments (same realized-P/L pool — shown as one figure).
+                    const plRows = rows.filter((r: any) => r.kind === "TRADE" || (r.kind === "FIN" && String(r.type) === "PNL_ADJUST"));
+                    const tradePL = plRows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
+                    const deposits = fin(["DEPOSIT"]); const withdrawals = fin(["WITHDRAWAL"]); const credit = fin(["CREDIT_IN", "CREDIT_OUT", "BONUS", "INSURANCE"]);
                     const net = rows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
                     const cell = (label: string, val: number, sign = true) => (
                       <span className="whitespace-nowrap"><span className="text-[var(--muted)]">{label}: </span><span style={{ color: val > 0 ? BUY : val < 0 ? SELL : "var(--text)", fontWeight: 700 }}>{sign && val > 0 ? "+" : ""}{val.toFixed(2)}</span></span>
@@ -1123,8 +1124,8 @@ export default function AdminDeskPage() {
                     return (
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--border)] bg-[var(--soft)] px-2 py-1.5 text-[10px]">
                         <span className="whitespace-nowrap"><span className="text-[var(--muted)]">Records: </span><b>{rows.length}</b></span>
-                        {cell("Deposits", deposits)}{cell("Withdrawals", withdrawals)}{cell("Credit/Bonus", credit)}{adj !== 0 && cell("Manual P/L", adj)}
-                        <span className="whitespace-nowrap"><span className="text-[var(--muted)]">Trade P/L({tr.length}): </span><span style={{ color: tradePL >= 0 ? BUY : SELL, fontWeight: 700 }}>{tradePL >= 0 ? "+" : ""}{tradePL.toFixed(2)}</span></span>
+                        {cell("Deposits", deposits)}{cell("Withdrawals", withdrawals)}{cell("Credit/Bonus", credit)}
+                        <span className="whitespace-nowrap"><span className="text-[var(--muted)]">Trade P/L({plRows.length}): </span><span style={{ color: tradePL >= 0 ? BUY : SELL, fontWeight: 700 }}>{tradePL >= 0 ? "+" : ""}{tradePL.toFixed(2)}</span></span>
                         <span className="ml-auto whitespace-nowrap rounded px-2 py-0.5" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)" }}><span className="text-[var(--muted)]">Net: </span><span style={{ color: net >= 0 ? BUY : SELL, fontWeight: 800 }}>{net >= 0 ? "+" : ""}{net.toFixed(2)}</span></span>
                       </div>
                     );
