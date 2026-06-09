@@ -109,7 +109,7 @@ export default function PaymentsPanel() {
                   <td className={td}><span className="rounded-full px-1.5 py-0.5 text-[9px]" style={badge(st(p))}>{st(p)}</span></td>
                   <td className={td}>
                     <div className="flex items-center justify-end gap-1">
-                      {slip(p) ? <button onClick={() => setView(slip(p))} className="ui-btn px-2 py-0.5 text-[9px]">Slip</button> : null}
+                      {slip(p) ? <button onClick={() => setView("/api/files/slip/" + g(p, ["id"], ""))} className="ui-btn px-2 py-0.5 text-[9px]">Slip</button> : null}
                       {st(p) === "PENDING" && (<>
                         <button disabled={!!busy} onClick={() => act(p, "approve")} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
                         <button disabled={!!busy} onClick={() => act(p, "reject")} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
