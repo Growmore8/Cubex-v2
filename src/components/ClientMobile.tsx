@@ -66,7 +66,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [noForm, setNoForm] = useState<any>({ idx: 0, lots: 0.01, trigger: "", sl: "", tp: "" });
   const [balOpen, setBalOpen] = useState(false);
   const {
-    theme, brand, account, accts, accId, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
+    theme, brand, account, accts, accId, pnlOnly, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
     selSym, vol, sl, tp, err,
     balance, equity, floating, free, used, level, price, bid, ask, tf, TFS,
     setSelSym, setVol, setSl, setTp, setTf,
@@ -1145,6 +1145,9 @@ export default function ClientMobile({ t }: { t: any }) {
               <option value="">Select account</option>
               {(accts || []).filter((a: any) => a.id !== xfer?.fromId).map((a: any) => <option key={a.id} value={a.id}>{a.login} ({a.type})</option>)}
             </select>
+            {(() => { const xf = (accts || []).find((a: any) => a.id === (xfer?.fromId || accId)); const av = xf ? (pnlOnly ? Math.max(0, Number(xf.pnl || 0)) : acctBal(xf)) : 0; return (
+              <div className="mb-1 flex items-center justify-between text-[10px]"><span className="text-[var(--muted)]">Available {pnlOnly ? "(profit only)" : "balance"}</span><button type="button" onClick={() => setXfer({ ...(xfer || {}), amount: String(av.toFixed(2)) })} className="font-semibold" style={{ color: "#22d3ee" }}>${fmt(av)} · Use max</button></div>
+            ); })()}
             <label className="text-[10px] text-[var(--muted)]">Amount</label>
             <input type="number" value={xfer?.amount || ""} onChange={(e) => setXfer({ ...(xfer || {}), amount: e.target.value })} placeholder="0.00" className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
             {xferErr && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{xferErr}</div>}
