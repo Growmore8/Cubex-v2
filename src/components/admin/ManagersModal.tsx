@@ -69,7 +69,7 @@ export default function ManagersModal({ onClose }: { onClose: () => void }) {
   // /.ui-input which pull next-themes light vars (white) and broke the dark theme.
   const inp = "w-full rounded-lg border px-3 py-2 text-sm bg-[var(--bg)] text-[var(--text)] border-[var(--border)] outline-none focus:border-[var(--accent)]";
   const lab = "mb-1 block text-[11px] font-medium text-[var(--muted)]";
-  const ovl = "fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6";
+  const ovl = "fixed inset-0 z-[120] flex items-center justify-center bg-black/20 p-6";
   const card = "ui-pop desk-modal rounded-2xl border p-5 shadow-2xl bg-[var(--panel)] text-[var(--text)] border-[var(--border)]";
 
   const filtered = managers.filter((m) => {

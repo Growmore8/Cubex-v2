@@ -1108,6 +1108,25 @@ export default function AdminDeskPage() {
                     <span className="text-[var(--muted)]">To</span><input type="date" value={hfTo} onChange={(e) => { setHfTo(e.target.value); setHfPreset("ALL"); }} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]" />
                     <span className="text-[var(--muted)]">Type</span><select value={hfType} onChange={(e) => setHfType(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All</option><option value="BUY">Buy</option><option value="SELL">Sell</option></select>{Object.keys(histSel).filter((k) => histSel[k]).length > 0 && <button onClick={delHistBulk} className="ml-auto rounded px-2 py-0.5" style={{ background: SELL, color: "#1a0606" }}>Delete Selected ({Object.keys(histSel).filter((k) => histSel[k]).length})</button>}
                   </div>
+                  {/* Period summary bar */}
+                  {(() => {
+                    const fin = (types: string[]) => rows.filter((r: any) => r.kind === "FIN" && types.includes(String(r.type))).reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
+                    const tr = rows.filter((r: any) => r.kind === "TRADE");
+                    const tradePL = tr.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
+                    const deposits = fin(["DEPOSIT"]); const withdrawals = fin(["WITHDRAWAL"]); const credit = fin(["CREDIT_IN", "CREDIT_OUT", "BONUS", "INSURANCE"]); const adj = fin(["PNL_ADJUST"]);
+                    const net = rows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
+                    const cell = (label: string, val: number, sign = true) => (
+                      <span className="whitespace-nowrap"><span className="text-[var(--muted)]">{label}: </span><span style={{ color: val > 0 ? BUY : val < 0 ? SELL : "var(--text)", fontWeight: 700 }}>{sign && val > 0 ? "+" : ""}{val.toFixed(2)}</span></span>
+                    );
+                    return (
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--border)] bg-[var(--soft)] px-2 py-1.5 text-[10px]">
+                        <span className="whitespace-nowrap"><span className="text-[var(--muted)]">Records: </span><b>{rows.length}</b></span>
+                        {cell("Deposits", deposits)}{cell("Withdrawals", withdrawals)}{cell("Credit/Bonus", credit)}{adj !== 0 && cell("Manual P/L", adj)}
+                        <span className="whitespace-nowrap"><span className="text-[var(--muted)]">Trade P/L({tr.length}): </span><span style={{ color: tradePL >= 0 ? BUY : SELL, fontWeight: 700 }}>{tradePL >= 0 ? "+" : ""}{tradePL.toFixed(2)}</span></span>
+                        <span className="ml-auto whitespace-nowrap rounded px-2 py-0.5" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)" }}><span className="text-[var(--muted)]">Net: </span><span style={{ color: net >= 0 ? BUY : SELL, fontWeight: 800 }}>{net >= 0 ? "+" : ""}{net.toFixed(2)}</span></span>
+                      </div>
+                    );
+                  })()}
                   <div className="flex-1 overflow-auto">
                     <table className="w-full border-collapse [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-2.5 [&_th]:px-2.5">
                       <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
@@ -1420,7 +1439,7 @@ export default function AdminDeskPage() {
       </>)}
 
       {ticket && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.18)" }}>
           <div className="ui-pop desk-modal w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">Order - {ticket}</div>
             <div className={lab}>Type</div>
@@ -1452,7 +1471,7 @@ export default function AdminDeskPage() {
         </div>
       </>)}
       {pos && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.18)" }}>
           <div className="ui-pop desk-modal w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold">{pos.kind === "modify" ? "Modify S/L - T/P" : pos.kind === "manual" ? "Manual Close" : "Partial Close"}</div>
             <div className="mb-2 text-[10px] text-[var(--muted)]">#{pos.t.ticket} · {pos.t.symbol} · {pos.t.type} · {Number(pos.t.lots).toFixed(2)}L</div>
@@ -1498,7 +1517,7 @@ export default function AdminDeskPage() {
             <button onClick={() => setAct(null)} title="Close" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
           </div>
         ) : (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.18)" }}>
           <div className="ui-pop desk-modal w-[420px] max-w-[95vw] max-h-[90vh] overflow-auto rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent2)" }}><i className={"fa-solid " + actIcon()} /></span>
@@ -1620,7 +1639,7 @@ export default function AdminDeskPage() {
         </div>
       )}
       {modal && !modalMin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.18)" }}>
           <div className="ui-pop desk-modal w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-sm font-semibold">{modal === "client" && "New Client"}{modal === "manager" && "New Manager"}{modal === "group" && "Manage Groups"}{modal === "notify" && "Send Notification"}</div>
@@ -1704,7 +1723,7 @@ export default function AdminDeskPage() {
         const cats = Object.entries(grouped).sort((a, b) => (CAT_ORDER.indexOf(a[0]) === -1 ? 99 : CAT_ORDER.indexOf(a[0])) - (CAT_ORDER.indexOf(b[0]) === -1 ? 99 : CAT_ORDER.indexOf(b[0])));
         const catName = (c: string) => c === "metals" ? "PREC. METALS" : c.toUpperCase();
         return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.18)" }}>
           <div className="ui-pop flex max-h-[88vh] w-[580px] max-w-[95vw] flex-col rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--red) 16%, transparent)", color: "#e05260" }}><i className="fa-solid fa-ban" /></span>
@@ -1752,7 +1771,7 @@ export default function AdminDeskPage() {
         </div>
       )}
       {mt && !mtMin && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.18)" }}>
           <div className="ui-pop desk-modal w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-sm font-semibold">Manual Trade - <span style={{ color: "var(--accent)" }}>{mt.acc.login} - {mt.acc.name}</span></div>
@@ -1797,7 +1816,7 @@ export default function AdminDeskPage() {
         </div>
       )}
       {hEdit && (() => { const isFin = String(hEdit.id).startsWith("F"); return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.18)" }}>
           <div className="ui-pop desk-modal w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 text-sm font-semibold">Edit {isFin ? "Transaction" : "Trade"} {hEdit.ticket}</div>
             {isFin ? (<>

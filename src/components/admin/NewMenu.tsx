@@ -39,7 +39,7 @@ export default function NewMenu({ onCreated }: { onCreated: () => void }) {
     </div>
 
     {modal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.18)" }}>
         <div className="ui-card ui-pop w-[330px] p-4 text-left" style={{ background: "var(--panel)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
           <div className="mb-2 text-sm font-semibold">{modal === "client" ? "New Client" : modal === "manager" ? "New Manager" : modal === "group" ? "New Group" : "Send Notification"}</div>
 
