@@ -652,7 +652,7 @@ export default function AdminDeskPage() {
       <div className="flex items-stretch border-b border-[var(--border)] bg-[var(--panel)] text-[11px]">
         <div className="flex items-center gap-2 border-r border-[var(--border)] px-3 py-1.5" style={{ width: panels.nav ? navW + 1 : undefined }}>
           {brand.logoUrl ? <img src={brand.logoUrl} alt="" className="h-4 w-4 rounded object-contain" /> : <span className="inline-block h-4 w-4 rounded" style={{ background: "var(--accent)" }} />}<b className="font-medium">{brand.name || "Platform"}</b>
-          <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent)" }}>Back Office</span>
+          <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent)" }}>{isManager ? "Manager Terminal" : "Back Office"}</span>
         </div>
         <div className="flex flex-1 items-center gap-0.5 px-2 py-1">
           {(() => {
