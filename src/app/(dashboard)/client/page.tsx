@@ -721,7 +721,7 @@ export default function ClientTerminal() {
           <button onClick={() => setBotTab("summary")} className={tab(botTab === "summary")} style={botTab === "summary" ? { color: BUY } : undefined}>Summary</button>
           <button onClick={() => setBotTab("requests")} className={tab(botTab === "requests")} style={botTab === "requests" ? { color: BUY } : undefined}>My Requests</button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto px-3">
           {botTab === "positions" && positions.length > 0 && (
             <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-[var(--border)] px-2 py-1 text-[10px] text-[var(--muted)]">
               <span>Total Trades: <span className="text-[var(--text)]">{positions.length}</span></span>

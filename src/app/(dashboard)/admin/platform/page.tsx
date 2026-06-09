@@ -980,7 +980,7 @@ export default function AdminDeskPage() {
             <button onClick={toggleTabCloseX} title={tabCloseX ? "Hide tab close (\u00D7) marks" : "Show tab close (\u00D7) marks"} className="pb-1 px-1.5 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-circle-xmark text-[11px]" style={{ opacity: tabCloseX ? 1 : 0.35 }} /></button>
             <button onClick={() => togglePanel("toolbox")} title="Close toolbox" className="pb-1 px-1.5 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-chevron-down text-[11px]" /></button>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div className="min-h-0 flex-1 overflow-auto px-3">
             {tab === "trade" && (() => {
               if (!selAcc) return <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>Please select an account first.</div>;
               const tAllOn = accOpen.length > 0 && accOpen.every((p) => tradeSel[p.id]);
