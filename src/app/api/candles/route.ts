@@ -3,10 +3,32 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 const TD_KEY = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
+const FH_KEY = process.env.FINNHUB_KEY || "";
 
 const INTERVAL: Record<string, string> = {
   "1M": "1min", "5M": "5min", "15M": "15min", "30M": "30min", "1H": "1h", "4H": "4h", "1D": "1day",
 };
+// Finnhub candle resolution (forex/stock) — used for symbols with an OANDA feed.
+const FH_RES: Record<string, string> = { "1M": "1", "5M": "5", "15M": "15", "30M": "30", "1H": "60", "4H": "60", "1D": "D" };
+
+// Finnhub OHLC for an OANDA-fed symbol (e.g. OANDA:EUR_USD). Returns candles or null.
+async function finnhubCandles(feed: string, tf: string): Promise<any[] | null> {
+  if (!FH_KEY) return null;
+  const res = FH_RES[tf] || "1";
+  const secPer: Record<string, number> = { "1": 60, "5": 300, "15": 900, "30": 1800, "60": 3600, "D": 86400 };
+  const to = Math.floor(Date.now() / 1000);
+  const from = to - (secPer[res] || 60) * 5000; // ~5000 bars back
+  const kind = feed.startsWith("OANDA:") ? "forex" : "stock";
+  const api = `https://finnhub.io/api/v1/${kind}/candle?symbol=${encodeURIComponent(feed)}&resolution=${res}&from=${from}&to=${to}&token=${FH_KEY}`;
+  try {
+    const r = await fetch(api, { cache: "no-store" });
+    const d = await r.json();
+    if (!d || d.s !== "ok" || !Array.isArray(d.t)) return null;
+    const out = d.t.map((t: number, i: number) => ({ time: t, open: Number(d.o[i]), high: Number(d.h[i]), low: Number(d.l[i]), close: Number(d.c[i]) }))
+      .filter((c: any) => isFinite(c.time) && isFinite(c.close));
+    return out.length ? out : null;
+  } catch { return null; }
+}
 
 // Map an internal symbol (e.g. "XAUUSD", "GBPUSD", "BTCUSD") to a Twelve Data symbol.
 function tdSymbol(sym: string, feed?: string | null): string {
@@ -32,6 +54,17 @@ export async function GET(req: Request) {
 
   let feed: string | null = null;
   try { const gs = await prisma.globalSymbol.findUnique({ where: { symbol } }); feed = gs?.feed || null; } catch {}
+
+  // For symbols on a Finnhub (OANDA) feed, use Finnhub's OHLC first; fall back to TD.
+  if (feed && feed.includes(":")) {
+    const fh = await finnhubCandles(feed, tf);
+    if (fh && fh.length) {
+      fh.sort((a, b) => a.time - b.time);
+      const seen = new Set<number>();
+      const clean = fh.filter((c) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
+      return NextResponse.json({ ok: true, candles: clean, source: "finnhub" });
+    }
+  }
 
   const tdSym = tdSymbol(symbol, feed);
   const interval = INTERVAL[tf] || "1min";

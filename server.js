@@ -163,6 +163,20 @@ function connectFinnhub() {
   fhWs.on("close", () => { setTimeout(connectFinnhub, 5000); });
   fhWs.on("error", (e) => console.error("[FH]", e.message));
 }
+// Finnhub Quote endpoint — real current price (c) for each Finnhub-fed symbol.
+// Seeds the live price on boot and acts as a fallback between WebSocket trades.
+async function pollFinnhubQuotes() {
+  if (!FINNHUB_KEY) return;
+  const fed = symbols.filter((s) => meta[s] && meta[s].feed);
+  for (const s of fed) {
+    try {
+      const r = await fetch("https://finnhub.io/api/v1/quote?symbol=" + encodeURIComponent(meta[s].feed) + "&token=" + FINNHUB_KEY);
+      const d = await r.json();
+      if (d && typeof d.c === "number" && d.c > 0) applyPrice(s, d.c, "FH-Q");
+    } catch (e) { /* ignore per-symbol quote errors */ }
+  }
+}
+
 let tdWs = null;
 function connectTD() {
   if (!TD_KEY) { console.log("[TD] no key"); return; }
@@ -498,8 +512,10 @@ app.prepare().then(async () => {
   connectFinnhub();
   connectTD();
   pollPrices();
+  pollFinnhubQuotes();              // seed REAL prices for Finnhub-fed symbols (Quote endpoint)
   setTimeout(ensureSeeded, 4000); // after feeds connect, seed anything still unpriced
   setInterval(pollPrices, 5000);
+  setInterval(pollFinnhubQuotes, 12000); // Quote fallback so prices stay real if the WS is quiet
   setInterval(microTick, 140);
   setInterval(() => monitor(io), MONITOR_MS);
   setInterval(() => checkPending(io), 2000);
