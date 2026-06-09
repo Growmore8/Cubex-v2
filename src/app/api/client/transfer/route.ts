@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     const movable = withdrawableBalance(from, pnlOnly);
     if (amount > movable) throw new Error(pnlOnly ? "Only your profit (PNL) balance is transferable" : "Insufficient balance");
     const amt = new Prisma.Decimal(amount);
-    const ref = "TRF-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+    const ref = String(Date.now()).slice(-8); // short 8-digit numeric reference
     await prisma.$transaction(async (tx) => {
       await tx.account.update({ where: { id: from.id }, data: { withdrawal: { increment: amt } } });
       await tx.account.update({ where: { id: to.id }, data: { deposit: { increment: amt } } });

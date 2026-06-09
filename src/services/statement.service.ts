@@ -88,7 +88,16 @@ export function buildStatementPdf(data: StatementData, periodLabel: string): Pro
         .text(periodLabel, left, 28, { width: totalW, align: "right" })
         .text("Generated " + dt(new Date()), left, 41, { width: totalW, align: "right" });
 
-      let y = 76;
+      let y = 70;
+
+      // ── Client identity + statement period ──
+      const holderName = account.name || account.user?.name || "";
+      const holderEmail = account.user?.email || (account as any).email || "";
+      doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(9).text(holderName, left, y, { width: totalW * 0.62, lineBreak: false });
+      if (holderEmail) doc.fillColor("#64748b").font("Helvetica").fontSize(7.8).text(holderEmail, left, y + 11, { width: totalW * 0.62, lineBreak: false });
+      doc.fillColor("#475569").font("Helvetica-Bold").fontSize(8).text("Statement Period", left, y, { width: totalW, align: "right" });
+      doc.fillColor("#64748b").font("Helvetica").fontSize(7.8).text(periodLabel, left, y + 11, { width: totalW, align: "right" });
+      y += 26;
 
       // ── Summary cards ──
       const cards: [string, string, string?][] = [
@@ -152,8 +161,8 @@ export function buildStatementPdf(data: StatementData, periodLabel: string): Pro
 
       heading("Closed Trades");
       table(
-        [{ label: "Ticket", w: 64 }, { label: "Symbol", w: 60 }, { label: "Side", w: 38 }, { label: "Lots", w: 42, align: "right" }, { label: "Open", w: 58, align: "right" }, { label: "Close", w: 58, align: "right" }, { label: "P/L", w: 62, align: "right" }, { label: "Closed", w: 93 }],
-        account.history.map((h) => [h.ticket.toString(), h.symbol, h.side, Number(h.lots).toFixed(2), String(Number(h.openPrice)), String(Number(h.closePrice)), money(Number(h.pnl)), dt(h.closedAt)]),
+        [{ label: "Ticket", w: 52 }, { label: "Symbol", w: 50 }, { label: "Side", w: 30 }, { label: "Lots", w: 34, align: "right" }, { label: "Open", w: 46, align: "right" }, { label: "Close", w: 46, align: "right" }, { label: "P/L", w: 52, align: "right" }, { label: "Opened", w: 82 }, { label: "Closed", w: 82 }],
+        account.history.map((h) => [h.ticket.toString(), h.symbol, h.side, Number(h.lots).toFixed(2), String(Number(h.openPrice)), String(Number(h.closePrice)), money(Number(h.pnl)), dt((h as any).openedAt), dt(h.closedAt)]),
         "No closed trades in this period.",
       );
 

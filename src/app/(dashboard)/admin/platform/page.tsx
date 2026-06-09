@@ -284,11 +284,12 @@ export default function AdminDeskPage() {
   }
   useEffect(() => { loadNotifs(); const t = setInterval(loadNotifs, 20000); return () => clearInterval(t); }, []);
   async function openNotifs() { setNotifOpen((v) => !v); if (!notifOpen && notifUnread > 0) { try { await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch {} setNotifUnread(0); } }
-  function toast(msg: string, kind: string) { const id = Date.now() + Math.random(); setToasts((t) => [...t, { id, msg, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500); }
+  // Single toast at a time — a new one replaces the old (no stacking list).
+  function toast(msg: string, kind: string) { const id = Date.now() + Math.random(); setToasts([{ id, msg, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500); }
   function pushNotifToast(n: any) {
     const st = soundForNotification(n);
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t.slice(-4), { id, notif: true, st, title: n.title, body: n.body }]);
+    setToasts([{ id, notif: true, st, title: n.title, body: n.body }]); // replace, no list
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
   }
   useEffect(() => { if (ok) toast(ok, "ok"); }, [ok]);
@@ -1826,14 +1827,14 @@ export default function AdminDeskPage() {
       )}
 
       {toasts.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+        <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2" onClick={() => setToasts([])}>
           {toasts.map((t) => t.notif ? (
-            <div key={t.id} className="flex items-start gap-2 rounded-lg border px-3 py-2 text-[11px] shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", minWidth: 230, maxWidth: 300, borderLeft: `3px solid ${t.st === "trade" ? "#2f81f7" : t.st === "funds" ? GOLD : t.st === "login" ? "#a78bfa" : BUY}` }}>
+            <div key={t.id} className="flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-[11px] shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", minWidth: 230, maxWidth: 300, borderLeft: `3px solid ${t.st === "trade" ? "#2f81f7" : t.st === "funds" ? GOLD : t.st === "login" ? "#a78bfa" : BUY}` }}>
               <i className={"fa-solid mt-0.5 " + (t.st === "trade" ? "fa-chart-line" : t.st === "funds" ? "fa-money-bill" : t.st === "login" ? "fa-right-to-bracket" : "fa-bell")} style={{ color: t.st === "trade" ? "#2f81f7" : t.st === "funds" ? GOLD : t.st === "login" ? "#a78bfa" : BUY, fontSize: 12 }} />
               <div className="min-w-0"><div className="font-semibold">{t.title}</div>{t.body && <div className="mt-0.5 text-[10px] text-[var(--muted)]">{t.body}</div>}</div>
             </div>
           ) : (
-            <div key={t.id} className="rounded-md border px-3 py-2 text-[11px] shadow-lg" style={{ background: "var(--panel)", borderColor: t.kind === "err" ? SELL : BUY, color: "var(--text)", minWidth: 180 }}><span style={{ color: t.kind === "err" ? SELL : BUY }}>{t.kind === "err" ? "Error" : "Success"}</span> {t.msg}</div>
+            <div key={t.id} className="cursor-pointer rounded-md border px-3 py-2 text-[11px] shadow-lg" style={{ background: "var(--panel)", borderColor: t.kind === "err" ? SELL : BUY, color: "var(--text)", minWidth: 180 }}><span style={{ color: t.kind === "err" ? SELL : BUY }}>{t.kind === "err" ? "Error" : "Success"}</span> {t.msg}</div>
           ))}
         </div>
       )}

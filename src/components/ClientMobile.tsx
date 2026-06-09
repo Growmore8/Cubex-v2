@@ -155,7 +155,7 @@ export default function ClientMobile({ t }: { t: any }) {
     setStmtSending(false); setStmtOpen(false);
     pushToast?.({ id: "stmt-" + Date.now(), title: r.ok ? "Statement emailed to " + r.to : (r.error || "Failed to send"), st: "funds" });
   }
-  const { cToasts = [], pushToast } = t;
+  const { cToasts = [], pushToast, dismissToasts } = t;
   useEffect(() => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
     navigator.serviceWorker.ready.then((reg) => reg.pushManager.getSubscription().then((sub) => setPushEnabled(!!sub))).catch(() => {});
@@ -386,9 +386,9 @@ export default function ClientMobile({ t }: { t: any }) {
 
       {/* Toast overlay — bottom of screen, auto-dismiss */}
       {cToasts.length > 0 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4">
+        <div className="absolute inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4" onClick={() => dismissToasts?.()}>
           {cToasts.map((toast: any) => (
-            <div key={toast.id} className="flex w-full max-w-sm items-center gap-2.5 rounded-xl px-4 py-3 shadow-2xl" style={{ background: "var(--panel)", border: `1px solid var(--border)`, borderLeft: `4px solid ${toast.st === "trade" ? "#2f81f7" : toast.st === "funds" ? GOLD : toast.st === "login" ? "#a78bfa" : BUY}` }}>
+            <div key={toast.id} className="flex w-full max-w-sm cursor-pointer items-center gap-2.5 rounded-xl px-4 py-3 shadow-2xl" style={{ background: "var(--panel)", border: `1px solid var(--border)`, borderLeft: `4px solid ${toast.st === "trade" ? "#2f81f7" : toast.st === "funds" ? GOLD : toast.st === "login" ? "#a78bfa" : BUY}` }}>
               <i className={"fa-solid text-sm " + (toast.st === "trade" ? "fa-chart-line" : toast.st === "funds" ? "fa-money-bill" : "fa-bell")} style={{ color: toast.st === "trade" ? "#2f81f7" : toast.st === "funds" ? GOLD : BUY }} />
               <div className="min-w-0 flex-1">
                 <div className="text-[12px] font-semibold text-[var(--text)]">{toast.title}</div>

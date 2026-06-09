@@ -1,5 +1,5 @@
 "use client";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
 import PriceCell from "./PriceCell";
 
@@ -18,21 +18,28 @@ function DeskMarketWatch({ symbols, selSym, onPick }: { symbols: Sym[]; selSym?:
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
     const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const prev: Record<string, number> = {};
-    let raf = 0;
+    // Steady interval flush + startTransition (mirrors the client) — rAF can be
+    // throttled by the browser, which made the desk watch lag. This keeps it
+    // ticking pip-by-pip for every symbol.
     const flush = () => {
-      raf = 0;
-      if (Object.keys(pP).length) { setPrices((pp) => ({ ...pp, ...pP })); for (const k in pP) delete pP[k]; }
-      if (Object.keys(pD).length) { setDirs((dd) => ({ ...dd, ...pD })); for (const k in pD) delete pD[k]; }
+      const pk = Object.keys(pP), dk = Object.keys(pD);
+      if (!pk.length && !dk.length) return;
+      const px = { ...pP }; const dr = { ...pD };
+      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k];
+      startTransition(() => {
+        if (pk.length) setPrices((pp) => ({ ...pp, ...px }));
+        if (dk.length) setDirs((dd) => ({ ...dd, ...dr }));
+      });
     };
-    socket.on("prices", (snap: Record<string, number>) => { setPrices((pp) => ({ ...pp, ...snap })); for (const k in snap) prev[k] = snap[k]; });
+    socket.on("prices", (snap: Record<string, number>) => { startTransition(() => setPrices((pp) => ({ ...pp, ...snap }))); for (const k in snap) prev[k] = snap[k]; });
     socket.on("tick", ({ symbol, price }: any) => {
       const pv = prev[symbol];
       if (pv != null && pv !== price) pD[symbol] = price > pv ? 1 : -1;
       prev[symbol] = price; pP[symbol] = price;
-      if (!raf) raf = requestAnimationFrame(flush);
     });
+    const fv = setInterval(flush, 120);
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
-    return () => { socket.disconnect(); clearInterval(clr); if (raf) cancelAnimationFrame(raf); };
+    return () => { socket.disconnect(); clearInterval(clr); clearInterval(fv); };
   }, []);
 
   const q = search.trim().toLowerCase();
