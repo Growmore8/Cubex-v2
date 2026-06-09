@@ -841,7 +841,9 @@ export default function AdminDeskPage() {
                 const adminGroups = groupIdsWithRows.filter((gid) => !grpOwner[gid]);
                 const mgrGroups: Record<string, string[]> = {};
                 groupIdsWithRows.forEach((gid) => { const mid = grpOwner[gid]; if (mid) (mgrGroups[mid] || (mgrGroups[mid] = [])).push(gid); });
-                const managerIds = Array.from(new Set([...Object.keys(mgrDirect), ...Object.keys(mgrGroups)]));
+                // Include ALL managers (even those with no clients yet) in the LIVE tab,
+                // so a newly created manager shows in the terminal immediately.
+                const managerIds = Array.from(new Set([...Object.keys(mgrDirect), ...Object.keys(mgrGroups), ...(navTab === "live" && !navSearch ? managers.map((m: any) => m.id) : [])]));
 
                 const header = (key: string, label: string, icon: string, color: string, count: number, pad = "") => (
                   <button onClick={() => toggleCat(key)} className={"flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-[10px] font-semibold " + pad} style={{ color }}>
@@ -1412,6 +1414,11 @@ export default function AdminDeskPage() {
                 DNL
               </button>
             </div>
+            {can("deleteClients") && (
+              <button onClick={() => delClient(menu.acc)} className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-[10px] font-semibold transition-opacity hover:opacity-75" style={{ background: SELL + "20", color: SELL }}>
+                <i className="fa-solid fa-trash text-[9px]" /> Delete Client (permanent)
+              </button>
+            )}
           </div>
 
           {/* Status section — all accounts of this user */}
