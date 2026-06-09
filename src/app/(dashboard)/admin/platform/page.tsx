@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
 import LWChart from "@/components/LWChart";
 import PriceCell from "@/components/PriceCell";
@@ -318,17 +318,24 @@ export default function AdminDeskPage() {
     // animation frame so 57 symbols can't trigger hundreds of re-renders/sec.
     const pP: Record<string, number> = {};
     const pD: Record<string, number> = {};
-    let raf = 0;
+    // Mirror the CLIENT's mechanism exactly: accumulate ticks in refs, then flush
+    // on a short interval inside startTransition so the (heavy) desk price update
+    // is NON-blocking/interruptible and stays real-time — matching the client.
     const flush = () => {
-      raf = 0;
-      const px = pP; const dr = pD;
-      if (Object.keys(px).length) { setPrices((pp) => ({ ...pp, ...px })); for (const k in px) delete px[k]; }
-      if (Object.keys(dr).length) { setDirs((dd) => ({ ...dd, ...dr })); for (const k in dr) delete dr[k]; }
+      const pxKeys = Object.keys(pP); const drKeys = Object.keys(pD);
+      if (!pxKeys.length && !drKeys.length) return;
+      const px = { ...pP }; const dr = { ...pD };
+      for (const k in pP) delete pP[k];
+      for (const k in pD) delete pD[k];
+      startTransition(() => {
+        if (pxKeys.length) setPrices((pp) => ({ ...pp, ...px }));
+        if (drKeys.length) setDirs((dd) => ({ ...dd, ...dr }));
+      });
     };
     socket.on("prices", (snapshot: Record<string, number>) => {
       // Initial (and post-seed) bulk snapshot — sets all known prices at once,
       // including frozen/closed-market symbols that never emit tick events.
-      setPrices((pp) => ({ ...pp, ...snapshot }));
+      startTransition(() => setPrices((pp) => ({ ...pp, ...snapshot })));
       for (const k in snapshot) prevRef.current[k] = snapshot[k];
     });
     socket.on("tick", ({ symbol, price }: any) => {
@@ -336,14 +343,14 @@ export default function AdminDeskPage() {
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
-      if (!raf) raf = requestAnimationFrame(flush);
     });
+    const flushIv = setInterval(flush, 150);
     // Single timer clears the up/down flash for all symbols (cheap vs per-symbol timers)
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
     socket.on("liquidation", () => { loadAll(); loadNotifs(); });
     socket.on("refresh", () => { loadAll(); loadNotifs(); });
     const t = setInterval(() => fetch("/api/desk/trades").then((r) => r.json()).then((d) => d.ok && setOpen(d.trades)).catch(() => {}), 7000);
-    return () => { socket.disconnect(); clearInterval(t); clearInterval(clr); if (raf) cancelAnimationFrame(raf); };
+    return () => { socket.disconnect(); clearInterval(t); clearInterval(clr); clearInterval(flushIv); };
   }, []);
 
   function dragX(e: any, which: "nav" | "mw") { e.preventDefault(); const sx = e.clientX; const sw = which === "nav" ? navW : mwW; const mv = (ev: any) => { const dx = ev.clientX - sx; if (which === "nav") setNavW(Math.max(120, Math.min(360, sw + dx))); else setMwW(Math.max(120, Math.min(380, sw - dx))); }; const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }; document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); }
@@ -638,6 +645,7 @@ export default function AdminDeskPage() {
       <div className="flex items-stretch border-b border-[var(--border)] bg-[var(--panel)] text-[11px]">
         <div className="flex items-center gap-2 border-r border-[var(--border)] px-3 py-1.5" style={{ width: panels.nav ? navW + 1 : undefined }}>
           {brand.logoUrl ? <img src={brand.logoUrl} alt="" className="h-4 w-4 rounded object-contain" /> : <span className="inline-block h-4 w-4 rounded" style={{ background: "var(--accent)" }} />}<b className="font-medium">{brand.name || "Platform"}</b>
+          <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent)" }}>Back Office</span>
         </div>
         <div className="flex flex-1 items-center gap-0.5 px-2 py-1">
           {(() => {
