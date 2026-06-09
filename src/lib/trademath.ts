@@ -47,23 +47,19 @@ export function pipSize(symbol: string): number {
   return /JPY$/i.test(symbol) ? 0.01 : 0.0001;
 }
 
-// Floating / closed P&L in USD.
-// Forex: $1 per pip per 1.0 lot when USD is the quote currency (e.g. GBPUSD).
-//   GBPUSD 144 pips, 0.01 lot => 144 * 0.01 = $1.44.
-//   When USD is the base currency (USDJPY, USDCHF, USDCAD…), the quote-currency
-//   P&L is converted to USD by dividing by the current rate.
-// Metals / crypto / indices keep the contract-size model.
+// Floating / closed P&L in USD — STANDARD contract-size model (1.0 lot = the
+// instrument's contract size; forex = 100,000 units, i.e. $10 per pip per lot).
+//   GBPUSD 0.1 lot, 834.1 pips => 0.08341 * 0.1 * 100000 = $834.10.
+//   When USD is the BASE currency (USDJPY, USDCHF, USDCAD…) the P&L lands in the
+//   quote currency, so it is converted to USD by dividing by the current rate.
+// Metals / crypto / indices use their own contract size (unchanged).
 export function pnlFor(symbol: string, type: "BUY" | "SELL", openPrice: number, price: number, lots: number, category?: string): number {
   const dir = type === "BUY" ? 1 : -1;
   const diff = (price - openPrice) * dir;
-  if (isForex(symbol)) {
-    const pips = diff / pipSize(symbol);
-    let profit = pips * lots; // $1 / pip / lot (USD as quote)
-    if (/^USD/i.test(symbol)) profit = profit / (price || 1); // USD as base -> convert to USD
-    return profit;
-  }
   const cs = contractSize(symbol, category);
-  return diff * lots * cs;
+  let profit = diff * lots * cs;
+  if (isForex(symbol) && /^USD/i.test(symbol)) profit = profit / (price || 1); // USD as base -> convert to USD
+  return profit;
 }
 
 // TP/SL placement rule:

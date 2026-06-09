@@ -24,13 +24,10 @@ function pnlOf(p: any, price: number, cs: number) {
   const dir = p.type === "BUY" ? 1 : -1;
   const diff = (price - p.openPrice) * dir;
   const isFx = !/^(XAU|XAG|XPT|XPD)/.test(sym) && !sym.endsWith("USDT") && /^[A-Z]{6}$/.test(sym);
-  if (isFx) {
-    const pip = /JPY$/i.test(sym) ? 0.01 : 0.0001;
-    let pf = (diff / pip) * p.lots;
-    if (/^USD/i.test(sym)) pf = pf / (price || 1);
-    return pf;
-  }
-  return diff * p.lots * (cs || 100000);
+  // Standard contract-size model (forex = 100,000 units per 1.0 lot).
+  let pf = diff * p.lots * (cs || 100000);
+  if (isFx && /^USD/i.test(sym)) pf = pf / (price || 1); // USD as base -> convert to USD
+  return pf;
 }
 
 export default function ClientTerminal() {

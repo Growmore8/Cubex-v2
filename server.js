@@ -351,14 +351,11 @@ function calcPnl(symbol, type, openPrice, price, lots) {
   const dir = type === "BUY" ? 1 : -1;
   const diff = (price - openPrice) * dir;
   const isFx = !/^(XAU|XAG|XPT|XPD)/.test(sym) && !sym.endsWith("USDT") && /^[A-Z]{6}$/.test(sym);
-  if (isFx) {
-    const pip = /JPY$/i.test(sym) ? 0.01 : 0.0001;
-    let pf = (diff / pip) * lots;
-    if (/^USD/i.test(sym)) pf = pf / (price || 1);
-    return pf;
-  }
   const m = meta[sym] || { contract: 100000 };
-  return diff * lots * m.contract;
+  // Standard contract-size model (1.0 lot = contract size; forex = 100,000).
+  let pf = diff * lots * m.contract;
+  if (isFx && /^USD/i.test(sym)) pf = pf / (price || 1); // USD as base -> convert to USD
+  return pf;
 }
 const liquidating = new Set(); // guard: prevent double-liquidation of same account
 const closing = new Set();    // guard: prevent double-close of same trade (TP/SL)

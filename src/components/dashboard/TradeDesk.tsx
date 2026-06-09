@@ -8,14 +8,11 @@ function pnlOf(p: any, price: number) {
   const dir = p.type === "BUY" ? 1 : -1;
   const diff = (price - p.openPrice) * dir;
   const isFx = !/^(XAU|XAG|XPT|XPD)/.test(sym) && !sym.endsWith("USDT") && /^[A-Z]{6}$/.test(sym);
-  if (isFx) {
-    const pip = /JPY$/i.test(sym) ? 0.01 : 0.0001;
-    let pf = (diff / pip) * p.lots;
-    if (/^USD/i.test(sym)) pf = pf / (price || 1);
-    return pf;
-  }
+  // Standard contract-size model (forex = 100,000 units per 1.0 lot).
   const meta = instruments[sym] || { contractSize: 100000 };
-  return diff * p.lots * meta.contractSize;
+  let pf = diff * p.lots * meta.contractSize;
+  if (isFx && /^USD/i.test(sym)) pf = pf / (price || 1); // USD base -> convert to USD
+  return pf;
 }
 
 export default function TradeDesk() {
