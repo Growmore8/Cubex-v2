@@ -193,7 +193,11 @@ export default function AdminDeskPage() {
   async function toggleSymPerm(symbol: string, disabled: boolean) {
     const r = await fetch("/api/admin/symbol-perms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol, disabled }) });
     const d = await r.json();
-    if (d.ok) { setSymPerm((p: any) => ({ ...p, disabled: d.disabled })); loadAll(); }
+    if (d.ok) {
+      setSymPerm((p: any) => (p ? { ...p, disabled: d.disabled } : p));
+      setOk(`${symbol} turned ${disabled ? "OFF" : "ON"} for clients`);
+      loadAll();
+    } else setErr(d.error || "Failed to update symbol");
   }
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   async function loadPending() { try { const d = await fetch("/api/desk/pending").then((r) => r.json()); if (d.ok) setPendingOrders(d.pending || []); } catch {} }
@@ -937,7 +941,7 @@ export default function AdminDeskPage() {
           <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
             <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
-            <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile} />
+            <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile} onDisable={(sym) => toggleSymPerm(sym, true)} />
           </aside>
         </>)}
       </div>

@@ -9,11 +9,12 @@ const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "
 
 // Self-contained market watch with its OWN socket + price state, so it ticks
 // pip-by-pip independently of the (heavy) desk re-render — as smooth as the client.
-function DeskMarketWatch({ symbols, selSym, onPick }: { symbols: Sym[]; selSym?: string; onPick: (sym: string) => void }) {
+function DeskMarketWatch({ symbols, selSym, onPick, onDisable }: { symbols: Sym[]; selSym?: string; onPick: (sym: string) => void; onDisable?: (sym: string) => void }) {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [ctx, setCtx] = useState<{ x: number; y: number; sym: string } | null>(null);
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
@@ -68,7 +69,7 @@ function DeskMarketWatch({ symbols, selSym, onPick }: { symbols: Sym[]; selSym?:
             <div onClick={() => setCollapsed((o) => ({ ...o, [cat]: !o[cat] }))} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[cat] ? "▸" : "▾"} {cat.toUpperCase()}</div>
             {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dgFor(s); const bid = p != null ? (p * 0.9999).toFixed(d) : "—"; const ask = p != null ? (p * 1.0001).toFixed(d) : "—"; const dir = dirs[s.symbol] || 0;
               return (
-                <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)} className={"grid cursor-pointer grid-cols-[1fr_72px_72px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")} style={{ borderRadius: 3, minHeight: 22 }}>
+                <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)} onContextMenu={onDisable ? (e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); } : undefined} className={"grid cursor-pointer grid-cols-[1fr_72px_72px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")} style={{ borderRadius: 3, minHeight: 22 }}>
                   <span className="truncate pl-2 text-left">{s.symbol}</span>
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
@@ -77,6 +78,15 @@ function DeskMarketWatch({ symbols, selSym, onPick }: { symbols: Sym[]; selSym?:
         ))}
         {ordered.length === 0 && <div className="px-2 py-3 text-center text-[var(--muted)]">No symbols match &ldquo;{search}&rdquo;.</div>}
       </div>
+      {ctx && onDisable && (<>
+        <div className="fixed inset-0 z-[120]" onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
+        <div className="fixed z-[121] min-w-[180px] overflow-hidden rounded-lg border py-1 text-[11px] shadow-2xl" style={{ left: Math.min(ctx.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 200), top: ctx.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+          <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{ctx.sym}</div>
+          <button onClick={() => { onDisable(ctx.sym); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]" style={{ color: "#dc2626" }}>
+            <i className="fa-solid fa-eye-slash text-[10px]" /> Disable symbol (turn off for clients)
+          </button>
+        </div>
+      </>)}
     </>
   );
 }
