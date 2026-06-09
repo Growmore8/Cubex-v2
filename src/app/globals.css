@@ -98,6 +98,11 @@
 .dark .app-ambient::before { opacity: 0.22; }
 .dark .app-ambient::after  { opacity: 0.18; }
 
+/* ---- account card 3D flip (tap + auto) ---- */
+.flip3d { transform-style: preserve-3d; transition: transform .8s cubic-bezier(.2,.8,.2,1); will-change: transform; }
+.flip3d > .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flip3d > .face.front { position: relative; }
+.flip3d > .face.back { transform: rotateY(180deg); }
 /* ---- dashboard account card button micro-animation ---- */
 @keyframes coin-bob { 0%,100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-3px) rotate(8deg); } }
 .coin-bob { animation: coin-bob 1.5s ease-in-out infinite; }

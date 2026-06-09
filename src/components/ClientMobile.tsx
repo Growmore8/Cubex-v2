@@ -90,6 +90,9 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mSl, setMSl] = useState("");
   const [mTp, setMTp] = useState("");
   const [notisOpen, setNotisOpen] = useState(false);
+  // Account card flip — tap to flip, and auto-flips every 15s.
+  const [flipped, setFlipped] = useState(false);
+  useEffect(() => { const t = setInterval(() => setFlipped((f) => !f), 15000); return () => clearInterval(t); }, []);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [bioOn, setBioOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -259,21 +262,18 @@ export default function ClientMobile({ t }: { t: any }) {
     setModifyId(null); setExpanded(null);
   };
 
-  // Account-card palette — LIVE uses the tenant brand colours, DEMO a distinct amber/gold.
+  // Account-card palette — FIXED premium dark gradients from the reference cards
+  // (NOT the tenant theme). The card stays dark in light mode too. LIVE = deep
+  // blue, DEMO = purple/magenta. Front + back share the gradient.
   const cIsLive = account?.type === "LIVE";
-  // Premium vivid gradients (like the reference cards). LIVE = brand blue→violet,
-  // DEMO = a distinct magenta→purple. Content unchanged, colour only.
-  const cardC1 = cIsLive ? (brand?.primaryColor || "#2563eb") : "#db2777";
-  const cardC2 = cIsLive ? (brand?.accentColor || "#7c3aed") : "#6d28d9";
-  const cardGlow = cIsLive ? "rgba(37,99,235,.6)" : "rgba(219,39,119,.6)";
-  // Glass in dark mode; in LIGHT mode use a richer, deeper gradient so the white
-  // card text stays readable (translucent-over-light washed it out).
-  const cardDark = theme === "dark";
-  // Vivid premium gradient like the reference cards (both themes) — the world-map
-  // texture and metallic chip sit on top.
-  const cardFrontBg = cardDark
-    ? `linear-gradient(150deg, ${cardC1} 0%, ${cardC2} 62%, color-mix(in srgb, ${cardC2} 55%, #000) 100%)`
-    : `linear-gradient(150deg, ${cardC1} 0%, ${cardC2} 70%, color-mix(in srgb, ${cardC2} 70%, #000) 100%)`;
+  const cardDark = theme === "dark"; // (kept for button styling elsewhere)
+  const cardC1 = cIsLive ? "#2547d6" : "#7c2d92";
+  const cardC2 = cIsLive ? "#4f74ff" : "#a83bbf";
+  const cardGlow = cIsLive ? "rgba(79,116,255,.55)" : "rgba(168,59,191,.55)";
+  // Reference-style dark gradient (constant across light/dark): rich colour top-left,
+  // deepening to near-black bottom-right. World-map shade + chip sit on top.
+  const cardFrontBg = `linear-gradient(145deg, ${cardC1} 0%, ${cardC2} 42%, #1a1430 78%, #0b0a16 100%)`;
+  const cardBackBg = `linear-gradient(145deg, ${cardC2} 0%, ${cardC1} 45%, #161228 80%, #0b0a16 100%)`;
 
   return (
     <>
@@ -406,55 +406,73 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── DASHBOARD ───────── */}
         <KeepAlive active={tab === "dashboard"}>{(
           <div className="space-y-4 p-3">
-            {/* premium world-map account card — swipe left/right to switch accounts */}
-            <div style={{ touchAction: "pan-y" }}
+            {/* premium world-map account card — tap to flip, swipe to switch accounts */}
+            <div style={{ touchAction: "pan-y", perspective: 1400 }}
               onTouchStart={(e) => { (e.currentTarget as any)._sx = e.touches[0].clientX; }}
               onTouchEnd={(e) => {
                 const sx = (e.currentTarget as any)._sx;
                 if (sx == null) return;
                 const dx = e.changedTouches[0].clientX - sx;
-                if (Math.abs(dx) < 40) return; // ignore taps
+                if (Math.abs(dx) < 40) { setFlipped((f) => !f); return; } // tap = flip
                 const ids = (accts || []).map((a: any) => a.id);
                 const cur = ids.indexOf(accId);
                 if (dx < 0 && cur < ids.length - 1) switchAcc(ids[cur + 1]);
                 else if (dx > 0 && cur > 0) switchAcc(ids[cur - 1]);
-              }}>
-              <div className="relative overflow-hidden rounded-[20px] p-5 text-white" style={{
-                background: cardFrontBg,
-                border: "1px solid rgba(255,255,255,0.16)",
-                boxShadow: "0 26px 50px -22px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.22)",
-              }}>
-                {/* world-map texture + subtle glow + sheen */}
-                <WorldMapBg opacity={cardDark ? 0.18 : 0.22} />
-                <div className="card-sheen pointer-events-none absolute inset-0" />
-                <div className="pointer-events-none absolute -right-16 -top-24 h-60 w-60 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.16), transparent 70%)" }} />
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${cardC1}, ${cardC2}, ${cardC1})`, boxShadow: `0 0 16px 1px ${cardGlow}` }} />
+              }}
+              onClick={() => setFlipped((f) => !f)}>
+              <div className="flip3d relative" style={{ transform: flipped ? "rotateY(180deg)" : "none" }}>
 
-                {/* top row: brand + bank-style chip */}
-                <div className="relative flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="text-[11px] font-bold tracking-[0.2em] text-white/90">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
-                    <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>{account?.type}</span>
+                {/* ── FRONT ── */}
+                <div className="face front overflow-hidden rounded-[20px] p-5 text-white" style={{
+                  background: cardFrontBg,
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  boxShadow: "0 26px 50px -22px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.18)",
+                }}>
+                  <WorldMapBg opacity={0.16} />
+                  <div className="card-sheen pointer-events-none absolute inset-0" />
+                  <div className="pointer-events-none absolute -right-16 -top-24 h-60 w-60 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.12), transparent 70%)" }} />
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${cardC1}, ${cardC2}, ${cardC1})`, boxShadow: `0 0 16px 1px ${cardGlow}` }} />
+                  <div className="relative flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="text-[11px] font-bold tracking-[0.2em] text-white/90">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
+                      <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>{account?.type}</span>
+                    </div>
+                    <div className="h-7 w-9 rounded-[6px]" style={{ background: "linear-gradient(135deg,#f4e3a1,#caa54e 45%,#9c7c2e 70%,#e9d27f)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.6), inset 0 -1px 2px rgba(0,0,0,0.35)" }} />
                   </div>
-                  {/* metallic chip */}
-                  <div className="h-7 w-9 rounded-[6px]" style={{ background: "linear-gradient(135deg,#f4e3a1,#caa54e 45%,#9c7c2e 70%,#e9d27f)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.6), inset 0 -1px 2px rgba(0,0,0,0.35)" }} />
+                  <div className="relative mt-5">
+                    <div className="text-[9px] font-semibold tracking-[0.18em] text-white/55">TOTAL BALANCE</div>
+                    <div className="mt-1 text-[32px] font-extrabold leading-none tracking-tight text-white" style={{ textShadow: "0 2px 14px rgba(0,0,0,0.5)" }}>${fmt(balance)}</div>
+                    <div className="mt-2 flex items-center gap-2 text-[11px] text-white/75">
+                      <span className="font-mono tracking-[0.2em]">{account?.login}</span>
+                      <span className="text-white/40">·</span>
+                      <span className="uppercase tracking-wide">{titleCaseName(account?.ownerName || account?.name)}</span>
+                    </div>
+                  </div>
+                  <div className="relative my-3 h-px" style={{ background: "rgba(255,255,255,0.18)" }} />
+                  <div className="relative grid grid-cols-3 gap-2 text-white">
+                    <div><div className="text-[8px] tracking-[0.12em] text-white/50">EQUITY</div><div className="text-[13px] font-bold tabular-nums">${fmt(equity)}</div></div>
+                    <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE</div><div className="text-[13px] font-bold tabular-nums">${fmt(free)}</div></div>
+                    <div><div className="text-[8px] tracking-[0.12em] text-white/50">FLT P/L</div><div className="text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#5ef2b3" : "#ff9a9a" }}>{floating >= 0 ? "+" : ""}{fmt(floating)}</div></div>
+                  </div>
                 </div>
 
-                <div className="relative mt-5">
-                  <div className="text-[9px] font-semibold tracking-[0.18em] text-white/55">TOTAL BALANCE</div>
-                  <div className="mt-1 text-[32px] font-extrabold leading-none tracking-tight text-white" style={{ textShadow: "0 2px 14px rgba(0,0,0,0.5)" }}>${fmt(balance)}</div>
-                  <div className="mt-2 flex items-center gap-2 text-[11px] text-white/75">
-                    <span className="font-mono tracking-[0.2em]">{account?.login}</span>
-                    <span className="text-white/40">·</span>
-                    <span className="uppercase tracking-wide">{titleCaseName(account?.ownerName || account?.name)}</span>
+                {/* ── BACK (brand + $) ── */}
+                <div className="face back overflow-hidden rounded-[20px] p-5 text-white" style={{
+                  background: cardBackBg,
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  boxShadow: "0 26px 50px -22px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.18)",
+                }}>
+                  <WorldMapBg opacity={0.16} />
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${cardC1}, ${cardC2}, ${cardC1})`, boxShadow: `0 0 16px 1px ${cardGlow}` }} />
+                  {/* magnetic stripe */}
+                  <div className="pointer-events-none absolute inset-x-0 top-7 h-9" style={{ background: "rgba(0,0,0,0.55)" }} />
+                  <div className="relative flex h-full flex-col items-center justify-center" style={{ minHeight: 150 }}>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full text-2xl font-black" style={{ background: `linear-gradient(135deg, ${cardC1}, ${cardC2})`, boxShadow: `0 0 26px ${cardGlow}, inset 0 1px 0 rgba(255,255,255,0.45)` }}>$</div>
+                    <div className="mt-3 text-[13px] font-bold tracking-[0.24em] text-white/90">{(brand?.name || "TRADING").toUpperCase()}</div>
+                    <div className="mt-1 text-[9px] tracking-[0.14em] text-white/45">{account?.type} · {account?.login}</div>
                   </div>
                 </div>
-                <div className="relative my-3 h-px" style={{ background: "rgba(255,255,255,0.18)" }} />
-                <div className="relative grid grid-cols-3 gap-2 text-white">
-                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">EQUITY</div><div className="text-[13px] font-bold tabular-nums">${fmt(equity)}</div></div>
-                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE</div><div className="text-[13px] font-bold tabular-nums">${fmt(free)}</div></div>
-                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">FLT P/L</div><div className="text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#5ef2b3" : "#ff9a9a" }}>{floating >= 0 ? "+" : ""}{fmt(floating)}</div></div>
-                </div>
+
               </div>
             </div>
             {/* dots */}
