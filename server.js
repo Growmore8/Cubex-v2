@@ -401,6 +401,7 @@ async function closeTpSl(t, reason, price, io) {
       await prisma.auditLog.create({ data: { tenantId: t.account.tenantId, action: "trade." + (reason === "TP" ? "tp" : "sl"), detail: (t.account.login || "") + " " + body, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
     }
     io.emit("refresh", {});
+    io.emit("refresh", { kind: "notification" }); // make client + staff reload notifs (sound + toast)
     console.log("[" + reason + "]", t.symbol, t.type, Number(t.lots) + "L @ " + price, "P/L", calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots)).toFixed(2));
   } catch (e) { console.error("[tp/sl close]", e); } finally { closing.delete(t.id.toString()); }
 }
@@ -424,6 +425,7 @@ async function liquidate(acc, list, io) {
     await prisma.auditLog.create({ data: { tenantId: acc.tenantId, action: "account.liquidated", detail: body, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
     io.emit("liquidation", { accountId: acc.id, login: acc.login });
     io.emit("refresh", {});
+    io.emit("refresh", { kind: "notification" }); // client + staff reload notifs (sound + toast)
     console.log("[MC] liquidated", acc.login, list.length, "trades, total P/L:", total.toFixed(2));
   } catch (e) { console.error("[liquidate]", e); } finally { liquidating.delete(acc.id); }
 }
@@ -497,6 +499,7 @@ async function checkPending(io) {
       await notifyStaffRaw(o.account.tenantId, { title: "Pending filled — " + (o.account.login || ""), body: pbody, type: "TRADE" }, o.account.managerId);
       await prisma.auditLog.create({ data: { tenantId: o.account.tenantId, action: "order.filled", detail: (o.account.login || "") + " " + pbody, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
       io.emit("refresh", {});
+      io.emit("refresh", { kind: "notification" }); // client + staff reload notifs (sound + toast)
     }
   } catch (e) { console.error("[checkPending]", e); }
 }
