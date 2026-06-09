@@ -65,6 +65,7 @@ export async function createClient(tenantId: string, input: any, actor = "admin"
         leverage: input.leverage || 100, currency: input.currency || "USD",
         managerId: input.managerId || null, phone: input.phone || null, country: input.country || null,
         isPool: !!input.isPool,
+        mcLevel: new Prisma.Decimal(50), // default margin-call level
         deposit: type === "DEMO" ? new Prisma.Decimal(input.deposit ?? 10000) : new Prisma.Decimal(input.deposit ?? 0),
       },
     });

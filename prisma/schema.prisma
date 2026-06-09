@@ -108,7 +108,7 @@ model Account {
   type            AccountType        @default(LIVE)
   leverage        Int                @default(100)
   currency        Currency           @default(USD)
-  mcLevel         Decimal            @default(0) @db.Decimal(6, 2)
+  mcLevel         Decimal            @default(50) @db.Decimal(6, 2)
   doNotLiquidate  Boolean            @default(false)
   locked          Boolean            @default(false)
   deactivated     Boolean            @default(false)

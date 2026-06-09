@@ -146,7 +146,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const login = String(max + 1);
         const subType = b.type === "DEMO" ? "DEMO" : (b.type === "LIVE" ? "LIVE" : acc.type);
         const subDep = Number(b.deposit) > 0 ? new Prisma.Decimal(Number(b.deposit)) : new Prisma.Decimal(0);
-        const sub = await prisma.account.create({ data: { tenantId, login, name: b.name || (acc.name + " sub"), type: subType, leverage: Number(b.leverage) || acc.leverage, currency: b.currency || acc.currency, managerId: acc.managerId, groupId: acc.groupId, parentId: acc.id, userId: acc.userId, deposit: subDep } });
+        const sub = await prisma.account.create({ data: { tenantId, login, name: b.name || (acc.name + " sub"), type: subType, leverage: Number(b.leverage) || acc.leverage, currency: b.currency || acc.currency, managerId: acc.managerId, groupId: acc.groupId, parentId: acc.id, userId: acc.userId, mcLevel: new Prisma.Decimal(50), deposit: subDep } });
         if (Number(b.deposit) > 0) await prisma.financialHistory.create({ data: { accountId: sub.id, type: "DEPOSIT" as any, amount: subDep, description: "Initial deposit", mode: "MANUAL", createdBy: actor } });
         await audit(tenantId, "client.subAccount", "parent " + acc.login + " -> " + login, actor);
         break;

@@ -134,7 +134,7 @@ export async function registerClient(
     await tx.account.create({
       data: {
         tenantId: tenant!.id, login, userId: user.id, name, type,
-        leverage: 100, currency: "USD",
+        leverage: 100, currency: "USD", mcLevel: new Prisma.Decimal(50),
         phone: phone || null, country: country || null,
         deposit: type === "DEMO" ? new Prisma.Decimal(10000) : new Prisma.Decimal(0),
       },
