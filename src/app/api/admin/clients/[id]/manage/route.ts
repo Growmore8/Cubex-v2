@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       throw new Error("Not permitted for manager role");
     }
     const actor = s.email || "admin";
-    const permMap: Record<string, string> = { manualPnl: "editFinancial", transfer: "transferFunds", subAccount: "createClients" };
+    const permMap: Record<string, string> = { manualPnl: "editFinancial", transfer: "transferFunds", subAccount: "createClients", reconcile: "editFinancial" };
     if (permMap[b.action]) await assertCan(s, permMap[b.action]);
 
     switch (b.action) {
@@ -97,6 +97,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         await prisma.financialHistory.create({ data: { accountId: acc.id, type: "PNL_ADJUST" as any, amount: new Prisma.Decimal(amt), description: b.description || "Manual P/L adjustment", mode: "MANUAL" as any, createdBy: actor } }).catch(() => {});
         await audit(tenantId, "client.manualPnl", acc.login + " " + amt, actor);
         break;
+      }
+      case "reconcile": {
+        // Recompute the account's realized P/L from the surviving records:
+        // sum of closed-trade P/L + sum of manual P/L (PNL_ADJUST) rows. This
+        // removes orphaned amounts left when a manual P/L was deleted on a build
+        // that didn't reverse the balance. Deposits/credit/bonus are untouched.
+        const [tAgg, fins] = await Promise.all([
+          prisma.tradeHistory.aggregate({ where: { accountId: acc.id }, _sum: { pnl: true } }),
+          prisma.financialHistory.findMany({ where: { accountId: acc.id, type: "PNL_ADJUST" as any }, select: { amount: true } }),
+        ]);
+        const tradePnl = Number(tAgg._sum.pnl || 0);
+        const manualPnl = fins.reduce((sum, f) => sum + Number(f.amount), 0);
+        const after = tradePnl + manualPnl;
+        const before = Number(acc.pnl);
+        await prisma.account.update({ where: { id: acc.id }, data: { pnl: new Prisma.Decimal(after) } });
+        await audit(tenantId, "client.reconcile", `${acc.login} pnl ${before} -> ${after} (trades ${tradePnl} + manual ${manualPnl})`, actor);
+        return NextResponse.json({ ok: true, before, after, delta: after - before });
       }
       case "transfer": {
         const amt = Number(b.amount);
