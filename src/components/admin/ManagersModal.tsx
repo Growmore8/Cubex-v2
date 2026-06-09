@@ -219,9 +219,21 @@ export default function ManagersModal({ onClose }: { onClose: () => void }) {
         <div className={ovl} onMouseDown={() => setDelRow(null)}>
           <div className={card + " w-[380px]"} onMouseDown={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center justify-between"><div className="font-semibold text-red-500">Delete Manager</div><button onClick={() => setDelRow(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button></div>
-            <p className="mb-4 text-sm text-[var(--muted)]">Delete <span className="font-semibold text-[var(--text)]">{delRow.name}</span> ({delRow.email})? This cannot be undone.</p>
+            <p className="mb-1 text-sm text-[var(--muted)]">Delete <span className="font-semibold text-[var(--text)]">{delRow.name}</span> ({delRow.email})?</p>
+            <p className="mb-4 text-xs text-[var(--muted)]">{(delRow._count?.managedAccounts ?? 0) > 0
+              ? <>This manager has <b className="text-[var(--text)]">{delRow._count?.managedAccounts}</b> assigned client(s). Choose what to do:</>
+              : <>This manager has no assigned clients.</>}</p>
             {err && <div className="mb-2 text-xs text-red-500">{err}</div>}
-            <div className="flex justify-end gap-2"><button className="ui-btn ui-btn-ghost px-4 py-2 text-sm" onClick={() => setDelRow(null)}>Cancel</button><button className="ui-btn px-4 py-2 text-sm font-medium text-white" style={{ background: "#dc2626" }} onClick={async () => { setErr(""); const r = await fetch("/api/admin/managers/" + delRow.id, { method: "DELETE" }).then((x) => x.json()); if (r.ok) { setDelRow(null); load(); } else setErr(r.error || "Delete failed"); }}>Delete</button></div>
+            {(() => {
+              const del = async (withClients: boolean) => { setErr(""); const r = await fetch("/api/admin/managers/" + delRow.id + (withClients ? "?withClients=1" : ""), { method: "DELETE" }).then((x) => x.json()); if (r.ok) { setDelRow(null); load(); } else setErr(r.error || "Delete failed"); };
+              return (
+                <div className="flex flex-col gap-2">
+                  <button className="ui-btn px-4 py-2 text-sm font-medium text-white" style={{ background: "#dc2626" }} onClick={() => del(false)}>Delete manager only{(delRow._count?.managedAccounts ?? 0) > 0 ? " — keep clients (move to Admin)" : ""}</button>
+                  {(delRow._count?.managedAccounts ?? 0) > 0 && <button className="ui-btn px-4 py-2 text-sm font-medium text-white" style={{ background: "#991b1b" }} onClick={() => { if (confirm(`Permanently delete this manager AND their ${delRow._count?.managedAccounts} client account(s)? This cannot be undone.`)) del(true); }}>Delete manager + all {delRow._count?.managedAccounts} clients</button>}
+                  <button className="ui-btn ui-btn-ghost px-4 py-2 text-sm" onClick={() => setDelRow(null)}>Cancel</button>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

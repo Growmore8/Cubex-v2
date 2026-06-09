@@ -779,7 +779,7 @@ export default function AdminDeskPage() {
               <button onClick={() => setNavTab("demo")} className="flex-1 py-1.5 font-semibold" style={navTab === "demo" ? { color: "var(--accent)", borderBottom: `2px solid var(--accent)` } : { color: "var(--muted)" }}>DEMO ({demoAccs.length})</button>
             </div>
             <div className="border-b border-[var(--border)] px-1.5 py-1">
-              <input value={navSearch} onChange={(e) => setNavSearch(e.target.value)} placeholder="Client ID / Name / Email" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[10px] text-[var(--text)]" />
+              <input value={navSearch} onChange={(e) => setNavSearch(e.target.value)} name="nav-search" autoComplete="off" data-form-type="other" placeholder="Client ID / Name / Email" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[10px] text-[var(--text)]" />
             </div>
             <div className="flex-1 overflow-auto p-1 text-[11px]">
               {(() => {

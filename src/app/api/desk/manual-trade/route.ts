@@ -6,6 +6,8 @@ import { manualTrade } from "@/services/desk.service";
 const schema = z.object({
   accountId: z.string(), symbol: z.string(), type: z.enum(["BUY", "SELL"]),
   lots: z.number().positive(), sl: z.number().optional(), tp: z.number().optional(),
+  // Custom open price + back-dated open time for manual/historical entries.
+  openPrice: z.number().optional(), openedAt: z.string().optional(),
 });
 
 export async function POST(req: Request) {

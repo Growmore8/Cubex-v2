@@ -52,9 +52,21 @@ export async function updateManager(tenantId: string, id: string, data: any) {
   return prisma.user.update({ where: { id }, data: patch, select: { id: true, name: true, email: true, status: true, perms: true } });
 }
 
-export async function deleteManager(tenantId: string, id: string) {
+export async function deleteManager(tenantId: string, id: string, withClients = false) {
   const m = await prisma.user.findFirst({ where: { tenantId, id, role: "MANAGER" } });
   if (!m) throw new Error("Manager not found");
+  if (withClients) {
+    // Also delete this manager's assigned client accounts (+ their owner users
+    // that have no other accounts). Otherwise managerId is SET NULL and the
+    // clients simply move under the admin (the manager FK is onDelete: SetNull).
+    const accs = await prisma.account.findMany({ where: { tenantId, managerId: id }, select: { id: true, userId: true } });
+    const userIds = Array.from(new Set(accs.map((a) => a.userId).filter(Boolean) as string[]));
+    if (accs.length) await prisma.account.deleteMany({ where: { id: { in: accs.map((a) => a.id) } } });
+    for (const uid of userIds) {
+      const left = await prisma.account.count({ where: { userId: uid } });
+      if (left === 0) await prisma.user.delete({ where: { id: uid } }).catch(() => {});
+    }
+  }
   await prisma.user.delete({ where: { id } });
   return { ok: true };
 }

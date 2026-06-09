@@ -43,7 +43,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       if (!row) throw new Error("Financial history not found");
       const rule = FIN[row.type];
       const ops: any[] = [];
-      if (rule) ops.push(prisma.account.update({ where: { id: row.accountId }, data: { [rule.col]: { increment: -rule.sign * Math.abs(Number(row.amount)) } } as any }));
+      if (row.type === "PNL_ADJUST") {
+        // Manual P/L stored signed — reverse it out of the account's pnl so the
+        // balance/equity/ticker update everywhere.
+        ops.push(prisma.account.update({ where: { id: row.accountId }, data: { pnl: { decrement: Number(row.amount) } } }));
+      } else if (rule) {
+        ops.push(prisma.account.update({ where: { id: row.accountId }, data: { [rule.col]: { increment: -rule.sign * Math.abs(Number(row.amount)) } } as any }));
+      }
       ops.push(prisma.financialHistory.delete({ where: { id: p.id } }));
       // Transfer delete-sync: remove the paired entry on the other account too
       if ((row.type === "TRANSFER_IN" || row.type === "TRANSFER_OUT") && row.reference) {

@@ -28,14 +28,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     await assertCan(s, "manageManagers");
-    await deleteManager(s.tenantId!, id);
-    await audit(s.tenantId!, "manager.delete", id, s.email || "admin");
+    const withClients = new URL(req.url).searchParams.get("withClients") === "1";
+    await deleteManager(s.tenantId!, id, withClients);
+    await audit(s.tenantId!, "manager.delete", id + (withClients ? " (+clients)" : " (clients kept)"), s.email || "admin");
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Delete failed" }, { status: 400 });
