@@ -444,9 +444,9 @@ export default function ClientTerminal() {
                 <div className="ui-pop absolute right-0 z-[90] mt-1 w-56 overflow-hidden rounded-xl border py-1 text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
                   {head("Funds")}
                   {curAcct?.type === "LIVE" ? (<>
-                    {mItem(() => { close(); setWalletModal("deposit"); }, "fa-arrow-down-to-bracket", "Deposit", BUY)}
-                    {mItem(() => { close(); setWalletModal("withdraw"); }, "fa-arrow-up-from-bracket", "Withdraw", GOLD)}
-                    {accts.length >= 2 && mItem(() => { setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); }, "fa-right-left", "Transfer", undefined, readOnly)}
+                    {mItem(() => { close(); setWalletModal("deposit"); }, "fa-circle-dollar-to-slot", "Deposit", BUY)}
+                    {mItem(() => { close(); setWalletModal("withdraw"); }, "fa-hand-holding-dollar", "Withdraw", GOLD)}
+                    {accts.length >= 2 && mItem(() => { setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); }, "fa-money-bill-transfer", "Transfer", undefined, readOnly)}
                   </>) : (
                     mItem(topUp, "fa-coins", "Top up Demo", GOLD, readOnly)
                   )}

@@ -63,6 +63,25 @@ function LotStepper({ vol, setVol, small }: { vol: number; setVol: (v: number) =
   );
 }
 
+// Mini line chart (sparkline) — builds from a rolling price history; falls back
+// to a gentle directional slope until enough points have streamed in.
+function Sparkline({ data, up, w = 50, h = 20 }: { data?: number[]; up: boolean; w?: number; h?: number }) {
+  const col = up ? "#2dd4a7" : "#ff5b6b";
+  let pairs: [number, number][];
+  if (data && data.length >= 2) {
+    const min = Math.min(...data), max = Math.max(...data), rng = (max - min) || 1;
+    pairs = data.map((v, i) => [(i / (data.length - 1)) * w, h - 2 - ((v - min) / rng) * (h - 4)]);
+  } else {
+    pairs = up ? [[0, h - 3], [w * 0.35, h * 0.55], [w * 0.62, h * 0.6], [w, 3]] : [[0, 3], [w * 0.4, h * 0.5], [w * 0.66, h * 0.46], [w, h - 3]];
+  }
+  const pts = pairs.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0">
+      <polyline points={pts} fill="none" stroke={col} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function ClientMobile({ t }: { t: any }) {
   const [noOpen, setNoOpen] = useState(false);
   const [noForm, setNoForm] = useState<any>({ idx: 0, lots: 0.01, trigger: "", sl: "", tp: "" });
@@ -196,10 +215,13 @@ export default function ClientMobile({ t }: { t: any }) {
   // movers — snapshotted every 3s (not every ~80ms tick) so the list & numbers
   // stay calm instead of flickering. Ranked by cumulative % change.
   const pricesRef = useRef(prices); pricesRef.current = prices;
+  const sparkRef = useRef<Record<string, number[]>>({}); // rolling price history for sparklines
   const [movers, setMovers] = useState<{ gainers: any[]; losers: any[]; any: boolean }>({ gainers: [], losers: [], any: false });
   useEffect(() => {
     const compute = () => {
       const pr = pricesRef.current; const b = baselineRef.current;
+      // append one history point per symbol (cap 24) — ~every 3s
+      for (const s of (symbols || [])) { const p = pr[s.symbol]; if (p == null) continue; const h = sparkRef.current[s.symbol] || (sparkRef.current[s.symbol] = []); h.push(p); if (h.length > 24) h.shift(); }
       const list = (symbols || []).filter((s: any) => pr[s.symbol] != null).map((s: any) => {
         const base = b[s.symbol]; const p = pr[s.symbol];
         return { symbol: s.symbol, display: s.display, price: p, pct: (base && p) ? ((p - base) / base) * 100 : 0 };
@@ -462,9 +484,9 @@ export default function ClientMobile({ t }: { t: any }) {
             {account?.type === "LIVE" ? (
               <div className="grid grid-cols-3 gap-2">
                 {([
-                  { label: "Deposit", icon: "fa-arrow-down-to-bracket", col: BUY, on: () => setWalletTab("deposit") },
-                  { label: "Withdraw", icon: "fa-arrow-up-from-bracket", col: SELL, on: () => setWalletTab("withdraw") },
-                  { label: "Transfer", icon: "fa-right-left", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); } },
+                  { label: "Deposit", icon: "fa-circle-dollar-to-slot", col: BUY, on: () => setWalletTab("deposit") },
+                  { label: "Withdraw", icon: "fa-hand-holding-dollar", col: SELL, on: () => setWalletTab("withdraw") },
+                  { label: "Transfer", icon: "fa-money-bill-transfer", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); } },
                 ]).map((b) => (
                   <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, #ffffff, #eef1f6)", border: "1px solid var(--border)", boxShadow: cardDark ? "inset 0 1px 0 rgba(255,255,255,0.06)" : "0 1px 2px rgba(0,0,0,0.05)" }}>
                     {/* metallic chrome icon chip (reference look) */}
@@ -504,8 +526,9 @@ export default function ClientMobile({ t }: { t: any }) {
                       return (
                         <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
                           <span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-up" /></span>
-                          <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
-                          <span className="text-[12px] font-semibold" style={{ color: BUY }}>{(p >= 0 ? "+" : "") + p.toFixed(2)}%</span>
+                          <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
+                          <Sparkline data={sparkRef.current[s.symbol]} up={true} />
+                          <span className="w-[52px] text-right text-[12px] font-semibold tabular-nums" style={{ color: BUY }}>{(p >= 0 ? "+" : "") + p.toFixed(2)}%</span>
                         </button>
                       );
                     })}
@@ -517,8 +540,9 @@ export default function ClientMobile({ t }: { t: any }) {
                       return (
                         <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
                           <span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-down" /></span>
-                          <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
-                          <span className="text-[12px] font-semibold" style={{ color: SELL }}>{p.toFixed(2)}%</span>
+                          <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
+                          <Sparkline data={sparkRef.current[s.symbol]} up={false} />
+                          <span className="w-[52px] text-right text-[12px] font-semibold tabular-nums" style={{ color: SELL }}>{p.toFixed(2)}%</span>
                         </button>
                       );
                     })}
@@ -548,6 +572,8 @@ export default function ClientMobile({ t }: { t: any }) {
                 const sBid = p != null ? p * 0.9999 : null; const sAsk = p;
                 const spread = p != null ? Math.max(1, Math.round((p - sBid!) / Math.pow(10, -dd))) : 0;
                 const dr = dirs?.[s.symbol] || 0;
+                const hist = sparkRef.current[s.symbol];
+                const upTrend = hist && hist.length >= 2 ? hist[hist.length - 1] >= hist[0] : dr >= 0;
                 return (
                   <div key={s.symbol} className="rounded-xl border bg-[var(--card)] p-3" style={{ borderColor: dr > 0 ? BUY : dr < 0 ? SELL : "var(--border)", transition: "border-color 0.4s ease" }}>
                     {/* Double-tap the info row to open this symbol's chart */}
@@ -557,7 +583,10 @@ export default function ClientMobile({ t }: { t: any }) {
                         <button onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="text-sm font-bold underline-offset-2 active:underline">{s.display || s.symbol}</button>
                         {dr !== 0 && <i className={"fa-solid " + (dr > 0 ? "fa-caret-up" : "fa-caret-down")} style={{ fontSize: 11, color: dr > 0 ? BUY : SELL }} />}
                       </div>
-                      <span className="text-[10px] text-[var(--muted)]">Sprd: {spread} · double-tap for chart</span>
+                      <div className="flex items-center gap-2">
+                        <Sparkline data={hist} up={upTrend} />
+                        <span className="text-[10px] text-[var(--muted)]">Sprd {spread}</span>
+                      </div>
                     </div>
                     <div className="grid grid-cols-3 items-center gap-2">
                       <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "SELL"); }} className="rounded-lg py-2 text-center text-white" style={{ background: SELL }}>
