@@ -47,11 +47,20 @@ async function presenceMarkOffline(info) {
   try {
     // Flip the online dot off immediately by back-dating lastSeenAt past the window.
     await prisma.user.update({ where: { id: info.sub }, data: { lastSeenAt: new Date(Date.now() - 10 * 60 * 1000) } }).catch(() => {});
-    const acc = await prisma.account.findFirst({ where: { tenantId: info.tenantId, userId: info.sub }, select: { login: true, managerId: true } });
-    await prisma.auditLog.create({
-      data: { tenantId: info.tenantId, action: "auth.disconnect", detail: `CLIENT "${info.name}" (${acc && acc.login || ""}) went offline (app / tab closed)`, performedBy: info.email || info.name || "client", category: "CLIENT" },
-    }).catch(() => {});
-    await notifyStaffRaw(info.tenantId, { title: "Client offline", body: `${info.name} (${acc && acc.login || ""}) closed the app`, type: "LOGIN" }, acc && acc.managerId);
+    if (info.role === "MANAGER") {
+      // Manager closed the terminal -> tenant admins + superadmins (no managerId).
+      await prisma.auditLog.create({
+        data: { tenantId: info.tenantId, action: "auth.disconnect", detail: `MANAGER "${info.name}" went offline (terminal closed)`, performedBy: info.email || info.name || "manager", category: "MANAGER" },
+      }).catch(() => {});
+      await notifyStaffRaw(info.tenantId, { title: "Manager offline", body: `${info.name} closed the terminal`, type: "LOGIN" }, null);
+    } else {
+      // Client closed the app -> tenant admins + owning manager + superadmins.
+      const acc = await prisma.account.findFirst({ where: { tenantId: info.tenantId, userId: info.sub }, select: { login: true, managerId: true } });
+      await prisma.auditLog.create({
+        data: { tenantId: info.tenantId, action: "auth.disconnect", detail: `CLIENT "${info.name}" (${acc && acc.login || ""}) went offline (app / tab closed)`, performedBy: info.email || info.name || "client", category: "CLIENT" },
+      }).catch(() => {});
+      await notifyStaffRaw(info.tenantId, { title: "Client offline", body: `${info.name} (${acc && acc.login || ""}) closed the app`, type: "LOGIN" }, acc && acc.managerId);
+    }
     if (global.__io) global.__io.emit("refresh", {});
   } catch (e) { console.error("[presenceMarkOffline]", e); }
 }
@@ -562,9 +571,10 @@ app.prepare().then(async () => {
     // latest price immediately — open positions then show their real last P&L, not 0.
     const px = {}; for (const s of symbols) { const st = state[s]; if (st && st.price != null) px[s] = st.price; }
     socket.emit("prices", px);
-    // Presence tracking — only real CLIENT sessions count toward online/offline.
+    // Presence tracking — CLIENT and MANAGER sessions count toward online/offline
+    // (so closing the app / terminal notifies staff even when the beacon fails).
     const sess = sessionFromSocket(socket);
-    if (sess && sess.role === "CLIENT" && sess.sub && sess.tenantId) {
+    if (sess && (sess.role === "CLIENT" || sess.role === "MANAGER") && sess.sub && sess.tenantId) {
       presenceConnect(socket, sess);
       socket.on("disconnect", () => presenceDisconnect(socket));
     }

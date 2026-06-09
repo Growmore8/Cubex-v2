@@ -186,7 +186,11 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
       </>)}
       {wType === "UPI" && (<div><div className={lbl}>Your UPI ID</div><input className={input} value={wAddress} onChange={(e) => setWAddress(e.target.value)} placeholder="name@bank" required /></div>)}
       {wType === "BANK" && (<>
-        <div><div className={lbl}>Account Name <span className="font-normal normal-case text-[var(--muted)]">(auto — from your registered name)</span></div><input className={input} value={acctName} onChange={(e) => setAcctName(e.target.value)} placeholder="Account holder name" /></div>
+        <div><div className={lbl}>Account Name <span className="font-normal normal-case text-[var(--muted)]">(locked — must match your registered name)</span></div>
+          <div className="relative">
+            <input className={input + " pr-8 opacity-90 cursor-not-allowed"} value={acctName} readOnly title="The bank account name must match your registered name and cannot be changed." placeholder="Account holder name" />
+            <i className="fa-solid fa-lock absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]" />
+          </div></div>
         <div><div className={lbl}>Account Number</div><input className={input} value={bankAcctNo} onChange={(e) => setBankAcctNo(e.target.value)} placeholder="Account number" required /></div>
         <div className="grid grid-cols-2 gap-3">
           <div><div className={lbl}>Bank Name</div><input className={input} value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Bank name" required /></div>

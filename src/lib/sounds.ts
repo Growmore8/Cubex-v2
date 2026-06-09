@@ -32,26 +32,32 @@ function audioCtx(): AudioContext | null {
   } catch { return null; }
 }
 
-function blip(freq: number, start: number, dur: number, vol: number, type: OscillatorType = "sine") {
+// A single soft note with a gentle attack/decay envelope. `detune` adds a faint
+// second oscillator a few cents apart for a warmer, less "beepy" tone.
+function blip(freq: number, start: number, dur: number, vol: number, type: OscillatorType = "sine", warm = true) {
   const ac = audioCtx(); if (!ac) return;
   const t0 = ac.currentTime + start;
-  const osc = ac.createOscillator();
   const gain = ac.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, t0);
+  // soft attack, smooth exponential release — no clicks
   gain.gain.setValueAtTime(0.0001, t0);
-  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  osc.connect(gain); gain.connect(ac.destination);
-  osc.start(t0); osc.stop(t0 + dur + 0.02);
+  gain.connect(ac.destination);
+  const mk = (f: number, detune = 0) => { const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t0); o.detune.setValueAtTime(detune, t0); o.connect(gain); o.start(t0); o.stop(t0 + dur + 0.03); };
+  mk(freq);
+  if (warm) mk(freq, 6); // subtle chorus
 }
 
-// Distinct patterns per category so they're recognizable by ear.
+// Distinct, pleasant patterns per category (gentle bells / arpeggios, not beeps).
 const PATTERNS: Record<SoundType, () => void> = {
-  trade: () => { const v = getVol() * 0.55; blip(660, 0, 0.09, v, "triangle"); blip(880, 0.09, 0.11, v, "triangle"); },
-  funds: () => { const v = getVol() * 0.6; blip(523, 0, 0.1, v); blip(659, 0.1, 0.1, v); blip(784, 0.2, 0.16, v); },
-  login: () => { const v = getVol() * 0.5; blip(440, 0, 0.16, v, "sine"); },
-  notice: () => { const v = getVol() * 0.55; blip(880, 0, 0.14, v, "sine"); },
+  // trade: quick confident two-note rise
+  trade: () => { const v = getVol() * 0.5; blip(587, 0, 0.12, v, "triangle"); blip(880, 0.1, 0.18, v, "triangle"); },
+  // funds: warm 3-note major arpeggio (C-E-G) — "cha-ching" feel
+  funds: () => { const v = getVol() * 0.55; blip(523.25, 0, 0.12, v); blip(659.25, 0.11, 0.12, v); blip(783.99, 0.22, 0.26, v); },
+  // login: soft two-note "doorbell" (in = up, but kept gentle)
+  login: () => { const v = getVol() * 0.45; blip(494, 0, 0.16, v); blip(659, 0.14, 0.24, v); },
+  // notice: single mellow bell
+  notice: () => { const v = getVol() * 0.5; blip(784, 0, 0.1, v); blip(988, 0.08, 0.28, v); },
 };
 
 export function playSound(type: SoundType) {

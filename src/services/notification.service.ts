@@ -59,6 +59,19 @@ export async function notifyStaff(
   return recipients.length;
 }
 
+// Notify ALL SuperAdmins only (platform-owner visibility) — used for staff
+// login/logout where tenant admins don't need their own/peers' events.
+export async function notifySuperAdmins(tenantId: string, opts: { title: string; body?: string; type?: string }) {
+  const supers = await prisma.user.findMany({ where: { role: "SUPERADMIN" }, select: { id: true } });
+  if (!supers.length) return null;
+  await prisma.notification.createMany({
+    data: supers.map((u) => ({ tenantId, userId: u.id, title: opts.title, body: opts.body || null, type: opts.type || "NOTICE" })),
+  }).catch(() => {});
+  await Promise.all(supers.map((u) => sendPushToUser(u.id, { title: opts.title, body: opts.body }))).catch(() => {});
+  ping(supers.map((u) => u.id));
+  return supers.length;
+}
+
 export function listNotifications(userId: string) {
   return prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 30 });
 }

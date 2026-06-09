@@ -5,7 +5,7 @@ import { authenticate } from "@/services/auth.service";
 import { signSession, SESSION_COOKIE, signDeviceToken, DEVICE_COOKIE } from "@/lib/jwt";
 import { ROLE_HOME } from "@/config/roles";
 import { audit } from "@/lib/audit";
-import { notifyStaff } from "@/services/notification.service";
+import { notifyStaff, notifySuperAdmins } from "@/services/notification.service";
 import { prisma } from "@/lib/prisma";
 import { deviceFromUA } from "@/lib/presence";
 import { rateLimit } from "@/lib/rateLimit";
@@ -23,13 +23,22 @@ export async function POST(req: Request) {
     }
     const session = await authenticate(host, email, password, ip, h.get("user-agent") || undefined);
     audit(session.tenantId, "auth.login", `${session.role} "${session.name}" logged in` + (ip ? ` (${ip})` : ""), session.email, session.role as any);
-    // Notify staff when a client logs in (drives the login sound on admin/manager side)
-    if (session.role === "CLIENT" && session.tenantId) {
+    // Realtime login notifications + sound:
+    //  CLIENT  -> tenant admins + owning manager + superadmins
+    //  MANAGER -> tenant admins + superadmins
+    //  ADMIN   -> superadmins only (platform-owner visibility)
+    if (session.tenantId) {
       try {
-        const acc = await prisma.account.findFirst({ where: { tenantId: session.tenantId, userId: session.sub }, select: { managerId: true, login: true } });
         const dev = deviceFromUA(h.get("user-agent"));
         const meta = (ip ? ` · IP ${ip}` : "") + (dev ? ` · ${dev}` : "");
-        notifyStaff(session.tenantId, { type: "LOGIN", title: "Client login", body: `${session.name} (${acc?.login || ""}) signed in${meta}` }, acc?.managerId).catch(() => {});
+        if (session.role === "CLIENT") {
+          const acc = await prisma.account.findFirst({ where: { tenantId: session.tenantId, userId: session.sub }, select: { managerId: true, login: true } });
+          notifyStaff(session.tenantId, { type: "LOGIN", title: "Client login", body: `${session.name} (${acc?.login || ""}) signed in${meta}` }, acc?.managerId).catch(() => {});
+        } else if (session.role === "MANAGER") {
+          notifyStaff(session.tenantId, { type: "LOGIN", title: "Manager login", body: `${session.name} signed in${meta}` }).catch(() => {});
+        } else if (session.role === "ADMIN") {
+          notifySuperAdmins(session.tenantId, { type: "LOGIN", title: "Admin login", body: `${session.name} signed in${meta}` }).catch(() => {});
+        }
       } catch {}
     }
     const token = await signSession(session, remember ? "30d" : undefined);

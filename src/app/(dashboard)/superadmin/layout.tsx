@@ -3,6 +3,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
+import { io, type Socket } from "socket.io-client";
+import { playSound, soundForNotification, setVol as setSndVol } from "@/lib/sounds";
 
 const IDLE_MS = 15 * 60 * 1000;
 const WARN_MS = 13 * 60 * 1000;
@@ -134,7 +136,6 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   const [notifs, setNotifs] = useState<any[]>([]);
   const [unread, setUnread] = useState(0);
   const [panel, setPanel] = useState(false);
-  const ac = useRef<any>(null);
   const prev = useRef<number>(-1);
   const volRef = useRef(1.5);
   const [idleWarn, setIdleWarn] = useState(false);
@@ -143,17 +144,6 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   const idleWarnRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleCountRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  function beep(f: number, d: number, g: number) {
-    try {
-      if (!ac.current) ac.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const c = ac.current; if (c.state === "suspended") c.resume();
-      const o = c.createOscillator(), gain = c.createGain();
-      o.connect(gain); gain.connect(c.destination); o.type = "sine"; o.frequency.value = f;
-      gain.gain.value = Math.min(0.9, g * volRef.current);
-      gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + d);
-      o.start(); o.stop(c.currentTime + d);
-    } catch (e) {}
-  }
   async function loadNotifs() {
     try {
       // Received notifications (everything notifyStaff routes to this SuperAdmin —
@@ -162,7 +152,8 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
       const d = await fetch("/api/notifications").then((r) => r.json());
       if (d.ok) {
         const items = d.items || [];
-        if (prev.current >= 0 && items.length > prev.current) { beep(880, 0.12, 0.25); }
+        // Play the category-specific sound (trade / funds / login / notice) for new arrivals.
+        if (prev.current >= 0 && items.length > prev.current && items[0]) { playSound(soundForNotification(items[0])); }
         prev.current = items.length; setNotifs(items);
         setUnread(items.filter((n: any) => !n.read).length);
       }
@@ -170,8 +161,12 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   }
   useEffect(() => {
     setMounted(true);
-    try { const v = parseFloat(localStorage.getItem("sa_notifVol") || "1.5"); volRef.current = v; setVol(v); } catch (e) {}
+    try { const v = parseFloat(localStorage.getItem("sa_notifVol") || "1.5"); volRef.current = v; setVol(v); setSndVol(Math.min(1, v / 3)); } catch (e) {}
     loadNotifs(); const t = setInterval(loadNotifs, 30000);
+    // Realtime: the notify pipeline emits "refresh" — reload notifs instantly
+    // instead of waiting for the 30s poll.
+    let sock: Socket | null = null;
+    try { sock = io({ path: "/socket.io" }); sock.on("refresh", () => loadNotifs()); } catch {}
 
     // Tab/browser close = logout (if not remembered)
     function onPageHide() {
@@ -208,6 +203,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
 
     return () => {
       clearInterval(t);
+      try { sock?.disconnect(); } catch {}
       window.removeEventListener("pagehide", onPageHide);
       actEvents.forEach((e) => window.removeEventListener(e, resetIdle));
       if (idleWarnRef.current) clearTimeout(idleWarnRef.current);
@@ -216,7 +212,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
     };
   }, []);
  function toggleTheme() { setTheme(dark ? "light" : "dark"); }
-  function setVolume(v: number) { volRef.current = v; setVol(v); try { localStorage.setItem("sa_notifVol", String(v)); } catch (e) {} beep(880, 0.08, 0.25); }
+  function setVolume(v: number) { volRef.current = v; setVol(v); setSndVol(Math.min(1, v / 3)); try { localStorage.setItem("sa_notifVol", String(v)); } catch (e) {} playSound("notice"); }
   function openPanel() { setPanel((p) => { const n = !p; if (n) { setUnread(0); fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {}); } return n; }); }
 
   return (
