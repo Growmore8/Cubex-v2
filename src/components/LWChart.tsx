@@ -98,7 +98,7 @@ export type ChartPosition = {
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
 function LWChart({
-  symbol, tf, theme, positions, digits = 2, showTools = true, ind, calcPnl,
+  symbol, tf, theme, positions, digits = 2, showTools = true, ind, calcPnl, tool: toolProp, onTool, clearKey,
 }: {
   symbol: string;
   tf: string;
@@ -113,6 +113,11 @@ function LWChart({
   /** Controlled indicators from a parent header (desktop). When set, the in-chart
       left sidebar is hidden and the parent renders the SMA/EMA/BB/RSI/MACD buttons. */
   ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean };
+  /** Controlled drawing tool from a parent header (H-line / trend next to indicators).
+      When onTool is set, the in-chart floating draw toolbar is hidden. */
+  tool?: "none" | "hline" | "trend";
+  onTool?: (t: "none" | "hline" | "trend") => void;
+  clearKey?: number; // increment to clear all drawings
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
@@ -126,8 +131,10 @@ function LWChart({
   const tfRef = useRef(tf);
   symRef.current = symbol; tfRef.current = tf;
 
-  // Drawing tools + indicators
-  const [tool, setTool] = useState<"none" | "hline" | "trend">("none");
+  // Drawing tools + indicators — `tool` may be controlled by a parent header.
+  const [internalTool, setInternalTool] = useState<"none" | "hline" | "trend">("none");
+  const tool = toolProp !== undefined ? toolProp : internalTool;
+  const setTool = (t: "none" | "hline" | "trend") => { if (onTool) onTool(t); else setInternalTool(t); };
   const toolRef = useRef(tool); toolRef.current = tool;
   const [sma, setSma] = useState(false);
   const [ema, setEma] = useState(false);
@@ -165,6 +172,8 @@ function LWChart({
     trendRefs.current = [];
     trendStart.current = null; setDrawN(0); setTool("none");
   }
+  // Parent-triggered clear (header "clear drawings" button).
+  useEffect(() => { if (clearKey) clearDrawings(); /* eslint-disable-next-line */ }, [clearKey]);
 
   // Create / recreate chart on theme change
   useEffect(() => {
@@ -532,8 +541,9 @@ function LWChart({
         {/* Main price chart */}
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
           <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
-          {/* Desktop drawing tools (H-line / trend / clear) — floating top-left */}
-          {showTools && ind && (
+          {/* Desktop drawing tools (H-line / trend / clear) — floating top-left.
+              Hidden when the parent header controls the tool (onTool set). */}
+          {showTools && ind && !onTool && (
             <div style={{ position: "absolute", top: 6, left: 8, zIndex: 6, display: "flex", gap: 3, padding: "3px 5px", borderRadius: 8, background: panelBg, border: `1px solid ${bord}` }}>
               {drawBtns}
             </div>
@@ -578,6 +588,7 @@ function posSig(ps?: ChartPosition[]) {
 function areEqual(a: any, b: any) {
   return a.symbol === b.symbol && a.tf === b.tf && a.theme === b.theme && a.digits === b.digits
     && a.showTools === b.showTools && JSON.stringify(a.ind) === JSON.stringify(b.ind)
+    && a.tool === b.tool && a.clearKey === b.clearKey
     && posSig(a.positions) === posSig(b.positions);
 }
 export default memo(LWChart, areEqual);

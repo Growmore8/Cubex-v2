@@ -152,6 +152,8 @@ export default function AdminDeskPage() {
   const [auditCat, setAuditCat] = useState("ALL");
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false });
+  const [chartTool, setChartTool] = useState<"none" | "hline" | "trend">("none");
+  const [chartClearKey, setChartClearKey] = useState(0);
   const [stmtModal, setStmtModal] = useState(false);
   const [stmtEmailModal, setStmtEmailModal] = useState(false);
   const [stmtPreset, setStmtPreset] = useState("all");
@@ -894,6 +896,10 @@ export default function AdminDeskPage() {
               <button onClick={() => { const a = symbols.find((s) => openCharts.indexOf(s.symbol) === -1); if (a) addChart(a.symbol); }} className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[var(--muted)]">+</button>
             </div>
             <div className="ml-auto flex items-center gap-0.5">
+              {/* Drawing tools: H-line + trend line, next to the indicators */}
+              <button onClick={() => setChartTool((t) => t === "hline" ? "none" : "hline")} title="Horizontal line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "hline" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "hline" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "hline" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-minus text-[11px]" /></button>
+              <button onClick={() => setChartTool((t) => t === "trend" ? "none" : "trend")} title="Trend line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "trend" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "trend" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "trend" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-arrow-trend-up text-[11px]" /></button>
+              <button onClick={() => setChartClearKey((n) => n + 1)} title="Clear drawings" className="mr-1 rounded px-1.5 py-0.5 text-[var(--muted)]" style={{ border: "1px solid transparent" }}><i className="fa-solid fa-eraser text-[11px]" /></button>
               {(["sma", "ema", "bb", "rsi", "macd"] as const).map((k) => (
                 <button key={k} onClick={() => setChartInd((v) => ({ ...v, [k]: !v[k] }))} title={k.toUpperCase()}
                   className="rounded px-1.5 py-0.5 text-[10px] font-bold"
@@ -912,7 +918,7 @@ export default function AdminDeskPage() {
               <div key={sym + i} className="relative min-h-0 bg-[var(--bg)]" onClick={() => setActive(i)}>
                 
                 {ocStrip(sym)}
-                <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} ind={chartInd} positions={[
+                <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} ind={chartInd} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={[
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]} calcPnl={(p: any, price: number) => pnlOf({ symbol: sym, type: p.type, openPrice: p.openPrice, lots: p.lots } as any, price, csz(sym))} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} />

@@ -71,6 +71,8 @@ export default function ClientTerminal() {
   const [ordIdx, setOrdIdx] = useState(0); // selected order kind (app-style grid)
   const [walletModal, setWalletModal] = useState<null | "deposit" | "withdraw" | "kyc">(null);
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false });
+  const [chartTool, setChartTool] = useState<"none" | "hline" | "trend">("none");
+  const [chartClearKey, setChartClearKey] = useState(0);
   const [stmtRep, setStmtRep] = useState(false);
   const [repPreset, setRepPreset] = useState("all");
   const [repFrom, setRepFrom] = useState("");
@@ -593,6 +595,9 @@ export default function ClientTerminal() {
           <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
             <b className="font-medium">{selSym}</b>
             <div className="ml-auto flex items-center gap-0.5">
+              <button onClick={() => setChartTool((t) => t === "hline" ? "none" : "hline")} title="Horizontal line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "hline" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "hline" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "hline" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-minus text-[11px]" /></button>
+              <button onClick={() => setChartTool((t) => t === "trend" ? "none" : "trend")} title="Trend line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "trend" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "trend" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "trend" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-arrow-trend-up text-[11px]" /></button>
+              <button onClick={() => setChartClearKey((n) => n + 1)} title="Clear drawings" className="mr-1 rounded px-1.5 py-0.5 text-[var(--muted)]"><i className="fa-solid fa-eraser text-[11px]" /></button>
               {(["sma", "ema", "bb", "rsi", "macd"] as const).map((k) => (
                 <button key={k} onClick={() => setChartInd((v) => ({ ...v, [k]: !v[k] }))} title={k.toUpperCase()}
                   className="rounded px-1.5 py-0.5 text-[10px] font-bold"
@@ -604,7 +609,7 @@ export default function ClientTerminal() {
             <span className="h-3 w-px bg-[var(--border)]" />
             <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[10px] text-[var(--text)]" style={{ cursor: "pointer" }}>{TFS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
           </div>
-          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><LWChart symbol={selSym} tf={tf} theme={theme} digits={d} ind={chartInd} positions={[
+          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><LWChart symbol={selSym} tf={tf} theme={theme} digits={d} ind={chartInd} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={[
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
           ]} calcPnl={(p: any, price: number) => pnlOf({ symbol: selSym, type: p.type, openPrice: p.openPrice, lots: p.lots } as any, price, csz(selSym))} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} /></div>
