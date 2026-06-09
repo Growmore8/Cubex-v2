@@ -80,7 +80,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     if (wType === "BANK") {
       if (!bankAcctNo.trim() || !bankName.trim()) { setErr("Enter account number and bank name"); return; }
       methodLabel = "Bank Transfer";
-      note = `Bank Transfer — ${acctName || "Account holder"} · A/C ${bankAcctNo} · ${bankName}${ifsc ? " · IFSC " + ifsc : ""}${wNote ? " — " + wNote : ""}`;
+      note = `Bank Transfer — ${(acctName || "Account holder").toUpperCase()} · A/C ${bankAcctNo} · ${bankName}${ifsc ? " · IFSC " + ifsc : ""}${wNote ? " — " + wNote : ""}`;
     } else {
       if (!wAddress.trim()) { setErr("Enter your destination address / account"); return; }
       methodLabel = wType === "CRYPTO" ? `Crypto (${wNetwork})` : "UPI";
@@ -188,7 +188,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
       {wType === "BANK" && (<>
         <div><div className={lbl}>Account Name <span className="font-normal normal-case text-[var(--muted)]">(locked — must match your registered name)</span></div>
           <div className="relative">
-            <input className={input + " pr-8 opacity-90 cursor-not-allowed"} value={acctName} readOnly title="The bank account name must match your registered name and cannot be changed." placeholder="Account holder name" />
+            <input className={input + " pr-8 uppercase opacity-90 cursor-not-allowed"} value={acctName} readOnly title="The bank account name must match your registered name and cannot be changed." placeholder="Account holder name" />
             <i className="fa-solid fa-lock absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]" />
           </div></div>
         <div><div className={lbl}>Account Number</div><input className={input} value={bankAcctNo} onChange={(e) => setBankAcctNo(e.target.value)} placeholder="Account number" required /></div>
