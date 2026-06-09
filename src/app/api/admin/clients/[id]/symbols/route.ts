@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
+import { emitRefresh } from "@/lib/realtime";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,6 +36,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await prisma.accountSymbolOverride.deleteMany({ where: { accountId: acc.id, symbol } });
     }
     await audit(s.tenantId!, "client.symbolOverride", acc.login + " " + symbol + (disabled ? " disabled" : " enabled"), s.email);
+    // Realtime: that client's open app reloads its symbol list immediately.
+    emitRefresh({ kind: "symbols", scope: "account", accountId: acc.id });
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

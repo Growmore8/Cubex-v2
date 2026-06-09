@@ -78,6 +78,9 @@ export async function GET(req: Request) {
       select: { symbol: true, display: true, category: true, digits: true },
     });
     const hidden = await getDisabledSetFor(s);
+    // Per-account overrides: a symbol the admin switched off for THIS specific account.
+    const ovr = account ? await prisma.accountSymbolOverride.findMany({ where: { accountId: account.id, disabled: true }, select: { symbol: true } }) : [];
+    for (const o of ovr) hidden.add(o.symbol);
     if (hidden.size) symbols = symbols.filter((x: any) => !hidden.has(x.symbol));
   } catch { symbols = []; }
 
