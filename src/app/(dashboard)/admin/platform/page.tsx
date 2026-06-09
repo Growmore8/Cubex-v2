@@ -7,6 +7,7 @@ import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds
 import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
 import ManagersModal from "@/components/admin/ManagersModal";
+import PaymentMethodsModal from "@/components/admin/PaymentMethodsModal";
 import DeskMarketWatch from "@/components/DeskMarketWatch";
 import PasswordInput from "@/components/ui/PasswordInput";
 import CountrySelect from "@/components/ui/CountrySelect";
@@ -53,6 +54,7 @@ export default function AdminDeskPage() {
   const isSubAcc = (c: any) => !!c.parentId || subAccIds.has(c.id);
   const [managers, setManagers] = useState<any[]>([]);
   const [mgrModal, setMgrModal] = useState(false);
+  const [pmModal, setPmModal] = useState(false);
   // Toolbox: show the per-tab × close mark? Off by default, toggleable (persisted).
   const [tabCloseX, setTabCloseX] = useState(false);
   useEffect(() => { try { setTabCloseX(localStorage.getItem("cubex-tabx") === "1"); } catch {} }, []);
@@ -684,7 +686,7 @@ export default function AdminDeskPage() {
                     {can("createClients") && dItem(() => openModal("client"), "fa-user-plus", "New Client", BUY)}
                     {!isManager && can("manageManagers") && dItem(() => openModal("manager"), "fa-user-tie", "New Manager")}
                     {!isManager && can("manageManagers") && dItem(() => { setMgrModal(true); }, "fa-users-gear", "Manage Managers")}
-                    {!isManager && dItem(() => { window.location.href = "/admin/payments"; }, "fa-credit-card", "Payment Methods")}
+                    {!isManager && dItem(() => { setPmModal(true); }, "fa-credit-card", "Payment Methods")}
                     {!isManager && dItem(() => openModal("group"), "fa-layer-group", "Groups")}
                     {dDivider}
                     {can("sendNotifications") && dItem(() => openModal("notify"), "fa-paper-plane", "Send Notification", GOLD)}
@@ -1289,6 +1291,7 @@ export default function AdminDeskPage() {
       </>)}
 
       {mgrModal && <ManagersModal onClose={() => { setMgrModal(false); loadAll(); }} />}
+      {pmModal && <PaymentMethodsModal onClose={() => setPmModal(false)} />}
 
       {menu && (<>
         <div className="fixed inset-0 z-40" onClick={() => { setMenu(null); setMenuSub(""); }} />
