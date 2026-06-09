@@ -525,10 +525,10 @@ export default function ClientMobile({ t }: { t: any }) {
                       const p = s.pct;
                       return (
                         <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-up" /></span>
-                          <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
-                          <Sparkline data={sparkRef.current[s.symbol]} up={true} />
-                          <span className="w-[52px] text-right text-[12px] font-semibold tabular-nums" style={{ color: BUY }}>{(p >= 0 ? "+" : "") + p.toFixed(2)}%</span>
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-up" /></span>
+                          <div className="w-24 shrink-0 text-left"><div className="truncate text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
+                          <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={true} /></div>
+                          <span className="w-[52px] shrink-0 text-right text-[12px] font-semibold tabular-nums" style={{ color: BUY }}>{(p >= 0 ? "+" : "") + p.toFixed(2)}%</span>
                         </button>
                       );
                     })}
@@ -539,10 +539,10 @@ export default function ClientMobile({ t }: { t: any }) {
                       const p = s.pct;
                       return (
                         <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-down" /></span>
-                          <div className="flex-1 text-left"><div className="text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
-                          <Sparkline data={sparkRef.current[s.symbol]} up={false} />
-                          <span className="w-[52px] text-right text-[12px] font-semibold tabular-nums" style={{ color: SELL }}>{p.toFixed(2)}%</span>
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-down" /></span>
+                          <div className="w-24 shrink-0 text-left"><div className="truncate text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
+                          <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={false} /></div>
+                          <span className="w-[52px] shrink-0 text-right text-[12px] font-semibold tabular-nums" style={{ color: SELL }}>{p.toFixed(2)}%</span>
                         </button>
                       );
                     })}
@@ -621,7 +621,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       </div>
                     </button>
                     <div className="text-right">
-                      <div className="text-[28px] font-extrabold leading-none tabular-nums text-[var(--text)]">{price != null ? price.toFixed(dg(selSym)) : "…"}</div>
+                      <div className="text-[28px] font-extrabold leading-none tabular-nums" style={{ color: upC ? BUY : SELL }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</div>
                       <div className="mt-1 text-[12px] font-semibold tabular-nums" style={{ color: upC ? BUY : SELL }}>{upC ? "▲" : "▼"} {chg >= 0 ? "+" : ""}{chg.toFixed(dg(selSym))} ({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</div>
                     </div>
                   </div>
@@ -663,12 +663,12 @@ export default function ClientMobile({ t }: { t: any }) {
           <div className="fixed inset-0 z-[85] flex flex-col" style={{ background: "var(--bg)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
             <div className="flex items-center gap-2 border-b px-4" style={{ paddingTop: "calc(env(safe-area-inset-top) + 10px)", paddingBottom: 10, borderColor: "var(--border)", background: "var(--panel)" }}>
               <span className="font-bold text-sm">{selSym}</span>
-              <span className="text-[12px] tabular-nums" style={{ color: BUY }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</span>
+              <span className="text-[12px] tabular-nums" style={{ color: (price != null && baselineRef.current[selSym] != null && price >= baselineRef.current[selSym]) ? BUY : SELL }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</span>
               <div className="ml-auto flex items-center gap-2">
                 <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text)]">
                   {(TFS || []).map((x: string) => <option key={x} value={x}>{x}</option>)}
                 </select>
-                <button onPointerDown={(e) => { e.preventDefault(); setChartFull(false); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
+                <button onClick={() => setChartFull(false)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
                   <i className="fa-solid fa-compress text-[12px]" />
                 </button>
               </div>
