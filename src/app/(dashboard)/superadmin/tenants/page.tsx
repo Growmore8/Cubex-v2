@@ -178,7 +178,7 @@ export default function SATenantsPage() {
             <span className="text-xs text-gray-400">{filteredRows.length} of {rows.length}</span>
           )}
         </div>
-        <table className="sa-table sa-grid">
+        <table className="sa-table">
           <thead>
             <tr>
               <th>Tenant</th>

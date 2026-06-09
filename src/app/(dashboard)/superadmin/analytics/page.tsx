@@ -112,7 +112,7 @@ export default function SAAnalyticsPage() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="sa-table sa-grid">
+          <table className="sa-table">
             <thead>
               <tr>
                 <th>Tenant</th>

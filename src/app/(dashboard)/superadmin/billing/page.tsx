@@ -145,7 +145,7 @@ export default function SABillingPage() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="sa-table sa-grid">
+          <table className="sa-table">
             <thead>
               <tr className="text-left">
                 {["Invoice #","Tenant","Period","Plan","Amount","Status","Due Date","Paid Date","Actions"].map((h) => (
@@ -282,7 +282,7 @@ export default function SABillingPage() {
                   <div className="text-sm text-gray-600">Status: <span className="font-medium">{printInv.status}</span></div>
                 </div>
               </div>
-              <table className="sa-table sa-grid mb-6">
+              <table className="sa-table mb-6">
                 <thead>
                   <tr>
                     <th className="text-left">Description</th>

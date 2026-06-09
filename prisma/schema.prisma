@@ -442,6 +442,7 @@ enum FinType {
   INSURANCE
   TRANSFER_IN
   TRANSFER_OUT
+  PNL_ADJUST
 }
 enum FinMode {
   REALTIME

@@ -52,13 +52,15 @@ export async function listHistory(s: any) {
   }));
   const NEG = new Set(["WITHDRAWAL", "CREDIT_OUT", "TRANSFER_OUT"]);
   const finRows = fins.map((f: any) => {
-    const amt = Math.abs(Number(f.amount));
+    const raw = Number(f.amount);
+    const amt = Math.abs(raw);
     return {
       id: "F" + f.id.toString(), kind: "FIN",
       ticket: f.reference || "-", accountLogin: f.account.login,
       symbol: "-", side: f.type, type: f.type, lots: 0,
       openPrice: 0, closePrice: 0, sl: 0, tp: 0,
-      pnl: NEG.has(f.type) ? -amt : amt,
+      // PNL_ADJUST keeps its real sign (can be + or -); others use the NEG set.
+      pnl: f.type === "PNL_ADJUST" ? raw : (NEG.has(f.type) ? -amt : amt),
       closeReason: f.type, desc: f.description || f.type,
       openedAt: f.appliedAt, closedAt: f.appliedAt, at: f.appliedAt,
     };

@@ -221,7 +221,7 @@ export default function SAClientsPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="sa-table sa-grid">
+          <table className="sa-table">
             <thead>
               <tr>
                 {["ID","NAME / EMAIL / PHONE","COUNTRY","COMPANY / MANAGER","TYPE","BALANCE","ONLINE","IP","JOINED","STATUS","ACTIONS"].map((h) => (

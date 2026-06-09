@@ -800,7 +800,7 @@ export default function ClientMobile({ t }: { t: any }) {
             ) : (
               <div className="space-y-2.5">
                 {(financials || []).length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No financial records.</div> : (financials || []).map((f: any) => {
-                  const credit = ["DEPOSIT", "CREDIT_IN", "BONUS", "TRANSFER_IN", "INSURANCE"].includes(f.type);
+                  const credit = ["DEPOSIT", "CREDIT_IN", "BONUS", "TRANSFER_IN", "INSURANCE"].includes(f.type) || (f.type === "PNL_ADJUST" && Number(f.amount) >= 0);
                   return (
                     <div key={f.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
                       <div>
