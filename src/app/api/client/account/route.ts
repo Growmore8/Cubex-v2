@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { getDisabledSetFor } from "@/services/symbolPerms.service";
+import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
 
 export async function GET(req: Request) {
   const s = await requireClient();
@@ -87,10 +88,16 @@ export async function GET(req: Request) {
     if (t) brand = { name: t.brandName || t.name, logoUrl: t.logoUrl, primaryColor: (t as any).primaryColor || null, accentColor: (t as any).accentColor || null };
   } catch {}
 
+  // Withdraw/transfer cap for THIS (selected) account, per tenant pnl-only setting.
+  const pnlOnly = await getFundsPnlOnly(s.tenantId!).catch(() => false);
+  const withdrawable = account ? withdrawableBalance(account as any, pnlOnly) : 0;
+
   return NextResponse.json({
     ok: true,
     kycVerified,
     brand,
+    pnlOnly,
+    withdrawable,
     account: account ? {
       login: account.login, type: account.type, currency: account.currency, leverage: account.leverage, locked: account.locked,
       name: parentDisplay?.name || account.name,

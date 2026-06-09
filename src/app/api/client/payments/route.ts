@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
+import { prisma } from "@/lib/prisma";
 import { clientAccount } from "@/services/kyc.service";
 import { listClientPayments, createPayment } from "@/services/payment.service";
 import { notifyStaff } from "@/services/notification.service";
@@ -20,9 +21,16 @@ export async function POST(req: Request) {
   const s = await requireClient();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
-    const account = await clientAccount(s.tenantId!, s.sub);
-    if (!account) throw new Error("No account");
     const form = await req.formData();
+    // Resolve the SELECTED account (validated to belong to this client), so the
+    // request is recorded against — and the balance checked for — that account,
+    // not a default/other one.
+    const reqAccId = form.get("accountId") ? String(form.get("accountId")) : "";
+    let account: any = reqAccId
+      ? await prisma.account.findFirst({ where: { id: reqAccId, tenantId: s.tenantId!, userId: s.sub } })
+      : null;
+    if (!account) account = await clientAccount(s.tenantId!, s.sub);
+    if (!account) throw new Error("No account");
     const kind = String(form.get("kind"));
     const amount = Number(form.get("amount"));
     const method = form.get("method") ? String(form.get("method")) : undefined;

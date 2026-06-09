@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 // Shared deposit / withdraw / KYC panel used by the full wallet page, the client
 // desktop terminal modal, and the mobile app. Premium method-list -> QR-detail
 // deposit flow and tabbed withdraw. My Requests is shown in the Profile section.
-export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: { initialTab?: "deposit" | "withdraw" | "kyc"; onClose?: () => void; tabs?: ("deposit" | "withdraw" | "kyc")[] }) {
+export default function WalletPanel({ initialTab = "deposit", onClose, tabs, accountId }: { initialTab?: "deposit" | "withdraw" | "kyc"; onClose?: () => void; tabs?: ("deposit" | "withdraw" | "kyc")[]; accountId?: string }) {
   const shown: ("deposit" | "withdraw" | "kyc")[] = tabs && tabs.length ? tabs : ["deposit", "withdraw", "kyc"];
   const panelTitle = shown.length === 1
     ? (shown[0] === "kyc" ? "KYC Verification" : shown[0] === "deposit" ? "Deposit Funds" : "Withdraw Funds")
@@ -15,6 +15,12 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
   const [links, setLinks] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
+  const [pnlOnly, setPnlOnly] = useState(false);
+  const [acctName, setAcctName] = useState("");
+  // Bank Transfer fields
+  const [bankAcctNo, setBankAcctNo] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [ifsc, setIfsc] = useState("");
   const [err, setErr] = useState(""); const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -33,11 +39,15 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
     const [pm, k, ac] = await Promise.all([
       fetch("/api/client/payment-methods").then((r) => r.json()).catch(() => ({})),
       fetch("/api/client/kyc").then((r) => r.json()).catch(() => ({})),
-      fetch("/api/client/account").then((r) => r.json()).catch(() => ({})),
+      fetch("/api/client/account" + (accountId ? "?accountId=" + encodeURIComponent(accountId) : "")).then((r) => r.json()).catch(() => ({})),
     ]);
     if (pm.ok) { setCrypto(pm.crypto || pm.wallets || []); setUpi(pm.upi || []); setLinks(pm.links || []); }
     if (k.ok) setDocs(k.docs || []);
-    if (ac.ok && ac.account) setWithdrawable(typeof ac.withdrawable === "number" ? ac.withdrawable : Math.max(0, Number(ac.account.pnl || 0)));
+    if (ac.ok && ac.account) {
+      setWithdrawable(typeof ac.withdrawable === "number" ? ac.withdrawable : Math.max(0, Number(ac.account.pnl || 0)));
+      setPnlOnly(!!ac.pnlOnly);
+      setAcctName(ac.account.name || ac.account.ownerName || "");
+    }
   }
   useEffect(() => { load(); }, []);
 
@@ -65,17 +75,26 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
   async function submitWithdraw(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setMsg("");
     const amt = Number(wAmount); if (!(amt > 0)) { setErr("Enter an amount"); return; }
-    if (!wAddress.trim()) { setErr("Enter your destination address / account"); return; }
-    const methodLabel = wType === "CRYPTO" ? `Crypto (${wNetwork})` : wType === "UPI" ? "UPI" : "Bank Transfer";
+    if (withdrawable != null && amt > withdrawable + 1e-6) { setErr(`Max ${fmtUsd(withdrawable)} (${pnlOnly ? "profit only" : "available balance"})`); return; }
+    let methodLabel = ""; let note = "";
+    if (wType === "BANK") {
+      if (!bankAcctNo.trim() || !bankName.trim()) { setErr("Enter account number and bank name"); return; }
+      methodLabel = "Bank Transfer";
+      note = `Bank Transfer — ${acctName || "Account holder"} · A/C ${bankAcctNo} · ${bankName}${ifsc ? " · IFSC " + ifsc : ""}${wNote ? " — " + wNote : ""}`;
+    } else {
+      if (!wAddress.trim()) { setErr("Enter your destination address / account"); return; }
+      methodLabel = wType === "CRYPTO" ? `Crypto (${wNetwork})` : "UPI";
+      note = `Withdraw to ${wType === "CRYPTO" ? wNetwork + " " : ""}${wAddress}${wNote ? " — " + wNote : ""}`;
+    }
     const fd = new FormData();
     fd.set("kind", "WITHDRAWAL"); fd.set("amount", String(amt));
-    fd.set("method", methodLabel);
-    fd.set("note", `Withdraw to ${wType === "CRYPTO" ? wNetwork + " " : ""}${wAddress}${wNote ? " — " + wNote : ""}`);
+    fd.set("method", methodLabel); fd.set("note", note);
+    if (accountId) fd.set("accountId", accountId);
     setSending(true);
     const r = await fetch("/api/client/payments", { method: "POST", body: fd });
     const d = await r.json(); setSending(false);
     if (!d.ok) { setErr(d.error || "Failed"); return; }
-    setWAmount(""); setWAddress(""); setWNote(""); setMsg("Withdrawal request submitted"); load();
+    setWAmount(""); setWAddress(""); setWNote(""); setBankAcctNo(""); setBankName(""); setIfsc(""); setMsg("Withdrawal request submitted"); load();
   }
 
   async function uploadKyc(e: React.FormEvent) {
@@ -148,9 +167,9 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
     {/* ── WITHDRAW ── */}
     {tab === "withdraw" && (<form onSubmit={submitWithdraw} className="ui-card ui-fade-up space-y-3 p-4">
       <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--border)", background: "var(--soft)" }}>
-        <div className={lbl + " text-center"}>Available Profit To Withdraw</div>
+        <div className={lbl + " text-center"}>{pnlOnly ? "Available Profit To Withdraw" : "Available Balance To Withdraw"}</div>
         <div className="text-xl font-bold" style={{ color: "#22d3ee" }}>{withdrawable != null ? fmtUsd(withdrawable) : "—"}</div>
-        <div className="text-[10px] text-[var(--muted)]">Closed PnL only — deposit cannot be withdrawn</div>
+        <div className="text-[10px] text-[var(--muted)]">{pnlOnly ? "Closed PnL only — deposit cannot be withdrawn" : "Full available balance of this account"}</div>
       </div>
       <div><div className={lbl}>Method</div>
         <div className="grid grid-cols-3 gap-1.5">
@@ -159,10 +178,24 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs }: {
           ))}
         </div>
       </div>
-      {wType === "CRYPTO" && (<div><div className={lbl}>Network</div><select className={input} value={wNetwork} onChange={(e) => setWNetwork(e.target.value)}>{["TRC20", "BEP20", "ERC20"].map((n) => <option key={n} value={n}>{n}</option>)}</select></div>)}
-      <div><div className={lbl}>{wType === "CRYPTO" ? "Your Wallet Address" : wType === "UPI" ? "Your UPI ID" : "Bank Account / IBAN"}</div><input className={input} value={wAddress} onChange={(e) => setWAddress(e.target.value)} placeholder={wType === "CRYPTO" ? "Paste your USDT wallet address" : wType === "UPI" ? "name@bank" : "Account number / IBAN"} required />
-        {wType === "CRYPTO" && <div className="mt-1 text-[10px] font-medium" style={{ color: "#f0b829" }}>⚠ Wrong network = lost funds. Double-check.</div>}
-      </div>
+      {wType === "CRYPTO" && (<>
+        <div><div className={lbl}>Network</div><select className={input} value={wNetwork} onChange={(e) => setWNetwork(e.target.value)}>{["TRC20", "BEP20", "ERC20"].map((n) => <option key={n} value={n}>{n}</option>)}</select></div>
+        <div><div className={lbl}>Your Wallet Address</div><input className={input} value={wAddress} onChange={(e) => setWAddress(e.target.value)} placeholder="Paste your USDT wallet address" required />
+          <div className="mt-1 text-[10px] font-medium" style={{ color: "#f0b829" }}>⚠ Wrong network = lost funds. Double-check.</div>
+        </div>
+      </>)}
+      {wType === "UPI" && (<div><div className={lbl}>Your UPI ID</div><input className={input} value={wAddress} onChange={(e) => setWAddress(e.target.value)} placeholder="name@bank" required /></div>)}
+      {wType === "BANK" && (<>
+        <div><div className={lbl}>Account Name <span className="font-normal normal-case text-[var(--muted)]">(auto — from your registered name)</span></div><input className={input} value={acctName} onChange={(e) => setAcctName(e.target.value)} placeholder="Account holder name" /></div>
+        <div><div className={lbl}>Account Number</div><input className={input} value={bankAcctNo} onChange={(e) => setBankAcctNo(e.target.value)} placeholder="Account number" required /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><div className={lbl}>Bank Name</div><input className={input} value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Bank name" required /></div>
+          <div><div className={lbl}>IFSC Code</div><input className={input} value={ifsc} onChange={(e) => setIfsc(e.target.value.toUpperCase())} placeholder="IFSC" /></div>
+        </div>
+        <div className="rounded-lg border px-2.5 py-2 text-[10px] leading-snug" style={{ borderColor: "rgba(240,184,41,0.4)", background: "rgba(240,184,41,0.08)", color: "#d99a1e" }}>
+          <i className="fa-solid fa-triangle-exclamation mr-1" />Third-party accounts are not allowed. The bank account name <b>must match your own registered name</b>. Withdrawals to a mismatched name will be rejected.
+        </div>
+      </>)}
       <div className="grid grid-cols-2 gap-3">
         <div><div className={lbl}>Amount (USD)</div><input className={input} type="number" step="0.01" value={wAmount} onChange={(e) => setWAmount(e.target.value)} placeholder="0.00" required /></div>
         <div className="flex items-end"><button type="button" onClick={() => withdrawable != null && setWAmount(String(withdrawable))} className="w-full rounded-lg border py-2 text-xs" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Use max: {withdrawable != null ? fmtUsd(withdrawable) : "$0.00"}</button></div>

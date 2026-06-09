@@ -262,9 +262,11 @@ export default function ClientMobile({ t }: { t: any }) {
 
   // Account-card palette — LIVE uses the tenant brand colours, DEMO a distinct amber/gold.
   const cIsLive = account?.type === "LIVE";
-  const cardC1 = cIsLive ? (brand?.primaryColor || "#3b82f6") : "#f59e0b";
-  const cardC2 = cIsLive ? (brand?.accentColor || brand?.primaryColor || "#1e3a8a") : "#b45309";
-  const cardGlow = cIsLive ? "rgba(22,163,74,.6)" : "rgba(245,158,11,.65)";
+  // Premium vivid gradients (like the reference cards). LIVE = brand blue→violet,
+  // DEMO = a distinct magenta→purple. Content unchanged, colour only.
+  const cardC1 = cIsLive ? (brand?.primaryColor || "#2563eb") : "#db2777";
+  const cardC2 = cIsLive ? (brand?.accentColor || "#7c3aed") : "#6d28d9";
+  const cardGlow = cIsLive ? "rgba(37,99,235,.6)" : "rgba(219,39,119,.6)";
   // Glass in dark mode; in LIGHT mode use a richer, deeper gradient so the white
   // card text stays readable (translucent-over-light washed it out).
   const cardDark = theme === "dark";
@@ -1159,7 +1161,7 @@ export default function ClientMobile({ t }: { t: any }) {
       {walletTab && (
         <div className="fixed inset-0 z-[125] flex items-start justify-center overflow-auto p-3" style={{ background: "rgba(0,0,0,0.55)", paddingTop: "max(12px, env(safe-area-inset-top))", paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
           <div className="w-full max-w-md rounded-2xl bg-[var(--panel)] text-[var(--text)] p-4 shadow-2xl" style={{ ["--foreground" as any]: "var(--text)", "--card": "var(--soft)", "--card-foreground": "var(--text)", "--background": "var(--bg)", "--secondary": "var(--soft)", "--secondary-foreground": "var(--text)", "--muted-foreground": "var(--muted)" } as any} onClick={(e) => e.stopPropagation()}>
-            <WalletPanel key={walletTab} initialTab={walletTab} tabs={walletTab === "kyc" ? ["kyc"] : ["deposit", "withdraw"]} onClose={() => setWalletTab(null)} />
+            <WalletPanel key={walletTab} accountId={accId} initialTab={walletTab} tabs={walletTab === "kyc" ? ["kyc"] : ["deposit", "withdraw"]} onClose={() => setWalletTab(null)} />
           </div>
         </div>
       )}
