@@ -287,7 +287,7 @@ export default function ClientMobile({ t }: { t: any }) {
         <div className="flex items-center gap-2.5">
           <Avatar size={38} />
           <div className="leading-tight">
-            <div className="text-sm font-bold">{titleCaseName(account?.ownerName || account?.name) || "Trader"}</div>
+            <div className="text-sm font-bold uppercase">{titleCaseName(account?.ownerName || account?.name) || "Trader"}</div>
             <div className="text-[10px] text-[var(--muted)]">{account?.type === "LIVE" ? "Live" : "Demo"} #{account?.login} · 1:{account?.leverage}</div>
           </div>
         </div>
@@ -443,7 +443,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div className="mt-2 flex items-center gap-2 text-[11px] text-white/75">
                     <span className="font-mono tracking-[0.2em]">{account?.login}</span>
                     <span className="text-white/40">·</span>
-                    <span className="tracking-wide">{titleCaseName(account?.ownerName || account?.name)}</span>
+                    <span className="uppercase tracking-wide">{titleCaseName(account?.ownerName || account?.name)}</span>
                   </div>
                 </div>
                 <div className="relative my-3 h-px" style={{ background: "rgba(255,255,255,0.18)" }} />

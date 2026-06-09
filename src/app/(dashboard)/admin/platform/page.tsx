@@ -607,7 +607,7 @@ export default function AdminDeskPage() {
   const acctRow = (c: any) => (
     <button key={c.id} onClick={() => setSelAcc(c)} onContextMenu={(e) => { e.preventDefault(); setSelAcc(c); setMenu({ x: e.clientX, y: e.clientY, acc: c }); }}
       className="flex w-full items-center gap-1 rounded px-1.5 py-1 text-left" style={selAcc?.id === c.id ? { background: "var(--soft)", color: GOLD } : undefined}>
-      {dot(presenceOnline(c.user?.lastSeenAt) ? "#16a34a" : c.deactivated ? "var(--muted)" : c.locked ? SELL : BUY)}<span className="flex-1 truncate">{c.login} - {c.name}</span>
+      {dot(presenceOnline(c.user?.lastSeenAt) ? "#16a34a" : c.deactivated ? "var(--muted)" : c.locked ? SELL : BUY)}<span className="flex-1 truncate uppercase">{c.login} - {c.name}</span>
       <span className="flex shrink-0 items-center gap-1.5">
         {/* device icon only — left dot already encodes online/offline */}
         {c.user?.lastDevice && sIco(String(c.user.lastDevice).toLowerCase() === "mobile" ? "fa-mobile-screen-button" : String(c.user.lastDevice).toLowerCase() === "tablet" ? "fa-tablet-screen-button" : "fa-laptop", "#8b97a8", c.user.lastDevice)}
@@ -1227,7 +1227,7 @@ export default function AdminDeskPage() {
                                 <button onClick={() => setSelAcc(c)} title="Select account">{c.login}</button>
                                 {c.isPool && <span className="ml-1 text-[9px] rounded px-0.5" style={{ background: GOLD + "22", color: GOLD }}>POOL</span>}
                               </td>
-                              <td className="px-2 py-1">{c.name}</td>
+                              <td className="px-2 py-1 uppercase">{c.name}</td>
                               <td className="px-2 py-1 text-[var(--muted)]">{email}</td>
                               <td className="px-2 py-1 text-[var(--muted)]">{c.phone || "-"}</td>
                               <td className="px-2 py-1 text-[var(--muted)]">{c.country || "-"}</td>
@@ -1309,7 +1309,7 @@ export default function AdminDeskPage() {
                 <span className="truncate font-bold" style={{ color: GOLD }}>{menu.acc.login}</span>
                 <span className="rounded px-1 py-px text-[8px] font-semibold" style={{ background: (menu.acc.type === "LIVE" ? BUY : "#6366f1") + "22", color: menu.acc.type === "LIVE" ? BUY : "#818cf8" }}>{menu.acc.type}</span>
               </div>
-              <div className="truncate text-[9px]" style={{ color: "var(--muted)" }}>{menu.acc.name}</div>
+              <div className="truncate text-[9px] uppercase" style={{ color: "var(--muted)" }}>{menu.acc.name}</div>
             </div>
             <div className="flex flex-col items-end gap-0.5">
               {menu.acc.locked && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: SELL + "22", color: SELL }}>LOCKED</span>}

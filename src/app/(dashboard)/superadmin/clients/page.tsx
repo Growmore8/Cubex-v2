@@ -242,7 +242,7 @@ export default function SAClientsPage() {
                   </td>
                   <td className="px-3 py-2.5 max-w-[220px]">
                     <div className="font-medium flex items-center gap-1.5">
-                      <span className="truncate">{r.name}</span>
+                      <span className="truncate uppercase">{r.name}</span>
                       {r.kyc === "APPROVED" && <span className="sab sab-green shrink-0" style={{ fontSize: 9 }}>KYC</span>}
                       {r.kyc === "PENDING" && <span className="sab sab-amber shrink-0" style={{ fontSize: 9 }}>KYC</span>}
                       {r.kyc === "REJECTED" && <span className="sab sab-red shrink-0" style={{ fontSize: 9 }}>KYC</span>}

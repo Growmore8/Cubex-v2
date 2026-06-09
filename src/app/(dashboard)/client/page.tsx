@@ -495,7 +495,7 @@ export default function ClientTerminal() {
             <div className="text-base font-semibold">Verify your identity</div>
             <p className="mx-auto mt-1 max-w-xs text-[12px] text-[var(--muted)]">Complete KYC to unlock live trading on <b>{curAcct?.login}</b>. Until it&apos;s approved, only your profile is available.</p>
             <div className="mt-4 rounded-lg border px-3 py-2 text-left text-[12px]" style={{ borderColor: "var(--border)" }}>
-              <div className="flex justify-between py-0.5"><span className="text-[var(--muted)]">Name</span><span>{titleCaseName(account?.ownerName || account?.name)}</span></div>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--muted)]">Name</span><span className="uppercase">{titleCaseName(account?.ownerName || account?.name)}</span></div>
               <div className="flex justify-between py-0.5"><span className="text-[var(--muted)]">Email</span><span className="truncate pl-2">{account?.email}</span></div>
               <div className="flex justify-between py-0.5"><span className="text-[var(--muted)]">Live account</span><span>{curAcct?.login}</span></div>
             </div>
