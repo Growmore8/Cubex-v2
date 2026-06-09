@@ -528,9 +528,11 @@ export default function AdminDeskPage() {
       const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
       setMt(null); loadPending(); loadAll(); return;
     }
-    // Market manual trades always open at the current live price (not a stale manual value).
-    const marketPrice = prices[mt.symbol] ?? Number(mt.openPrice) ?? 0;
-    const body = { accountId: mt.acc.id, symbol: mt.symbol, type: mt.type, lots: Number(mt.lots), sl: Number(mt.sl) || 0, tp: Number(mt.tp) || 0, openPrice: marketPrice, openedAt: mt.date ? new Date(mt.date).toISOString() : undefined };
+    // Use the LIVE price only when "follow live" is on; otherwise honour the price
+    // (and date/time) the user typed — so a manual/back-dated trade opens exactly
+    // at the entered price, not the current market.
+    const openPrice = (mt.follow === false && Number(mt.openPrice) > 0) ? Number(mt.openPrice) : (prices[mt.symbol] ?? Number(mt.openPrice) ?? 0);
+    const body = { accountId: mt.acc.id, symbol: mt.symbol, type: mt.type, lots: Number(mt.lots), sl: Number(mt.sl) || 0, tp: Number(mt.tp) || 0, openPrice, openedAt: mt.date ? new Date(mt.date).toISOString() : undefined };
     const r = await fetch("/api/desk/manual-trade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
     setMt(null); loadAll();

@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { assertManagerAvailable } from "@/services/tenant.service";
-import { createStaffAccount } from "@/services/account.service";
 
 export function listManagers(tenantId: string) {
   return prisma.user.findMany({
@@ -28,8 +27,8 @@ export async function createManager(tenantId: string, input: any) {
     },
     select: { id: true, name: true, email: true, status: true, perms: true },
   });
-  // Managers get their own trading account too (they trade like a client).
-  await createStaffAccount(tenantId, manager.id, input.name).catch(() => {});
+  // NOTE: managers no longer get an auto-created client trading account (it showed
+  // up as a duplicate client of the same name in the navigator).
   return manager;
 }
 

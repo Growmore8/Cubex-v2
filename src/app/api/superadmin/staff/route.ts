@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { isOnline } from "@/lib/presence";
-import { createStaffAccount } from "@/services/account.service";
 
 export async function GET(req: Request) {
   const s = await requireSuperAdmin();
@@ -45,8 +44,8 @@ export async function POST(req: Request) {
     const dup = await prisma.user.findFirst({ where: { tenantId: b.tenantId, email } });
     if (dup) throw new Error("This email is already in use in this tenant.");
     const u = await prisma.user.create({ data: { tenantId: b.tenantId, email, name: b.name, passwordHash: await hashPassword(b.password), role: role as any, status: "ACTIVE" as any, perms: {} } });
-    // Staff get their own trading account too (they trade like a client).
-    await createStaffAccount(b.tenantId, u.id, b.name).catch(() => {});
+    // Staff no longer get an auto-created trading account (it appeared as a
+    // duplicate client of the same name).
     await audit(b.tenantId, "sa.create." + role, email, s.email);
     return NextResponse.json({ ok: true, id: u.id });
   } catch (e: any) {
