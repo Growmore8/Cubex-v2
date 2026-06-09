@@ -11,6 +11,7 @@ import PaymentMethodsModal from "@/components/admin/PaymentMethodsModal";
 import DeskMarketWatch from "@/components/DeskMarketWatch";
 import PasswordInput from "@/components/ui/PasswordInput";
 import CountrySelect from "@/components/ui/CountrySelect";
+import SymbolPicker from "@/components/ui/SymbolPicker";
 import { isOnline as presenceOnline } from "@/components/ui/Presence";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
@@ -1785,7 +1786,7 @@ export default function AdminDeskPage() {
               </div>
             </div>
             <div className={lab}>Symbol</div>
-            <select className={inp} value={mt.symbol} onChange={(e) => setMt({ ...mt, symbol: e.target.value, openPrice: mt.follow ? (prices[e.target.value] ?? 0) : mt.openPrice })}>{symbols.map((s) => <option key={s.symbol} value={s.symbol}>{s.symbol}</option>)}</select>
+            <SymbolPicker className={inp} symbols={symbols} value={mt.symbol} onChange={(sym) => setMt({ ...mt, symbol: sym, openPrice: mt.follow ? (prices[sym] ?? 0) : mt.openPrice })} />
             <div className="mt-2"><div className={lab}>Order Kind</div>
               <select className={inp} value={mt.kind || "MARKET"} onChange={(e) => setMt({ ...mt, kind: e.target.value, follow: e.target.value === "MARKET" })}>
                 <option value="MARKET">Market (open now)</option>
