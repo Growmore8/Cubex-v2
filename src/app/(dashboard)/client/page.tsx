@@ -72,6 +72,7 @@ export default function ClientTerminal() {
   const [walletModal, setWalletModal] = useState<null | "deposit" | "withdraw" | "kyc">(null);
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false });
   const [pnlOnly, setPnlOnly] = useState(false);
+  const [mwSearch, setMwSearch] = useState("");
   const [chartTool, setChartTool] = useState<"none" | "hline" | "trend">("none");
   const [chartClearKey, setChartClearKey] = useState(0);
   const [stmtRep, setStmtRep] = useState(false);
@@ -394,7 +395,8 @@ export default function ClientTerminal() {
   const margin = price != null ? ((vol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0;
   const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const groups: Record<string, any[]> = {};
-  symbols.forEach((s) => { const c = s.category || "other"; (groups[c] || (groups[c] = [])).push(s); });
+  const mwq = mwSearch.trim().toLowerCase();
+  symbols.filter((s) => !mwq || (s.symbol + " " + (s.display || "")).toLowerCase().includes(mwq)).forEach((s) => { const c = s.category || "other"; (groups[c] || (groups[c] = [])).push(s); });
   const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "agriculture", "other"];
   const orderedGroups = Object.entries(groups).sort((a, b) => { const ia = CAT_ORDER.indexOf(a[0]); const ib = CAT_ORDER.indexOf(b[0]); return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib); });
   const histShown = history.filter((h: any) => { if (histRange === "all") return true; const t = new Date(h.closedAt).getTime(); const now = Date.now(); const day = 86400000; if (histRange === "today") return t >= now - day; if (histRange === "week") return t >= now - 7 * day; return t >= now - 30 * day; });
@@ -561,7 +563,14 @@ export default function ClientTerminal() {
           </>)}
           <aside className="flex flex-col border-r border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
           <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">MARKET WATCH</div>
-          
+          <div className="border-b border-[var(--border)] px-1.5 py-1">
+            <div className="relative">
+              <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-[var(--muted)]" />
+              <input value={mwSearch} onChange={(e) => setMwSearch(e.target.value)} name="mw-search" autoComplete="off" placeholder="Search symbol…" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] py-1 pl-6 pr-6 text-[10px] text-[var(--text)]" />
+              {mwSearch && <button onClick={() => setMwSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--text)]">{"×"}</button>}
+            </div>
+          </div>
+
           <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[1fr_64px_64px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-2">Bid</span><span className="text-right pr-2">Ask</span></div>
             {favs.length > 0 && (
               <div>
