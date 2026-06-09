@@ -10,11 +10,12 @@ export default function KycPanel() {
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [view, setView] = useState("");
+  const [canVerify, setCanVerify] = useState(true);
   const { prompt, confirm, node } = useDialog();
 
   async function load() {
     const r = await fetch("/api/admin/kyc").then((x) => x.json()).catch(() => ({ ok: false }));
-    if (r.ok) setList(r.docs || r.documents || r.kyc || []);
+    if (r.ok) { setList(r.docs || r.documents || r.kyc || []); setCanVerify(r.canVerify !== false); }
   }
   useEffect(() => { load(); }, []);
 
@@ -83,11 +84,16 @@ export default function KycPanel() {
                 <td className={td}><span className="rounded-full px-1.5 py-0.5 text-[9px]" style={badge(st(p))}>{st(p)}</span></td>
                 <td className={td}>
                   <div className="flex items-center justify-end gap-1">
-                    {st(p) === "PENDING" ? (<>
-                      <button disabled={!!busy} onClick={() => act(p, "approve")} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
-                      <button disabled={!!busy} onClick={() => doReject(p)} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
-                    </>) : <span className="text-[var(--muted)]">{reviewed(p)}</span>}
-                    <button title="Delete" onClick={() => doDelete(p)} className="ui-btn px-1.5 py-0.5 text-[9px]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
+                    {!canVerify ? (
+                      // Managers: read-only — see status only (only the tenant admin verifies).
+                      <span className="text-[var(--muted)]">{st(p) === "PENDING" ? "Awaiting admin" : reviewed(p)}</span>
+                    ) : (<>
+                      {st(p) === "PENDING" ? (<>
+                        <button disabled={!!busy} onClick={() => act(p, "approve")} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
+                        <button disabled={!!busy} onClick={() => doReject(p)} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
+                      </>) : <span className="text-[var(--muted)]">{reviewed(p)}</span>}
+                      <button title="Delete" onClick={() => doDelete(p)} className="ui-btn px-1.5 py-0.5 text-[9px]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
+                    </>)}
                   </div>
                 </td>
               </tr>

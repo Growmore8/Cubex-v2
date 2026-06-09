@@ -8,9 +8,10 @@ export function listClientKyc(accountId: string) {
   return prisma.kycDocument.findMany({ where: { accountId }, orderBy: { createdAt: "desc" } });
 }
 
-export function listTenantKyc(tenantId: string) {
+export function listTenantKyc(tenantId: string, managerId?: string | null) {
   return prisma.kycDocument.findMany({
-    where: { account: { tenantId } },
+    // Managers see only their own clients' KYC; admins see the whole tenant.
+    where: { account: { tenantId, ...(managerId ? { managerId } : {}) } },
     orderBy: { createdAt: "desc" },
     include: { account: { select: { login: true, name: true } } },
   });
