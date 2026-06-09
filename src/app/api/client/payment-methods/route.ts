@@ -5,13 +5,17 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const s = await requireClient();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  // If this tenant has configured its OWN methods, show only those (globals are
-  // hidden for that tenant). Otherwise fall back to the global defaults.
+  // Tenant self-service: when SuperAdmin has ticked "Can add own methods" for
+  // this tenant, its clients see ONLY the tenant's own methods — the global
+  // defaults are hidden, even before the tenant has added any of its own.
+  // Otherwise, the tenant falls back to the global defaults.
+  const tenant = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { permissions: true } });
+  const selfService = !!((tenant?.permissions as any) || {}).ownPaymentMethods;
   const own = await prisma.cryptoWallet.findMany({
     where: { active: true, tenantId: s.tenantId! },
     orderBy: { createdAt: "asc" },
   });
-  const all = own.length > 0
+  const all = selfService || own.length > 0
     ? own
     : await prisma.cryptoWallet.findMany({
         where: { active: true, tenantId: null },
@@ -24,7 +28,7 @@ export async function GET() {
   // legacy single Xynder setting -> surface as a link if no LINK methods configured
   const setting = await prisma.setting.findUnique({ where: { key: "payments" } }).catch(() => null);
   const xy: any = (setting && setting.value) || {};
-  if (links.length === 0 && xy.url && xy.active !== false) links.push({ id: "legacy", label: "Local Payment", url: xy.url });
+  if (!selfService && links.length === 0 && xy.url && xy.active !== false) links.push({ id: "legacy", label: "Local Payment", url: xy.url });
 
   return NextResponse.json({
     ok: true,
