@@ -400,7 +400,613 @@ export default function ClientTerminal() {
   const histShown = history.filter((h: any) => { if (histRange === "all") return true; const t = new Date(h.closedAt).getTime(); const now = Date.now(); const day = 86400000; if (histRange === "today") return t >= now - day; if (histRange === "week") return t >= now - 7 * day; return t >= now - 30 * day; });
   const tab = (active: boolean) => "px-3 py-1.5 text-[11px] " + (active ? "" : "text-[var(--muted)]");
 
-  // Client uses the app UI on every device (no separate desktop terminal) — it's
-  // rendered as a centered phone-width column on larger screens.
-  return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  return (
+    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+      {needKyc && (
+        <div className="flex items-center gap-3 px-3 py-2 text-[12px] font-medium" style={{ background: "linear-gradient(90deg, rgba(240,180,41,0.22), rgba(240,180,41,0.08))", borderBottom: "1px solid rgba(240,180,41,0.4)", color: "#f0b829" }}>
+          <i className="fa-solid fa-triangle-exclamation" />
+          <span className="flex-1">Verify your identity to unlock trading on your live account. Demo accounts are unaffected.</span>
+          <button onClick={() => setWalletModal("kyc")} className="rounded px-3 py-1 text-[11px] font-semibold text-white" style={{ background: "#f0b829" }}>Upload KYC</button>
+        </div>
+      )}
+      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm">
+        <div className="flex items-center gap-2"><input type="file" accept="image/*" style={{ display: "none" }} ref={avatarInputRef} onChange={uploadAvatar} /><button onClick={() => avatarInputRef.current && avatarInputRef.current.click()} title="Change photo" className="h-6 w-6 overflow-hidden rounded-full border border-[var(--border)]">{avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : brand.logoUrl ? <img src={brand.logoUrl} alt="" className="h-full w-full object-contain" /> : <span className="inline-block h-full w-full bg-[#3b82f6]" />}</button><b className="font-medium">{brand.name || " "}</b><span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent)" }}>Client Terminal</span></div>
+        <div className="flex items-center gap-1.5 text-[11px]">
+          {curAcct && <span className="mr-1 rounded px-2 py-0.5 text-[11px] font-semibold" style={{ background: "var(--soft)", color: curAcct.type === "DEMO" ? GOLD : BUY }}>{curAcct.login} · {curAcct.type}</span>}
+          {/* Account switcher — icon dropdown */}
+          <div className="relative">
+            <button onClick={() => setAcctSwitchOpen((o) => !o)} title="Switch account" className="flex items-center gap-1 rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-arrow-right-arrow-left" /><i className="fa-solid fa-chevron-down text-[8px] opacity-60" /></button>
+            {acctSwitchOpen && (<><div className="fixed inset-0 z-[80]" onClick={() => setAcctSwitchOpen(false)} />
+              <div className="ui-pop absolute right-0 z-[90] mt-1 w-56 overflow-hidden rounded-xl border py-1" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
+                <div className="px-3 pb-1 pt-1.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Switch Account</div>
+                {accts.map((a) => (
+                  <button key={a.id} onClick={() => { switchAcc(a.id); setAcctSwitchOpen(false); }} className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-[var(--soft)]" style={a.id === accId ? { background: "var(--soft)" } : undefined}>
+                    <span><span className="font-medium">{a.login}</span> <span style={{ color: a.type === "DEMO" ? GOLD : BUY }}>{a.type}</span></span>
+                    {a.id === accId && <i className="fa-solid fa-check text-[10px]" style={{ color: BUY }} />}
+                  </button>
+                ))}
+              </div></>)}
+          </div>
+          {/* Consolidated account/funds/security menu */}
+          <div className="relative">
+            <button onClick={() => setAcctMenu((o) => !o)} className="flex items-center gap-1.5 rounded border border-[var(--border)] px-2.5 py-1 hover:bg-[var(--soft)]"><i className="fa-solid fa-bars-staggered" /> Menu <i className="fa-solid fa-chevron-down text-[8px] opacity-60" /></button>
+            {acctMenu && (() => {
+              const close = () => setAcctMenu(false);
+              const mItem = (onClick: () => void, icon: string, label: string, color?: string, disabled?: boolean) => (
+                <button disabled={disabled} onClick={() => { if (disabled) return; onClick(); close(); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[var(--soft)] disabled:opacity-40 disabled:cursor-not-allowed">
+                  <i className={"fa-solid " + icon} style={{ width: 14, textAlign: "center", color: color || "var(--muted)" }} />{label}
+                </button>
+              );
+              const head = (t: string) => <div className="px-3 pt-2 pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{t}</div>;
+              const div = <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />;
+              return (<><div className="fixed inset-0 z-[80]" onClick={close} />
+                <div className="ui-pop absolute right-0 z-[90] mt-1 w-56 overflow-hidden rounded-xl border py-1 text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
+                  {head("Funds")}
+                  {curAcct?.type === "LIVE" ? (<>
+                    {mItem(() => { close(); setWalletModal("deposit"); }, "fa-arrow-down-to-bracket", "Deposit", BUY)}
+                    {mItem(() => { close(); setWalletModal("withdraw"); }, "fa-arrow-up-from-bracket", "Withdraw", GOLD)}
+                    {accts.length >= 2 && mItem(() => { setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); }, "fa-right-left", "Transfer", undefined, readOnly)}
+                  </>) : (
+                    mItem(topUp, "fa-coins", "Top up Demo", GOLD, readOnly)
+                  )}
+                  {div}
+                  {head("Accounts")}
+                  {!accts.some((a: any) => a.type === "DEMO") && mItem(() => openAccount("DEMO"), "fa-vial", "Open Demo Account", undefined, readOnly)}
+                  {mItem(() => openAccount("LIVE"), "fa-bolt", "Open Live Account", BUY, readOnly)}
+                  {curAcct?.type === "LIVE" && mItem(() => { close(); setWalletModal("kyc"); }, "fa-id-card", "KYC Verification")}
+                  {div}
+                  {head("Reports")}
+                  {mItem(() => { close(); setRepPreset("all"); setRepFrom(""); setRepTo(""); setRepMsg(""); setStmtRep(true); }, "fa-file-invoice", "Statement / Report", BUY)}
+                  {div}
+                  {head("Security")}
+                  {mItem(() => { setPinErr(""); setPinForm({}); setPinModal(true); }, "fa-shield-halved", pinHasPin ? "Change PIN" : "Set PIN")}
+                  {pinHasPin && mItem(async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } }, "fa-shield-slash", "Disable PIN", SELL)}
+                  {mItem(addPasskey, "fa-fingerprint", "Biometrics / Face ID")}
+                  {mItem(enablePush, "fa-bell-concierge", "Push Notifications")}
+                </div></>);
+            })()}
+          </div>
+          <button onClick={toggleTheme} title={theme === "dark" ? "Light mode" : "Dark mode"} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className={"fa-solid " + (theme === "dark" ? "fa-sun" : "fa-moon")} /></button>
+          <div className="relative">
+            <button onClick={() => { const w = !notiOpen; setNotiOpen(w); if (w && unread > 0) { fetch("/api/client/notifications", { method: "POST" }).then(() => setNotis((ns) => ns.map((n) => ({ ...n, read: true })))); } }} title="Notifications" className="relative rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-bell" />{unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 text-[8px] font-bold" style={{ background: SELL, color: "#fff" }}>{unread}</span>}</button>
+            {notiOpen && (<><div className="fixed inset-0 z-[80]" onClick={() => setNotiOpen(false)} /><div className="ui-pop absolute right-0 z-[90] mt-1 max-h-80 w-72 overflow-hidden rounded-xl border text-left text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)" }}><div className="sticky top-0 flex items-center justify-between border-b px-3 py-2" style={{ background: "var(--panel)", borderColor: "var(--border)" }}><span className="font-semibold">Notifications</span>{notis.length > 0 && <button onClick={() => { markAllNotifsRead(); }} className="text-[10px]" style={{ color: GOLD }}>Mark all read</button>}</div><div className="overflow-auto" style={{ maxHeight: "calc(20rem - 36px)" }}>{notis.length === 0 ? <div className="px-2 py-3 text-center text-[var(--muted)]">No notifications</div> : notis.map((n, i) => (<div key={i} className="border-b px-2 py-2 last:border-0" style={{ borderColor: "var(--border)", background: !n.read ? "color-mix(in srgb, var(--soft) 60%, transparent)" : undefined }}><div className="font-medium text-[var(--text)]">{n.title}</div>{n.body && <div className="mt-0.5 whitespace-pre-line text-[var(--muted)]">{n.body}</div>}{n.image && <img src={n.image} alt="" className="mt-1 max-h-28 w-full rounded object-cover" />}<div className="mt-1 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div></div>))}</div></div></>)}
+          </div>
+          <button onClick={async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} title="Logout" className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-right-from-bracket" /></button>
+        </div>
+      </div>
+
+      {readOnly && (
+        <div className="flex items-center justify-center gap-2 py-1.5 text-[11px] font-semibold" style={{ background: "rgba(224,82,96,0.16)", color: SELL, borderBottom: "1px solid rgba(224,82,96,0.35)" }}>
+          <i className="fa-solid fa-lock" /> READ ONLY ACCESS — You can view everything, but all actions are disabled.
+        </div>
+      )}
+
+      {/* Live account is locked to Profile + KYC until the client's KYC is approved.
+          Demo accounts are unaffected (switch below to practise). */}
+      {needKyc && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-auto p-4" style={{ background: "var(--bg)" }}>
+          <div className="ui-pop w-full max-w-md rounded-2xl border p-6 text-center" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+            {brand.logoUrl && <img src={brand.logoUrl} alt="" className="mx-auto mb-2 h-10 object-contain" />}
+            <div className="text-lg font-bold">{brand.name}</div>
+            <div className="mx-auto my-4 flex h-14 w-14 items-center justify-center rounded-full" style={{ background: "rgba(240,180,41,0.15)", color: GOLD }}>
+              <i className="fa-solid fa-id-card text-2xl" />
+            </div>
+            <div className="text-base font-semibold">Verify your identity</div>
+            <p className="mx-auto mt-1 max-w-xs text-[12px] text-[var(--muted)]">Complete KYC to unlock live trading on <b>{curAcct?.login}</b>. Until it&apos;s approved, only your profile is available.</p>
+            <div className="mt-4 rounded-lg border px-3 py-2 text-left text-[12px]" style={{ borderColor: "var(--border)" }}>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--muted)]">Name</span><span className="uppercase">{titleCaseName(account?.ownerName || account?.name)}</span></div>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--muted)]">Email</span><span className="truncate pl-2">{account?.email}</span></div>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--muted)]">Live account</span><span>{curAcct?.login}</span></div>
+            </div>
+            <button onClick={() => setWalletModal("kyc")} className="mt-4 w-full rounded-lg py-2.5 text-sm font-semibold" style={{ background: GOLD, color: "#1a1300" }}>
+              <i className="fa-solid fa-upload mr-2" />Upload KYC documents
+            </button>
+            {accts.some((a: any) => a.type === "DEMO") && (
+              <button onClick={() => { const dm = accts.find((a: any) => a.type === "DEMO"); if (dm) switchAcc(dm.id); }} className="mt-2 w-full rounded-lg border py-2.5 text-sm font-medium" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+                <i className="fa-solid fa-vial mr-2" style={{ color: GOLD }} />Practise on your Demo account
+              </button>
+            )}
+            <button onClick={async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="mt-2 w-full rounded-lg py-2 text-[12px] text-[var(--muted)] hover:bg-[var(--soft)]">Log out</button>
+          </div>
+        </div>
+      )}
+
+      {topUpOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="ui-pop w-[320px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 text-sm font-semibold">Top up Demo Account</div>
+            <div className="mb-1.5 grid grid-cols-3 gap-2">
+              {[1000, 5000, 10000].map((amt) => (
+                <button key={amt} type="button" onClick={() => setTopUpAmt(String(amt))}
+                  className="rounded-lg border py-2 text-xs font-semibold transition-colors"
+                  style={Number(topUpAmt) === amt
+                    ? { borderColor: GOLD, background: "rgba(240,180,41,0.12)", color: GOLD }
+                    : { borderColor: "var(--border)", color: "var(--text)" }}>
+                  ${amt.toLocaleString()}
+                </button>
+              ))}
+            </div>
+            <div className="mb-1 text-[10px] text-[var(--muted)]">Amount (USD)</div>
+            <input type="number" value={topUpAmt} onChange={(e) => setTopUpAmt(e.target.value)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]" autoFocus />
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setTopUpOpen(false)} className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs">Cancel</button>
+              <button onClick={() => doTopUp(Number(topUpAmt))} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: GOLD, color: "#1a1300" }}>Top up</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cToasts.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-[120] flex flex-col gap-2" onClick={() => setCToasts([])}>
+          {cToasts.map((t) => (
+            <div key={t.id} className="flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-[11px] shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", minWidth: 230, maxWidth: 300, borderLeft: `3px solid ${t.st === "trade" ? "#2f81f7" : t.st === "funds" ? GOLD : t.st === "login" ? "#a78bfa" : BUY}` }}>
+              <i className={"fa-solid mt-0.5 " + (t.st === "trade" ? "fa-chart-line" : t.st === "funds" ? "fa-money-bill" : "fa-bell")} style={{ color: t.st === "trade" ? "#2f81f7" : t.st === "funds" ? GOLD : BUY, fontSize: 12 }} />
+              <div className="min-w-0"><div className="font-semibold">{t.title}</div>{t.body && <div className="mt-0.5 text-[10px] text-[var(--muted)]">{t.body}</div>}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1">
+        {ctx && (<>
+            <div className="fixed inset-0 z-[80]" onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
+            <div className="ui-pop fixed z-[90] min-w-[150px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] py-1 text-[12px] shadow-lg" style={{ left: ctx.x, top: ctx.y }}>
+              <div className="px-3 py-1 text-[10px] text-[var(--muted)]">{ctx.sym}</div>
+              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setSelSym(ctx.sym); setCtx(null); }}>New Order</button>
+              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setSelSym(ctx.sym); setCtx(null); }}>Open Chart</button>
+              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { if (navigator.clipboard) navigator.clipboard.writeText(ctx.sym); setCtx(null); }}>Copy Symbol</button>
+              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { toggleFav(ctx.sym); setCtx(null); }}>{favs.includes(ctx.sym) ? "Remove favourite" : "Add favourite"}</button>
+            </div>
+          </>)}
+          <aside className="flex flex-col border-r border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
+          <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">MARKET WATCH</div>
+          <div className="border-b border-[var(--border)] px-1.5 py-1">
+            <div className="relative">
+              <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-[var(--muted)]" />
+              <input value={mwSearch} onChange={(e) => setMwSearch(e.target.value)} name="mw-search" autoComplete="off" placeholder="Search symbol…" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] py-1 pl-6 pr-6 text-[10px] text-[var(--text)]" />
+              {mwSearch && <button onClick={() => setMwSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--text)]">{"×"}</button>}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[1fr_64px_64px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-2">Bid</span><span className="text-right pr-2">Ask</span></div>
+            {favs.length > 0 && (
+              <div>
+                <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
+                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const b = p != null ? p * 0.9999 : null; const a = p != null ? p * 1.0001 : null; const dir = dirs[s.symbol] || 0; return (
+                  <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
+                    <button onClick={() => setSelSym(s.symbol)} className="truncate text-left">{s.symbol}</button>
+                    <PriceCell value={b != null ? b.toFixed(dd) : "..."} dir={dir} />
+                    <PriceCell value={a != null ? a.toFixed(dd) : "..."} dir={dir} />
+                  </div>); })}
+              </div>
+            )}
+            {orderedGroups.map(([c, list]) => (
+              <div key={c}>
+                <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
+                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const b = p != null ? p * 0.9999 : null; const a = p != null ? p * 1.0001 : null; const dir = dirs[s.symbol] || 0; const fc = dir > 0 ? BUY : dir < 0 ? SELL : "var(--text)"; const bg = dir > 0 ? "rgba(22,199,132,0.32)" : dir < 0 ? "rgba(224,82,96,0.32)" : "transparent"; return (
+                  <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
+                    <button onClick={() => setSelSym(s.symbol)} className="truncate text-left">{s.symbol}</button>
+                    <PriceCell value={b != null ? b.toFixed(dd) : "..."} dir={dir} />
+                    <PriceCell value={a != null ? a.toFixed(dd) : "..."} dir={dir} /><span style={{ display: "none" }}>
+                      
+                      
+                    </span>
+                  </div>); })}
+              </div>
+            ))}
+          </div>
+        </aside>
+        <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
+            <b className="font-medium">{selSym}</b>
+            <div className="ml-auto flex items-center gap-0.5">
+              <button onClick={() => setChartTool((t) => t === "hline" ? "none" : "hline")} title="Horizontal line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "hline" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "hline" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "hline" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-minus text-[11px]" /></button>
+              <button onClick={() => setChartTool((t) => t === "trend" ? "none" : "trend")} title="Trend line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "trend" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "trend" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "trend" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-arrow-trend-up text-[11px]" /></button>
+              <button onClick={() => setChartClearKey((n) => n + 1)} title="Clear drawings" className="mr-1 rounded px-1.5 py-0.5 text-[var(--muted)]"><i className="fa-solid fa-eraser text-[11px]" /></button>
+              {(["sma", "ema", "bb", "rsi", "macd"] as const).map((k) => (
+                <button key={k} onClick={() => setChartInd((v) => ({ ...v, [k]: !v[k] }))} title={k.toUpperCase()}
+                  className="rounded px-1.5 py-0.5 text-[10px] font-bold"
+                  style={{ background: chartInd[k] ? "rgba(90,169,255,0.18)" : "transparent", color: chartInd[k] ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartInd[k] ? "rgba(90,169,255,0.4)" : "transparent") }}>
+                  {k.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <span className="h-3 w-px bg-[var(--border)]" />
+            <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[10px] text-[var(--text)]" style={{ cursor: "pointer" }}>{TFS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+          </div>
+          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><LWChart symbol={selSym} tf={tf} theme={theme} digits={d} ind={chartInd} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={[
+            ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
+            ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
+          ]} calcPnl={(p: any, price: number) => pnlOf({ symbol: selSym, type: p.type, openPrice: p.openPrice, lots: p.lots } as any, price, csz(selSym))} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} /></div>
+        </div>
+        <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
+
+        <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: rtW }}>
+          <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-semibold tracking-wide" style={{ color: BUY }}>NEW ORDER · <span className="text-[var(--text)]">{selSym}</span></div>
+          <div className="min-h-0 flex-1 overflow-auto">
+          {rightTab === "NEWS" ? (
+            <div className="p-2 text-[11px]">
+              {news.length === 0 ? <div className="p-4 text-center text-[var(--muted)]">Loading news...</div> : news.map((n: any) => (
+                <a key={n.id} href={n.url} target="_blank" rel="noreferrer" className="block border-b border-[var(--border)] px-1 py-2 hover:bg-[var(--soft)]">
+                  <div className="font-medium text-[var(--text)]">{n.headline}</div>
+                  <div className="mt-0.5 text-[10px] text-[var(--muted)]">{n.source} - {new Date(n.datetime * 1000).toLocaleString()}</div>
+                </a>
+              ))}
+            </div>
+          ) : rightTab !== "TRADE" ? (
+            <div className="p-6 text-center text-[11px] text-[var(--muted)]">{rightTab} panel - coming soon</div>
+          ) : (
+            <div className="p-2">
+              {/* Trade / Pending tab toggle */}
+              <div className="mb-2 flex gap-1 rounded-lg border border-[var(--border)] p-1">
+                {([["trade", "Trade"], ["pending", "Pending"]] as const).map(([k, lbl]) => (
+                  <button key={k} onClick={() => { setEntryTab(k); setOrderType(k === "trade" ? "MARKET" : "PENDING"); if (k === "pending" && !pendingPrice && price != null) setPendingPrice(price.toFixed(d)); }} className="flex-1 rounded-md py-1.5 text-[11px] font-semibold transition-colors" style={entryTab === k ? { background: "#2f81f7", color: "#fff" } : { color: "var(--muted)" }}>{lbl}</button>
+                ))}
+              </div>
+
+              {/* Pending trigger price */}
+              {entryTab === "pending" && (<div className="mb-2">
+                <div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Trigger Price</div>
+                <input type="number" value={pendingPrice} onChange={(e) => setPendingPrice(e.target.value)} placeholder={price ? price.toFixed(d) : "price"} className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[13px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" />
+              </div>)}
+
+              {/* Volume */}
+              <div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Volume (lots)</div>
+              <div className="mb-1 flex items-center gap-1.5">
+                <button onClick={() => setVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--soft)]">−</button>
+                <input type="number" step="0.01" value={vol} onChange={(e) => setVol(Number(e.target.value))} className="h-8 flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-center text-[13px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" />
+                <button onClick={() => setVol((v) => +(v + 0.01).toFixed(2))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--soft)]">+</button>
+              </div>
+              <div className="mb-2 flex gap-1">{LOTS.map((l) => <button key={l} onClick={() => setVol(l)} className="flex-1 rounded-md py-1 text-[9px] font-medium transition-colors" style={vol === l ? { background: "#2f81f7", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{l}</button>)}</div>
+
+              {/* SL / TP */}
+              <div className="mb-2 grid grid-cols-2 gap-2">
+                <div><div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Stop Loss</div><input value={sl} onChange={(e) => setSl(e.target.value)} placeholder="—" className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[11px] tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" /></div>
+                <div><div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Take Profit</div><input value={tp} onChange={(e) => setTp(e.target.value)} placeholder="—" className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[11px] tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" /></div>
+              </div>
+
+              {/* Margin */}
+              <div className="mb-2 flex items-center justify-between rounded-lg bg-[var(--soft)] px-3 py-1.5 text-[10px] text-[var(--muted)]">Required Margin<span className="font-semibold tabular-nums text-[var(--text)]">{margin ? "$" + fmt(margin) : "$0.00"}</span></div>
+
+              {/* Action buttons */}
+              {entryTab === "trade" ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: SELL }}>
+                    <span className="text-[10px] uppercase tracking-wide opacity-90">Sell</span><span className="text-[14px] tabular-nums">{bid?.toFixed(d) ?? "…"}</span>
+                  </button>
+                  <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "#2f81f7" }}>
+                    <span className="text-[10px] uppercase tracking-wide opacity-90">Buy</span><span className="text-[14px] tabular-nums">{ask?.toFixed(d) ?? "…"}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {([["BUY", "LIMIT", "Buy Limit"], ["SELL", "LIMIT", "Sell Limit"], ["BUY", "STOP", "Buy Stop"], ["SELL", "STOP", "Sell Stop"]] as const).map(([side, kind, lbl]) => {
+                    const buy = side === "BUY";
+                    return (<button key={lbl} onClick={() => placePending(selSym, side, kind, Number(pendingPrice), vol, Number(sl) || 0, Number(tp) || 0)} disabled={!account || account?.locked} className="rounded-xl py-2 text-[11px] font-semibold transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: buy ? "rgba(47,129,247,0.15)" : "rgba(224,82,96,0.13)", color: buy ? "#6ab0ff" : SELL, border: "1px solid " + (buy ? "rgba(47,129,247,0.45)" : "rgba(224,82,96,0.45)") }}>{lbl}</button>);
+                  })}
+                </div>
+              )}
+              {!account && <div className="mt-2 text-center text-[10px]" style={{ color: SELL }}>No account selected</div>}
+              {err && <div className="mt-2 text-center text-[10px]" style={{ color: SELL }}>{err}</div>}
+            </div>
+          )}
+          </div>
+        </aside>
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "#facc15" }}>
+        <span>Balance: <span className="text-[var(--text)]">{account ? fmt(balance) : "--"}</span></span>
+        <span>Flt P/L: <span style={{ color: floating >= 0 ? BUY : SELL }}>{account ? fmt(floating) : "--"}</span></span>
+        <span>Equity: <span className="text-[var(--text)]">{account ? fmt(equity) : "--"}</span></span>
+        <span>Used Margin: <span className="text-[var(--text)]">{account ? fmt(used) : "--"}</span></span>
+        <span>Free Margin: <span className="text-[var(--text)]">{account ? fmt(free) : "--"}</span></span>
+        <span>Margin Level: <span className="text-[var(--text)]">{account && level ? level.toFixed(1) + "%" : "--"}</span></span>
+      </div>
+
+      <div onMouseDown={dragY} className="h-1 cursor-row-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
+
+      <div className="flex shrink-0 flex-col bg-[var(--panel)]" style={{ height: tbH }}>
+        <div className="flex gap-1 border-b border-[var(--border)] px-2">
+          <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length}{pending.length ? <span className="ml-1 rounded-full px-1.5 text-[9px]" style={{ background: "rgba(90,169,255,0.2)", color: "#5aa9ff" }}>{pending.length} pending</span> : ""}</button>
+          <button onClick={() => setBotTab("history")} className={tab(botTab === "history")} style={botTab === "history" ? { color: BUY } : undefined}>History</button>
+          <button onClick={() => setBotTab("summary")} className={tab(botTab === "summary")} style={botTab === "summary" ? { color: BUY } : undefined}>Summary</button>
+          <button onClick={() => setBotTab("requests")} className={tab(botTab === "requests")} style={botTab === "requests" ? { color: BUY } : undefined}>My Requests</button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          {botTab === "positions" && positions.length > 0 && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-[var(--border)] px-2 py-1 text-[10px] text-[var(--muted)]">
+              <span>Total Trades: <span className="text-[var(--text)]">{positions.length}</span></span>
+              <span>Total Lots: <span className="text-[var(--text)]">{positions.reduce((a: number, p: any) => a + Number(p.lots), 0).toFixed(2)}</span></span>
+              <span>Total P/L: <span style={{ color: floating >= 0 ? BUY : SELL }}>{fmt(floating)}</span></span>
+            </div>
+          )}
+          {botTab === "positions" && (
+            <table className="w-full text-[10px]">
+              <thead><tr className="text-left text-[var(--muted)]"><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /><Sth tbl="pos" k="pnl" label="Net P/L" align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
+              <tbody>
+                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={11}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
+                  <tr key={p.id} className="border-t border-[var(--border)]">
+                    <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span></td>
+                    <td className="px-2 py-1 text-[var(--muted)]">{new Date(p.openedAt).toLocaleDateString()}</td>
+                    <td className="px-2 py-1 text-right">{p.lots}</td><td className="px-2 py-1 text-right">{p.openPrice.toFixed(dg(p.symbol))}</td>
+                    <td className="px-2 py-1 text-right tabular-nums" style={{ color: cdir > 0 ? "#16c784" : cdir < 0 ? "#e05260" : "var(--text)", transition: "color 0.3s ease" }}>{cur.toFixed(dg(p.symbol))}</td>
+                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "tp", val: p.tp ? String(p.tp) : "" }); }} title="Click to edit TP" style={{ cursor: "pointer" }}>
+                      {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "tp" ? (
+                        <input type="text" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "tp", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-20 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#10b981", color: "#10b981" }} onClick={(e) => e.stopPropagation()} />
+                      ) : (
+                        <span style={{ color: p.tp ? "#10b981" : "var(--muted)" }}>{p.tp ? Number(p.tp).toFixed(dg(p.symbol)) : <span className="text-[9px]">+ TP</span>}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "sl", val: p.sl ? String(p.sl) : "" }); }} title="Click to edit SL" style={{ cursor: "pointer" }}>
+                      {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "sl" ? (
+                        <input type="text" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "sl", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-20 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#f43f5e", color: "#f43f5e" }} onClick={(e) => e.stopPropagation()} />
+                      ) : (
+                        <span style={{ color: p.sl ? "#f43f5e" : "var(--muted)" }}>{p.sl ? Number(p.sl).toFixed(dg(p.symbol)) : <span className="text-[9px]">+ SL</span>}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">0.00</td>
+                    <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
+                    <td className="px-2 py-1 text-right"><button style={{ color: SELL }} onClick={() => close(p.id)}>X</button></td>
+                  </tr>); })}
+              </tbody>
+            </table>
+          )}
+          {botTab === "positions" && pending.length > 0 && (
+            <table className="w-full text-[10px]">
+              <thead>
+                <tr><th colSpan={9} className="border-t-2 px-2 pb-1 pt-2 text-left text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#5aa9ff", borderColor: "rgba(90,169,255,0.35)" }}><i className="fa-regular fa-clock mr-1" />Pending Orders ({pending.length}) — waiting to trigger</th></tr>
+                <tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Order</th><th className="px-2 py-1 font-normal">Type</th><th className="px-2 py-1 font-normal text-right">Lots</th><th className="px-2 py-1 font-normal text-right">Trigger</th><th className="px-2 py-1 font-normal text-right">Current</th><th className="px-2 py-1 font-normal text-right">Distance</th><th className="px-2 py-1 font-normal text-right">SL</th><th className="px-2 py-1 font-normal text-right">TP</th><th className="px-2 py-1 font-normal text-right"></th></tr>
+              </thead>
+              <tbody>
+                {pending.map((o: any) => {
+                  const d = dg(o.symbol); const trig = Number(o.price); const cur = prices[o.symbol]; const dist = cur != null ? Math.abs(trig - cur) : null;
+                  const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : "Stop"); const c = o.side === "BUY" ? "#5aa9ff" : SELL;
+                  return (
+                  <tr key={o.id} className="border-t border-[var(--border)]" style={{ background: "rgba(90,169,255,0.05)" }}>
+                    <td className="px-2 py-1"><i className="fa-regular fa-clock mr-1 text-[var(--muted)]" />{o.symbol}</td>
+                    <td className="px-2 py-1"><span className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: c + "22", color: c }}>{label}</span></td>
+                    <td className="px-2 py-1 text-right">{o.lots}</td>
+                    <td className="px-2 py-1 text-right font-semibold">{trig.toFixed(d)}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{cur != null ? cur.toFixed(d) : "…"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{dist != null ? dist.toFixed(d) : "—"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{o.sl ? Number(o.sl).toFixed(d) : "-"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{o.tp ? Number(o.tp).toFixed(d) : "-"}</td>
+                    <td className="px-2 py-1 text-right"><button title="Cancel order" style={{ color: SELL }} onClick={() => cancelPending(o.id)}><i className="fa-solid fa-xmark" /></button></td>
+                  </tr>); })}
+              </tbody>
+            </table>
+          )}
+          {botTab === "history" && (
+            <div className="flex gap-1 px-2 py-1 text-[9px]">
+              {(["all", "today", "week", "month"] as const).map((r) => <button key={r} onClick={() => setHistRange(r)} className="rounded px-2 py-0.5" style={histRange === r ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{r === "all" ? "All" : r === "today" ? "Today" : r === "week" ? "Week" : "Month"}</button>)}
+            </div>
+          )}
+          {botTab === "history" && (
+            <table className="w-full text-[10px]">
+              <thead><tr className="text-left text-[var(--muted)]"><Sth tbl="chist" k="name" label="Name" /><Sth tbl="chist" k="opened" label="Opened" /><Sth tbl="chist" k="closed" label="Closed" /><Sth tbl="chist" k="qty" label="Qty" align="right" /><Sth tbl="chist" k="open" label="Open" align="right" /><Sth tbl="chist" k="close" label="Close" align="right" /><Sth tbl="chist" k="reason" label="Reason" /><Sth tbl="chist" k="pnl" label="P/L" align="right" /></tr></thead>
+              <tbody>
+                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={8}>No history.</td></tr> : sortRows("chist", histShown, { name: (h) => h.symbol, opened: (h) => h.openedAt ? new Date(h.openedAt).getTime() : null, closed: (h) => h.closedAt ? new Date(h.closedAt).getTime() : null, qty: (h) => Number(h.lots), open: (h) => Number(h.openPrice), close: (h) => Number(h.closePrice), reason: (h) => h.closeReason || "MANUAL", pnl: (h) => Number(h.pnl) }).map((h) => {
+                  const r = h.closeReason || "MANUAL";
+                  const rc = r === "TP" ? "#10b981" : r === "SL" ? "#f43f5e" : r === "MC" ? "#f59e0b" : "var(--muted)";
+                  return (
+                  <tr key={h.id} className="border-t border-[var(--border)]">
+                    <td className="px-2 py-1">{h.symbol} <span style={{ color: h.side === "BUY" ? BUY : SELL }}>{h.side}</span></td>
+                    <td className="px-2 py-1 text-[var(--muted)]">{h.openedAt ? new Date(h.openedAt).toLocaleString() : "—"}</td>
+                    <td className="px-2 py-1 text-[var(--muted)]">{h.closedAt ? new Date(h.closedAt).toLocaleString() : "—"}</td>
+                    <td className="px-2 py-1 text-right">{h.lots}</td>
+                    <td className="px-2 py-1 text-right">{h.openPrice.toFixed(dg(h.symbol))}</td>
+                    <td className="px-2 py-1 text-right">{h.closePrice.toFixed(dg(h.symbol))}</td>
+                    <td className="px-2 py-1"><span style={{ color: rc, fontWeight: r !== "MANUAL" ? 600 : "normal" }}>{r}</span></td>
+                    <td className="px-2 py-1 text-right" style={{ color: h.pnl >= 0 ? BUY : SELL }}>{(h.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(h.pnl))}</td>
+                  </tr>); })}
+              </tbody>
+            </table>
+          )}
+          {botTab === "summary" && (() => {
+            // By direction
+            const buys = positions.filter((p) => p.type === "BUY");
+            const sells = positions.filter((p) => p.type === "SELL");
+            const buyPnl = buys.reduce((a: number, p: any) => a + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
+            const sellPnl = sells.reduce((a: number, p: any) => a + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
+            const buyLots = buys.reduce((a: number, p: any) => a + Number(p.lots), 0);
+            const sellLots = sells.reduce((a: number, p: any) => a + Number(p.lots), 0);
+            // By symbol
+            const symMap: Record<string, { buy: number; sell: number; lots: number; pnl: number }> = {};
+            for (const p of positions) {
+              const s = p.symbol; if (!symMap[s]) symMap[s] = { buy: 0, sell: 0, lots: 0, pnl: 0 };
+              const pl = pnlOf(p, prices[s] ?? p.openPrice, csz(s));
+              symMap[s].lots += Number(p.lots); symMap[s].pnl += pl;
+              if (p.type === "BUY") symMap[s].buy += Number(p.lots);
+              else symMap[s].sell += Number(p.lots);
+            }
+            const symRows = Object.entries(symMap).sort((a, b) => Math.abs(b[1].pnl) - Math.abs(a[1].pnl));
+            return (
+              <div className="p-3 text-[10px]">
+                <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {([["BALANCE", fmt(balance), "var(--text)"], ["EQUITY", fmt(equity), "var(--text)"], ["FLOATING P/L", fmt(floating), floating >= 0 ? BUY : SELL], ["CLOSED P/L", fmt(Number(account?.pnl || 0)), Number(account?.pnl || 0) >= 0 ? BUY : SELL], ["DEPOSITS", fmt(Number(account?.deposit || 0)), BUY], ["WITHDRAWALS", "-" + fmt(Number(account?.withdrawal || 0)), SELL], ["FREE MARGIN", fmt(free), "var(--text)"], ["MARGIN LEVEL", level ? level.toFixed(1) + "%" : "—", GOLD]] as [string, string, string][]).map(([k, v, c]) => (
+                    <div key={k} className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{k}</div><div className="mt-1 text-sm font-bold tabular-nums" style={{ color: c }}>{v}</div></div>
+                  ))}
+                </div>
+                <div className="mb-3">
+                  <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>By Direction</div>
+                  <table className="w-full">
+                    <thead><tr className="text-[var(--muted)]"><th className="py-1 pr-3 text-left font-normal">Direction</th><th className="py-1 pr-3 text-right font-normal">Trades</th><th className="py-1 pr-3 text-right font-normal">Lots</th><th className="py-1 text-right font-normal">Floating P/L</th></tr></thead>
+                    <tbody>
+                      <tr className="border-t border-[var(--border)]">
+                        <td className="py-1 pr-3 font-semibold" style={{ color: BUY }}>BUY</td>
+                        <td className="py-1 pr-3 text-right">{buys.length}</td>
+                        <td className="py-1 pr-3 text-right">{buyLots.toFixed(2)}</td>
+                        <td className="py-1 text-right font-semibold" style={{ color: buyPnl >= 0 ? BUY : SELL }}>{(buyPnl >= 0 ? "+$" : "-$") + fmt(Math.abs(buyPnl))}</td>
+                      </tr>
+                      <tr className="border-t border-[var(--border)]">
+                        <td className="py-1 pr-3 font-semibold" style={{ color: SELL }}>SELL</td>
+                        <td className="py-1 pr-3 text-right">{sells.length}</td>
+                        <td className="py-1 pr-3 text-right">{sellLots.toFixed(2)}</td>
+                        <td className="py-1 text-right font-semibold" style={{ color: sellPnl >= 0 ? BUY : SELL }}>{(sellPnl >= 0 ? "+$" : "-$") + fmt(Math.abs(sellPnl))}</td>
+                      </tr>
+                      <tr className="border-t-2 border-[var(--border)]">
+                        <td className="py-1 pr-3 font-semibold">Total</td>
+                        <td className="py-1 pr-3 text-right">{positions.length}</td>
+                        <td className="py-1 pr-3 text-right">{(buyLots + sellLots).toFixed(2)}</td>
+                        <td className="py-1 text-right font-semibold" style={{ color: floating >= 0 ? BUY : SELL }}>{(floating >= 0 ? "+$" : "-$") + fmt(Math.abs(floating))}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                {symRows.length > 0 && (
+                  <div>
+                    <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>By Symbol</div>
+                    <table className="w-full">
+                      <thead><tr className="text-[var(--muted)]"><th className="py-1 pr-3 text-left font-normal">Symbol</th><th className="py-1 pr-3 text-right font-normal">Buy L</th><th className="py-1 pr-3 text-right font-normal">Sell L</th><th className="py-1 pr-3 text-right font-normal">Total L</th><th className="py-1 text-right font-normal">Floating P/L</th></tr></thead>
+                      <tbody>
+                        {symRows.map(([sym, v]) => (
+                          <tr key={sym} className="border-t border-[var(--border)]">
+                            <td className="py-1 pr-3 font-medium">{sym}</td>
+                            <td className="py-1 pr-3 text-right" style={{ color: BUY }}>{v.buy > 0 ? v.buy.toFixed(2) : "—"}</td>
+                            <td className="py-1 pr-3 text-right" style={{ color: SELL }}>{v.sell > 0 ? v.sell.toFixed(2) : "—"}</td>
+                            <td className="py-1 pr-3 text-right">{v.lots.toFixed(2)}</td>
+                            <td className="py-1 text-right font-semibold" style={{ color: v.pnl >= 0 ? BUY : SELL }}>{(v.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(v.pnl))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {positions.length === 0 && <div className="py-4 text-center" style={{ color: "var(--muted)" }}>No open positions to summarize.</div>}
+              </div>
+            );
+          })()}
+          {botTab === "requests" && (
+            <div className="p-3 text-[11px]">
+              {!myReqsLoaded ? (
+                <div className="py-4 text-center text-[var(--muted)]">Loading…</div>
+              ) : myReqs.length === 0 ? (
+                <div className="py-4 text-center text-[var(--muted)]">No deposit or withdrawal requests yet.</div>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-left text-[var(--muted)]">
+                      <th className="px-2 py-1 font-normal">Type</th>
+                      <th className="px-2 py-1 font-normal text-right">Amount</th>
+                      <th className="px-2 py-1 font-normal">Method</th>
+                      <th className="px-2 py-1 font-normal">Status</th>
+                      <th className="px-2 py-1 font-normal">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myReqs.map((r: any) => (
+                      <tr key={r.id} className="border-t border-[var(--border)]">
+                        <td className="px-2 py-1 font-medium">
+                          <span style={{ color: r.kind === "DEPOSIT" ? BUY : SELL }}>
+                            <i className={"fa-solid mr-1 " + (r.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up")} />
+                            {r.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1 text-right font-semibold tabular-nums">${Number(r.amount).toFixed(2)}</td>
+                        <td className="px-2 py-1 text-[var(--muted)]">{r.method || "—"}</td>
+                        <td className="px-2 py-1">
+                          <span className="rounded-full px-2 py-0.5 text-[9px] font-semibold" style={{ background: r.status === "APPROVED" ? "rgba(22,163,74,0.15)" : r.status === "REJECTED" ? "rgba(220,38,38,0.15)" : "rgba(240,180,41,0.15)", color: r.status === "APPROVED" ? BUY : r.status === "REJECTED" ? SELL : GOLD }}>{r.status}</span>
+                        </td>
+                        <td className="px-2 py-1 text-[var(--muted)]">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {stmtRep && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}>
+          <div className="ui-pop w-[340px] max-w-[95vw] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 text-sm font-semibold">Statement / Report</div>
+            <div className="mb-3 text-[10px]" style={{ color: "var(--muted)" }}>{curAcct?.login} · {curAcct?.type}</div>
+            <div className="mb-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Date Range</div>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {(["day", "week", "month", "year", "all", "custom"] as const).map((p) => (
+                <button key={p} onClick={() => { setRepPreset(p); setRepMsg(""); if (p !== "custom") { const now = new Date(); const iso = (d: Date) => d.toISOString().slice(0, 10); if (p === "day") { const dd = iso(now); setRepFrom(dd); setRepTo(dd); } else if (p === "week") { const f = new Date(now); f.setDate(now.getDate() - 7); setRepFrom(iso(f)); setRepTo(iso(now)); } else if (p === "month") { const y = now.getFullYear(), m = now.getMonth(); setRepFrom(new Date(y, m, 1).toISOString().slice(0, 10)); setRepTo(new Date(y, m + 1, 0).toISOString().slice(0, 10)); } else if (p === "year") { const y = now.getFullYear(); setRepFrom(`${y}-01-01`); setRepTo(`${y}-12-31`); } else { setRepFrom(""); setRepTo(""); } } }} className="rounded-lg px-2.5 py-1 text-[10px] font-semibold capitalize" style={{ background: repPreset === p ? BUY : "var(--soft)", color: repPreset === p ? "#04140e" : "var(--text)", border: "1px solid " + (repPreset === p ? "transparent" : "var(--border)") }}>{p === "all" ? "All Time" : p}</button>
+              ))}
+            </div>
+            {repPreset === "custom" && (
+              <div className="mb-3 flex gap-2">
+                <input type="date" value={repFrom} onChange={(e) => setRepFrom(e.target.value)} className="flex-1 rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+                <input type="date" value={repTo} onChange={(e) => setRepTo(e.target.value)} className="flex-1 rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+              </div>
+            )}
+            <div className="mb-2 text-[9px]" style={{ color: "var(--muted)" }}>Email is sent to your registered address ({account?.email || "—"}) as no-reply.</div>
+            {repMsg && <div className="mb-2 text-[10px]" style={{ color: repMsg.startsWith("✓") ? "#16a34a" : "#ef4444" }}>{repMsg}</div>}
+            <div className="flex gap-2">
+              <button onClick={() => setStmtRep(false)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Close</button>
+              <button onClick={() => { const q = new URLSearchParams({ accountId: accId || "" }); if (repFrom) q.set("from", repFrom); if (repTo) q.set("to", repTo); window.open("/api/client/statement?" + q.toString(), "_blank"); }} className="flex-1 rounded py-2 text-[11px] font-semibold" style={{ background: "#ef4444", color: "#fff" }}><i className="fa-solid fa-file-pdf mr-1" /> Download</button>
+              <button disabled={repSending} onClick={async () => {
+                setRepSending(true); setRepMsg("");
+                const r = await fetch("/api/client/statement/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accId, from: repFrom || undefined, to: repTo || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+                setRepSending(false);
+                setRepMsg(r.ok ? "✓ Sent to " + r.to : (r.error || "Failed to send"));
+              }} className="flex-1 rounded py-2 text-[11px] font-semibold disabled:opacity-60" style={{ background: BUY, color: "#04140e" }}><i className="fa-solid fa-envelope mr-1" /> {repSending ? "…" : "Email"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {walletModal && (
+        <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-auto p-4 sm:items-center" style={{ background: "rgba(0,0,0,0.55)" }}>
+          <div className="ui-pop w-full max-w-2xl rounded-xl bg-[var(--panel)] text-[var(--text)] p-5 shadow-2xl" style={{ ["--foreground" as any]: "var(--text)", "--card": "var(--soft)", "--card-foreground": "var(--text)", "--background": "var(--bg)", "--secondary": "var(--soft)", "--secondary-foreground": "var(--text)", "--muted-foreground": "var(--muted)" } as any} onClick={(e) => e.stopPropagation()}>
+            <WalletPanel key={walletModal} accountId={accId} initialTab={walletModal} tabs={walletModal === "kyc" ? ["kyc"] : ["deposit", "withdraw"]} onClose={() => setWalletModal(null)} />
+          </div>
+        </div>
+      )}
+      {pinModal && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="ui-pop w-[300px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold">{pinHasPin ? "Change PIN" : "Set PIN"}</div>
+              <button onClick={() => setPinModal(false)} aria-label="Close" className="-mr-1 flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
+            {pinHasPin && (<><div className="text-[10px] text-[var(--muted)]">Current PIN</div><input type="password" inputMode="numeric" value={pinForm.current || ""} onChange={(e) => setPinForm({ ...pinForm, current: e.target.value })} className="mb-2 mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[var(--text)]" /></>)}
+            <div className="text-[10px] text-[var(--muted)]">New PIN (4-6 digits)</div>
+            <input type="password" inputMode="numeric" value={pinForm.pin || ""} onChange={(e) => setPinForm({ ...pinForm, pin: e.target.value })} className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-center text-[var(--text)]" />
+            {pinErr && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{pinErr}</div>}
+            <button onClick={savePin} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Save PIN</button>
+          </div>
+        </div>
+      )}
+      {pinLock && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(5,9,16,0.96)" }}>
+          <div className="ui-pop w-[300px] rounded-xl border p-5 text-center" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+            <div className="mb-1 text-sm font-semibold">Enter your PIN</div>
+            <div className="mb-3 text-[10px] text-[var(--muted)]">This terminal is locked.</div>
+            <input type="password" inputMode="numeric" autoFocus value={pinInput} onChange={(e) => setPinInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") unlock(); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-center text-lg tracking-widest text-[var(--text)]" />
+            {pinErr && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{pinErr}</div>}
+            <button onClick={unlock} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Unlock</button>
+            <button onClick={unlockPasskey} className="mt-2 w-full rounded border border-[var(--border)] py-2 text-xs">Unlock with passkey</button>
+          </div>
+        </div>
+      )}
+      {xferModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center" style={{ background: "rgba(5,9,16,0.7)" }}>
+          <div className="ui-pop w-[320px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 text-sm font-semibold">Transfer Between Accounts</div>
+            <div className="text-[10px] text-[var(--muted)]">From</div>
+            <select value={xfer.fromId || accId} onChange={(e) => setXfer({ ...xfer, fromId: e.target.value })} className="mb-2 mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text)]">{accts.map((a) => <option key={a.id} value={a.id}>{a.login} - {a.type}</option>)}</select>
+            <div className="text-[10px] text-[var(--muted)]">To</div>
+            <select value={xfer.toId || ""} onChange={(e) => setXfer({ ...xfer, toId: e.target.value })} className="mb-2 mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text)]"><option value="">Select account</option>{accts.map((a) => <option key={a.id} value={a.id}>{a.login} - {a.type}</option>)}</select>
+            {(() => { const xf = accts.find((a: any) => a.id === (xfer.fromId || accId)); const av = xf ? (pnlOnly ? Math.max(0, Number(xf.pnl || 0)) : (Number(xf.deposit || 0) - Number(xf.withdrawal || 0) + Number(xf.credit || 0) + Number(xf.bonus || 0) + Number(xf.pnl || 0))) : 0; return (
+              <div className="mb-1 flex items-center justify-between text-[10px]"><span className="text-[var(--muted)]">Available {pnlOnly ? "(profit only)" : "balance"}</span><button type="button" onClick={() => setXfer({ ...xfer, amount: String(av.toFixed(2)) })} className="font-semibold" style={{ color: "#22d3ee" }}>${fmt(av)} · Use max</button></div>
+            ); })()}
+            <div className="text-[10px] text-[var(--muted)]">Amount</div>
+            <input type="number" value={xfer.amount || ""} onChange={(e) => setXfer({ ...xfer, amount: e.target.value })} className="mb-2 mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[var(--text)]" />
+            {xferErr && <div className="mb-2 text-[10px]" style={{ color: SELL }}>{xferErr}</div>}
+            <div className="flex gap-2"><button onClick={() => setXferModal(false)} className="flex-1 rounded border border-[var(--border)] py-2 text-xs">Cancel</button><button onClick={doTransfer} className="flex-1 rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Transfer</button></div>
+          </div>
+        </div>
+      )}
+      {dragging && <div className="fixed inset-0 z-[60]" />}
+    </div>
+  );
 }
