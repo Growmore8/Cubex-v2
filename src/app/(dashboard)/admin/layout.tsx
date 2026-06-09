@@ -16,7 +16,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Admin pages live inside the Platform; also allow the standalone manager-
   // management page. Anything else redirects to the desk.
-  const allowed = path.startsWith("/admin/platform") || path.startsWith("/admin/managers");
+  const allowed = path.startsWith("/admin/platform") || path.startsWith("/admin/managers") || path.startsWith("/admin/payments");
   useEffect(() => {
     if (!allowed) router.replace("/admin/platform");
   }, [allowed, router]);

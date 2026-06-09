@@ -681,6 +681,7 @@ export default function AdminDeskPage() {
                     {can("createClients") && dItem(() => openModal("client"), "fa-user-plus", "New Client", BUY)}
                     {!isManager && can("manageManagers") && dItem(() => openModal("manager"), "fa-user-tie", "New Manager")}
                     {!isManager && can("manageManagers") && dItem(() => { setMgrModal(true); }, "fa-users-gear", "Manage Managers")}
+                    {!isManager && dItem(() => { window.location.href = "/admin/payments"; }, "fa-credit-card", "Payment Methods")}
                     {!isManager && dItem(() => openModal("group"), "fa-layer-group", "Groups")}
                     {dDivider}
                     {can("sendNotifications") && dItem(() => openModal("notify"), "fa-paper-plane", "Send Notification", GOLD)}
