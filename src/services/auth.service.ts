@@ -9,6 +9,7 @@ import { verificationEmail, resetPasswordEmail, type BrandInfo } from "@/lib/ema
 import { Prisma } from "@prisma/client";
 import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
+import { titleCaseName } from "@/lib/format";
 import type { SessionPayload } from "@/types";
 import type { Role } from "@/config/roles";
 
@@ -105,6 +106,7 @@ export async function registerClient(
   if (!tenant) throw new Error("Registration is only available on a brand site");
 
   const lowerEmail = email.toLowerCase();
+  name = titleCaseName(name); // store the submitted name capitalised
   const passwordHash = await hashPassword(password);
 
   // Email verification (OTP) is mandatory. If the broker has no SMTP configured we

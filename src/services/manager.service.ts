@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { assertManagerAvailable } from "@/services/tenant.service";
+import { titleCaseName } from "@/lib/format";
 
 export function listManagers(tenantId: string) {
   return prisma.user.findMany({
@@ -22,7 +23,7 @@ export async function createManager(tenantId: string, input: any) {
   const passwordHash = await hashPassword(input.password);
   const manager = await prisma.user.create({
     data: {
-      tenantId, email: input.email.toLowerCase(), name: input.name, passwordHash,
+      tenantId, email: input.email.toLowerCase(), name: titleCaseName(input.name), passwordHash,
       role: "MANAGER", perms: input.perms || {},
     },
     select: { id: true, name: true, email: true, status: true, perms: true },
@@ -36,7 +37,7 @@ export async function updateManager(tenantId: string, id: string, data: any) {
   const m = await prisma.user.findFirst({ where: { tenantId, id, role: "MANAGER" } });
   if (!m) throw new Error("Manager not found");
   const patch: any = {};
-  if (data.name !== undefined) patch.name = data.name;
+  if (data.name !== undefined) patch.name = titleCaseName(data.name);
   if (data.status !== undefined) patch.status = data.status;
   if (data.perms !== undefined) patch.perms = data.perms;
   if (data.email) {

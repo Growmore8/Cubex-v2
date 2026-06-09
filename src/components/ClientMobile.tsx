@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, startTransition } from "react";
 import dynamic from "next/dynamic";
 import WalletPanel from "@/components/WalletPanel";
 import WorldMapBg from "@/components/ui/WorldMapBg";
+import { titleCaseName } from "@/lib/format";
 
 // Lazy-load the chart lib — it's ~350 kB and only needed on the Chart tab.
 // Loads on first tab open; subsequent visits are instant (module cached).
@@ -442,7 +443,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div className="mt-2 flex items-center gap-2 text-[11px] text-white/75">
                     <span className="font-mono tracking-[0.2em]">{account?.login}</span>
                     <span className="text-white/40">·</span>
-                    <span className="uppercase tracking-wide">{account?.ownerName || account?.name}</span>
+                    <span className="tracking-wide">{titleCaseName(account?.ownerName || account?.name)}</span>
                   </div>
                 </div>
                 <div className="relative my-3 h-px" style={{ background: "rgba(255,255,255,0.18)" }} />

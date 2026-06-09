@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { audit } from "@/lib/audit";
 import { notify, notifyStaff } from "@/services/notification.service";
 import { assertSeatAvailable } from "@/services/tenant.service";
+import { titleCaseName } from "@/lib/format";
 
 export function listClients(tenantId: string, managerId?: string | null) {
   return prisma.account.findMany({
@@ -36,6 +37,7 @@ export async function nextLogin(tx: any, tenantId: string, type: string) {
 
 export async function createClient(tenantId: string, input: any, actor = "admin") {
   const type = input.type || "LIVE";
+  if (input.name) input.name = titleCaseName(input.name); // store names capitalised
   const acc = await prisma.$transaction(async (tx) => {
     await assertSeatAvailable(tx, tenantId, type); // enforce the plan's account limit (live only)
     const email = input.email.toLowerCase();

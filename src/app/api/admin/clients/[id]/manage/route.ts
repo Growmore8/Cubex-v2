@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { assertCan } from "@/lib/perms";
 import { notify } from "@/services/notification.service";
 import { assertSeatAvailable } from "@/services/tenant.service";
+import { titleCaseName } from "@/lib/format";
 
 const MANAGER_ALLOWED = ["status", "deactivate", "statusAll", "deactivateAll", "rename", "pool", "clearPin", "assign"];
 
@@ -57,7 +58,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         break;
       }
       case "rename": {
-        const name = String(b.name || acc.name);
+        const name = titleCaseName(String(b.name || acc.name));
         const data: any = { name };
         if (b.phone !== undefined) data.phone = b.phone || null;
         if (b.country !== undefined) data.country = b.country || null;
