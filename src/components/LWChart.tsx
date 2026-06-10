@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, memo, type CSSProperties } from "react";
 import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries, HistogramSeries, createSeriesMarkers } from "lightweight-charts";
 import { io, Socket } from "socket.io-client";
-import { RSI, SMA, EMA, BollingerBands, MACD, PSAR, bullishengulfingpattern, bearishengulfingpattern, morningstar, eveningstar, hammerpattern, shootingstar, doji } from "technicalindicators";
+import { RSI, SMA, EMA, BollingerBands, MACD, PSAR, Stochastic, ATR, ADX, bullishengulfingpattern, bearishengulfingpattern, morningstar, eveningstar, hammerpattern, shootingstar, doji } from "technicalindicators";
 
 // Indicators are computed with the `technicalindicators` library; each helper
 // keeps the same {time,value} output shape, aligned back to the candle times.
@@ -32,6 +32,30 @@ function computeBB(bars: any[], period = 20, mult = 2) {
   const mid: any[] = [], upper: any[] = [], lower: any[] = [];
   res.forEach((b: any, k: number) => { const t = bars[off + k].time; mid.push({ time: t, value: b.middle }); upper.push({ time: t, value: b.upper }); lower.push({ time: t, value: b.lower }); });
   return { mid, upper, lower };
+}
+
+// Stochastic oscillator — %K and %D lines (0..100).
+function computeStoch(bars: any[], period = 14, signalPeriod = 3) {
+  if (!bars || bars.length < period + signalPeriod) return { k: [], d: [] };
+  const res = Stochastic.calculate({ period, signalPeriod, high: bars.map((b) => b.high), low: bars.map((b) => b.low), close: bars.map((b) => b.close) });
+  const off = bars.length - res.length;
+  const k: any[] = [], d: any[] = [];
+  res.forEach((r: any, i: number) => { const t = bars[off + i].time; if (r.k != null) k.push({ time: t, value: +r.k.toFixed(2) }); if (r.d != null) d.push({ time: t, value: +r.d.toFixed(2) }); });
+  return { k, d };
+}
+// ATR — average true range (volatility), price-scale line.
+function computeATR(bars: any[], period = 14) {
+  if (!bars || bars.length < period + 1) return [];
+  const res = ATR.calculate({ period, high: bars.map((b) => b.high), low: bars.map((b) => b.low), close: bars.map((b) => b.close) });
+  const off = bars.length - res.length;
+  return res.map((v: number, i: number) => ({ time: bars[off + i].time, value: v }));
+}
+// ADX — trend strength (0..100).
+function computeADX(bars: any[], period = 14) {
+  if (!bars || bars.length < period * 2) return [];
+  const res = ADX.calculate({ period, high: bars.map((b) => b.high), low: bars.map((b) => b.low), close: bars.map((b) => b.close) });
+  const off = bars.length - res.length;
+  return res.map((r: any, i: number) => ({ time: bars[off + i].time, value: r.adx != null ? +r.adx.toFixed(2) : 0 }));
 }
 
 // Candlestick pattern markers — scan each bar and tag recognised reversal/indecision
@@ -111,7 +135,7 @@ function LWChart({
   calcPnl?: (p: ChartPosition, price: number) => number;
   /** Controlled indicators from a parent header (desktop). When set, the in-chart
       left sidebar is hidden and the parent renders the SMA/EMA/BB/RSI/MACD buttons. */
-  ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean; psar?: boolean; cdl?: boolean };
+  ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean; psar?: boolean; cdl?: boolean; stoch?: boolean; atr?: boolean; adx?: boolean };
   /** Controlled drawing tool from a parent header (H-line / trend next to indicators).
       When onTool is set, the in-chart floating draw toolbar is hidden. */
   tool?: "none" | "hline" | "trend";
@@ -160,13 +184,23 @@ function LWChart({
   const [macd, setMacd] = useState(false);
   const macdWrapRef = useRef<HTMLDivElement | null>(null);
   const macdChartRef = useRef<any>(null), macdLineRef = useRef<any>(null), macdSignalRef = useRef<any>(null), macdHistRef = useRef<any>(null);
+  // Stochastic / ATR / ADX sub-panes
+  const [stoch, setStoch] = useState(false);
+  const stochWrapRef = useRef<HTMLDivElement | null>(null);
+  const stochChartRef = useRef<any>(null), stochKRef = useRef<any>(null), stochDRef = useRef<any>(null);
+  const [atr, setAtr] = useState(false);
+  const atrWrapRef = useRef<HTMLDivElement | null>(null);
+  const atrChartRef = useRef<any>(null), atrSeriesRef = useRef<any>(null);
+  const [adx, setAdx] = useState(false);
+  const adxWrapRef = useRef<HTMLDivElement | null>(null);
+  const adxChartRef = useRef<any>(null), adxSeriesRef = useRef<any>(null);
 
   // When indicators are controlled by a parent header (desktop), sync them into
   // the internal state so all the existing chart effects keep working unchanged.
   useEffect(() => {
     if (!ind) return;
-    setSma(ind.sma); setEma(ind.ema); setBb(ind.bb); setRsi(ind.rsi); setMacd(ind.macd); setPsar(!!ind.psar); setCdl(!!ind.cdl);
-  }, [ind?.sma, ind?.ema, ind?.bb, ind?.rsi, ind?.macd, ind?.psar, ind?.cdl]); // eslint-disable-line react-hooks/exhaustive-deps
+    setSma(ind.sma); setEma(ind.ema); setBb(ind.bb); setRsi(ind.rsi); setMacd(ind.macd); setPsar(!!ind.psar); setCdl(!!ind.cdl); setStoch(!!ind.stoch); setAtr(!!ind.atr); setAdx(!!ind.adx);
+  }, [ind?.sma, ind?.ema, ind?.bb, ind?.rsi, ind?.macd, ind?.psar, ind?.cdl, ind?.stoch, ind?.atr, ind?.adx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function clearDrawings() {
     for (const l of hlineRefs.current) { try { seriesRef.current?.removePriceLine(l); } catch {} }
@@ -266,6 +300,9 @@ function LWChart({
     // Sub-pane data sync (charts managed by their own effects)
     if (rsi && rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
     if (macd && macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
+    if (stoch && stochKRef.current) { const { k, d } = computeStoch(barsRef.current); try { stochKRef.current.setData(k); stochDRef.current?.setData(d); } catch {} }
+    if (atr && atrSeriesRef.current) { try { atrSeriesRef.current.setData(computeATR(barsRef.current)); } catch {} }
+    if (adx && adxSeriesRef.current) { try { adxSeriesRef.current.setData(computeADX(barsRef.current)); } catch {} }
     // Keep onBarsLoaded fresh so seed() triggers indicator recompute after async bar load
     onBarsLoaded.current = () => {
       if (smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, 20, false)); } catch {} }
@@ -275,8 +312,11 @@ function LWChart({
       if (markersRef.current && cdl) { try { markersRef.current.setMarkers(computePatterns(barsRef.current)); } catch {} }
       if (rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
       if (macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
+      if (stochKRef.current) { const { k, d } = computeStoch(barsRef.current); try { stochKRef.current.setData(k); stochDRef.current?.setData(d); } catch {} }
+      if (atrSeriesRef.current) { try { atrSeriesRef.current.setData(computeATR(barsRef.current)); } catch {} }
+      if (adxSeriesRef.current) { try { adxSeriesRef.current.setData(computeADX(barsRef.current)); } catch {} }
     };
-  }, [sma, ema, bb, rsi, macd, psar, cdl, symbol, tf, theme, digits, drawN]);
+  }, [sma, ema, bb, rsi, macd, psar, cdl, stoch, atr, adx, symbol, tf, theme, digits, drawN]);
 
   // RSI sub-pane chart (separate LW instance below main chart)
   useEffect(() => {
@@ -350,6 +390,69 @@ function LWChart({
       if (macdChartRef.current) { macdChartRef.current.remove(); macdChartRef.current = null; macdLineRef.current = null; macdSignalRef.current = null; macdHistRef.current = null; }
     };
   }, [macd, theme]);
+
+  // Generic 0..100 / price sub-pane factory for Stochastic, ATR, ADX.
+  function makePane(el: HTMLDivElement, opts: { range100?: boolean }) {
+    const dark = theme === "dark";
+    return createChart(el, {
+      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: dark ? "#9aa6bf" : "#475569", fontSize: 9 },
+      grid: { vertLines: { color: "transparent" }, horzLines: { color: dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.05)" } },
+      rightPriceScale: { borderColor: dark ? "#242a38" : "#e2e8f0", scaleMargins: { top: 0.12, bottom: 0.12 } },
+      timeScale: { visible: false }, autoSize: true, handleScroll: false, handleScale: false,
+    });
+  }
+  // Stochastic sub-pane (%K cyan, %D orange, 0..100)
+  useEffect(() => {
+    if (!stoch) { if (stochChartRef.current) { stochChartRef.current.remove(); stochChartRef.current = null; stochKRef.current = null; stochDRef.current = null; } return; }
+    const el = stochWrapRef.current; if (!el) return;
+    let raf = 0; let syncFn: ((r: any) => void) | null = null;
+    raf = requestAnimationFrame(() => {
+      if (!el.isConnected) return;
+      const chart = makePane(el, { range100: true });
+      const kS = chart.addSeries(LineSeries, { color: "#22d3ee", lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, priceFormat: { type: "price", precision: 1, minMove: 0.1 }, autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) });
+      const dS = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      kS.createPriceLine({ price: 20, color: "#e05260", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+      kS.createPriceLine({ price: 80, color: "#26a69a", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+      stochChartRef.current = chart; stochKRef.current = kS; stochDRef.current = dS;
+      if (barsRef.current.length) { const { k, d } = computeStoch(barsRef.current); try { kS.setData(k); dS.setData(d); } catch {} }
+      syncFn = (range: any) => { if (range && stochChartRef.current) { try { stochChartRef.current.timeScale().setVisibleLogicalRange(range); } catch {} } };
+      if (chartRef.current) chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(syncFn);
+    });
+    return () => { cancelAnimationFrame(raf); if (syncFn && chartRef.current) { try { chartRef.current.timeScale().unsubscribeVisibleLogicalRangeChange(syncFn); } catch {} } if (stochChartRef.current) { stochChartRef.current.remove(); stochChartRef.current = null; stochKRef.current = null; stochDRef.current = null; } };
+  }, [stoch, theme]);
+  // ATR sub-pane (single line, price-scale auto)
+  useEffect(() => {
+    if (!atr) { if (atrChartRef.current) { atrChartRef.current.remove(); atrChartRef.current = null; atrSeriesRef.current = null; } return; }
+    const el = atrWrapRef.current; if (!el) return;
+    let raf = 0; let syncFn: ((r: any) => void) | null = null;
+    raf = requestAnimationFrame(() => {
+      if (!el.isConnected) return;
+      const chart = makePane(el, {});
+      const s = chart.addSeries(LineSeries, { color: "#eab308", lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, priceFormat: { type: "price", precision: digits, minMove: Math.pow(10, -digits) } });
+      atrChartRef.current = chart; atrSeriesRef.current = s;
+      if (barsRef.current.length) { try { s.setData(computeATR(barsRef.current)); } catch {} }
+      syncFn = (range: any) => { if (range && atrChartRef.current) { try { atrChartRef.current.timeScale().setVisibleLogicalRange(range); } catch {} } };
+      if (chartRef.current) chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(syncFn);
+    });
+    return () => { cancelAnimationFrame(raf); if (syncFn && chartRef.current) { try { chartRef.current.timeScale().unsubscribeVisibleLogicalRangeChange(syncFn); } catch {} } if (atrChartRef.current) { atrChartRef.current.remove(); atrChartRef.current = null; atrSeriesRef.current = null; } };
+  }, [atr, theme, digits]);
+  // ADX sub-pane (single line, 0..100)
+  useEffect(() => {
+    if (!adx) { if (adxChartRef.current) { adxChartRef.current.remove(); adxChartRef.current = null; adxSeriesRef.current = null; } return; }
+    const el = adxWrapRef.current; if (!el) return;
+    let raf = 0; let syncFn: ((r: any) => void) | null = null;
+    raf = requestAnimationFrame(() => {
+      if (!el.isConnected) return;
+      const chart = makePane(el, { range100: true });
+      const s = chart.addSeries(LineSeries, { color: "#a78bfa", lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, priceFormat: { type: "price", precision: 1, minMove: 0.1 }, autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) });
+      s.createPriceLine({ price: 25, color: "#9aa0aa", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+      adxChartRef.current = chart; adxSeriesRef.current = s;
+      if (barsRef.current.length) { try { s.setData(computeADX(barsRef.current)); } catch {} }
+      syncFn = (range: any) => { if (range && adxChartRef.current) { try { adxChartRef.current.timeScale().setVisibleLogicalRange(range); } catch {} } };
+      if (chartRef.current) chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(syncFn);
+    });
+    return () => { cancelAnimationFrame(raf); if (syncFn && chartRef.current) { try { chartRef.current.timeScale().unsubscribeVisibleLogicalRangeChange(syncFn); } catch {} } if (adxChartRef.current) { adxChartRef.current.remove(); adxChartRef.current = null; adxSeriesRef.current = null; } };
+  }, [adx, theme]);
 
   // Load Twelve Data historical candles (up to 5000) on symbol / timeframe change
   useEffect(() => {
@@ -576,6 +679,27 @@ function LWChart({
             <span style={{ position: "absolute", top: 3, left: 6, zIndex: 5, fontSize: 9, pointerEvents: "none" }}>
               <span style={{ color: "#22d3ee" }}>MACD</span><span style={{ color: "#f97316", marginLeft: 4 }}>Signal</span>
             </span>
+          </div>
+        )}
+        {/* Stochastic sub-pane */}
+        {stoch && (
+          <div style={{ flexShrink: 0, height: 100, position: "relative", borderTop: `1px solid ${bord}` }}>
+            <div ref={stochWrapRef} style={{ position: "absolute", inset: 0 }} />
+            <span style={{ position: "absolute", top: 3, left: 6, zIndex: 5, fontSize: 9, pointerEvents: "none" }}><span style={{ color: "#22d3ee" }}>Stoch %K</span><span style={{ color: "#f97316", marginLeft: 4 }}>%D</span></span>
+          </div>
+        )}
+        {/* ATR sub-pane */}
+        {atr && (
+          <div style={{ flexShrink: 0, height: 100, position: "relative", borderTop: `1px solid ${bord}` }}>
+            <div ref={atrWrapRef} style={{ position: "absolute", inset: 0 }} />
+            <span style={{ position: "absolute", top: 3, left: 6, zIndex: 5, fontSize: 9, color: "#eab308", pointerEvents: "none" }}>ATR 14</span>
+          </div>
+        )}
+        {/* ADX sub-pane */}
+        {adx && (
+          <div style={{ flexShrink: 0, height: 100, position: "relative", borderTop: `1px solid ${bord}` }}>
+            <div ref={adxWrapRef} style={{ position: "absolute", inset: 0 }} />
+            <span style={{ position: "absolute", top: 3, left: 6, zIndex: 5, fontSize: 9, color: "#a78bfa", pointerEvents: "none" }}>ADX 14</span>
           </div>
         )}
         </div>
