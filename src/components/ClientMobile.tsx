@@ -109,6 +109,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mSl, setMSl] = useState("");
   const [mTp, setMTp] = useState("");
   const [notisOpen, setNotisOpen] = useState(false);
+  const [cfgSheet, setCfgSheet] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [bioOn, setBioOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -637,11 +638,28 @@ export default function ClientMobile({ t }: { t: any }) {
               );
             })()}
             {/* Indicator toggles (reflect the same engine as desk/desktop) */}
-            <div className="flex gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5" style={{ scrollbarWidth: "none" }}>
+            <div className="flex items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5" style={{ scrollbarWidth: "none" }}>
+              <button onClick={() => setCfgSheet(true)} className="sticky left-0 z-10 shrink-0 rounded-md bg-[var(--panel)] px-2 py-1 text-[var(--muted)]" title="Indicator settings"><i className="fa-solid fa-gear text-[11px]" /></button>
               {(["sig", "ribbon", "ema", "bb", "psar", "cdl", "rsi", "macd", "stoch", "atr", "adx"] as const).map((k) => (
                 <button key={k} onClick={() => t.setChartInd && t.setChartInd((v: any) => ({ ...v, [k]: !v[k] }))} className="shrink-0 rounded-md px-2 py-1 text-[10px] font-bold" style={{ background: t.chartInd?.[k] ? "rgba(47,129,247,0.18)" : "transparent", color: t.chartInd?.[k] ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (t.chartInd?.[k] ? "rgba(47,129,247,0.4)" : "var(--border)") }}>{k === "sig" ? "SIGNALS" : k.toUpperCase()}</button>
               ))}
             </div>
+            {/* Indicator settings bottom sheet (periods) */}
+            {cfgSheet && (
+              <>
+                <div className="fixed inset-0 z-[80]" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setCfgSheet(false)} />
+                <div className="fixed inset-x-0 bottom-0 z-[90] rounded-t-3xl p-4" style={{ background: "var(--panel)", paddingBottom: "calc(env(safe-area-inset-bottom) + 14px)" }}>
+                  <div className="mb-3 flex items-center justify-between"><div className="text-sm font-bold text-[var(--text)]">Indicator Settings</div><button onClick={() => setCfgSheet(false)} className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-xmark" /></button></div>
+                  {([["ma", "MA period"], ["rsi", "RSI period"], ["bb", "Bollinger period"], ["macdF", "MACD fast"], ["macdS", "MACD slow"], ["macdSig", "MACD signal"]] as const).map(([k, lbl]) => (
+                    <div key={k} className="mb-2.5 flex items-center justify-between gap-3">
+                      <span className="text-[13px] text-[var(--muted)]">{lbl}</span>
+                      <input type="number" min={1} value={t.chartCfg?.[k] ?? ""} onChange={(e) => t.setChartCfg && t.setChartCfg((c: any) => ({ ...c, [k]: Math.max(1, Number(e.target.value) || 1) }))} className="w-20 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-right text-[15px] text-[var(--text)]" />
+                    </div>
+                  ))}
+                  <button onClick={() => t.setChartCfg && t.setChartCfg({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 })} className="mt-1 w-full rounded-xl border border-[var(--border)] py-2.5 text-[12px] text-[var(--muted)]">Reset to defaults</button>
+                </div>
+              </>
+            )}
             {/* Chart — no sidebar tools by default (use full-screen for tools) */}
             <div className="relative min-h-0 flex-1 bg-[var(--bg)]">
               <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={false} ind={t.chartInd} cfg={t.chartCfg}
