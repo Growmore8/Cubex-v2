@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { emitRefresh } from "@/lib/realtime";
 
 export async function POST(req: Request) {
   const s = await requireClient();
@@ -19,6 +20,7 @@ export async function POST(req: Request) {
       prisma.account.update({ where: { id: acc.id }, data: { deposit: { increment: amt } } }),
       prisma.financialHistory.create({ data: { accountId: acc.id, type: "DEPOSIT", amount: amt, description: "Demo top-up", mode: "MANUAL", createdBy: "demo-topup" } }),
     ]);
+    emitRefresh(); // sync the client's other open devices
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

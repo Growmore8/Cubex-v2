@@ -3,6 +3,7 @@ import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
+import { emitRefresh } from "@/lib/realtime";
 
 export async function POST(req: Request) {
   const s = await requireClient();
@@ -27,6 +28,7 @@ export async function POST(req: Request) {
       await tx.financialHistory.create({ data: { accountId: from.id, type: "TRANSFER_OUT" as any, amount: amt, description: "Transfer to " + to.login, reference: ref, mode: "MANUAL", createdBy: s.email } });
       await tx.financialHistory.create({ data: { accountId: to.id, type: "TRANSFER_IN" as any, amount: amt, description: "Transfer from " + from.login, reference: ref, mode: "MANUAL", createdBy: s.email } });
     });
+    emitRefresh(); // sync the client's other open devices
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Transfer failed" }, { status: 400 });
