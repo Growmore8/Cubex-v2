@@ -683,9 +683,10 @@ function LWChart({
         title: `${p.kind ? p.kind + " " : ""}${p.type} ${Number(p.openPrice)}`,
       });
       lineRefs.current.push(entryLine);
-      // SL = rose red; TP = emerald green — thin dotted, same for all trade types
-      if (p.sl) lineRefs.current.push(s.createPriceLine({ price: p.sl, color: "#f43f5e", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "SL" }));
-      if (p.tp) lineRefs.current.push(s.createPriceLine({ price: p.tp, color: "#10b981", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "TP" }));
+      // SL = rose red; TP = emerald green — thin dotted, same for all trade types.
+      // Label each with its exact price so multiple trades' SL/TP stay distinct.
+      if (p.sl) lineRefs.current.push(s.createPriceLine({ price: p.sl, color: "#f43f5e", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: `SL ${Number(p.sl)}` }));
+      if (p.tp) lineRefs.current.push(s.createPriceLine({ price: p.tp, color: "#10b981", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: `TP ${Number(p.tp)}` }));
     }
   }, [positions, theme, tf, symbol]);
 
