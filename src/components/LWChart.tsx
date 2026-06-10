@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, memo, type CSSProperties } from "react";
 import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries, HistogramSeries } from "lightweight-charts";
 import { io, Socket } from "socket.io-client";
-import { RSI, SMA, EMA, BollingerBands, MACD } from "technicalindicators";
+import { RSI, SMA, EMA, BollingerBands, MACD, PSAR } from "technicalindicators";
 
 // Indicators are computed with the `technicalindicators` library; each helper
 // keeps the same {time,value} output shape, aligned back to the candle times.
@@ -32,6 +32,14 @@ function computeBB(bars: any[], period = 20, mult = 2) {
   const mid: any[] = [], upper: any[] = [], lower: any[] = [];
   res.forEach((b: any, k: number) => { const t = bars[off + k].time; mid.push({ time: t, value: b.middle }); upper.push({ time: t, value: b.upper }); lower.push({ time: t, value: b.lower }); });
   return { mid, upper, lower };
+}
+
+// Parabolic SAR — trend dots plotted on the price chart (one value per bar).
+function computePSAR(bars: any[], step = 0.02, max = 0.2) {
+  if (!bars || bars.length < 3) return [];
+  const res = PSAR.calculate({ step, max, high: bars.map((b) => b.high), low: bars.map((b) => b.low) });
+  const off = bars.length - res.length;
+  return res.map((v: number, k: number) => ({ time: bars[off + k].time, value: v }));
 }
 
 // MACD (12, 26, 9) — macd line, signal line, histogram bars
@@ -77,7 +85,7 @@ function LWChart({
   calcPnl?: (p: ChartPosition, price: number) => number;
   /** Controlled indicators from a parent header (desktop). When set, the in-chart
       left sidebar is hidden and the parent renders the SMA/EMA/BB/RSI/MACD buttons. */
-  ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean };
+  ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean; psar?: boolean };
   /** Controlled drawing tool from a parent header (H-line / trend next to indicators).
       When onTool is set, the in-chart floating draw toolbar is hidden. */
   tool?: "none" | "hline" | "trend";
@@ -104,12 +112,14 @@ function LWChart({
   const [sma, setSma] = useState(false);
   const [ema, setEma] = useState(false);
   const [rsi, setRsi] = useState(false);
+  const [psar, setPsar] = useState(false);
   const [drawN, setDrawN] = useState(0);
   const hlineRefs = useRef<any[]>([]);
   const trendRefs = useRef<any[]>([]);
   const trendStart = useRef<{ time: any; value: number } | null>(null);
   const smaRef = useRef<any>(null);
   const emaRef = useRef<any>(null);
+  const psarRef = useRef<any>(null);
   const rsiWrapRef = useRef<HTMLDivElement | null>(null);
   const rsiChartRef = useRef<any>(null);
   const rsiSeriesRef = useRef<any>(null);
@@ -127,8 +137,8 @@ function LWChart({
   // the internal state so all the existing chart effects keep working unchanged.
   useEffect(() => {
     if (!ind) return;
-    setSma(ind.sma); setEma(ind.ema); setBb(ind.bb); setRsi(ind.rsi); setMacd(ind.macd);
-  }, [ind?.sma, ind?.ema, ind?.bb, ind?.rsi, ind?.macd]); // eslint-disable-line react-hooks/exhaustive-deps
+    setSma(ind.sma); setEma(ind.ema); setBb(ind.bb); setRsi(ind.rsi); setMacd(ind.macd); setPsar(!!ind.psar);
+  }, [ind?.sma, ind?.ema, ind?.bb, ind?.rsi, ind?.macd, ind?.psar]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function clearDrawings() {
     for (const l of hlineRefs.current) { try { seriesRef.current?.removePriceLine(l); } catch {} }
@@ -164,7 +174,7 @@ function LWChart({
     chartRef.current = chart;
     seriesRef.current = series;
     // a recreated chart loses prior drawings/indicators — drop the stale refs
-    hlineRefs.current = []; trendRefs.current = []; smaRef.current = null; emaRef.current = null; trendStart.current = null;
+    hlineRefs.current = []; trendRefs.current = []; smaRef.current = null; emaRef.current = null; psarRef.current = null; trendStart.current = null;
     // Click handler for H-Line / Trend drawing tools
     chart.subscribeClick((param: any) => {
       const t = toolRef.current;
@@ -211,6 +221,10 @@ function LWChart({
       bbMidRef.current = null; bbUpRef.current = null; bbLoRef.current = null;
     }
     if (bb && bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current); try { bbMidRef.current.setData(mid); bbUpRef.current.setData(upper); bbLoRef.current.setData(lower); } catch {} }
+    // Parabolic SAR — dots on the price chart (line hidden, point markers shown)
+    if (psar && !psarRef.current) psarRef.current = chart.addSeries(LineSeries, { color: "#eab308", lineVisible: false, pointMarkersVisible: true, pointMarkersRadius: 1.7, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false } as any);
+    if (!psar && psarRef.current) { try { chart.removeSeries(psarRef.current); } catch {} psarRef.current = null; }
+    if (psar && psarRef.current) { try { psarRef.current.setData(computePSAR(barsRef.current)); } catch {} }
     // Sub-pane data sync (charts managed by their own effects)
     if (rsi && rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
     if (macd && macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
@@ -219,10 +233,11 @@ function LWChart({
       if (smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, 20, false)); } catch {} }
       if (emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, 20, true)); } catch {} }
       if (bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current); try { bbMidRef.current.setData(mid); bbUpRef.current?.setData(upper); bbLoRef.current?.setData(lower); } catch {} }
+      if (psarRef.current) { try { psarRef.current.setData(computePSAR(barsRef.current)); } catch {} }
       if (rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
       if (macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
     };
-  }, [sma, ema, bb, rsi, macd, symbol, tf, theme, digits, drawN]);
+  }, [sma, ema, bb, rsi, macd, psar, symbol, tf, theme, digits, drawN]);
 
   // RSI sub-pane chart (separate LW instance below main chart)
   useEffect(() => {
