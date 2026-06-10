@@ -192,6 +192,11 @@ function LWChart({
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
   const barsRef = useRef<any[]>([]);
+  // TradingView-style OHLC legend (updated via ref, no re-render) + right-click menu
+  const legendRef = useRef<HTMLDivElement | null>(null);
+  const fmtLegRef = useRef<(b: any) => void>(() => {});
+  const hoveringRef = useRef(false);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; price: number | null } | null>(null);
   const lineRefs = useRef<any[]>([]);
   const linePricesRef = useRef<number[]>([]); // entry/SL/TP/trigger prices to keep in view
   const posLinesRef = useRef<{ line: any; p: ChartPosition }[]>([]); // open-trade entry lines for live P&L labels
@@ -307,7 +312,26 @@ function LWChart({
         }
       }
     });
-    if (barsRef.current.length) { series.setData(barsRef.current); chart.timeScale().fitContent(); }
+    // OHLC legend (TradingView-style) — updated on crosshair move / each tick.
+    const tcol = theme === "dark" ? "#e8eaed" : "#0f172a";
+    fmtLegRef.current = (b: any) => {
+      if (!legendRef.current || !b || b.open == null) return;
+      const up = b.close >= b.open; const col = up ? "#26a69a" : "#ef5350";
+      const ch = b.close - b.open, pct = b.open ? (ch / b.open) * 100 : 0;
+      legendRef.current.innerHTML =
+        `<b style="color:${tcol}">${symRef.current}</b> <span style="opacity:.6">· ${tfRef.current}</span>` +
+        ` &nbsp; <span style="opacity:.6">O</span><span style="color:${col}">${b.open}</span>` +
+        ` <span style="opacity:.6">H</span><span style="color:${col}">${b.high}</span>` +
+        ` <span style="opacity:.6">L</span><span style="color:${col}">${b.low}</span>` +
+        ` <span style="opacity:.6">C</span><span style="color:${col}">${b.close}</span>` +
+        ` <span style="color:${col}">${ch >= 0 ? "+" : ""}${ch.toFixed(digits)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)</span>`;
+    };
+    chart.subscribeCrosshairMove((param: any) => {
+      const d = param?.seriesData?.get(series);
+      if (d && d.open != null) { hoveringRef.current = true; fmtLegRef.current(d); }
+      else { hoveringRef.current = false; const last = barsRef.current[barsRef.current.length - 1]; if (last) fmtLegRef.current(last); }
+    });
+    if (barsRef.current.length) { series.setData(barsRef.current); chart.timeScale().fitContent(); fmtLegRef.current(barsRef.current[barsRef.current.length - 1]); }
     return () => { chart.remove(); chartRef.current = null; seriesRef.current = null; };
   }, [theme, digits]);
 
@@ -537,7 +561,7 @@ function LWChart({
         .sort((a: any, b: any) => a.time - b.time)
         .filter((c: any) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
       if (!bars.length) return false;
-      try { seriesRef.current.setData(bars); barsRef.current = bars; chartRef.current?.timeScale().fitContent(); onBarsLoaded.current(); return true; }
+      try { seriesRef.current.setData(bars); barsRef.current = bars; chartRef.current?.timeScale().fitContent(); onBarsLoaded.current(); fmtLegRef.current(bars[bars.length - 1]); return true; }
       catch { return false; }
     }
     // Build a plausible `count`-bar history (random walk) ending at `lastPrice`,
@@ -621,6 +645,7 @@ function LWChart({
           bars.push(bar);
           seriesRef.current.update(bar);
         }
+        if (!hoveringRef.current) fmtLegRef.current(barsRef.current[barsRef.current.length - 1]);
       } catch { /* out-of-order tick during a reseed — ignore */ }
     };
     const iv = setInterval(apply, 80);
@@ -703,6 +728,7 @@ function LWChart({
     </>
   );
   return (
+    <>
     <div style={{ display: "flex", flexDirection: "row", height: "100%", width: "100%" }}>
       {/* Left sidebar — TradingView-style tool panel (mobile / default). Hidden when
           showTools=false, or when indicators are controlled by a parent header (`ind`). */}
@@ -714,12 +740,15 @@ function LWChart({
       {/* Chart column */}
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
         {/* Main price chart */}
-        <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+        <div style={{ position: "relative", flex: 1, minHeight: 0 }}
+          onContextMenu={(e) => { e.preventDefault(); let price: number | null = null; try { const r = wrapRef.current?.getBoundingClientRect(); if (r && seriesRef.current) price = seriesRef.current.coordinateToPrice(e.clientY - r.top); } catch {} setCtxMenu({ x: e.clientX, y: e.clientY, price }); }}>
           <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
+          {/* TradingView-style OHLC legend */}
+          <div ref={legendRef} style={{ position: "absolute", top: 6, left: 10, zIndex: 6, fontSize: 11, fontWeight: 600, pointerEvents: "none", whiteSpace: "nowrap", color: theme === "dark" ? "#9aa6bf" : "#475569", textShadow: theme === "dark" ? "0 1px 2px rgba(0,0,0,0.6)" : "none" }} />
           {/* Desktop drawing tools (H-line / trend / clear) — floating top-left.
               Hidden when the parent header controls the tool (onTool set). */}
           {showTools && ind && !onTool && (
-            <div style={{ position: "absolute", top: 6, left: 8, zIndex: 6, display: "flex", gap: 3, padding: "3px 5px", borderRadius: 8, background: panelBg, border: `1px solid ${bord}` }}>
+            <div style={{ position: "absolute", top: 26, left: 8, zIndex: 6, display: "flex", gap: 3, padding: "3px 5px", borderRadius: 8, background: panelBg, border: `1px solid ${bord}` }}>
               {drawBtns}
             </div>
           )}
@@ -770,6 +799,31 @@ function LWChart({
         )}
         </div>
       </div>
+      {/* Right-click context menu (TradingView-style) */}
+      {ctxMenu && (() => {
+        const close = () => setCtxMenu(null);
+        const item = (label: string, icon: string, onClick: () => void, danger = false) => (
+          <button onMouseDown={(e) => { e.preventDefault(); onClick(); close(); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 12px", textAlign: "left", fontSize: 12, color: danger ? "#ef5350" : (theme === "dark" ? "#e8eaed" : "#0f172a"), background: "transparent", border: 0, cursor: "pointer" }} onMouseEnter={(e) => (e.currentTarget.style.background = theme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+            <i className={"fa-solid " + icon} style={{ width: 14, opacity: 0.8, fontSize: 11 }} />{label}
+          </button>
+        );
+        const sep = <div style={{ height: 1, margin: "4px 0", background: bord }} />;
+        return (
+          <>
+            <div style={{ position: "fixed", inset: 0, zIndex: 130 }} onMouseDown={close} onContextMenu={(e) => { e.preventDefault(); close(); }} />
+            <div style={{ position: "fixed", left: Math.min(ctxMenu.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 220), top: ctxMenu.y, zIndex: 131, minWidth: 200, padding: "4px 0", borderRadius: 10, background: panelBg, border: `1px solid ${bord}`, boxShadow: "0 16px 40px rgba(0,0,0,0.45)" }} onContextMenu={(e) => e.preventDefault()}>
+              {item("Reset chart view", "fa-rotate-left", () => { try { chartRef.current?.timeScale().fitContent(); seriesRef.current?.priceScale().applyOptions({ autoScale: true }); } catch {} })}
+              {ctxMenu.price != null && item(`Copy price ${ctxMenu.price.toFixed(digits)}`, "fa-copy", () => { try { navigator.clipboard.writeText(ctxMenu.price!.toFixed(digits)); } catch {} })}
+              {sep}
+              {item("Fit data", "fa-arrows-left-right-to-line", () => { try { chartRef.current?.timeScale().fitContent(); } catch {} })}
+              {item("Take screenshot", "fa-camera", () => { try { const cv = chartRef.current?.takeScreenshot(); if (cv) { const a = document.createElement("a"); a.href = cv.toDataURL("image/png"); a.download = `${symRef.current}-${tfRef.current}.png`; a.click(); } } catch {} })}
+              {sep}
+              {item("Remove drawings", "fa-eraser", () => clearDrawings(), true)}
+            </div>
+          </>
+        );
+      })()}
+    </>
   );
 }
 
