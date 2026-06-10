@@ -1329,9 +1329,15 @@ export default function AdminDeskPage() {
       {mgrModal && <ManagersModal onClose={() => { setMgrModal(false); loadAll(); }} />}
       {pmModal && <PaymentMethodsModal onClose={() => setPmModal(false)} />}
 
-      {menu && (<>
+      {menu && (() => {
+        const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+        const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+        const left = Math.max(6, Math.min(menu.x, vw - 246));
+        const openUp = menu.y > vh * 0.55; // flip upward when near the bottom so nothing is cut off
+        const vpos = openUp ? { bottom: Math.max(6, vh - menu.y) } : { top: menu.y };
+        return (<>
         <div className="fixed inset-0 z-40" onClick={() => { setMenu(null); setMenuSub(""); }} />
-        <div className="ui-pop fixed z-50 w-60 rounded-2xl border py-1 text-[11px]" style={{ left: menu.x, top: menu.y, background: "color-mix(in srgb, var(--panel) 92%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.14s cubic-bezier(.16,1,.3,1)" }}>
+        <div className="ui-pop fixed z-50 w-60 rounded-2xl border py-1 text-[11px]" style={{ left, ...vpos, background: "color-mix(in srgb, var(--panel) 92%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.14s cubic-bezier(.16,1,.3,1)" }}>
           {/* Header */}
           <div className="mx-1.5 mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 5%, transparent))" }}>
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm" style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
@@ -1476,7 +1482,8 @@ export default function AdminDeskPage() {
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
           {can("deleteClients") && <button onClick={() => delClient(menu.acc)} className={mi} style={{ color: SELL }}>{mIco("fa-trash", SELL)}Delete Client</button>}
         </div>
-      </>)}
+      </>);
+      })()}
 
       {ticket && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.18)" }}>
