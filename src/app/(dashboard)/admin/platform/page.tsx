@@ -13,6 +13,7 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import CountrySelect from "@/components/ui/CountrySelect";
 import SymbolPicker from "@/components/ui/SymbolPicker";
 import { randomConfirmWord } from "@/lib/confirmword";
+import { iconForNotification } from "@/lib/notif";
 import { isOnline as presenceOnline } from "@/components/ui/Presence";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
@@ -768,13 +769,16 @@ export default function AdminDeskPage() {
                   {notifs.length > 0 && <button onClick={async () => { try { await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); setNotifUnread(0); setNotifs((n: any[]) => n.map((x) => ({ ...x, read: true }))); } catch {} }} className="text-[10px]" style={{ color: "var(--accent)" }}>Mark all read</button>}
                 </div>
                 {notifs.length === 0 ? <div className="px-3 py-6 text-center text-[11px] text-[var(--muted)]"><i className="fa-solid fa-bell-slash mb-1 block text-lg opacity-40" />No notifications</div>
-                  : notifs.map((n: any) => (
-                    <div key={n.id} className="border-b px-3 py-2 last:border-0" style={{ borderColor: "var(--border)" }}>
-                      <div className="text-[11px] font-medium">{n.title}</div>
-                      {n.body && <div className="mt-0.5 text-[10px] text-[var(--muted)]">{n.body}</div>}
-                      <div className="mt-0.5 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div>
+                  : notifs.map((n: any) => { const ic = iconForNotification(n); return (
+                    <div key={n.id} className="flex items-start gap-2 border-b px-3 py-2 last:border-0" style={{ borderColor: "var(--border)" }}>
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: ic.color + "22", color: ic.color }}><i className={"fa-solid " + ic.icon + " text-[10px]"} /></span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[11px] font-medium">{n.title}</div>
+                        {n.body && <div className="mt-0.5 whitespace-pre-line text-[10px] text-[var(--muted)]">{n.body}</div>}
+                        <div className="mt-0.5 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div>
+                      </div>
                     </div>
-                  ))}
+                  ); })}
               </div></>)}
           </div>
           <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: SELL }} title="Logout"><i className="fa-solid fa-right-from-bracket" /></button>
@@ -1676,7 +1680,7 @@ export default function AdminDeskPage() {
       )}
       {modal && !modalMin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.18)" }}>
-          <div className="ui-pop desk-modal w-[420px] rounded-xl border p-4" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className={"ui-pop desk-modal rounded-xl border p-4 " + (modal === "notify" ? "w-[660px] max-w-[94vw]" : "w-[420px]")} style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-sm font-semibold">{modal === "client" && "New Client"}{modal === "manager" && "New Manager"}{modal === "group" && "Manage Groups"}{modal === "notify" && "Send Notification"}</div>
               <div className="flex items-center gap-1">
@@ -1737,18 +1741,34 @@ export default function AdminDeskPage() {
                 {form.editId && <button onClick={() => setForm({ type: "LIVE", leverage: 100, currency: "USD" })} className="rounded border border-[var(--border)] px-3 py-2 text-xs">New</button>}
               </div>
             </>)}
-            {modal === "notify" && (<>
-              <div className={lab + " mt-1"}>Template</div>
-              <div className="flex flex-wrap gap-1">{Object.keys(NOTI_TEMPLATES).map((k) => (<button key={k} onClick={() => { const t = NOTI_TEMPLATES[k]; setForm((pp: any) => ({ ...pp, title: t.title, body: t.body, template: k })); }} className="rounded border px-2 py-1 text-[10px]" style={{ borderColor: "var(--border)", color: form.template === k ? "var(--text)" : "var(--muted)", background: form.template === k ? "var(--soft)" : "transparent" }}>{k}</button>))}</div>
-              <div className={lab + " mt-2"}>Target</div>
-              <select className={inp} value={form.ntarget || "all_clients"} onChange={(e) => f("ntarget", e.target.value)}><option value="all_clients">All clients</option><option value="managers">All managers</option><option value="client">Specific client</option></select>
-              {form.ntarget === "client" && (<><div className={lab + " mt-2"}>Client</div><select className={inp} value={form.naccountId || ""} onChange={(e) => f("naccountId", e.target.value)}><option value="">- select -</option>{clients.filter((cl: any) => !cl.parentId).map((cl: any) => <option key={cl.id} value={cl.id}>{cl.login} - {cl.name}</option>)}</select></>)}
-              <div className={lab + " mt-2"}>Title</div><input className={inp} value={form.title || ""} onChange={(e) => f("title", e.target.value)} />
-              <div className={lab + " mt-2"}>Message</div><textarea className={inp} rows={3} value={form.body || ""} onChange={(e) => f("body", e.target.value)} />
-              <div className={lab + " mt-2"}>Image URL (optional)</div><input className={inp} value={form.image || ""} onChange={(e) => f("image", e.target.value)} placeholder="https://..." />
-              <button onClick={() => submit("/api/admin/notify", { title: form.title, body: form.body, image: form.image, target: form.ntarget || "all_clients", accountId: form.naccountId }, "Notification")} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Send notification</button>
-              {nrecent.length > 0 && (<div className="mt-3 border-t pt-2" style={{ borderColor: "var(--border)" }}><div className="text-[10px] text-[var(--muted)]">Recently sent</div>{nrecent.map((n: any, i: number) => (<div key={i} className="mt-1 text-[10px]"><span className="text-[var(--text)]">{n.title}</span> <span className="text-[var(--muted)]"> · {new Date(n.createdAt).toLocaleString()}</span></div>))}</div>)}
-            </>)}
+            {modal === "notify" && (
+              <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 230px" }}>
+                {/* LEFT — compose */}
+                <div className="min-w-0">
+                  <div className={lab + " mt-1"}>Template</div>
+                  <div className="flex flex-wrap gap-1">{Object.keys(NOTI_TEMPLATES).map((k) => (<button key={k} onClick={() => { const t = NOTI_TEMPLATES[k]; setForm((pp: any) => ({ ...pp, title: t.title, body: t.body, template: k })); }} className="rounded border px-2 py-1 text-[10px]" style={{ borderColor: "var(--border)", color: form.template === k ? "var(--text)" : "var(--muted)", background: form.template === k ? "var(--soft)" : "transparent" }}>{k}</button>))}</div>
+                  <div className={lab + " mt-2"}>Target</div>
+                  <select className={inp} value={form.ntarget || "all_clients"} onChange={(e) => f("ntarget", e.target.value)}><option value="all_clients">All clients</option><option value="managers">All managers</option><option value="client">Specific client</option></select>
+                  {form.ntarget === "client" && (<><div className={lab + " mt-2"}>Client</div><select className={inp} value={form.naccountId || ""} onChange={(e) => f("naccountId", e.target.value)}><option value="">- select -</option>{clients.filter((cl: any) => !cl.parentId).map((cl: any) => <option key={cl.id} value={cl.id}>{cl.login} - {cl.name}</option>)}</select></>)}
+                  <div className={lab + " mt-2"}>Title</div><input className={inp} value={form.title || ""} onChange={(e) => f("title", e.target.value)} />
+                  <div className={lab + " mt-2"}>Message</div><textarea className={inp} rows={3} value={form.body || ""} onChange={(e) => f("body", e.target.value)} />
+                  <div className={lab + " mt-2"}>Image URL (optional)</div><input className={inp} value={form.image || ""} onChange={(e) => f("image", e.target.value)} placeholder="https://..." />
+                  <button onClick={() => submit("/api/admin/notify", { title: form.title, body: form.body, image: form.image, target: form.ntarget || "all_clients", accountId: form.naccountId }, "Notification")} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Send notification</button>
+                </div>
+                {/* RIGHT — recently sent (own scroll, keeps modal height fixed) */}
+                <div className="min-w-0 border-l pl-3" style={{ borderColor: "var(--border)" }}>
+                  <div className="mb-1 text-[10px] font-semibold text-[var(--muted)]">Recently sent</div>
+                  <div className="space-y-1.5 overflow-auto pr-1" style={{ maxHeight: 360 }}>
+                    {nrecent.length === 0 ? <div className="text-[10px] text-[var(--muted)]">Nothing yet.</div> : nrecent.map((n: any, i: number) => { const ic = iconForNotification(n); return (
+                      <div key={i} className="flex items-start gap-1.5 text-[10px]">
+                        <i className={"fa-solid " + ic.icon + " mt-0.5"} style={{ color: ic.color, fontSize: 10, width: 12, textAlign: "center" }} />
+                        <div className="min-w-0"><div className="truncate text-[var(--text)]">{n.title}</div><div className="text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div></div>
+                      </div>
+                    ); })}
+                  </div>
+                </div>
+              </div>
+            )}
             {err && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
             <button onClick={() => setModal("")} className="mt-2 w-full rounded border border-[var(--border)] py-1.5 text-xs">Cancel</button>
           </div>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { io, type Socket } from "socket.io-client";
 import { playSound, soundForNotification, setVol as setSndVol } from "@/lib/sounds";
+import { iconForNotification } from "@/lib/notif";
 
 const IDLE_MS = 15 * 60 * 1000;
 const WARN_MS = 13 * 60 * 1000;
@@ -260,13 +261,16 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
         <div className="sa-notif-list">
           {notifs.length === 0
             ? <div className="sa-notif-empty"><i className="fa-regular fa-bell-slash" style={{ fontSize: 32, display: "block", marginBottom: 10, opacity: 0.4 }}></i>No notifications yet.</div>
-            : notifs.map((n, i) => (
-              <div className="sa-notif-item" key={i}>
-                <div className="sa-notif-title">{n.title}</div>
-                {n.body && <div className="sa-notif-detail">{n.body}</div>}
-                <div className="sa-notif-time">{n.createdAt ? new Date(n.createdAt).toLocaleString() : ""}</div>
+            : notifs.map((n, i) => { const ic = iconForNotification(n); return (
+              <div className="sa-notif-item" key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <span style={{ marginTop: 2, flexShrink: 0, width: 26, height: 26, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", background: ic.color + "22", color: ic.color }}><i className={"fa-solid " + ic.icon} style={{ fontSize: 11 }} /></span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="sa-notif-title">{n.title}</div>
+                  {n.body && <div className="sa-notif-detail" style={{ whiteSpace: "pre-line" }}>{n.body}</div>}
+                  <div className="sa-notif-time">{n.createdAt ? new Date(n.createdAt).toLocaleString() : ""}</div>
+                </div>
               </div>
-            ))}
+            ); })}
         </div>
       </div>
 

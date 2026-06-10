@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
+import { sendPushToUser } from "@/lib/push";
+import { emitRefresh } from "@/lib/realtime";
 
 export async function GET(req: Request) {
   const s = await requireSuperAdmin();
@@ -131,6 +133,9 @@ export async function POST(req: Request) {
       })),
     });
 
+    // Web push + realtime so it reaches clients even when the app is closed.
+    await Promise.all(recipients.map((u) => sendPushToUser(u.id, { title, body: signedBody }))).catch(() => {});
+    try { emitRefresh({ kind: "notification", users: recipients.map((u) => u.id) }); } catch {}
     await audit(null, "sa.notify", `${title} → ${scope} (${recipients.length})`, s.email);
     return NextResponse.json({ ok: true, count: recipients.length, batchId });
   } catch (e: any) {

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import WalletPanel from "@/components/WalletPanel";
 import WorldMapBg from "@/components/ui/WorldMapBg";
 import { titleCaseName } from "@/lib/format";
+import { iconForNotification } from "@/lib/notif";
 
 // Lazy-load the chart lib — it's ~350 kB and only needed on the Chart tab.
 // Loads on first tab open; subsequent visits are instant (module cached).
@@ -375,12 +376,8 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div className="mt-1 text-[12px]" style={{ color: "var(--muted)" }}>No notifications yet</div>
                 </div>
               ) : (notis || []).map((n: any, i: number) => {
-                const t = String(n.type || "").toUpperCase();
-                const isTrade = t === "TRADE";
-                const isFunds = t === "FUNDS";
-                const isKyc = t === "KYC";
-                const iconName = isTrade ? "fa-chart-line" : isFunds ? "fa-money-bill-wave" : isKyc ? "fa-id-card" : "fa-bell";
-                const iconColor = isTrade ? "#2f81f7" : isFunds ? BUY : isKyc ? "#a78bfa" : GOLD;
+                const ic = iconForNotification(n);
+                const iconName = ic.icon, iconColor = ic.color;
                 return (
                   <div key={i} className="mx-3 mb-2 overflow-hidden rounded-2xl" style={{ background: !n.read ? "color-mix(in srgb, var(--soft) 80%, transparent)" : "var(--soft)" }}>
                     <div className="flex gap-3 px-4 py-3.5">
