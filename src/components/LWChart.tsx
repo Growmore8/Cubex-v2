@@ -58,6 +58,52 @@ function computeADX(bars: any[], period = 14) {
   return res.map((r: any, i: number) => ({ time: bars[off + i].time, value: r.adx != null ? +r.adx.toFixed(2) : 0 }));
 }
 
+// EMA aligned to every bar (leading warm-up bars = null).
+function emaAligned(closes: number[], period: number): (number | null)[] {
+  const res = EMA.calculate({ period, values: closes });
+  const off = closes.length - res.length;
+  const a: (number | null)[] = new Array(closes.length).fill(null);
+  res.forEach((v: number, k: number) => { a[off + k] = v; });
+  return a;
+}
+// Trade signal engine: EMA(9/21) crossover, graded by RSI + ADX → BUY/SELL/Strong.
+function computeSignals(bars: any[]) {
+  if (!bars || bars.length < 30) return [];
+  const closes = bars.map((b) => b.close);
+  const ef = emaAligned(closes, 9), es = emaAligned(closes, 21);
+  const rres = RSI.calculate({ period: 14, values: closes }); const roff = closes.length - rres.length; const rsiA: number[] = new Array(closes.length).fill(50); rres.forEach((v, k) => { rsiA[roff + k] = v; });
+  const ares = ADX.calculate({ period: 14, high: bars.map((b) => b.high), low: bars.map((b) => b.low), close: closes }); const aoff = closes.length - ares.length; const adxA: number[] = new Array(closes.length).fill(0); ares.forEach((v: any, k: number) => { adxA[aoff + k] = v?.adx ?? 0; });
+  const out: any[] = []; let last: boolean | null = null;
+  for (let i = 0; i < bars.length; i++) {
+    const a = ef[i], b = es[i]; if (a == null || b == null) continue;
+    const trend = a > b;
+    if (last !== null && trend !== last) {
+      const strong = adxA[i] > 25 && (trend ? rsiA[i] >= 52 : rsiA[i] <= 48);
+      out.push({ time: bars[i].time, position: trend ? "belowBar" : "aboveBar", color: trend ? "#26a69a" : "#ef5350", shape: trend ? "arrowUp" : "arrowDown", text: trend ? (strong ? "Strong BUY" : "BUY") : (strong ? "Strong SELL" : "SELL") });
+    }
+    last = trend;
+  }
+  return out;
+}
+// MA ribbon: 5 EMAs, each split into green (uptrend) / red (downtrend) line data.
+const RIBBON_PERIODS = [8, 13, 21, 34, 55];
+function computeRibbon(bars: any[]) {
+  const closes = bars.map((b) => b.close);
+  const ef = emaAligned(closes, 9), es = emaAligned(closes, 21);
+  return RIBBON_PERIODS.map((p) => {
+    const line = emaAligned(closes, p);
+    const g: any[] = [], r: any[] = [];
+    for (let i = 0; i < bars.length; i++) {
+      const t = bars[i].time;
+      if (line[i] == null) { g.push({ time: t }); r.push({ time: t }); continue; }
+      const up = ef[i] != null && es[i] != null ? (ef[i] as number) >= (es[i] as number) : true;
+      g.push(up ? { time: t, value: +(line[i] as number).toFixed(6) } : { time: t });
+      r.push(!up ? { time: t, value: +(line[i] as number).toFixed(6) } : { time: t });
+    }
+    return { g, r };
+  });
+}
+
 // Candlestick pattern markers — scan each bar and tag recognised reversal/indecision
 // patterns. Returns lightweight-charts markers (sorted ascending by time).
 function patWin(bars: any[], i: number, n: number) {
@@ -135,7 +181,7 @@ function LWChart({
   calcPnl?: (p: ChartPosition, price: number) => number;
   /** Controlled indicators from a parent header (desktop). When set, the in-chart
       left sidebar is hidden and the parent renders the SMA/EMA/BB/RSI/MACD buttons. */
-  ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean; psar?: boolean; cdl?: boolean; stoch?: boolean; atr?: boolean; adx?: boolean };
+  ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean; psar?: boolean; cdl?: boolean; stoch?: boolean; atr?: boolean; adx?: boolean; sig?: boolean; ribbon?: boolean };
   /** Controlled drawing tool from a parent header (H-line / trend next to indicators).
       When onTool is set, the in-chart floating draw toolbar is hidden. */
   tool?: "none" | "hline" | "trend";
@@ -165,6 +211,10 @@ function LWChart({
   const [psar, setPsar] = useState(false);
   const [cdl, setCdl] = useState(false);
   const markersRef = useRef<any>(null);
+  const [sig, setSig] = useState(false);
+  const sigMarkersRef = useRef<any>(null);
+  const [ribbon, setRibbon] = useState(false);
+  const ribbonRefs = useRef<any[]>([]);
   const [drawN, setDrawN] = useState(0);
   const hlineRefs = useRef<any[]>([]);
   const trendRefs = useRef<any[]>([]);
@@ -199,8 +249,8 @@ function LWChart({
   // the internal state so all the existing chart effects keep working unchanged.
   useEffect(() => {
     if (!ind) return;
-    setSma(ind.sma); setEma(ind.ema); setBb(ind.bb); setRsi(ind.rsi); setMacd(ind.macd); setPsar(!!ind.psar); setCdl(!!ind.cdl); setStoch(!!ind.stoch); setAtr(!!ind.atr); setAdx(!!ind.adx);
-  }, [ind?.sma, ind?.ema, ind?.bb, ind?.rsi, ind?.macd, ind?.psar, ind?.cdl, ind?.stoch, ind?.atr, ind?.adx]); // eslint-disable-line react-hooks/exhaustive-deps
+    setSma(ind.sma); setEma(ind.ema); setBb(ind.bb); setRsi(ind.rsi); setMacd(ind.macd); setPsar(!!ind.psar); setCdl(!!ind.cdl); setStoch(!!ind.stoch); setAtr(!!ind.atr); setAdx(!!ind.adx); setSig(!!ind.sig); setRibbon(!!ind.ribbon);
+  }, [ind?.sma, ind?.ema, ind?.bb, ind?.rsi, ind?.macd, ind?.psar, ind?.cdl, ind?.stoch, ind?.atr, ind?.adx, ind?.sig, ind?.ribbon]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function clearDrawings() {
     for (const l of hlineRefs.current) { try { seriesRef.current?.removePriceLine(l); } catch {} }
@@ -236,7 +286,7 @@ function LWChart({
     chartRef.current = chart;
     seriesRef.current = series;
     // a recreated chart loses prior drawings/indicators — drop the stale refs
-    hlineRefs.current = []; trendRefs.current = []; smaRef.current = null; emaRef.current = null; psarRef.current = null; markersRef.current = null; trendStart.current = null;
+    hlineRefs.current = []; trendRefs.current = []; smaRef.current = null; emaRef.current = null; psarRef.current = null; markersRef.current = null; sigMarkersRef.current = null; ribbonRefs.current = []; trendStart.current = null;
     // Click handler for H-Line / Trend drawing tools
     chart.subscribeClick((param: any) => {
       const t = toolRef.current;
@@ -287,6 +337,20 @@ function LWChart({
     if (psar && !psarRef.current) psarRef.current = chart.addSeries(LineSeries, { color: "#eab308", lineVisible: false, pointMarkersVisible: true, pointMarkersRadius: 1.7, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false } as any);
     if (!psar && psarRef.current) { try { chart.removeSeries(psarRef.current); } catch {} psarRef.current = null; }
     if (psar && psarRef.current) { try { psarRef.current.setData(computePSAR(barsRef.current)); } catch {} }
+    // MA ribbon (5 EMAs, green up / red down)
+    if (ribbon && ribbonRefs.current.length === 0 && seriesRef.current) {
+      for (let i = 0; i < RIBBON_PERIODS.length; i++) {
+        const op = 0.3 + i * 0.08;
+        ribbonRefs.current.push(chart.addSeries(LineSeries, { color: `rgba(38,166,154,${op})`, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
+        ribbonRefs.current.push(chart.addSeries(LineSeries, { color: `rgba(239,83,80,${op})`, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
+      }
+    }
+    if (!ribbon && ribbonRefs.current.length) { for (const s of ribbonRefs.current) { try { chart.removeSeries(s); } catch {} } ribbonRefs.current = []; }
+    if (ribbon && ribbonRefs.current.length) { try { const rb = computeRibbon(barsRef.current); rb.forEach((d, i) => { ribbonRefs.current[i * 2]?.setData(d.g); ribbonRefs.current[i * 2 + 1]?.setData(d.r); }); } catch {} }
+    // Trade signals (BUY/SELL/Strong markers on the price series)
+    if (sig && seriesRef.current) {
+      try { const ms = computeSignals(barsRef.current); if (sigMarkersRef.current) sigMarkersRef.current.setMarkers(ms); else sigMarkersRef.current = createSeriesMarkers(seriesRef.current, ms); } catch {}
+    } else if (!sig && sigMarkersRef.current) { try { sigMarkersRef.current.setMarkers([]); } catch {} }
     // Candlestick pattern markers (on the price series)
     if (cdl && seriesRef.current) {
       try {
@@ -309,6 +373,8 @@ function LWChart({
       if (emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, 20, true)); } catch {} }
       if (bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current); try { bbMidRef.current.setData(mid); bbUpRef.current?.setData(upper); bbLoRef.current?.setData(lower); } catch {} }
       if (psarRef.current) { try { psarRef.current.setData(computePSAR(barsRef.current)); } catch {} }
+      if (ribbonRefs.current.length) { try { const rb = computeRibbon(barsRef.current); rb.forEach((d, i) => { ribbonRefs.current[i * 2]?.setData(d.g); ribbonRefs.current[i * 2 + 1]?.setData(d.r); }); } catch {} }
+      if (sigMarkersRef.current && sig) { try { sigMarkersRef.current.setMarkers(computeSignals(barsRef.current)); } catch {} }
       if (markersRef.current && cdl) { try { markersRef.current.setMarkers(computePatterns(barsRef.current)); } catch {} }
       if (rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
       if (macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
@@ -316,7 +382,7 @@ function LWChart({
       if (atrSeriesRef.current) { try { atrSeriesRef.current.setData(computeATR(barsRef.current)); } catch {} }
       if (adxSeriesRef.current) { try { adxSeriesRef.current.setData(computeADX(barsRef.current)); } catch {} }
     };
-  }, [sma, ema, bb, rsi, macd, psar, cdl, stoch, atr, adx, symbol, tf, theme, digits, drawN]);
+  }, [sma, ema, bb, rsi, macd, psar, cdl, sig, ribbon, stoch, atr, adx, symbol, tf, theme, digits, drawN]);
 
   // RSI sub-pane chart (separate LW instance below main chart)
   useEffect(() => {

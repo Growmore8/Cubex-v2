@@ -155,7 +155,7 @@ export default function AdminDeskPage() {
   };
   const [auditCat, setAuditCat] = useState("ALL");
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
-  const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false, psar: false, cdl: false, stoch: false, atr: false, adx: false });
+  const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false, psar: false, cdl: false, stoch: false, atr: false, adx: false, sig: false, ribbon: false });
   const [chartTool, setChartTool] = useState<"none" | "hline" | "trend">("none");
   const [chartClearKey, setChartClearKey] = useState(0);
   const [stmtModal, setStmtModal] = useState(false);
@@ -917,7 +917,7 @@ export default function AdminDeskPage() {
               <button onClick={() => setChartTool((t) => t === "hline" ? "none" : "hline")} title="Horizontal line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "hline" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "hline" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "hline" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-minus text-[11px]" /></button>
               <button onClick={() => setChartTool((t) => t === "trend" ? "none" : "trend")} title="Trend line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "trend" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "trend" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "trend" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-arrow-trend-up text-[11px]" /></button>
               <button onClick={() => setChartClearKey((n) => n + 1)} title="Clear drawings" className="mr-1 rounded px-1.5 py-0.5 text-[var(--muted)]" style={{ border: "1px solid transparent" }}><i className="fa-solid fa-eraser text-[11px]" /></button>
-              {(["sma", "ema", "bb", "rsi", "macd", "psar", "cdl", "stoch", "atr", "adx"] as const).map((k) => (
+              {(["sma", "ema", "bb", "rsi", "macd", "psar", "cdl", "stoch", "atr", "adx", "sig", "ribbon"] as const).map((k) => (
                 <button key={k} onClick={() => setChartInd((v) => ({ ...v, [k]: !v[k] }))} title={k.toUpperCase()}
                   className="rounded px-1.5 py-0.5 text-[10px] font-bold"
                   style={{ background: chartInd[k] ? "rgba(90,169,255,0.18)" : "transparent", color: chartInd[k] ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartInd[k] ? "rgba(90,169,255,0.4)" : "transparent") }}>

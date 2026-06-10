@@ -636,9 +636,15 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               );
             })()}
+            {/* Indicator toggles (reflect the same engine as desk/desktop) */}
+            <div className="flex gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5" style={{ scrollbarWidth: "none" }}>
+              {(["sig", "ribbon", "ema", "bb", "psar", "cdl", "rsi", "macd", "stoch", "atr", "adx"] as const).map((k) => (
+                <button key={k} onClick={() => t.setChartInd && t.setChartInd((v: any) => ({ ...v, [k]: !v[k] }))} className="shrink-0 rounded-md px-2 py-1 text-[10px] font-bold" style={{ background: t.chartInd?.[k] ? "rgba(47,129,247,0.18)" : "transparent", color: t.chartInd?.[k] ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (t.chartInd?.[k] ? "rgba(47,129,247,0.4)" : "var(--border)") }}>{k === "sig" ? "SIGNALS" : k.toUpperCase()}</button>
+              ))}
+            </div>
             {/* Chart — no sidebar tools by default (use full-screen for tools) */}
             <div className="relative min-h-0 flex-1 bg-[var(--bg)]">
-              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={false}
+              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={false} ind={t.chartInd}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
@@ -674,7 +680,7 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
-              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={true}
+              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={true} ind={t.chartInd}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
