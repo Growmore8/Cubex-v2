@@ -91,7 +91,16 @@ export default function ClientTerminal() {
   const [botTab, setBotTab] = useState<"positions" | "pending" | "history" | "summary" | "requests">("positions");
   const [myReqs, setMyReqs] = useState<any[]>([]);
   const [myReqsLoaded, setMyReqsLoaded] = useState(false);
-  useEffect(() => { if (botTab === "requests" && !myReqsLoaded) { fetch("/api/client/payments").then((r) => r.json()).then((d) => { if (d.ok) setMyReqs(d.requests || []); setMyReqsLoaded(true); }).catch(() => setMyReqsLoaded(true)); } }, [botTab, myReqsLoaded]);
+  const loadMyReqs = () => Promise.all([
+    fetch("/api/client/payments").then((r) => r.json()).catch(() => ({ ok: false })),
+    fetch("/api/client/account-requests").then((r) => r.json()).catch(() => ({ ok: false })),
+  ]).then(([p, a]) => {
+    const pay = (p.ok ? p.requests : []) || [];
+    const acc = ((a.ok ? a.requests : []) || []).map((r: any) => ({ ...r, kind: "ACCOUNT" }));
+    setMyReqs([...acc, ...pay].sort((x: any, y: any) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime()));
+    setMyReqsLoaded(true);
+  });
+  useEffect(() => { if (botTab === "requests" && !myReqsLoaded) loadMyReqs(); }, [botTab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const [tpSlEdit, setTpSlEdit] = useState<{ id: string; field: "tp" | "sl"; val: string } | null>(null);
   const [err, setErr] = useState("");
   const [pinLock, setPinLock] = useState(false);
@@ -129,6 +138,7 @@ export default function ClientTerminal() {
   useEffect(() => { try { setFavs(JSON.parse(localStorage.getItem("cubex-favs") || "[]")); } catch (e) {} }, []);
   function toggleFav(sym: string) { setFavs((f) => { const n = f.includes(sym) ? f.filter((x) => x !== sym) : [...f, sym]; localStorage.setItem("cubex-favs", JSON.stringify(n)); return n; }); }
   const [isMobile, setIsMobile] = useState(false);
+  const [acctReqModal, setAcctReqModal] = useState(false); // mobile: centered "request sent" confirmation
   useEffect(() => { const c = () => setIsMobile(window.innerWidth < 768); c(); window.addEventListener("resize", c); return () => window.removeEventListener("resize", c); }, []);
 
   const selSymRef = useRef(selSym);
@@ -341,14 +351,15 @@ export default function ClientTerminal() {
   }
   async function openAccount(type: "DEMO" | "LIVE") {
     setErr("");
-    if (account?.locked) { toast.error("Your account is read-only. Cannot create new accounts."); return; }
+    if (account?.locked) { toast.error("Your account is read-only. Cannot create new accounts."); return { ok: false }; }
     const tid = toast.loading(`Opening ${type === "LIVE" ? "live" : "demo"} account…`);
     const r = await fetch("/api/client/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }) }).then((x) => x.json()).catch(() => ({ ok: false }));
-    if (!r.ok) { toast.error(r.error || "Failed to open account", { id: tid }); setErr(r.error || "Failed"); return; }
-    if (r.pending) { toast.success("Request sent — your additional live account needs admin approval. You'll be notified once it's reviewed.", { id: tid, duration: 6000 }); return; }
+    if (!r.ok) { toast.error(r.error || "Failed to open account", { id: tid }); setErr(r.error || "Failed"); return r; }
+    if (r.pending) { toast.dismiss(tid); if (isMobile) setAcctReqModal(true); else toast.success("Request sent — your additional live account needs admin approval. You'll be notified once it's reviewed.", { duration: 6000 }); return r; }
     toast.success(`${type === "LIVE" ? "Live" : "Demo"} account ${r.account?.login || ""} created`, { id: tid });
     if (r.account) { accIdRef.current = r.account.id; setAccId(r.account.id); }
     load();
+    return r;
   }
   function topUp() { setTopUpOpen(true); }
   async function doTopUp(amt: number) {
@@ -404,7 +415,7 @@ export default function ClientTerminal() {
   const histShown = history.filter((h: any) => { if (histRange === "all") return true; const t = new Date(h.closedAt).getTime(); const now = Date.now(); const day = 86400000; if (histRange === "today") return t >= now - day; if (histRange === "week") return t >= now - 7 * day; return t >= now - 30 * day; });
   const tab = (active: boolean) => "px-3 py-1.5 text-[11px] " + (active ? "" : "text-[var(--muted)]");
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {needKyc && (
@@ -457,7 +468,7 @@ export default function ClientTerminal() {
                   {div}
                   {head("Accounts")}
                   {!accts.some((a: any) => a.type === "DEMO") && mItem(() => openAccount("DEMO"), "fa-vial", "Open Demo Account", undefined, readOnly)}
-                  {mItem(() => openAccount("LIVE"), "fa-bolt", "Open Live Account", BUY, readOnly)}
+                  {mItem(async () => { const r = await openAccount("LIVE"); if (r?.pending) { setMyReqsLoaded(false); setBotTab("requests"); } }, "fa-bolt", "Open Live Account", BUY, readOnly)}
                   {curAcct?.type === "LIVE" && mItem(() => { close(); setWalletModal("kyc"); }, "fa-id-card", "KYC Verification")}
                   {div}
                   {head("Reports")}
@@ -910,7 +921,7 @@ export default function ClientTerminal() {
               {!myReqsLoaded ? (
                 <div className="py-4 text-center text-[var(--muted)]">Loading…</div>
               ) : myReqs.length === 0 ? (
-                <div className="py-4 text-center text-[var(--muted)]">No deposit or withdrawal requests yet.</div>
+                <div className="py-4 text-center text-[var(--muted)]">No requests yet.</div>
               ) : (
                 <table className="w-full">
                   <thead>
@@ -923,22 +934,25 @@ export default function ClientTerminal() {
                     </tr>
                   </thead>
                   <tbody>
-                    {myReqs.map((r: any) => (
-                      <tr key={r.id} className="border-t border-[var(--border)]">
-                        <td className="px-2 py-1 font-medium">
-                          <span style={{ color: r.kind === "DEPOSIT" ? BUY : SELL }}>
-                            <i className={"fa-solid mr-1 " + (r.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up")} />
-                            {r.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"}
-                          </span>
-                        </td>
-                        <td className="px-2 py-1 text-right font-semibold tabular-nums">${Number(r.amount).toFixed(2)}</td>
-                        <td className="px-2 py-1 text-[var(--muted)]">{r.method || "—"}</td>
-                        <td className="px-2 py-1">
-                          <span className="rounded-full px-2 py-0.5 text-[9px] font-semibold" style={{ background: r.status === "APPROVED" ? "rgba(22,163,74,0.15)" : r.status === "REJECTED" ? "rgba(220,38,38,0.15)" : "rgba(240,180,41,0.15)", color: r.status === "APPROVED" ? BUY : r.status === "REJECTED" ? SELL : GOLD }}>{r.status}</span>
-                        </td>
-                        <td className="px-2 py-1 text-[var(--muted)]">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}</td>
-                      </tr>
-                    ))}
+                    {myReqs.map((r: any) => {
+                      const isAcc = r.kind === "ACCOUNT";
+                      return (
+                        <tr key={r.id} className="border-t border-[var(--border)]">
+                          <td className="px-2 py-1 font-medium">
+                            <span style={{ color: isAcc ? "#3b82f6" : r.kind === "DEPOSIT" ? BUY : SELL }}>
+                              <i className={"fa-solid mr-1 " + (isAcc ? "fa-circle-plus" : r.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up")} />
+                              {isAcc ? `New ${r.type === "DEMO" ? "Demo" : "Live"} Account` : r.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"}
+                            </span>
+                          </td>
+                          <td className="px-2 py-1 text-right font-semibold tabular-nums">{isAcc ? <span className="text-[var(--muted)]">1:{r.leverage}</span> : "$" + Number(r.amount).toFixed(2)}</td>
+                          <td className="px-2 py-1 text-[var(--muted)]">{isAcc ? r.currency : (r.method || "—")}</td>
+                          <td className="px-2 py-1">
+                            <span className="rounded-full px-2 py-0.5 text-[9px] font-semibold" style={{ background: r.status === "APPROVED" ? "rgba(22,163,74,0.15)" : r.status === "REJECTED" ? "rgba(220,38,38,0.15)" : "rgba(240,180,41,0.15)", color: r.status === "APPROVED" ? BUY : r.status === "REJECTED" ? SELL : GOLD }}>{r.status}</span>
+                          </td>
+                          <td className="px-2 py-1 text-[var(--muted)]">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}

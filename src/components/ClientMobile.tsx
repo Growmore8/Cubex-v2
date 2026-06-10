@@ -95,6 +95,7 @@ export default function ClientMobile({ t }: { t: any }) {
     place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr,
     toggleTheme, enablePush, disablePush, addPasskey, openPin, favs, toggleFav, avatarUrl, uploadAvatar,
     fmt, csz, pnlOf, dg, markAllNotifsRead, logout, pin,
+    acctReqModal, setAcctReqModal,
   } = t;
 
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "profile">("dashboard");
@@ -116,14 +117,16 @@ export default function ClientMobile({ t }: { t: any }) {
   const [pushBusy, setPushBusy] = useState(false);
   const [myReqs, setMyReqs] = useState<any[]>([]);
   const [myReqsLoaded, setMyReqsLoaded] = useState(false);
-  useEffect(() => {
-    if (tab === "profile" && !myReqsLoaded) {
-      fetch("/api/client/payments").then((r) => r.json()).then((d) => {
-        if (d.ok) setMyReqs(d.requests || []);
-        setMyReqsLoaded(true);
-      }).catch(() => setMyReqsLoaded(true));
-    }
-  }, [tab, myReqsLoaded]);
+  const loadMyReqs = () => Promise.all([
+    fetch("/api/client/payments").then((r) => r.json()).catch(() => ({ ok: false })),
+    fetch("/api/client/account-requests").then((r) => r.json()).catch(() => ({ ok: false })),
+  ]).then(([p, a]) => {
+    const pay = (p.ok ? p.requests : []) || [];
+    const acc = ((a.ok ? a.requests : []) || []).map((r: any) => ({ ...r, kind: "ACCOUNT" }));
+    setMyReqs([...acc, ...pay].sort((x: any, y: any) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime()));
+    setMyReqsLoaded(true);
+  });
+  useEffect(() => { if (tab === "profile" && !myReqsLoaded) loadMyReqs(); }, [tab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { setBioOn(localStorage.getItem("cubex-bio") === "1"); } catch {} }, []);
   // Await the enable/disable, THEN read the real subscription state (the old inline
   // handler raced the check before subscribe() finished, so the toggle never flipped).
@@ -967,7 +970,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   {a.id === accId && <i className="fa-solid fa-circle-check" style={{ color: BUY }} />}
                 </button>
               ))}
-              <button onClick={() => openAccount("LIVE")} className="mt-2 w-full rounded-lg py-2 text-[12px] font-semibold text-white" style={{ background: BUY }}><i className="fa-solid fa-plus mr-1" /> Create New Live Account</button>
+              <button onClick={async () => { const r = await openAccount("LIVE"); if (r?.pending) { setMyReqsLoaded(false); loadMyReqs(); } }} className="mt-2 w-full rounded-lg py-2 text-[12px] font-semibold text-white" style={{ background: BUY }}><i className="fa-solid fa-plus mr-1" /> Create New Live Account</button>
             </div>
 
             {/* demo accounts */}
@@ -1040,23 +1043,28 @@ export default function ClientMobile({ t }: { t: any }) {
               {!myReqsLoaded ? (
                 <div className="py-3 text-center text-[11px] text-[var(--muted)]">Loading…</div>
               ) : myReqs.length === 0 ? (
-                <div className="py-3 text-center text-[11px] text-[var(--muted)]">No deposit or withdrawal requests yet.</div>
+                <div className="py-3 text-center text-[11px] text-[var(--muted)]">No requests yet.</div>
               ) : (
                 <div className="space-y-2">
-                  {myReqs.map((req: any) => (
-                    <div key={req.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] px-3 py-2.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: req.kind === "DEPOSIT" ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)" }}>
-                          <i className={"fa-solid text-sm " + (req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up")} style={{ color: req.kind === "DEPOSIT" ? BUY : SELL }} />
+                  {myReqs.map((req: any) => {
+                    const isAcc = req.kind === "ACCOUNT";
+                    const ic = isAcc ? "fa-circle-plus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";
+                    const col = isAcc ? BLUE : req.kind === "DEPOSIT" ? BUY : SELL;
+                    return (
+                      <div key={req.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] px-3 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: col + "26" }}>
+                            <i className={"fa-solid text-sm " + ic} style={{ color: col }} />
+                          </div>
+                          <div>
+                            <div className="text-[12px] font-semibold">{isAcc ? <>New {req.type === "DEMO" ? "Demo" : "Live"} Account <span className="font-normal text-[var(--muted)]">{req.currency}</span></> : <>{req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} <span className="font-bold">${Number(req.amount).toFixed(2)}</span></>}</div>
+                            <div className="text-[10px] text-[var(--muted)]">{isAcc ? `1:${req.leverage}` : (req.method || "—")} · {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : "—"}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-[12px] font-semibold">{req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} <span className="font-bold">${Number(req.amount).toFixed(2)}</span></div>
-                          <div className="text-[10px] text-[var(--muted)]">{req.method || "—"} · {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : "—"}</div>
-                        </div>
+                        <span className="rounded-full px-2.5 py-1 text-[9px] font-bold" style={{ background: req.status === "APPROVED" ? "rgba(22,163,74,0.15)" : req.status === "REJECTED" ? "rgba(220,38,38,0.15)" : "rgba(227,168,85,0.18)", color: req.status === "APPROVED" ? BUY : req.status === "REJECTED" ? SELL : GOLD }}>{req.status}</span>
                       </div>
-                      <span className="rounded-full px-2.5 py-1 text-[9px] font-bold" style={{ background: req.status === "APPROVED" ? "rgba(22,163,74,0.15)" : req.status === "REJECTED" ? "rgba(220,38,38,0.15)" : "rgba(227,168,85,0.18)", color: req.status === "APPROVED" ? BUY : req.status === "REJECTED" ? SELL : GOLD }}>{req.status}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1073,6 +1081,21 @@ export default function ClientMobile({ t }: { t: any }) {
           </div>
         )}
       </div>
+
+      {/* ACCOUNT-REQUEST SUBMITTED — centered confirmation */}
+      {acctReqModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setAcctReqModal && setAcctReqModal(false)}>
+          <div className="glass-card w-full max-w-[320px] p-6 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full" style={{ background: BLUE + "22" }}>
+              <i className="fa-solid fa-paper-plane text-xl" style={{ color: BLUE }} />
+            </div>
+            <div className="text-[15px] font-bold">Request Sent</div>
+            <div className="mt-1.5 text-[12px] leading-relaxed text-[var(--muted)]">Your new live account request has been sent for approval. You'll be notified once it's reviewed. Track its status under <span className="font-semibold text-[var(--text)]">Profile → My Requests</span>.</div>
+            <button onClick={() => { setAcctReqModal && setAcctReqModal(false); setTab("profile"); }} className="mt-4 w-full rounded-xl py-2.5 text-[13px] font-semibold text-white" style={{ background: BLUE }}>View My Requests</button>
+            <button onClick={() => setAcctReqModal && setAcctReqModal(false)} className="mt-2 w-full rounded-xl py-2 text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Close</button>
+          </div>
+        </div>
+      )}
 
       {/* NEW ORDER / PENDING MODAL */}
       {noOpen && (() => {
