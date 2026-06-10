@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { assertCan } from "@/lib/perms";
 import { sendPushToUser } from "@/lib/push";
+import { emitRefresh } from "@/lib/realtime";
 
 export async function GET() {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  const recent = await prisma.notification.findMany({ where: { tenantId: s.tenantId! }, orderBy: { createdAt: "desc" }, distinct: ["title"], take: 15, select: { title: true, body: true, image: true, createdAt: true } });
+  // Only ADMIN/MANAGER-SENT broadcasts (senderId set) — not system events.
+  const recent = await prisma.notification.findMany({
+    where: { tenantId: s.tenantId!, senderId: { not: null }, senderRole: { in: ["ADMIN", "MANAGER"] as any } },
+    orderBy: { createdAt: "desc" }, distinct: ["title"], take: 15,
+    select: { title: true, body: true, image: true, createdAt: true, senderRole: true, type: true },
+  });
   return NextResponse.json({ ok: true, recent });
 }
 
 export async function POST(req: Request) {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     await assertCan(s, "sendNotifications");
@@ -35,12 +41,20 @@ export async function POST(req: Request) {
       const us = await prisma.user.findMany({ where: { tenantId: s.tenantId!, role: "MANAGER" as any }, select: { id: true } });
       userIds = us.map((u) => u.id);
     } else {
-      const us = await prisma.user.findMany({ where: { tenantId: s.tenantId!, role: "CLIENT" as any }, select: { id: true } });
-      userIds = us.map((u) => u.id);
+      // All clients — a manager only reaches THEIR own clients.
+      const accWhere: any = { tenantId: s.tenantId! };
+      if (s.role === "MANAGER") accWhere.managerId = s.sub;
+      const accs = await prisma.account.findMany({ where: accWhere, select: { userId: true } });
+      userIds = Array.from(new Set(accs.map((a) => a.userId).filter(Boolean) as string[]));
+      if (s.role !== "MANAGER") {
+        const us = await prisma.user.findMany({ where: { tenantId: s.tenantId!, role: "CLIENT" as any }, select: { id: true } });
+        userIds = Array.from(new Set([...userIds, ...us.map((u) => u.id)]));
+      }
     }
     if (userIds.length === 0) throw new Error("No recipients for this target");
-    await prisma.notification.createMany({ data: userIds.map((uid) => ({ tenantId: s.tenantId!, userId: uid, title, body, image })) });
-    await Promise.all(userIds.map((uid) => sendPushToUser(uid, { title, body, url: "/client" }))).catch(() => {});
+    await prisma.notification.createMany({ data: userIds.map((uid) => ({ tenantId: s.tenantId!, userId: uid, title, body, image, type: b.type || "NOTICE", senderId: s.sub, senderRole: s.role as any })) });
+    await Promise.all(userIds.map((uid) => sendPushToUser(uid, { title, body, url: "/client" }))).catch(() => {}); // reaches closed apps
+    try { emitRefresh({ kind: "notification", users: userIds }); } catch {} // open apps update instantly
     await audit(s.tenantId!, "notify", title + " -> " + target + " (" + userIds.length + ")", s.email);
     return NextResponse.json({ ok: true, count: userIds.length });
   } catch (e: any) {
