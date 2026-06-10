@@ -38,23 +38,36 @@ export async function nextLogin(tx: any, tenantId: string, type: string) {
 export async function createClient(tenantId: string, input: any, actor = "admin") {
   const type = input.type || "LIVE";
   if (input.name) input.name = titleCaseName(input.name); // store names capitalised
+  const isPool = !!input.isPool;
   const acc = await prisma.$transaction(async (tx) => {
     await assertSeatAvailable(tx, tenantId, type); // enforce the plan's account limit (live only)
-    const email = input.email.toLowerCase();
-    // One identity per person: an email used by a staff member can't also be a client.
-    const staffClash = await tx.user.findFirst({ where: { tenantId, email, role: { in: ["ADMIN", "MANAGER"] } } });
-    if (staffClash) throw new Error("This email is already in use by a staff member. Use a different email.");
-    // Scope to CLIENT so a manager/admin sharing the email isn't reused as the owner.
-    let user = await tx.user.findFirst({ where: { tenantId, email, role: "CLIENT" } });
-    if (!user) {
+    const rawEmail = String(input.email || "").trim().toLowerCase();
+    // Pool accounts are shared and log in by Live ID only — email (and KYC) are
+    // optional. Everyone else must have an email.
+    if (!isPool && !rawEmail) throw new Error("Email is required");
+    const login = await nextLogin(tx, tenantId, type);
+    let email = rawEmail;
+    let user: any;
+    if (isPool && !rawEmail) {
+      // Dedicated synthetic-email user so the shared account can log in by Live ID.
+      email = `pool.${login}@pool.local`;
       const passwordHash = await hashPassword(input.password);
       user = await tx.user.create({ data: { tenantId, email, name: input.name, passwordHash, role: "CLIENT" } });
+    } else {
+      // One identity per person: an email used by a staff member can't also be a client.
+      const staffClash = await tx.user.findFirst({ where: { tenantId, email, role: { in: ["ADMIN", "MANAGER"] } } });
+      if (staffClash) throw new Error("This email is already in use by a staff member. Use a different email.");
+      // Scope to CLIENT so a manager/admin sharing the email isn't reused as the owner.
+      user = await tx.user.findFirst({ where: { tenantId, email, role: "CLIENT" } });
+      if (!user) {
+        const passwordHash = await hashPassword(input.password);
+        user = await tx.user.create({ data: { tenantId, email, name: input.name, passwordHash, role: "CLIENT" } });
+      }
     }
     if (type === "DEMO") {
       const demoCount = await tx.account.count({ where: { userId: user.id, type: "DEMO" } });
       if (demoCount >= 1) throw new Error("Client already has a demo account");
     }
-    const login = await nextLogin(tx, tenantId, type);
     // Link every additional account to the client's primary (oldest) account, so
     // all linked accounts inherit the primary's KYC. The first account is the primary.
     const primary = await tx.account.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "asc" }, select: { id: true } });

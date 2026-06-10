@@ -48,7 +48,7 @@ export default function KycPanel() {
 
   const tabs = ["PENDING", "APPROVED", "REJECTED", "ALL"];
   const rows = list.filter((p) => (status === "ALL" || st(p) === status)).filter((p) => (name(p) + " " + login(p) + " " + email(p)).toLowerCase().includes(q.toLowerCase()));
-  const chip = (active: boolean) => "ui-transition rounded-lg px-2 py-0.5 text-[10px] " + (active ? "" : "text-[var(--muted)]");
+  const chip = (active: boolean) => "ui-transition rounded-md px-2.5 py-1 text-[10px] " + (active ? "" : "text-[var(--muted)]");
   const badge = (s: string) => ({ background: s === "APPROVED" ? "rgba(38,166,154,0.18)" : s === "REJECTED" ? "rgba(239,83,80,0.18)" : "rgba(240,180,41,0.18)", color: s === "APPROVED" ? BUY : s === "REJECTED" ? SELL : GOLD });
   const th = "px-2 py-1 text-left font-normal text-[var(--muted)]";
   const td = "px-2 py-1";
@@ -59,8 +59,8 @@ export default function KycPanel() {
       {node}
       <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-1 py-1">
         {tabs.map((t) => <button key={t} onClick={() => setStatus(t)} className={chip(status === t)} style={status === t ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)" }}>{t[0] + t.slice(1).toLowerCase()}</button>)}
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / email / account" className="ui-input ml-auto w-44 bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
-        <button onClick={load} className="ui-btn px-2 py-0.5">Refresh</button>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / email / account" className="ui-input !rounded-md ml-auto w-44 bg-[var(--bg)] px-2 py-1 text-[var(--text)]" />
+        <button onClick={load} className="ui-btn !rounded-md px-2.5 py-1">Refresh</button>
       </div>
       {err && <div className="px-2 py-1" style={{ color: SELL }}>{err}</div>}
       <div className="flex-1 overflow-auto">

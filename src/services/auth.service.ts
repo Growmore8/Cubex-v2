@@ -21,12 +21,22 @@ export async function authenticate(host: string | null, email: string, password:
   const tenant = await resolveTenant(host);
   const tenantId = tenant?.id ?? null;
 
-  const lower = email.toLowerCase();
-  // Several users can share an email under one tenant (e.g. a CLIENT trader who is
-  // also a MANAGER), so match the password across all candidates with that email.
-  const candidates = tenantId
-    ? await prisma.user.findMany({ where: { tenantId, email: lower }, orderBy: { createdAt: "asc" } })
-    : await prisma.user.findMany({ where: { email: lower }, orderBy: { createdAt: "asc" } });
+  const ident = String(email || "").trim();
+  let candidates;
+  if (/^\d{3,}$/.test(ident) && tenantId) {
+    // Login by Live ID (account number) — used by POOL accounts that have no email.
+    // Resolve the user(s) that own an account with this login in the tenant.
+    const accs = await prisma.account.findMany({ where: { tenantId, login: ident }, select: { userId: true } });
+    const uids = Array.from(new Set(accs.map((a) => a.userId).filter(Boolean) as string[]));
+    candidates = uids.length ? await prisma.user.findMany({ where: { id: { in: uids } }, orderBy: { createdAt: "asc" } }) : [];
+  } else {
+    const lower = ident.toLowerCase();
+    // Several users can share an email under one tenant (e.g. a CLIENT trader who is
+    // also a MANAGER), so match the password across all candidates with that email.
+    candidates = tenantId
+      ? await prisma.user.findMany({ where: { tenantId, email: lower }, orderBy: { createdAt: "asc" } })
+      : await prisma.user.findMany({ where: { email: lower }, orderBy: { createdAt: "asc" } });
+  }
 
   let user: (typeof candidates)[number] | null = null;
   for (const c of candidates) {

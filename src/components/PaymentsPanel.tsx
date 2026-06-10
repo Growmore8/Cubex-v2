@@ -63,7 +63,7 @@ export default function PaymentsPanel() {
   const selCount = Object.keys(sel).filter((k) => sel[k]).length;
   const allOn = rows.length > 0 && rows.every((p) => sel[p.id]);
   function toggleAll() { if (allOn) setSel({}); else { const n: Record<string, boolean> = {}; rows.forEach((p) => (n[p.id] = true)); setSel(n); } }
-  const chip = (active: boolean) => "ui-transition rounded-lg px-2 py-0.5 text-[10px] " + (active ? "" : "text-[var(--muted)]");
+  const chip = (active: boolean) => "ui-transition rounded-md px-2.5 py-1 text-[10px] " + (active ? "" : "text-[var(--muted)]");
   const badge = (s: string) => ({ background: s === "APPROVED" ? "rgba(38,166,154,0.18)" : s === "REJECTED" ? "rgba(239,83,80,0.18)" : "rgba(240,180,41,0.18)", color: s === "APPROVED" ? BUY : s === "REJECTED" ? SELL : GOLD });
   const th = "px-2 py-1 text-left font-normal text-[var(--muted)]";
   const td = "px-2 py-1";
@@ -73,9 +73,9 @@ export default function PaymentsPanel() {
       {node}
       <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-1 py-1">
         {tabs.map((t) => <button key={t} onClick={() => setStatus(t)} className={chip(status === t)} style={status === t ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)" }}>{t[0] + t.slice(1).toLowerCase()}</button>)}
-        <select value={kindF} onChange={(e) => setKindF(e.target.value)} className="ui-input bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All Kinds</option><option value="IN">In</option><option value="OUT">Out</option></select>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="ui-input ml-auto w-28 bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
-        <button onClick={load} className="ui-btn px-2 py-0.5">Refresh</button>
+        <select value={kindF} onChange={(e) => setKindF(e.target.value)} className="ui-input !rounded-md bg-[var(--bg)] px-1.5 py-1 text-[var(--text)]"><option value="ALL">All Kinds</option><option value="IN">In</option><option value="OUT">Out</option></select>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="ui-input !rounded-md ml-auto w-28 bg-[var(--bg)] px-2 py-1 text-[var(--text)]" />
+        <button onClick={load} className="ui-btn !rounded-md px-2.5 py-1">Refresh</button>
       </div>
       {selCount > 0 && (
         <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--soft)] px-2 py-1">

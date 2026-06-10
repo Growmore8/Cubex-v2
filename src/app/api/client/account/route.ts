@@ -65,7 +65,8 @@ export async function GET(req: Request) {
   // User-level KYC: verified if any of the user's accounts has an approved document.
   // Only the parent/primary needs KYC; all linked accounts (incl. sub-accounts and
   // the client's own additional accounts) inherit it.
-  const kycVerified = !!(await prisma.kycDocument.findFirst({ where: { account: { userId: s.sub }, status: "APPROVED" }, select: { id: true } }));
+  // Pool accounts don't require KYC; everyone else needs an approved document.
+  const kycVerified = (account as any)?.isPool ? true : !!(await prisma.kycDocument.findFirst({ where: { account: { userId: s.sub }, status: "APPROVED" }, select: { id: true } }));
 
   // Same global catalog as every other area, minus the symbols this client's tenant
   // admin / assigned managers have switched off (so an admin/manager "off" reflects
