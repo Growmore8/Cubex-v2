@@ -820,6 +820,11 @@ function LWChart({
               {ctxMenu.price != null && item(`Copy price ${ctxMenu.price.toFixed(digits)}`, "fa-copy", () => { try { navigator.clipboard.writeText(ctxMenu.price!.toFixed(digits)); } catch {} })}
               {sep}
               {item("Fit data", "fa-arrows-left-right-to-line", () => { try { chartRef.current?.timeScale().fitContent(); } catch {} })}
+              {sep}
+              {item("Regular scale", "fa-chart-line", () => { try { chartRef.current?.priceScale("right").applyOptions({ mode: 0 }); } catch {} })}
+              {item("Logarithmic scale", "fa-chart-area", () => { try { chartRef.current?.priceScale("right").applyOptions({ mode: 1 }); } catch {} })}
+              {item("Percent scale", "fa-percent", () => { try { chartRef.current?.priceScale("right").applyOptions({ mode: 2 }); } catch {} })}
+              {sep}
               {item("Take screenshot", "fa-camera", () => { try { const cv = chartRef.current?.takeScreenshot(); if (cv) { const a = document.createElement("a"); a.href = cv.toDataURL("image/png"); a.download = `${symRef.current}-${tfRef.current}.png`; a.click(); } } catch {} })}
               {sep}
               {item("Remove drawings", "fa-eraser", () => clearDrawings(), true)}
