@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState, memo, type CSSProperties } from "react";
-import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries, HistogramSeries } from "lightweight-charts";
+import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries, HistogramSeries, createSeriesMarkers } from "lightweight-charts";
 import { io, Socket } from "socket.io-client";
-import { RSI, SMA, EMA, BollingerBands, MACD, PSAR } from "technicalindicators";
+import { RSI, SMA, EMA, BollingerBands, MACD, PSAR, bullishengulfingpattern, bearishengulfingpattern, morningstar, eveningstar, hammerpattern, shootingstar, doji } from "technicalindicators";
 
 // Indicators are computed with the `technicalindicators` library; each helper
 // keeps the same {time,value} output shape, aligned back to the candle times.
@@ -32,6 +32,32 @@ function computeBB(bars: any[], period = 20, mult = 2) {
   const mid: any[] = [], upper: any[] = [], lower: any[] = [];
   res.forEach((b: any, k: number) => { const t = bars[off + k].time; mid.push({ time: t, value: b.middle }); upper.push({ time: t, value: b.upper }); lower.push({ time: t, value: b.lower }); });
   return { mid, upper, lower };
+}
+
+// Candlestick pattern markers — scan each bar and tag recognised reversal/indecision
+// patterns. Returns lightweight-charts markers (sorted ascending by time).
+function patWin(bars: any[], i: number, n: number) {
+  const s = bars.slice(Math.max(0, i - n + 1), i + 1);
+  return { open: s.map((b) => b.open), high: s.map((b) => b.high), low: s.map((b) => b.low), close: s.map((b) => b.close) };
+}
+function computePatterns(bars: any[]) {
+  if (!bars || bars.length < 3) return [];
+  const out: any[] = [];
+  for (let i = 2; i < bars.length; i++) {
+    const t = bars[i].time;
+    let m: { up: boolean; color: string; text: string } | null = null;
+    try {
+      if (eveningstar(patWin(bars, i, 3))) m = { up: false, color: "#ef5350", text: "Evening Star" };
+      else if (morningstar(patWin(bars, i, 3))) m = { up: true, color: "#26a69a", text: "Morning Star" };
+      else if (bearishengulfingpattern(patWin(bars, i, 2))) m = { up: false, color: "#ef5350", text: "Bear Engulf" };
+      else if (bullishengulfingpattern(patWin(bars, i, 2))) m = { up: true, color: "#26a69a", text: "Bull Engulf" };
+      else if (shootingstar(patWin(bars, i, 5))) m = { up: false, color: "#ef5350", text: "Shooting Star" };
+      else if (hammerpattern(patWin(bars, i, 5))) m = { up: true, color: "#26a69a", text: "Hammer" };
+      else if (doji(patWin(bars, i, 1))) m = { up: false, color: "#9aa0aa", text: "Doji" };
+    } catch { /* pattern fn needs more candles — skip */ }
+    if (m) out.push({ time: t, position: m.up ? "belowBar" : "aboveBar", color: m.color, shape: m.up ? "arrowUp" : "arrowDown", text: m.text });
+  }
+  return out;
 }
 
 // Parabolic SAR — trend dots plotted on the price chart (one value per bar).
@@ -85,7 +111,7 @@ function LWChart({
   calcPnl?: (p: ChartPosition, price: number) => number;
   /** Controlled indicators from a parent header (desktop). When set, the in-chart
       left sidebar is hidden and the parent renders the SMA/EMA/BB/RSI/MACD buttons. */
-  ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean; psar?: boolean };
+  ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean; psar?: boolean; cdl?: boolean };
   /** Controlled drawing tool from a parent header (H-line / trend next to indicators).
       When onTool is set, the in-chart floating draw toolbar is hidden. */
   tool?: "none" | "hline" | "trend";
@@ -113,6 +139,8 @@ function LWChart({
   const [ema, setEma] = useState(false);
   const [rsi, setRsi] = useState(false);
   const [psar, setPsar] = useState(false);
+  const [cdl, setCdl] = useState(false);
+  const markersRef = useRef<any>(null);
   const [drawN, setDrawN] = useState(0);
   const hlineRefs = useRef<any[]>([]);
   const trendRefs = useRef<any[]>([]);
@@ -137,8 +165,8 @@ function LWChart({
   // the internal state so all the existing chart effects keep working unchanged.
   useEffect(() => {
     if (!ind) return;
-    setSma(ind.sma); setEma(ind.ema); setBb(ind.bb); setRsi(ind.rsi); setMacd(ind.macd); setPsar(!!ind.psar);
-  }, [ind?.sma, ind?.ema, ind?.bb, ind?.rsi, ind?.macd, ind?.psar]); // eslint-disable-line react-hooks/exhaustive-deps
+    setSma(ind.sma); setEma(ind.ema); setBb(ind.bb); setRsi(ind.rsi); setMacd(ind.macd); setPsar(!!ind.psar); setCdl(!!ind.cdl);
+  }, [ind?.sma, ind?.ema, ind?.bb, ind?.rsi, ind?.macd, ind?.psar, ind?.cdl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function clearDrawings() {
     for (const l of hlineRefs.current) { try { seriesRef.current?.removePriceLine(l); } catch {} }
@@ -174,7 +202,7 @@ function LWChart({
     chartRef.current = chart;
     seriesRef.current = series;
     // a recreated chart loses prior drawings/indicators — drop the stale refs
-    hlineRefs.current = []; trendRefs.current = []; smaRef.current = null; emaRef.current = null; psarRef.current = null; trendStart.current = null;
+    hlineRefs.current = []; trendRefs.current = []; smaRef.current = null; emaRef.current = null; psarRef.current = null; markersRef.current = null; trendStart.current = null;
     // Click handler for H-Line / Trend drawing tools
     chart.subscribeClick((param: any) => {
       const t = toolRef.current;
@@ -225,6 +253,16 @@ function LWChart({
     if (psar && !psarRef.current) psarRef.current = chart.addSeries(LineSeries, { color: "#eab308", lineVisible: false, pointMarkersVisible: true, pointMarkersRadius: 1.7, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false } as any);
     if (!psar && psarRef.current) { try { chart.removeSeries(psarRef.current); } catch {} psarRef.current = null; }
     if (psar && psarRef.current) { try { psarRef.current.setData(computePSAR(barsRef.current)); } catch {} }
+    // Candlestick pattern markers (on the price series)
+    if (cdl && seriesRef.current) {
+      try {
+        const mk = computePatterns(barsRef.current);
+        if (markersRef.current) markersRef.current.setMarkers(mk);
+        else markersRef.current = createSeriesMarkers(seriesRef.current, mk);
+      } catch {}
+    } else if (!cdl && markersRef.current) {
+      try { markersRef.current.setMarkers([]); } catch {}
+    }
     // Sub-pane data sync (charts managed by their own effects)
     if (rsi && rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
     if (macd && macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
@@ -234,10 +272,11 @@ function LWChart({
       if (emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, 20, true)); } catch {} }
       if (bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current); try { bbMidRef.current.setData(mid); bbUpRef.current?.setData(upper); bbLoRef.current?.setData(lower); } catch {} }
       if (psarRef.current) { try { psarRef.current.setData(computePSAR(barsRef.current)); } catch {} }
+      if (markersRef.current && cdl) { try { markersRef.current.setMarkers(computePatterns(barsRef.current)); } catch {} }
       if (rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
       if (macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
     };
-  }, [sma, ema, bb, rsi, macd, psar, symbol, tf, theme, digits, drawN]);
+  }, [sma, ema, bb, rsi, macd, psar, cdl, symbol, tf, theme, digits, drawN]);
 
   // RSI sub-pane chart (separate LW instance below main chart)
   useEffect(() => {
