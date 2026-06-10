@@ -12,6 +12,7 @@ import DeskMarketWatch from "@/components/DeskMarketWatch";
 import PasswordInput from "@/components/ui/PasswordInput";
 import CountrySelect from "@/components/ui/CountrySelect";
 import SymbolPicker from "@/components/ui/SymbolPicker";
+import { randomConfirmWord } from "@/lib/confirmword";
 import { isOnline as presenceOnline } from "@/components/ui/Presence";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
@@ -93,8 +94,11 @@ export default function AdminDeskPage() {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [toasts, setToasts] = useState<any[]>([]);
-  const [confirmBox, setConfirmBox] = useState<{ msg: string; danger?: boolean; onYes: () => void } | null>(null);
-  function askConfirm(msg: string, onYes: () => void, danger = true) { setConfirmBox({ msg, danger, onYes }); }
+  const [confirmBox, setConfirmBox] = useState<{ msg: string; danger?: boolean; onYes: () => void; requireWord?: string } | null>(null);
+  const [confirmInput, setConfirmInput] = useState("");
+  function askConfirm(msg: string, onYes: () => void, danger = true) { setConfirmInput(""); setConfirmBox({ msg, danger, onYes }); }
+  // Safe-delete: requires typing a random word before the action runs.
+  function askDelete(msg: string, onYes: () => void) { setConfirmInput(""); setConfirmBox({ msg, danger: true, onYes, requireWord: randomConfirmWord() }); }
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [navW, setNavW] = useState(248);
   const [mwW, setMwW] = useState(278);
@@ -386,7 +390,7 @@ export default function AdminDeskPage() {
   async function delTrade(id: string) { const r = await fetch("/api/desk/trades/" + id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Delete failed"); return; } loadAll(); }
   async function delTradesBulk(ids: string[]) { for (const id of ids) { await fetch("/api/desk/trades/" + id, { method: "DELETE" }); } setTradeSel({}); loadAll(); }
   function unlinkSub(c: any) { askConfirm(`Unlink sub-account ${c.login} from its parent? It becomes a standalone account.`, async () => { const r = await fetch("/api/admin/clients/" + c.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "unlinkSub" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else { setOk("Sub-account unlinked"); loadAll(); } }, false); }
-  function delClient(acc: any) { setMenu(null); askConfirm(`Delete ${acc.login} - ${acc.name}? This cannot be undone.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }); }
+  function delClient(acc: any) { setMenu(null); askDelete(`Delete ${acc.login} - ${acc.name}? This permanently removes the client and cannot be undone.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }); }
   function reconcileAcc(acc: any) { setMenu(null); askConfirm(`Recalculate balance for ${acc.login} - ${acc.name}? This rebuilds realized P/L from the surviving closed trades and manual P/L entries (fixes balances left wrong after a deleted manual P/L). Deposits, withdrawals and credit are not touched.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reconcile" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else { setOk(`Balance recalculated (P/L ${d.before?.toFixed?.(2)} → ${d.after?.toFixed?.(2)})`); loadAll(); } }, false); }
 
   function openAct(kind: string, acc: any, finType?: string, label?: string) { setMenu(null); setMenuSub(""); setErr(""); setAform({}); setActMin(false); setAct({ kind, acc, finType, label }); }
@@ -493,7 +497,7 @@ export default function AdminDeskPage() {
     });
   }
   function delHist(h: any) {
-    askConfirm("Delete this history row? Balance will be reversed.", async () => {
+    askDelete("Delete this history row? Balance will be reversed.", async () => {
       const r = await fetch("/api/desk/history/" + h.id, { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false }));
       if (!r.ok) { setErr(r.error || "Delete failed"); return; }
       loadAll();
@@ -502,7 +506,7 @@ export default function AdminDeskPage() {
   function delHistBulk() {
     const ids = Object.keys(histSel).filter((k) => histSel[k]);
     if (!ids.length) return;
-    askConfirm(`Delete ${ids.length} row(s)? Balances will be reversed.`, async () => {
+    askDelete(`Delete ${ids.length} row(s)? Balances will be reversed.`, async () => {
       const r = await fetch("/api/desk/history/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) }).then((x) => x.json()).catch(() => ({ ok: false }));
       if (!r.ok) { setErr(r.error || "Bulk delete failed"); return; }
       setHistSel({}); loadAll();
@@ -1856,10 +1860,22 @@ export default function AdminDeskPage() {
             <div className="mb-1 flex items-center gap-2 text-sm font-semibold" style={{ color: confirmBox.danger ? SELL : "var(--text)" }}>
               <i className={"fa-solid " + (confirmBox.danger ? "fa-triangle-exclamation" : "fa-circle-question")} /> Please confirm
             </div>
-            <div className="mb-4 text-[12px] text-[var(--muted)]">{confirmBox.msg}</div>
+            <div className="mb-3 text-[12px] text-[var(--muted)]">{confirmBox.msg}</div>
+            {confirmBox.requireWord && (
+              <div className="mb-4">
+                <div className="mb-1.5 text-[11px] text-[var(--muted)]">To confirm, type this word:</div>
+                <div className="mb-2 flex items-center gap-2">
+                  <code className="select-all rounded-md px-2 py-1 text-[13px] font-bold tracking-wider" style={{ background: "rgba(239,68,68,0.12)", color: SELL, border: "1px solid rgba(239,68,68,0.35)" }}>{confirmBox.requireWord}</code>
+                  <button onClick={() => { try { navigator.clipboard.writeText(confirmBox.requireWord!); } catch {} }} className="rounded px-1.5 py-1 text-[10px] text-[var(--muted)] hover:bg-[var(--soft)]" title="Copy"><i className="fa-solid fa-copy" /></button>
+                </div>
+                <input autoFocus value={confirmInput} onChange={(e) => setConfirmInput(e.target.value)} placeholder="Type the word here" className="w-full rounded-lg border bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none" style={{ borderColor: confirmInput && confirmInput.trim().toUpperCase() === confirmBox.requireWord ? BUY : "var(--border)" }} />
+              </div>
+            )}
             <div className="flex justify-end gap-2">
-              <button onClick={() => setConfirmBox(null)} className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs">Cancel</button>
-              <button onClick={() => { const fn = confirmBox.onYes; setConfirmBox(null); fn(); }} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: confirmBox.danger ? SELL : "var(--accent)" }}>Confirm</button>
+              <button onClick={() => { setConfirmBox(null); setConfirmInput(""); }} className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs">Cancel</button>
+              {(() => { const ok = !confirmBox.requireWord || confirmInput.trim().toUpperCase() === confirmBox.requireWord; return (
+                <button disabled={!ok} onClick={() => { if (!ok) return; const fn = confirmBox.onYes; setConfirmBox(null); setConfirmInput(""); fn(); }} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40" style={{ background: confirmBox.danger ? SELL : "var(--accent)" }}>Confirm</button>
+              ); })()}
             </div>
           </div>
         </div>

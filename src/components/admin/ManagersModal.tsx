@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { randomConfirmWord } from "@/lib/confirmword";
 
 interface Manager {
   id: string; name: string; email: string; status: string;
@@ -38,6 +39,9 @@ export default function ManagersModal({ onClose }: { onClose: () => void }) {
   const [perms, setPerms] = useState<Record<string, boolean>>({});
 
   const [delRow, setDelRow] = useState<Manager | null>(null);
+  const [delWord, setDelWord] = useState("");
+  const [delInput, setDelInput] = useState("");
+  useEffect(() => { if (delRow) { setDelWord(randomConfirmWord()); setDelInput(""); } }, [delRow]);
 
   async function load() {
     setLoading(true);
@@ -208,13 +212,23 @@ export default function ManagersModal({ onClose }: { onClose: () => void }) {
             <p className="mb-4 text-xs text-[var(--muted)]">{(delRow._count?.managedAccounts ?? 0) > 0
               ? <>This manager has <b className="text-[var(--text)]">{delRow._count?.managedAccounts}</b> assigned client(s). Choose what to do:</>
               : <>This manager has no assigned clients.</>}</p>
+            {/* Safe-delete: type the random word to enable the delete buttons */}
+            <div className="mb-3">
+              <div className="mb-1 text-[11px] text-[var(--muted)]">To confirm, type this word:</div>
+              <div className="mb-2 flex items-center gap-2">
+                <code className="select-all rounded-md px-2 py-1 text-[13px] font-bold tracking-wider" style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.35)" }}>{delWord}</code>
+                <button type="button" onClick={() => { try { navigator.clipboard.writeText(delWord); } catch {} }} className="rounded px-1.5 py-1 text-[10px] text-[var(--muted)] hover:bg-[var(--soft)]" title="Copy"><i className="fa-solid fa-copy" /></button>
+              </div>
+              <input autoFocus value={delInput} onChange={(e) => setDelInput(e.target.value)} placeholder="Type the word here" className="w-full rounded-lg border bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none" style={{ borderColor: delInput.trim().toUpperCase() === delWord ? "#16a34a" : "var(--border)" }} />
+            </div>
             {err && <div className="mb-2 text-xs text-red-500">{err}</div>}
             {(() => {
-              const del = async (withClients: boolean) => { setErr(""); const r = await fetch("/api/admin/managers/" + delRow.id + (withClients ? "?withClients=1" : ""), { method: "DELETE" }).then((x) => x.json()); if (r.ok) { setDelRow(null); load(); } else setErr(r.error || "Delete failed"); };
+              const ok = delInput.trim().toUpperCase() === delWord;
+              const del = async (withClients: boolean) => { if (!ok) return; setErr(""); const r = await fetch("/api/admin/managers/" + delRow.id + (withClients ? "?withClients=1" : ""), { method: "DELETE" }).then((x) => x.json()); if (r.ok) { setDelRow(null); load(); } else setErr(r.error || "Delete failed"); };
               return (
                 <div className="flex flex-col gap-2">
-                  <button className="ui-btn px-4 py-2 text-sm font-medium text-white" style={{ background: "#dc2626" }} onClick={() => del(false)}>Delete manager only{(delRow._count?.managedAccounts ?? 0) > 0 ? " — keep clients (move to Admin)" : ""}</button>
-                  {(delRow._count?.managedAccounts ?? 0) > 0 && <button className="ui-btn px-4 py-2 text-sm font-medium text-white" style={{ background: "#991b1b" }} onClick={() => { if (confirm(`Permanently delete this manager AND their ${delRow._count?.managedAccounts} client account(s)? This cannot be undone.`)) del(true); }}>Delete manager + all {delRow._count?.managedAccounts} clients</button>}
+                  <button disabled={!ok} className="ui-btn px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40" style={{ background: "#dc2626" }} onClick={() => del(false)}>Delete manager only{(delRow._count?.managedAccounts ?? 0) > 0 ? " — keep clients (move to Admin)" : ""}</button>
+                  {(delRow._count?.managedAccounts ?? 0) > 0 && <button disabled={!ok} className="ui-btn px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40" style={{ background: "#991b1b" }} onClick={() => del(true)}>Delete manager + all {delRow._count?.managedAccounts} clients</button>}
                   <button className="ui-btn ui-btn-ghost px-4 py-2 text-sm" onClick={() => setDelRow(null)}>Cancel</button>
                 </div>
               );
