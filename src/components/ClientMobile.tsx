@@ -644,7 +644,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
             {/* Chart — no sidebar tools by default (use full-screen for tools) */}
             <div className="relative min-h-0 flex-1 bg-[var(--bg)]">
-              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={false} ind={t.chartInd}
+              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={false} ind={t.chartInd} cfg={t.chartCfg}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
@@ -680,7 +680,7 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
-              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={true} ind={t.chartInd}
+              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={true} ind={t.chartInd} cfg={t.chartCfg}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),

@@ -69,6 +69,8 @@ export default function ClientTerminal() {
   const [ordIdx, setOrdIdx] = useState(0); // selected order kind (app-style grid)
   const [walletModal, setWalletModal] = useState<null | "deposit" | "withdraw" | "kyc">(null);
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false, psar: false, cdl: false, stoch: false, atr: false, adx: false, sig: false, ribbon: false });
+  const [chartCfg, setChartCfg] = useState<any>({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 });
+  const [cfgOpen, setCfgOpen] = useState(false);
   const [pnlOnly, setPnlOnly] = useState(false);
   const [mwSearch, setMwSearch] = useState("");
   const [chartTool, setChartTool] = useState<"none" | "hline" | "trend">("none");
@@ -132,9 +134,9 @@ export default function ClientTerminal() {
   useEffect(() => { selSymRef.current = selSym; }, [selSym]);
   // Remember last symbol / timeframe / indicators across refreshes.
   useEffect(() => {
-    try { const sv = JSON.parse(localStorage.getItem("cubex-client-setup") || "null"); if (sv) { if (sv.selSym) setSelSym(sv.selSym); if (sv.tf) setTf(sv.tf); if (sv.chartInd) setChartInd(sv.chartInd); } } catch {}
+    try { const sv = JSON.parse(localStorage.getItem("cubex-client-setup") || "null"); if (sv) { if (sv.selSym) setSelSym(sv.selSym); if (sv.tf) setTf(sv.tf); if (sv.chartInd) setChartInd(sv.chartInd); if (sv.chartCfg) setChartCfg((c: any) => ({ ...c, ...sv.chartCfg })); } } catch {}
   }, []);
-  useEffect(() => { if (!selSym) return; try { localStorage.setItem("cubex-client-setup", JSON.stringify({ selSym, tf, chartInd })); } catch {} }, [selSym, tf, chartInd]);
+  useEffect(() => { if (!selSym) return; try { localStorage.setItem("cubex-client-setup", JSON.stringify({ selSym, tf, chartInd, chartCfg })); } catch {} }, [selSym, tf, chartInd, chartCfg]);
   const prevRef = useRef<Record<string, number>>({});
   const timersRef = useRef<Record<string, any>>({});
 
@@ -400,7 +402,7 @@ export default function ClientTerminal() {
   const histShown = history.filter((h: any) => { if (histRange === "all") return true; const t = new Date(h.closedAt).getTime(); const now = Date.now(); const day = 86400000; if (histRange === "today") return t >= now - day; if (histRange === "week") return t >= now - 7 * day; return t >= now - 30 * day; });
   const tab = (active: boolean) => "px-3 py-1.5 text-[11px] " + (active ? "" : "text-[var(--muted)]");
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {needKyc && (
@@ -614,10 +616,24 @@ export default function ClientTerminal() {
                 </button>
               ))}
             </div>
+            <div className="relative">
+              <button onClick={() => setCfgOpen((o) => !o)} title="Indicator settings" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-gear text-[11px]" /></button>
+              {cfgOpen && (<><div className="fixed inset-0 z-[60]" onClick={() => setCfgOpen(false)} />
+                <div className="ui-pop absolute right-0 z-[70] mt-1 w-56 rounded-lg border p-2.5 text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
+                  <div className="mb-2 font-semibold text-[var(--text)]">Indicator Settings</div>
+                  {([["ma", "MA period"], ["rsi", "RSI period"], ["bb", "Bollinger period"], ["macdF", "MACD fast"], ["macdS", "MACD slow"], ["macdSig", "MACD signal"]] as const).map(([k, lbl]) => (
+                    <div key={k} className="mb-1.5 flex items-center justify-between gap-2">
+                      <span className="text-[var(--muted)]">{lbl}</span>
+                      <input type="number" min={1} value={chartCfg[k]} onChange={(e) => setChartCfg((c: any) => ({ ...c, [k]: Math.max(1, Number(e.target.value) || 1) }))} className="w-14 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-right text-[var(--text)]" />
+                    </div>
+                  ))}
+                  <button onClick={() => setChartCfg({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 })} className="mt-1 w-full rounded border border-[var(--border)] py-1 text-[10px] text-[var(--muted)] hover:bg-[var(--soft)]">Reset to defaults</button>
+                </div></>)}
+            </div>
             <span className="h-3 w-px bg-[var(--border)]" />
             <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[10px] text-[var(--text)]" style={{ cursor: "pointer" }}>{TFS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
           </div>
-          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><LWChart symbol={selSym} tf={tf} theme={theme} digits={d} ind={chartInd} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={[
+          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><LWChart symbol={selSym} tf={tf} theme={theme} digits={d} ind={chartInd} cfg={chartCfg} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={[
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
           ]} calcPnl={(p: any, price: number) => pnlOf({ symbol: selSym, type: p.type, openPrice: p.openPrice, lots: p.lots } as any, price, csz(selSym))} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} /></div>

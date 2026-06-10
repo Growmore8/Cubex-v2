@@ -167,7 +167,7 @@ export type ChartPosition = {
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
 function LWChart({
-  symbol, tf, theme, positions, digits = 2, showTools = true, ind, calcPnl, tool: toolProp, onTool, clearKey,
+  symbol, tf, theme, positions, digits = 2, showTools = true, ind, cfg, calcPnl, tool: toolProp, onTool, clearKey,
 }: {
   symbol: string;
   tf: string;
@@ -182,6 +182,8 @@ function LWChart({
   /** Controlled indicators from a parent header (desktop). When set, the in-chart
       left sidebar is hidden and the parent renders the SMA/EMA/BB/RSI/MACD buttons. */
   ind?: { sma: boolean; ema: boolean; bb: boolean; rsi: boolean; macd: boolean; psar?: boolean; cdl?: boolean; stoch?: boolean; atr?: boolean; adx?: boolean; sig?: boolean; ribbon?: boolean };
+  /** Configurable indicator periods (TradingView-style settings). */
+  cfg?: { ma?: number; rsi?: number; bb?: number; macdF?: number; macdS?: number; macdSig?: number };
   /** Controlled drawing tool from a parent header (H-line / trend next to indicators).
       When onTool is set, the in-chart floating draw toolbar is hidden. */
   tool?: "none" | "hline" | "trend";
@@ -194,6 +196,8 @@ function LWChart({
   const barsRef = useRef<any[]>([]);
   // TradingView-style OHLC legend (updated via ref, no re-render) + right-click menu
   const legendRef = useRef<HTMLDivElement | null>(null);
+  const cfgRef = useRef(cfg); cfgRef.current = cfg;
+  const cfgKey = JSON.stringify(cfg || {});
   const fmtLegRef = useRef<(b: any) => void>(() => {});
   const hoveringRef = useRef(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; price: number | null } | null>(null);
@@ -341,11 +345,11 @@ function LWChart({
     // SMA
     if (sma && !smaRef.current) smaRef.current = chart.addSeries(LineSeries, { color: "#f0b90b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
     if (!sma && smaRef.current) { try { chart.removeSeries(smaRef.current); } catch {} smaRef.current = null; }
-    if (sma && smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, 20, false)); } catch {} }
+    if (sma && smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, cfgRef.current?.ma || 20, false)); } catch {} }
     // EMA
     if (ema && !emaRef.current) emaRef.current = chart.addSeries(LineSeries, { color: "#a78bfa", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
     if (!ema && emaRef.current) { try { chart.removeSeries(emaRef.current); } catch {} emaRef.current = null; }
-    if (ema && emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, 20, true)); } catch {} }
+    if (ema && emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, cfgRef.current?.ma || 20, true)); } catch {} }
     // Bollinger Bands
     if (bb && !bbMidRef.current) {
       bbMidRef.current = chart.addSeries(LineSeries, { color: "#f0b90b88", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
@@ -356,7 +360,7 @@ function LWChart({
       try { chart.removeSeries(bbMidRef.current); chart.removeSeries(bbUpRef.current); chart.removeSeries(bbLoRef.current); } catch {}
       bbMidRef.current = null; bbUpRef.current = null; bbLoRef.current = null;
     }
-    if (bb && bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current); try { bbMidRef.current.setData(mid); bbUpRef.current.setData(upper); bbLoRef.current.setData(lower); } catch {} }
+    if (bb && bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current, cfgRef.current?.bb || 20); try { bbMidRef.current.setData(mid); bbUpRef.current.setData(upper); bbLoRef.current.setData(lower); } catch {} }
     // Parabolic SAR — dots on the price chart (line hidden, point markers shown)
     if (psar && !psarRef.current) psarRef.current = chart.addSeries(LineSeries, { color: "#eab308", lineVisible: false, pointMarkersVisible: true, pointMarkersRadius: 1.7, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false } as any);
     if (!psar && psarRef.current) { try { chart.removeSeries(psarRef.current); } catch {} psarRef.current = null; }
@@ -386,27 +390,27 @@ function LWChart({
       try { markersRef.current.setMarkers([]); } catch {}
     }
     // Sub-pane data sync (charts managed by their own effects)
-    if (rsi && rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
-    if (macd && macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
+    if (rsi && rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current, cfgRef.current?.rsi || 14)); } catch {} }
+    if (macd && macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current, cfgRef.current?.macdF || 12, cfgRef.current?.macdS || 26, cfgRef.current?.macdSig || 9); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
     if (stoch && stochKRef.current) { const { k, d } = computeStoch(barsRef.current); try { stochKRef.current.setData(k); stochDRef.current?.setData(d); } catch {} }
     if (atr && atrSeriesRef.current) { try { atrSeriesRef.current.setData(computeATR(barsRef.current)); } catch {} }
     if (adx && adxSeriesRef.current) { try { adxSeriesRef.current.setData(computeADX(barsRef.current)); } catch {} }
     // Keep onBarsLoaded fresh so seed() triggers indicator recompute after async bar load
     onBarsLoaded.current = () => {
-      if (smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, 20, false)); } catch {} }
-      if (emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, 20, true)); } catch {} }
-      if (bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current); try { bbMidRef.current.setData(mid); bbUpRef.current?.setData(upper); bbLoRef.current?.setData(lower); } catch {} }
+      if (smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, cfgRef.current?.ma || 20, false)); } catch {} }
+      if (emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, cfgRef.current?.ma || 20, true)); } catch {} }
+      if (bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current, cfgRef.current?.bb || 20); try { bbMidRef.current.setData(mid); bbUpRef.current?.setData(upper); bbLoRef.current?.setData(lower); } catch {} }
       if (psarRef.current) { try { psarRef.current.setData(computePSAR(barsRef.current)); } catch {} }
       if (ribbonRefs.current.length) { try { const rb = computeRibbon(barsRef.current); rb.forEach((d, i) => { ribbonRefs.current[i * 2]?.setData(d.g); ribbonRefs.current[i * 2 + 1]?.setData(d.r); }); } catch {} }
       if (sigMarkersRef.current && sig) { try { sigMarkersRef.current.setMarkers(computeSignals(barsRef.current)); } catch {} }
       if (markersRef.current && cdl) { try { markersRef.current.setMarkers(computePatterns(barsRef.current)); } catch {} }
-      if (rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current)); } catch {} }
-      if (macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
+      if (rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current, cfgRef.current?.rsi || 14)); } catch {} }
+      if (macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current, cfgRef.current?.macdF || 12, cfgRef.current?.macdS || 26, cfgRef.current?.macdSig || 9); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
       if (stochKRef.current) { const { k, d } = computeStoch(barsRef.current); try { stochKRef.current.setData(k); stochDRef.current?.setData(d); } catch {} }
       if (atrSeriesRef.current) { try { atrSeriesRef.current.setData(computeATR(barsRef.current)); } catch {} }
       if (adxSeriesRef.current) { try { adxSeriesRef.current.setData(computeADX(barsRef.current)); } catch {} }
     };
-  }, [sma, ema, bb, rsi, macd, psar, cdl, sig, ribbon, stoch, atr, adx, symbol, tf, theme, digits, drawN]);
+  }, [sma, ema, bb, rsi, macd, psar, cdl, sig, ribbon, stoch, atr, adx, symbol, tf, theme, digits, drawN, cfgKey]);
 
   // RSI sub-pane chart (separate LW instance below main chart)
   useEffect(() => {
@@ -438,7 +442,7 @@ function LWChart({
       series.createPriceLine({ price: 30, color: "#e05260", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
       series.createPriceLine({ price: 70, color: "#26a69a", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
       rsiChartRef.current = chart; rsiSeriesRef.current = series;
-      if (barsRef.current.length) { try { series.setData(computeRSI(barsRef.current)); } catch {} }
+      if (barsRef.current.length) { try { series.setData(computeRSI(barsRef.current, cfgRef.current?.rsi || 14)); } catch {} }
       syncFn = (range: any) => { if (range && rsiChartRef.current) { try { rsiChartRef.current.timeScale().setVisibleLogicalRange(range); } catch {} } };
       if (chartRef.current) chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(syncFn);
     });
@@ -470,7 +474,7 @@ function LWChart({
       const lineS = chart.addSeries(LineSeries, { color: "#22d3ee", lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, priceFormat: { type: "price", precision: 5, minMove: 0.00001 } });
       const sigS = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
       macdChartRef.current = chart; macdLineRef.current = lineS; macdSignalRef.current = sigS; macdHistRef.current = histS;
-      if (barsRef.current.length) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current); try { lineS.setData(ml); sigS.setData(sl); histS.setData(hl); } catch {} }
+      if (barsRef.current.length) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current, cfgRef.current?.macdF || 12, cfgRef.current?.macdS || 26, cfgRef.current?.macdSig || 9); try { lineS.setData(ml); sigS.setData(sl); histS.setData(hl); } catch {} }
       syncFn = (range: any) => { if (range && macdChartRef.current) { try { macdChartRef.current.timeScale().setVisibleLogicalRange(range); } catch {} } };
       if (chartRef.current) chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(syncFn);
     });
@@ -838,6 +842,7 @@ function posSig(ps?: ChartPosition[]) {
 function areEqual(a: any, b: any) {
   return a.symbol === b.symbol && a.tf === b.tf && a.theme === b.theme && a.digits === b.digits
     && a.showTools === b.showTools && JSON.stringify(a.ind) === JSON.stringify(b.ind)
+    && JSON.stringify(a.cfg) === JSON.stringify(b.cfg)
     && a.tool === b.tool && a.clearKey === b.clearKey
     && posSig(a.positions) === posSig(b.positions);
 }

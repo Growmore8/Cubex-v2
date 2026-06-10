@@ -156,6 +156,8 @@ export default function AdminDeskPage() {
   const [auditCat, setAuditCat] = useState("ALL");
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false, psar: false, cdl: false, stoch: false, atr: false, adx: false, sig: false, ribbon: false });
+  const [chartCfg, setChartCfg] = useState<any>({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 });
+  const [cfgOpen, setCfgOpen] = useState(false);
   const [chartTool, setChartTool] = useState<"none" | "hline" | "trend">("none");
   const [chartClearKey, setChartClearKey] = useState(0);
   const [stmtModal, setStmtModal] = useState(false);
@@ -313,6 +315,7 @@ export default function AdminDeskPage() {
         if (typeof sv.activeChart === "number") setActiveChart(sv.activeChart);
         if (sv.tf) setTf(sv.tf);
         if (sv.chartInd) setChartInd(sv.chartInd);
+        if (sv.chartCfg) setChartCfg((c: any) => ({ ...c, ...sv.chartCfg }));
         if (typeof sv.layout === "number") setLayout(sv.layout);
         if (sv.panels) setPanels(sv.panels);
       }
@@ -320,8 +323,8 @@ export default function AdminDeskPage() {
   }, []);
   useEffect(() => {
     if (openCharts.length === 0) return; // don't persist the empty initial state
-    try { localStorage.setItem("cubex-desk-setup", JSON.stringify({ openCharts, activeChart, tf, chartInd, layout, panels })); } catch {}
-  }, [openCharts, activeChart, tf, chartInd, layout, panels]);
+    try { localStorage.setItem("cubex-desk-setup", JSON.stringify({ openCharts, activeChart, tf, chartInd, chartCfg, layout, panels })); } catch {}
+  }, [openCharts, activeChart, tf, chartInd, chartCfg, layout, panels]);
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
@@ -925,6 +928,21 @@ export default function AdminDeskPage() {
                 </button>
               ))}
             </div>
+            {/* indicator settings (periods) */}
+            <div className="relative">
+              <button onClick={() => setCfgOpen((o) => !o)} title="Indicator settings" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-gear text-[11px]" /></button>
+              {cfgOpen && (<><div className="fixed inset-0 z-[60]" onClick={() => setCfgOpen(false)} />
+                <div className="ui-pop absolute right-0 z-[70] mt-1 w-56 rounded-lg border p-2.5 text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
+                  <div className="mb-2 font-semibold text-[var(--text)]">Indicator Settings</div>
+                  {([["ma", "MA period (SMA/EMA)"], ["rsi", "RSI period"], ["bb", "Bollinger period"], ["macdF", "MACD fast"], ["macdS", "MACD slow"], ["macdSig", "MACD signal"]] as const).map(([k, lbl]) => (
+                    <div key={k} className="mb-1.5 flex items-center justify-between gap-2">
+                      <span className="text-[var(--muted)]">{lbl}</span>
+                      <input type="number" min={1} value={chartCfg[k]} onChange={(e) => setChartCfg((c: any) => ({ ...c, [k]: Math.max(1, Number(e.target.value) || 1) }))} className="w-14 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-right text-[var(--text)]" />
+                    </div>
+                  ))}
+                  <button onClick={() => setChartCfg({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 })} className="mt-1 w-full rounded border border-[var(--border)] py-1 text-[10px] text-[var(--muted)] hover:bg-[var(--soft)]">Reset to defaults</button>
+                </div></>)}
+            </div>
             <span className="mx-1 h-3 w-px bg-[var(--border)]" />
             <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[11px] text-[var(--text)]" style={{ cursor: "pointer" }}>
               {TFS.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -935,7 +953,7 @@ export default function AdminDeskPage() {
               <div key={sym + i} className="relative min-h-0 bg-[var(--bg)]" onClick={() => setActive(i)}>
                 
                 {ocStrip(sym)}
-                <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} ind={chartInd} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={[
+                <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} ind={chartInd} cfg={chartCfg} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={[
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]} calcPnl={(p: any, price: number) => pnlOf({ symbol: sym, type: p.type, openPrice: p.openPrice, lots: p.lots } as any, price, csz(sym))} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} />
