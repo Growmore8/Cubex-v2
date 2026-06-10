@@ -1008,12 +1008,16 @@ export default function AdminDeskPage() {
               const inR = (h: any) => { const d = hdt(h); if (!d) return hfPreset === "ALL" && !hfFrom && !hfTo; const dt = new Date(d); const now = new Date(); if (hfPreset === "TODAY") return dt.toDateString() === now.toDateString(); if (hfPreset === "WEEK") { const wk = new Date(now); wk.setDate(now.getDate() - 7); return dt >= wk; } if (hfPreset === "MONTH") { const mo = new Date(now); mo.setMonth(now.getMonth() - 1); return dt >= mo; } if (hfFrom && dt < new Date(hfFrom)) return false; if (hfTo && dt > new Date(hfTo + "T23:59:59")) return false; return true; };
               const hType = (h: any) => String(h.side || h.type || "").toUpperCase();
               const rows = history.filter((h) => h.accountLogin === selAcc.login).filter((h) => (hfType === "ALL" || hType(h) === hfType)).filter(inR);
+              const fin = (types: string[]) => rows.filter((r: any) => r.kind === "FIN" && types.includes(String(r.type))).reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
               const plRows = rows.filter((r: any) => r.kind === "TRADE" || (r.kind === "FIN" && String(r.type) === "PNL_ADJUST"));
               const tradePL = plRows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
+              const deposits = fin(["DEPOSIT"]); const withdrawals = fin(["WITHDRAWAL"]); const credit = fin(["CREDIT_IN", "CREDIT_OUT", "BONUS", "INSURANCE"]);
               const net = rows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
+              const cell = (label: string, val: number) => (<span className="whitespace-nowrap"><span className="text-[var(--muted)]">{label} </span><span style={{ color: val > 0 ? BUY : val < 0 ? SELL : "var(--text)", fontWeight: 700 }}>{val > 0 ? "+" : ""}{val.toFixed(2)}</span></span>);
               return (
-                <div className="flex items-center gap-3 whitespace-nowrap pb-1 pr-2 text-[10px]">
+                <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap pb-1 pr-2 text-[10px]" style={{ scrollbarWidth: "none", maxWidth: "62vw" }}>
                   <span><span className="text-[var(--muted)]">Records </span><b>{rows.length}</b></span>
+                  {cell("Deposits", deposits)}{cell("Withdrawals", withdrawals)}{cell("Credit/Bonus", credit)}
                   <span><span className="text-[var(--muted)]">Trade P/L </span><span style={{ color: tradePL >= 0 ? BUY : SELL, fontWeight: 700 }}>{tradePL >= 0 ? "+" : ""}{tradePL.toFixed(2)}</span></span>
                   <span className="rounded px-2 py-0.5" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)" }}><span className="text-[var(--muted)]">Net </span><span style={{ color: net >= 0 ? BUY : SELL, fontWeight: 800 }}>{net >= 0 ? "+" : ""}{net.toFixed(2)}</span></span>
                 </div>

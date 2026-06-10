@@ -317,14 +317,12 @@ function LWChart({
       }
     });
     // OHLC legend (TradingView-style) — updated on crosshair move / each tick.
-    const tcol = theme === "dark" ? "#e8eaed" : "#0f172a";
     fmtLegRef.current = (b: any) => {
       if (!legendRef.current || !b || b.open == null) return;
       const up = b.close >= b.open; const col = up ? "#26a69a" : "#ef5350";
       const ch = b.close - b.open, pct = b.open ? (ch / b.open) * 100 : 0;
       legendRef.current.innerHTML =
-        `<b style="color:${tcol}">${symRef.current}</b> <span style="opacity:.6">· ${tfRef.current}</span>` +
-        ` &nbsp; <span style="opacity:.6">O</span><span style="color:${col}">${b.open}</span>` +
+        `<span style="opacity:.6">O</span><span style="color:${col}">${b.open}</span>` +
         ` <span style="opacity:.6">H</span><span style="color:${col}">${b.high}</span>` +
         ` <span style="opacity:.6">L</span><span style="color:${col}">${b.low}</span>` +
         ` <span style="opacity:.6">C</span><span style="color:${col}">${b.close}</span>` +
@@ -747,8 +745,8 @@ function LWChart({
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}
           onContextMenu={(e) => { e.preventDefault(); let price: number | null = null; try { const r = wrapRef.current?.getBoundingClientRect(); if (r && seriesRef.current) price = seriesRef.current.coordinateToPrice(e.clientY - r.top); } catch {} setCtxMenu({ x: e.clientX, y: e.clientY, price }); }}>
           <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
-          {/* TradingView-style OHLC legend */}
-          <div ref={legendRef} style={{ position: "absolute", top: 6, left: 10, zIndex: 6, fontSize: 11, fontWeight: 600, pointerEvents: "none", whiteSpace: "nowrap", color: theme === "dark" ? "#9aa6bf" : "#475569", textShadow: theme === "dark" ? "0 1px 2px rgba(0,0,0,0.6)" : "none" }} />
+          {/* TradingView-style OHLC legend — next to the Trade toggle (showTools only) */}
+          {showTools && <div ref={legendRef} style={{ position: "absolute", top: 8, left: 70, zIndex: 6, fontSize: 11, fontWeight: 600, pointerEvents: "none", whiteSpace: "nowrap", color: theme === "dark" ? "#9aa6bf" : "#475569", textShadow: theme === "dark" ? "0 1px 2px rgba(0,0,0,0.6)" : "none" }} />}
           {/* Desktop drawing tools (H-line / trend / clear) — floating top-left.
               Hidden when the parent header controls the tool (onTool set). */}
           {showTools && ind && !onTool && (

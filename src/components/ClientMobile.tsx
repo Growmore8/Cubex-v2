@@ -637,14 +637,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               );
             })()}
-            {/* Indicator toggles (reflect the same engine as desk/desktop) */}
-            <div className="flex items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5" style={{ scrollbarWidth: "none" }}>
-              <button onClick={() => setCfgSheet(true)} className="sticky left-0 z-10 shrink-0 rounded-md bg-[var(--panel)] px-2 py-1 text-[var(--muted)]" title="Indicator settings"><i className="fa-solid fa-gear text-[11px]" /></button>
-              {(["sig", "ribbon", "ema", "bb", "psar", "cdl", "rsi", "macd", "stoch", "atr", "adx"] as const).map((k) => (
-                <button key={k} onClick={() => t.setChartInd && t.setChartInd((v: any) => ({ ...v, [k]: !v[k] }))} className="shrink-0 rounded-md px-2 py-1 text-[10px] font-bold" style={{ background: t.chartInd?.[k] ? "rgba(47,129,247,0.18)" : "transparent", color: t.chartInd?.[k] ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (t.chartInd?.[k] ? "rgba(47,129,247,0.4)" : "var(--border)") }}>{k === "sig" ? "SIGNALS" : k.toUpperCase()}</button>
-              ))}
-            </div>
-            {/* Indicator settings bottom sheet (periods) */}
+            {/* Indicator settings bottom sheet (periods) — opened from full-screen */}
             {cfgSheet && (
               <>
                 <div className="fixed inset-0 z-[80]" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setCfgSheet(false)} />
@@ -660,9 +653,9 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               </>
             )}
-            {/* Chart — no sidebar tools by default (use full-screen for tools) */}
+            {/* Simple preview chart — full TradingView-clone features live in full-screen */}
             <div className="relative min-h-0 flex-1 bg-[var(--bg)]">
-              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={false} ind={t.chartInd} cfg={t.chartCfg}
+              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={false}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
@@ -696,6 +689,13 @@ export default function ClientMobile({ t }: { t: any }) {
                   <i className="fa-solid fa-compress text-[12px]" />
                 </button>
               </div>
+            </div>
+            {/* Full TradingView-clone indicator toggles + settings (full-screen only) */}
+            <div className="flex items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5" style={{ scrollbarWidth: "none" }}>
+              <button onClick={() => setCfgSheet(true)} className="sticky left-0 z-10 shrink-0 rounded-md bg-[var(--panel)] px-2 py-1 text-[var(--muted)]" title="Indicator settings"><i className="fa-solid fa-gear text-[11px]" /></button>
+              {(["sig", "ribbon", "ema", "bb", "psar", "cdl", "rsi", "macd", "stoch", "atr", "adx"] as const).map((k) => (
+                <button key={k} onClick={() => t.setChartInd && t.setChartInd((v: any) => ({ ...v, [k]: !v[k] }))} className="shrink-0 rounded-md px-2 py-1 text-[10px] font-bold" style={{ background: t.chartInd?.[k] ? "rgba(47,129,247,0.18)" : "transparent", color: t.chartInd?.[k] ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (t.chartInd?.[k] ? "rgba(47,129,247,0.4)" : "var(--border)") }}>{k === "sig" ? "SIGNALS" : k.toUpperCase()}</button>
+              ))}
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
               <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={true} ind={t.chartInd} cfg={t.chartCfg}
