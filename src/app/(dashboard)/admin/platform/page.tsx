@@ -1662,9 +1662,15 @@ export default function AdminDeskPage() {
                 <button onClick={() => f("type", "LIVE")} className="flex-1 rounded py-1.5 text-xs" style={form.type === "LIVE" ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Live</button>
                 <button onClick={() => f("type", "DEMO")} className="flex-1 rounded py-1.5 text-xs" style={form.type === "DEMO" ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Demo</button>
               </div>
+              {/* Pool account — at the top; hides the Email field (pool logs in by Live ID, no email/KYC) */}
+              <label className="mt-2 flex items-center gap-2 rounded-lg border px-2.5 py-2 text-[11px]" style={{ borderColor: form.isPool ? "var(--accent)" : "var(--border)", background: form.isPool ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent", color: "var(--text)" }}>
+                <input type="checkbox" checked={!!form.isPool} onChange={(e) => f("isPool", e.target.checked)} />
+                <span className="font-semibold">Pool account</span>
+                <span className="text-[var(--muted)]">— shared account, logs in with Live ID (no email / KYC)</span>
+              </label>
               <div className={lab + " mt-2"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
               <div className={lab + " mt-2"}>Phone</div><input className={inp} value={form.phone || ""} onChange={(e) => f("phone", e.target.value)} />
-              <div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} autoComplete="off" data-lpignore="true" onChange={(e) => f("email", e.target.value)} />
+              {!form.isPool && (<><div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} autoComplete="off" data-lpignore="true" onChange={(e) => f("email", e.target.value)} /></>)}
               <div className={lab + " mt-2"}>Password</div><PasswordInput className={inp} value={form.password || ""} autoComplete="new-password" onChange={(e) => f("password", e.target.value)} />
               <div className={lab + " mt-2"}>Country</div><CountrySelect className={inp} value={form.country || ""} onChange={(v) => f("country", v)} />
               <div className="mt-2 grid grid-cols-2 gap-2">
@@ -1673,9 +1679,8 @@ export default function AdminDeskPage() {
               </div>
               <div className={lab + " mt-2"}>Manager (optional)</div>
               <select className={inp} value={form.managerId || ""} onChange={(e) => f("managerId", e.target.value || null)}><option value="">- none -</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-              <label className="mt-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--muted)" }}><input type="checkbox" checked={!!form.isPool} onChange={(e) => f("isPool", e.target.checked)} /> Pool account</label>
               {err && modal === "client" && <div className="mt-2 rounded border px-2 py-1.5 text-[10px]" style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.3)", color: SELL }}><i className="fa-solid fa-circle-exclamation mr-1" />{err}</div>}
-              <button onClick={() => submit("/api/admin/clients", { name: form.name, email: form.email, password: form.password, type: form.type, leverage: Number(form.leverage) || 100, currency: form.currency, managerId: form.managerId || null, phone: form.phone, country: form.country, isPool: !!form.isPool }, "Client")} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Create {form.type} Client</button>
+              <button onClick={() => submit("/api/admin/clients", { name: form.name, email: form.isPool ? "" : form.email, password: form.password, type: form.type, leverage: Number(form.leverage) || 100, currency: form.currency, managerId: form.managerId || null, phone: form.phone, country: form.country, isPool: !!form.isPool }, "Client")} className="mt-3 w-full rounded py-2 text-xs" style={{ background: BUY, color: "#04140e" }}>Create {form.type} Client</button>
             </>)}
             {modal === "manager" && (<>
               <div className={lab + " mt-1"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
