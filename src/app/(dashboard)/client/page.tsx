@@ -345,6 +345,7 @@ export default function ClientTerminal() {
     const tid = toast.loading(`Opening ${type === "LIVE" ? "live" : "demo"} account…`);
     const r = await fetch("/api/client/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { toast.error(r.error || "Failed to open account", { id: tid }); setErr(r.error || "Failed"); return; }
+    if (r.pending) { toast.success("Request sent — your additional live account needs admin approval. You'll be notified once it's reviewed.", { id: tid, duration: 6000 }); return; }
     toast.success(`${type === "LIVE" ? "Live" : "Demo"} account ${r.account?.login || ""} created`, { id: tid });
     if (r.account) { accIdRef.current = r.account.id; setAccId(r.account.id); }
     load();

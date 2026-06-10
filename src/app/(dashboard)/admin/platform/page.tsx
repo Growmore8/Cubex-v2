@@ -6,6 +6,7 @@ import PriceCell from "@/components/PriceCell";
 import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds";
 import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
+import RequestsPanel from "@/components/RequestsPanel";
 import ManagersModal from "@/components/admin/ManagersModal";
 import PaymentMethodsModal from "@/components/admin/PaymentMethodsModal";
 import DeskMarketWatch from "@/components/DeskMarketWatch";
@@ -20,7 +21,7 @@ import { contractFor } from "@/config/contracts";
 import { DARK, LIGHT, BUY, SELL, GOLD } from "@/config/theme";
 
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
-const TABS: [string, string][] = [["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"]];
+const TABS: [string, string][] = [["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"]];
 
 function pnlOf(p: any, price: number, cs: number) {
   const sym = String(p.symbol || "");
@@ -81,7 +82,7 @@ export default function AdminDeskPage() {
   const [sl, setSl] = useState(0);
   const [tp, setTp] = useState(0);
   const [tab, setTab] = useState("trade");
-  const [tabState, setTabState] = useState<Record<string, boolean>>({ trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true });
+  const [tabState, setTabState] = useState<Record<string, boolean>>({ trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true, requests: true });
   const [menu, setMenu] = useState<{ x: number; y: number; acc: any } | null>(null);
   const [menuSub, setMenuSub] = useState("");
   const [act, setAct] = useState<any>(null);
@@ -1323,6 +1324,7 @@ export default function AdminDeskPage() {
             })()}
             {tab === "payments" && <PaymentsPanel />}
             {tab === "kyc" && <KycPanel />}
+            {tab === "requests" && <RequestsPanel />}
           </div>
         </div>
       </>)}

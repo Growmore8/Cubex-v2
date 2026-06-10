@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/services/account.service";
+import { emitRefresh } from "@/lib/realtime";
 
 export async function GET() {
   const s = await requireClient();
@@ -28,6 +29,26 @@ export async function POST(req: Request) {
       // a client may hold only one demo account
       const demoCount = await prisma.account.count({ where: { userId: s.sub, type: "DEMO" } });
       if (demoCount >= 1) throw new Error("You can only have one demo account");
+    }
+    if (type === "LIVE") {
+      // First live account is auto-created. EVERY additional live account must be
+      // approved by the tenant admin (limits data growth / package seats).
+      const liveCount = await prisma.account.count({ where: { userId: s.sub, type: "LIVE" } });
+      if (liveCount >= 1) {
+        const existing = await prisma.accountRequest.findFirst({ where: { userId: s.sub, status: "PENDING" }, select: { id: true } });
+        if (existing) throw new Error("You already have a live-account request awaiting approval.");
+        await prisma.accountRequest.create({
+          data: { tenantId: s.tenantId!, userId: s.sub, type: "LIVE", leverage: Number(b.leverage) || 100, currency: b.currency || "USD" },
+        });
+        // Surface to tenant staff (admins + this client's manager, if any).
+        const mine = await prisma.account.findFirst({ where: { userId: s.sub, type: "LIVE" }, select: { managerId: true } });
+        const staff = await prisma.user.findMany({ where: { tenantId: s.tenantId!, OR: [{ role: "ADMIN" as any }, ...(mine?.managerId ? [{ id: mine.managerId }] : [])] }, select: { id: true } });
+        if (staff.length) {
+          await prisma.notification.createMany({ data: staff.map((u) => ({ tenantId: s.tenantId!, userId: u.id, title: "New account request", body: `${user.name} requested an additional live account. Review it in Requests.`, type: "NOTICE" })) });
+          try { emitRefresh({ kind: "notification", users: staff.map((u) => u.id) }); } catch {}
+        }
+        return NextResponse.json({ ok: true, pending: true });
+      }
     }
     // Note: a client opens their first live account WITHOUT prior KYC. The live
     // account is then locked to Profile + KYC (per-client gate) until verified —

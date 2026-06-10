@@ -221,6 +221,23 @@ model AccountSymbolOverride {
   @@unique([accountId, symbol])
   @@index([accountId])
 }
+// Client request for an ADDITIONAL live account — needs tenant-admin approval
+// (first live account is auto-created; extra ones are gated to limit data/seats).
+model AccountRequest {
+  id         String    @id @default(uuid())
+  tenantId   String
+  userId     String
+  type       String    @default("LIVE")
+  leverage   Int       @default(100)
+  currency   String    @default("USD")
+  status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  note       String?
+  reviewedBy String?
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+  @@index([tenantId, status])
+  @@index([userId])
+}
 model TradeGroup {
   id        String    @id @default(uuid())
   tenantId  String
