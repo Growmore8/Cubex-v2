@@ -990,7 +990,7 @@ export default function AdminDeskPage() {
               const oid = (p: any) => p.ticket ?? p.orderId ?? p.order ?? p.id;
               const thc = "px-2 py-1.5 text-left font-semibold text-[var(--text)]";
               return (
-                <table className="w-full border-collapse text-[10px] [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-2.5 [&_th]:px-2.5">
+                <table className="w-full border-collapse text-[10px] [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-1.5 [&_th]:px-1.5">
                   <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
                     <th className={thc}><input type="checkbox" checked={tAllOn} onChange={tToggleAll} /></th>
                     <SortTh tbl="trade" k="date" label="Date Time" cls={thc} /><SortTh tbl="trade" k="oid" label="Order ID" cls={thc} /><SortTh tbl="trade" k="symbol" label="Symbol" cls={thc} /><SortTh tbl="trade" k="type" label="Type" cls={thc} />
@@ -1135,7 +1135,7 @@ export default function AdminDeskPage() {
                     );
                   })()}
                   <div className="flex-1 overflow-auto">
-                    <table className="w-full border-collapse [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-2.5 [&_th]:px-2.5">
+                    <table className="w-full border-collapse [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-1.5 [&_th]:px-1.5">
                       <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
                         <th className={thc}><input type="checkbox" checked={hAllOn} onChange={hToggleAll} /></th>
                         <SortTh tbl="hist" k="date" label="Date/Time" cls={thc} /><SortTh tbl="hist" k="ref" label="Order/Ref" cls={thc} /><SortTh tbl="hist" k="type" label="Type" cls={thc} /><SortTh tbl="hist" k="symbol" label="Symbol" cls={thc} /><SortTh tbl="hist" k="desc" label="Desc" cls={thc} />
@@ -1163,7 +1163,7 @@ export default function AdminDeskPage() {
                             <td className="px-2 py-1 text-right">{h.tp ? Number(h.tp).toFixed(dg(h.symbol)) : "-"}</td>
                             <td className="px-2 py-1 text-[var(--muted)]">{hdt(h) ? new Date(hdt(h)).toLocaleString() : "-"}</td>
                             <td className="px-2 py-1 text-right" style={{ color: (h.pnl ?? 0) >= 0 ? BUY : SELL }}>{h.pnl != null ? Number(h.pnl).toFixed(2) : "-"}</td>
-                            <td className="px-2 py-1 text-right"><button onClick={() => openHEdit(h)} className="mr-1 text-[var(--accent)]">Edit</button><button onClick={() => delHist(h)} style={{ color: SELL }}>Del</button></td>
+                            <td className="px-2 py-1 text-right whitespace-nowrap"><button title="Edit" onClick={() => openHEdit(h)} className="mr-1.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen" /></button><button title="Delete" onClick={() => delHist(h)} className="rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -1202,7 +1202,7 @@ export default function AdminDeskPage() {
                     <span className="text-[var(--muted)]">{cliRows.length} clients</span>
                   </div>
                   <div className="flex-1 overflow-auto">
-                    <table className="w-full border-collapse [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-2.5 [&_th]:px-2.5">
+                    <table className="w-full border-collapse [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-1.5 [&_th]:px-1.5">
                       <thead><tr className="border-b border-[var(--border)] sticky top-0 bg-[var(--panel)] z-10">
                         <SortTh tbl="cli" k="login" label="Login" cls={thc} /><SortTh tbl="cli" k="name" label="Name" cls={thc} /><SortTh tbl="cli" k="email" label="Email" cls={thc} />
                         <SortTh tbl="cli" k="phone" label="Phone" cls={thc} /><SortTh tbl="cli" k="country" label="Country" cls={thc} /><SortTh tbl="cli" k="manager" label="Manager" cls={thc} />

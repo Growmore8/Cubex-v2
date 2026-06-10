@@ -90,15 +90,16 @@ const CSS = `
 .sa-shell .btn-primary{background:var(--accent2);color:#fff;}
 .sa-shell .btn-gold{background:var(--gold);color:var(--navy);font-weight:700;}
 .sa-shell .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
-.sa-shell .sab{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
-.sa-shell .sab-green{background:color-mix(in srgb,var(--green) 16%,transparent);color:#15803d;}
-.sa-shell .sab-red{background:color-mix(in srgb,var(--red) 16%,transparent);color:#b91c1c;}
-.sa-shell .sab-amber{background:color-mix(in srgb,var(--amber) 16%,transparent);color:#b45309;}
-.sa-shell .sab-blue{background:color-mix(in srgb,#2563eb 16%,transparent);color:#1d4ed8;}
-.sa-shell.dark .sab-blue{background:rgba(59,130,246,.18);color:#93c5fd;}
-.sa-shell.dark .sab-green{background:rgba(34,197,94,.16);color:#4ade80;}
-.sa-shell.dark .sab-red{background:rgba(239,68,68,.16);color:#f87171;}
-.sa-shell.dark .sab-amber{background:rgba(245,158,11,.18);color:#fbbf24;}
+/* status badges shown as plain coloured text (no pill) */
+.sa-shell .sab{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.02em;}
+.sa-shell .sab-green{color:#15803d;}
+.sa-shell .sab-red{color:#b91c1c;}
+.sa-shell .sab-amber{color:#b45309;}
+.sa-shell .sab-blue{color:#1d4ed8;}
+.sa-shell.dark .sab-blue{color:#93c5fd;}
+.sa-shell.dark .sab-green{color:#4ade80;}
+.sa-shell.dark .sab-red{color:#f87171;}
+.sa-shell.dark .sab-amber{color:#fbbf24;}
 .sa-shell .tbl{width:100%;border-collapse:collapse;}
 .sa-shell .tbl th{background:var(--bg);padding:8px 10px;text-align:left;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;font-weight:500;border-bottom:2px solid var(--border);}
 .sa-shell .tbl td{padding:10px;border-bottom:1px solid var(--border);}

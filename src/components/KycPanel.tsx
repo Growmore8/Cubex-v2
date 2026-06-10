@@ -81,7 +81,7 @@ export default function KycPanel() {
                 <td className={td}>{docType(p)}</td>
                 <td className={td}>{front(p) ? <button onClick={() => setView("/api/files/kyc/" + p.id)} className={eye}>View</button> : <span className="text-[var(--muted)]">-</span>}</td>
                 <td className={td}>{back(p) ? <button onClick={() => setView("/api/files/kyc/" + p.id + "?side=back")} className={eye}>View</button> : <span className="text-amber-600">no back</span>}</td>
-                <td className={td}><span className="rounded-full px-1.5 py-0.5 text-[9px]" style={badge(st(p))}>{st(p)}</span></td>
+                <td className={td}><span className="text-[10px] font-bold" style={{ color: st(p) === "APPROVED" ? BUY : st(p) === "REJECTED" ? SELL : GOLD }}>{st(p)}</span></td>
                 <td className={td}>
                   <div className="flex items-center justify-end gap-1">
                     {!canVerify ? (
