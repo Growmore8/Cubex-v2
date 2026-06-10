@@ -2,86 +2,51 @@
 import { useEffect, useRef, useState, memo, type CSSProperties } from "react";
 import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries, HistogramSeries } from "lightweight-charts";
 import { io, Socket } from "socket.io-client";
+import { RSI, SMA, EMA, BollingerBands, MACD } from "technicalindicators";
 
-// RSI (Wilder's smoothing) over candle closes -> line-series data.
+// Indicators are computed with the `technicalindicators` library; each helper
+// keeps the same {time,value} output shape, aligned back to the candle times.
+// (Library results omit the leading warm-up bars, so we offset by length diff.)
+
+// RSI (Wilder) over candle closes -> line-series data.
 function computeRSI(bars: any[], period = 14) {
   if (!bars || bars.length < period + 1) return [];
-  const out: { time: any; value: number }[] = [];
-  let ag = 0, al = 0;
-  for (let i = 1; i <= period; i++) { const d = bars[i].close - bars[i - 1].close; if (d > 0) ag += d; else al -= d; }
-  ag /= period; al /= period;
-  for (let i = period; i < bars.length; i++) {
-    if (i > period) { const d = bars[i].close - bars[i - 1].close; ag = (ag * (period - 1) + (d > 0 ? d : 0)) / period; al = (al * (period - 1) + (d < 0 ? -d : 0)) / period; }
-    const rs = al < 1e-10 ? 1000 : ag / al;
-    out.push({ time: bars[i].time, value: Number((100 - 100 / (1 + rs)).toFixed(2)) });
-  }
-  return out;
+  const res = RSI.calculate({ period, values: bars.map((b) => b.close) });
+  const off = bars.length - res.length;
+  return res.map((v, k) => ({ time: bars[off + k].time, value: Number(v.toFixed(2)) }));
 }
 
 // Simple / exponential moving average over candle closes -> line-series data.
 function computeMA(bars: any[], period: number, exp: boolean) {
   if (!bars || bars.length < period) return [];
-  const out: { time: any; value: number }[] = [];
-  if (exp) {
-    const k = 2 / (period + 1);
-    let ema = bars.slice(0, period).reduce((s, b) => s + b.close, 0) / period;
-    for (let i = period - 1; i < bars.length; i++) {
-      if (i === period - 1) ema = bars.slice(0, period).reduce((s, b) => s + b.close, 0) / period;
-      else ema = bars[i].close * k + ema * (1 - k);
-      out.push({ time: bars[i].time, value: ema });
-    }
-  } else {
-    let sum = 0;
-    for (let i = 0; i < bars.length; i++) {
-      sum += bars[i].close;
-      if (i >= period) sum -= bars[i - period].close;
-      if (i >= period - 1) out.push({ time: bars[i].time, value: sum / period });
-    }
-  }
-  return out;
+  const res = (exp ? EMA : SMA).calculate({ period, values: bars.map((b) => b.close) });
+  const off = bars.length - res.length;
+  return res.map((v: number, k: number) => ({ time: bars[off + k].time, value: v }));
 }
 
 // Bollinger Bands (SMA20 ± 2σ) — mid, upper, lower band
 function computeBB(bars: any[], period = 20, mult = 2) {
   if (!bars || bars.length < period) return { mid: [], upper: [], lower: [] };
-  const mid: { time: any; value: number }[] = [], upper: { time: any; value: number }[] = [], lower: { time: any; value: number }[] = [];
-  for (let i = period - 1; i < bars.length; i++) {
-    let s = 0; for (let j = i - period + 1; j <= i; j++) s += bars[j].close; const sma = s / period;
-    let v = 0; for (let j = i - period + 1; j <= i; j++) v += (bars[j].close - sma) ** 2; const sd = Math.sqrt(v / period);
-    mid.push({ time: bars[i].time, value: +sma.toFixed(6) });
-    upper.push({ time: bars[i].time, value: +(sma + mult * sd).toFixed(6) });
-    lower.push({ time: bars[i].time, value: +(sma - mult * sd).toFixed(6) });
-  }
+  const res = BollingerBands.calculate({ period, stdDev: mult, values: bars.map((b) => b.close) });
+  const off = bars.length - res.length;
+  const mid: any[] = [], upper: any[] = [], lower: any[] = [];
+  res.forEach((b: any, k: number) => { const t = bars[off + k].time; mid.push({ time: t, value: b.middle }); upper.push({ time: t, value: b.upper }); lower.push({ time: t, value: b.lower }); });
   return { mid, upper, lower };
 }
 
 // MACD (12, 26, 9) — macd line, signal line, histogram bars
 function computeMACD(bars: any[], fast = 12, slow = 26, sig = 9) {
   if (!bars || bars.length < slow + sig) return { macd: [], signal: [], hist: [] };
-  const ema = (src: number[], n: number) => {
-    const k = 2 / (n + 1), r: (number | null)[] = new Array(src.length).fill(null);
-    let e = src.slice(0, n).reduce((a, b) => a + b, 0) / n; r[n - 1] = e;
-    for (let i = n; i < src.length; i++) { e = src[i] * k + e * (1 - k); r[i] = e; }
-    return r;
-  };
-  const closes = bars.map((b: any) => b.close), fe = ema(closes, fast), se = ema(closes, slow);
-  const macdVals: number[] = [], macdLine: { time: any; value: number }[] = [];
-  for (let i = 0; i < bars.length; i++) {
-    if (fe[i] == null || se[i] == null) { macdVals.push(0); continue; }
-    const m = fe[i]! - se[i]!; macdVals.push(m);
-    if (i >= slow - 1) macdLine.push({ time: bars[i].time, value: +m.toFixed(6) });
-  }
-  const sigVals = ema(macdVals, sig);
-  const signalLine: { time: any; value: number }[] = [], hist: { time: any; value: number; color: string }[] = [];
-  let mIdx = 0;
-  for (let i = slow - 1; i < bars.length; i++) {
-    if (sigVals[i] == null || mIdx >= macdLine.length) break;
-    const sv = sigVals[i]!, mv = macdLine[mIdx].value;
-    signalLine.push({ time: bars[i].time, value: +sv.toFixed(6) });
-    hist.push({ time: bars[i].time, value: +(mv - sv).toFixed(6), color: mv >= sv ? "#26a69a99" : "#e0526099" });
-    mIdx++;
-  }
-  return { macd: macdLine, signal: signalLine, hist };
+  const res = MACD.calculate({ values: bars.map((b) => b.close), fastPeriod: fast, slowPeriod: slow, signalPeriod: sig, SimpleMAOscillator: false, SimpleMASignal: false });
+  const off = bars.length - res.length;
+  const macd: any[] = [], signal: any[] = [], hist: any[] = [];
+  res.forEach((r: any, k: number) => {
+    const t = bars[off + k].time;
+    if (r.MACD != null) macd.push({ time: t, value: +r.MACD.toFixed(6) });
+    if (r.signal != null) signal.push({ time: t, value: +r.signal.toFixed(6) });
+    if (r.histogram != null) hist.push({ time: t, value: +r.histogram.toFixed(6), color: r.histogram >= 0 ? "#26a69a99" : "#e0526099" });
+  });
+  return { macd, signal, hist };
 }
 
 export type ChartPosition = {
