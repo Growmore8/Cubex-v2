@@ -471,6 +471,9 @@ export default function AdminDeskPage() {
   function openModal(kind: any) { setTopMenu(""); setErr(""); setOk(""); setForm({ type: "LIVE", leverage: 100, currency: "USD" }); setModalMin(false); setModal(kind); }
   async function submit(url: string, body: any, label: string) { setErr(""); setOk(""); const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; } setOk(label + " created"); setModal(""); loadAll(); }
   const f = (k: string, v: any) => setForm((o: any) => ({ ...o, [k]: v }));
+  // Preview the Live ID that a new pool account will get (peek, no consume).
+  const [poolLogin, setPoolLogin] = useState("");
+  async function fetchNextLogin(type: string) { try { const d = await fetch("/api/admin/next-login?type=" + (type || "LIVE")).then((r) => r.json()); if (d.ok) setPoolLogin(d.login); } catch {} }
   async function saveGroup() {
     setErr(""); setOk("");
     if (!form.name) { setErr("Group name required"); return; }
@@ -1659,20 +1662,21 @@ export default function AdminDeskPage() {
             </div>
             {modal === "client" && (<>
               <div className="flex gap-1">
-                <button onClick={() => f("type", "LIVE")} className="flex-1 rounded py-1.5 text-xs" style={form.type === "LIVE" ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Live</button>
-                <button onClick={() => f("type", "DEMO")} className="flex-1 rounded py-1.5 text-xs" style={form.type === "DEMO" ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Demo</button>
+                <button onClick={() => { f("type", "LIVE"); if (form.isPool) fetchNextLogin("LIVE"); }} className="flex-1 rounded py-1.5 text-xs" style={form.type === "LIVE" ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Live</button>
+                <button onClick={() => { f("type", "DEMO"); if (form.isPool) fetchNextLogin("DEMO"); }} className="flex-1 rounded py-1.5 text-xs" style={form.type === "DEMO" ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>Demo</button>
               </div>
-              {/* Pool account — at the top; hides the Email field (pool logs in by Live ID, no email/KYC) */}
+              {/* Pool account — at the top; hides Email/Phone/Country (pool logs in by Live ID, no email/KYC) */}
               <label className="mt-2 flex items-center gap-2 rounded-lg border px-2.5 py-2 text-[11px]" style={{ borderColor: form.isPool ? "var(--accent)" : "var(--border)", background: form.isPool ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent", color: "var(--text)" }}>
-                <input type="checkbox" checked={!!form.isPool} onChange={(e) => f("isPool", e.target.checked)} />
+                <input type="checkbox" checked={!!form.isPool} onChange={(e) => { f("isPool", e.target.checked); if (e.target.checked) fetchNextLogin(form.type); }} />
                 <span className="font-semibold">Pool account</span>
                 <span className="text-[var(--muted)]">— shared account, logs in with Live ID (no email / KYC)</span>
               </label>
-              <div className={lab + " mt-2"}>Name</div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
-              <div className={lab + " mt-2"}>Phone</div><input className={inp} value={form.phone || ""} onChange={(e) => f("phone", e.target.value)} />
+              {form.isPool && (<><div className={lab + " mt-2"}>Live ID (auto-assigned)</div><input className={inp + " font-mono opacity-90 cursor-not-allowed"} value={poolLogin || "…"} readOnly /></>)}
+              <div className={lab + " mt-2"}>Name <span className="font-normal normal-case text-[var(--muted)]">{form.isPool ? "(person who will use this pool account)" : ""}</span></div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
+              {!form.isPool && (<><div className={lab + " mt-2"}>Phone</div><input className={inp} value={form.phone || ""} onChange={(e) => f("phone", e.target.value)} /></>)}
               {!form.isPool && (<><div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} autoComplete="off" data-lpignore="true" onChange={(e) => f("email", e.target.value)} /></>)}
               <div className={lab + " mt-2"}>Password</div><PasswordInput className={inp} value={form.password || ""} autoComplete="new-password" onChange={(e) => f("password", e.target.value)} />
-              <div className={lab + " mt-2"}>Country</div><CountrySelect className={inp} value={form.country || ""} onChange={(v) => f("country", v)} />
+              {!form.isPool && (<><div className={lab + " mt-2"}>Country</div><CountrySelect className={inp} value={form.country || ""} onChange={(v) => f("country", v)} /></>)}
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div><div className={lab}>Leverage</div><input type="number" className={inp} value={form.leverage} onChange={(e) => f("leverage", Number(e.target.value))} /></div>
                 <div><div className={lab}>Currency</div><select className={inp} value={form.currency} onChange={(e) => f("currency", e.target.value)}><option>USD</option><option>EUR</option><option>GBP</option></select></div>
