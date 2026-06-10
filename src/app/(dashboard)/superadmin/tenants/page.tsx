@@ -178,6 +178,19 @@ export default function SATenantsPage() {
             <span className="text-xs text-gray-400">{filteredRows.length} of {rows.length}</span>
           )}
         </div>
+        {(() => {
+          const broken = rows.filter((t: any) => !t.smtpConfigured);
+          if (!broken.length) return null;
+          return (
+            <div className="mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm" style={{ background: "rgba(220,38,38,0.07)", borderColor: "rgba(220,38,38,0.3)", color: "#b91c1c" }}>
+              <i className="fa-solid fa-triangle-exclamation mt-0.5" />
+              <div>
+                <b>{broken.length}</b> tenant{broken.length === 1 ? "" : "s"} have <b>no SMTP configured</b> — client registration, password reset and statement emails are disabled for them.
+                <div className="mt-0.5 text-xs" style={{ color: "#dc2626" }}>{broken.map((t: any) => t.brandName || t.name).join(", ")}</div>
+              </div>
+            </div>
+          );
+        })()}
         <table className="sa-table">
           <thead>
             <tr>
@@ -195,7 +208,14 @@ export default function SATenantsPage() {
             {filteredRows.map((t: any) => (
               <tr key={t.id} className="ui-row">
                 <td className="px-2 py-2 font-medium">
-                  {t.brandName || t.name}
+                  <span className="inline-flex items-center gap-1.5">
+                    {t.brandName || t.name}
+                    {!t.smtpConfigured && (
+                      <button type="button" onClick={() => openEdit(t)} title="SMTP not configured — client registration, password reset and statement emails are disabled. Click to set it up." className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: "rgba(220,38,38,0.12)", color: "#dc2626", border: "1px solid rgba(220,38,38,0.35)" }}>
+                        <i className="fa-solid fa-triangle-exclamation" /> SMTP
+                      </button>
+                    )}
+                  </span>
                   <div className="text-xs text-gray-400">{t.name}</div>
                 </td>
                 <td className="px-2 py-2 text-blue-600">{t.subdomain}</td>

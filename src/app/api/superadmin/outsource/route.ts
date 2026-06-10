@@ -29,6 +29,9 @@ export async function GET() {
       supportEmail: t.supportEmail,
       smtpEmail: t.smtpEmail || null,
       smtpHost: t.smtpHost || null,
+      // True only when BOTH email + password are set (registration / reset / statement
+      // emails work). Password itself is never sent to the client.
+      smtpConfigured: !!(t.smtpEmail && t.smtpPassword),
       contactName: t.contactName || null,
       contactPhone: t.contactPhone || null,
       primaryColor: t.primaryColor,
