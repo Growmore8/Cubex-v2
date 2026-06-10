@@ -186,8 +186,8 @@ function LWChart({
   cfg?: { ma?: number; rsi?: number; bb?: number; macdF?: number; macdS?: number; macdSig?: number };
   /** Controlled drawing tool from a parent header (H-line / trend next to indicators).
       When onTool is set, the in-chart floating draw toolbar is hidden. */
-  tool?: "none" | "hline" | "trend";
-  onTool?: (t: "none" | "hline" | "trend") => void;
+  tool?: "none" | "hline" | "trend" | "erase";
+  onTool?: (t: "none" | "hline" | "trend" | "erase") => void;
   clearKey?: number; // increment to clear all drawings
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -210,9 +210,9 @@ function LWChart({
   symRef.current = symbol; tfRef.current = tf;
 
   // Drawing tools + indicators — `tool` may be controlled by a parent header.
-  const [internalTool, setInternalTool] = useState<"none" | "hline" | "trend">("none");
+  const [internalTool, setInternalTool] = useState<"none" | "hline" | "trend" | "erase">("none");
   const tool = toolProp !== undefined ? toolProp : internalTool;
-  const setTool = (t: "none" | "hline" | "trend") => { if (onTool) onTool(t); else setInternalTool(t); };
+  const setTool = (t: "none" | "hline" | "trend" | "erase") => { if (onTool) onTool(t); else setInternalTool(t); };
   const toolRef = useRef(tool); toolRef.current = tool;
   const [sma, setSma] = useState(false);
   const [ema, setEma] = useState(false);
@@ -262,9 +262,9 @@ function LWChart({
   }, [ind?.sma, ind?.ema, ind?.bb, ind?.rsi, ind?.macd, ind?.psar, ind?.cdl, ind?.stoch, ind?.atr, ind?.adx, ind?.sig, ind?.ribbon]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function clearDrawings() {
-    for (const l of hlineRefs.current) { try { seriesRef.current?.removePriceLine(l); } catch {} }
+    for (const h of hlineRefs.current) { try { seriesRef.current?.removePriceLine(h.line ?? h); } catch {} }
     hlineRefs.current = [];
-    for (const ls of trendRefs.current) { try { chartRef.current?.removeSeries(ls); } catch {} }
+    for (const tr of trendRefs.current) { try { chartRef.current?.removeSeries(tr.series ?? tr); } catch {} }
     trendRefs.current = [];
     trendStart.current = null; setDrawN(0); setTool("none");
   }
@@ -303,7 +303,8 @@ function LWChart({
       const price = seriesRef.current.coordinateToPrice(param.point.y);
       if (price == null) return;
       if (t === "hline") {
-        hlineRefs.current.push(seriesRef.current.createPriceLine({ price, color: "#f0b90b", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "" }));
+        const line = seriesRef.current.createPriceLine({ price, color: "#f0b90b", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "" });
+        hlineRefs.current.push({ line, price });
         setTool("none"); setDrawN((n) => n + 1);
       } else if (t === "trend") {
         if (!trendStart.current) { trendStart.current = { time: param.time, value: price }; }
@@ -311,9 +312,17 @@ function LWChart({
           const pts = [trendStart.current, { time: param.time, value: price }].sort((x, y) => (x.time as number) - (y.time as number));
           const ls = chart.addSeries(LineSeries, { color: "#5aa9ff", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
           try { ls.setData(pts); } catch {}
-          trendRefs.current.push(ls);
+          trendRefs.current.push({ series: ls, a: pts[0], b: pts[1] });
           trendStart.current = null; setTool("none"); setDrawN((n) => n + 1);
         }
+      } else if (t === "erase") {
+        // Delete just the ONE drawn line nearest to the click (within ~13px).
+        const yPx = param.point.y; const s2 = seriesRef.current;
+        let bestDist = 13, bestKind = "", bestIdx = -1;
+        hlineRefs.current.forEach((h: any, i: number) => { const ly = s2.priceToCoordinate(h.price); if (ly == null) return; const d = Math.abs(ly - yPx); if (d < bestDist) { bestDist = d; bestKind = "h"; bestIdx = i; } });
+        trendRefs.current.forEach((tr: any, i: number) => { const a = tr.a, b = tr.b; if (!a || !b) return; const ct = param.time as number; let v: number; if (ct <= (a.time as number)) v = a.value; else if (ct >= (b.time as number)) v = b.value; else v = a.value + (b.value - a.value) * ((ct - (a.time as number)) / ((b.time as number) - (a.time as number))); const ly = s2.priceToCoordinate(v); if (ly == null) return; const d = Math.abs(ly - yPx); if (d < bestDist) { bestDist = d; bestKind = "t"; bestIdx = i; } });
+        if (bestKind === "h") { try { s2.removePriceLine(hlineRefs.current[bestIdx].line); } catch {} hlineRefs.current.splice(bestIdx, 1); setDrawN((n) => n + 1); }
+        else if (bestKind === "t") { try { chart.removeSeries(trendRefs.current[bestIdx].series); } catch {} trendRefs.current.splice(bestIdx, 1); setDrawN((n) => n + 1); }
       }
     });
     // OHLC legend (TradingView-style) — updated on crosshair move / each tick.
@@ -671,7 +680,7 @@ function LWChart({
       const entryLine = s.createPriceLine({
         price: p.openPrice, color: entryCol, lineWidth: 1,
         lineStyle: LineStyle.Dotted, axisLabelVisible: true,
-        title: `${p.kind ? p.kind + " " : ""}${p.type} ${p.lots}`,
+        title: `${p.kind ? p.kind + " " : ""}${p.type} ${Number(p.openPrice)}`,
       });
       lineRefs.current.push(entryLine);
       // SL = rose red; TP = emerald green — thin dotted, same for all trade types
@@ -700,9 +709,12 @@ function LWChart({
       <button style={tbV(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line">
         <i className="fa-solid fa-arrow-trend-up" style={{ fontSize: 12 }} />
       </button>
+      <button style={tbV(tool === "erase")} onClick={() => setTool(tool === "erase" ? "none" : "erase")} title="Erase one (click a line)">
+        <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
+      </button>
       {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && (
-        <button style={tbV(false)} onClick={clearDrawings} title="Clear drawings">
-          <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
+        <button style={tbV(false)} onClick={clearDrawings} title="Clear all drawings">
+          <i className="fa-solid fa-trash-can" style={{ fontSize: 11 }} />
         </button>
       )}
       <button style={{ ...tbV(sma), fontSize: 9, fontWeight: 700 }} onClick={() => setSma((v) => !v)} title="SMA 20">SMA</button>
@@ -722,9 +734,12 @@ function LWChart({
       <button style={tbV(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line">
         <i className="fa-solid fa-arrow-trend-up" style={{ fontSize: 12 }} />
       </button>
+      <button style={tbV(tool === "erase")} onClick={() => setTool(tool === "erase" ? "none" : "erase")} title="Erase one (click a line)">
+        <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
+      </button>
       {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && (
-        <button style={tbV(false)} onClick={clearDrawings} title="Clear drawings">
-          <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
+        <button style={tbV(false)} onClick={clearDrawings} title="Clear all drawings">
+          <i className="fa-solid fa-trash-can" style={{ fontSize: 11 }} />
         </button>
       )}
     </>

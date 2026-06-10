@@ -74,7 +74,7 @@ export default function ClientTerminal() {
   const [cfgOpen, setCfgOpen] = useState(false);
   const [pnlOnly, setPnlOnly] = useState(false);
   const [mwSearch, setMwSearch] = useState("");
-  const [chartTool, setChartTool] = useState<"none" | "hline" | "trend">("none");
+  const [chartTool, setChartTool] = useState<"none" | "hline" | "trend" | "erase">("none");
   const [chartClearKey, setChartClearKey] = useState(0);
   const [stmtRep, setStmtRep] = useState(false);
   const [repPreset, setRepPreset] = useState("all");
@@ -608,7 +608,8 @@ export default function ClientTerminal() {
             <div className="ml-auto flex items-center gap-0.5">
               <button onClick={() => setChartTool((t) => t === "hline" ? "none" : "hline")} title="Horizontal line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "hline" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "hline" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "hline" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-minus text-[11px]" /></button>
               <button onClick={() => setChartTool((t) => t === "trend" ? "none" : "trend")} title="Trend line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "trend" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "trend" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "trend" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-arrow-trend-up text-[11px]" /></button>
-              <button onClick={() => setChartClearKey((n) => n + 1)} title="Clear drawings" className="mr-1 rounded px-1.5 py-0.5 text-[var(--muted)]"><i className="fa-solid fa-eraser text-[11px]" /></button>
+              <button onClick={() => setChartTool((t) => t === "erase" ? "none" : "erase")} title="Erase one (click a line)" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "erase" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "erase" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "erase" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-eraser text-[11px]" /></button>
+              <button onClick={() => setChartClearKey((n) => n + 1)} title="Clear all drawings" className="mr-1 rounded px-1.5 py-0.5 text-[var(--muted)]"><i className="fa-solid fa-trash-can text-[11px]" /></button>
               {(["sma", "ema", "bb", "rsi", "macd", "psar", "cdl", "stoch", "atr", "adx", "sig", "ribbon"] as const).map((k) => (
                 <button key={k} onClick={() => setChartInd((v) => ({ ...v, [k]: !v[k] }))} title={k.toUpperCase()}
                   className="rounded px-1.5 py-0.5 text-[10px] font-bold"
