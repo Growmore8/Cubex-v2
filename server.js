@@ -87,13 +87,16 @@ let TD_KEY = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env
 // Primary feed ("TD" or "FH"). The other feed is a fallback used only when the
 // primary hasn't priced a symbol recently. Configurable from the SuperAdmin UI.
 let PRIMARY = "TD";
-// EXACT real-time mode (Option C): when a real data feed key is present, show the
-// real ticks AS-IS (no smoothing / synthetic jitter) so prices + candles match
-// the real market (TradingView/MT5). Set REALTIME_EXACT=0 to keep the smoothed
-// look. With no feed key, the platform falls back to the synthetic engine.
-let REAL_EXACT = process.env.REALTIME_EXACT !== "0" && !!TD_KEY;
+// Price display mode:
+//   DEFAULT (smoothed)  — the real feed sets each symbol's TARGET; the display
+//     crawls toward it one pip at a time (4100.31 -> .32 -> .33) and jitters the
+//     last digit when caught up, so movement is smooth/fast AND the level tracks
+//     the real market. Best UX (market watch, chart, P&L all move every pip).
+//   EXACT (REALTIME_EXACT=1) — snap to each real tick and hold between them, so
+//     candles are byte-exact to the feed but movement looks "steppy/slow".
+let REAL_EXACT = process.env.REALTIME_EXACT === "1";
 const REAL_TTL = 20000; // a fed symbol holds its real price for this long before synthetic fallback
-function recomputeExact() { REAL_EXACT = process.env.REALTIME_EXACT !== "0" && (!!TD_KEY || !!FINNHUB_KEY); }
+function recomputeExact() { REAL_EXACT = process.env.REALTIME_EXACT === "1"; }
 // Load feed keys + primary from the DB (SuperAdmin UI). DB overrides env.
 async function loadFeedConfig() {
   try {
@@ -376,10 +379,14 @@ function microTick() {
     const step = Math.pow(10, -d);
     let np;
     if (st.target != null && st.target !== st.price) {
-      // Walk toward the latest true (or computed) price one point at a time. Only
-      // a very large gap (a genuine fast move) is allowed to snap, to bound lag.
+      // Walk toward the latest true (or computed) price. Tiny moves crawl ONE
+      // point at a time (smooth last-digit: 4100.31 -> .32 -> .33); larger real
+      // moves catch up proportionally so the price tracks the market without lag;
+      // a huge jump snaps.
       const gapPts = Math.round((st.target - st.price) / step);
-      np = Math.abs(gapPts) > 200 ? st.target : r(st.price + Math.sign(gapPts) * step, d);
+      const ag = Math.abs(gapPts);
+      const mv = ag <= 4 ? Math.sign(gapPts) : (ag > 400 ? gapPts : Math.sign(gapPts) * Math.ceil(ag / 6));
+      np = r(st.price + mv * step, d);
     } else if (!DERIVED_SET.has(sym)) {
       // Base symbol caught up to its real price: idle jitter with momentum so the
       // last digit keeps ticking instead of freezing.
