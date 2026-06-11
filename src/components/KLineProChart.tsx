@@ -32,7 +32,7 @@ function ensureLevelOverlay() {
     try {
       kc.registerOverlay({
         name: "cubexLevel",
-        totalStep: 1,
+        totalStep: 2, // 1 point + finish step — required for the overlay to reach "drawn" state
         needDefaultPointFigure: false,
         needDefaultXAxisFigure: false,
         needDefaultYAxisFigure: true,
