@@ -387,9 +387,11 @@ function microTick() {
       const ag = Math.abs(gapPts);
       const mv = ag <= 4 ? Math.sign(gapPts) : (ag > 400 ? gapPts : Math.sign(gapPts) * Math.ceil(ag / 6));
       np = r(st.price + mv * step, d);
-    } else if (!DERIVED_SET.has(sym)) {
-      // Base symbol caught up to its real price: idle jitter with momentum so the
-      // last digit keeps ticking instead of freezing.
+    } else if (!DERIVED_SET.has(sym) && (!st.realAt || Date.now() - st.realAt > REAL_TTL)) {
+      // No live feed for this symbol: idle jitter with momentum so the last digit
+      // keeps ticking instead of freezing. Symbols WITH a recent real tick skip
+      // this — they hold the real price and move only on real updates (like
+      // TradingView), so they don't fake-oscillate between two values.
       if (st.drift == null) st.drift = Math.random() < 0.5 ? -1 : 1;
       const rr = Math.random();
       if (rr < 0.12) st.drift = -st.drift; // reverse direction

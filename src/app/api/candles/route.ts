@@ -2,8 +2,18 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-const TD_KEY = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
-const FH_KEY = process.env.FINNHUB_KEY || "";
+// Feed keys come from the SuperAdmin Feeds UI (DB), falling back to env.
+async function feedKeys(): Promise<{ td: string; fh: string }> {
+  let td = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
+  let fh = process.env.FINNHUB_KEY || "";
+  try {
+    const rec = await prisma.setting.findUnique({ where: { key: "feeds" } });
+    const v: any = (rec && rec.value) || {};
+    if (typeof v.tdKey === "string" && v.tdKey.trim()) td = v.tdKey.trim();
+    if (typeof v.finnhubKey === "string" && v.finnhubKey.trim()) fh = v.finnhubKey.trim();
+  } catch {}
+  return { td, fh };
+}
 
 const INTERVAL: Record<string, string> = {
   "1M": "1min", "5M": "5min", "15M": "15min", "30M": "30min", "1H": "1h", "4H": "4h", "1D": "1day",
@@ -12,14 +22,14 @@ const INTERVAL: Record<string, string> = {
 const FH_RES: Record<string, string> = { "1M": "1", "5M": "5", "15M": "15", "30M": "30", "1H": "60", "4H": "60", "1D": "D" };
 
 // Finnhub OHLC for an OANDA-fed symbol (e.g. OANDA:EUR_USD). Returns candles or null.
-async function finnhubCandles(feed: string, tf: string): Promise<any[] | null> {
-  if (!FH_KEY) return null;
+async function finnhubCandles(feed: string, tf: string, fhKey: string): Promise<any[] | null> {
+  if (!fhKey) return null;
   const res = FH_RES[tf] || "1";
   const secPer: Record<string, number> = { "1": 60, "5": 300, "15": 900, "30": 1800, "60": 3600, "D": 86400 };
   const to = Math.floor(Date.now() / 1000);
   const from = to - (secPer[res] || 60) * 5000; // ~5000 bars back
   const kind = feed.startsWith("OANDA:") ? "forex" : "stock";
-  const api = `https://finnhub.io/api/v1/${kind}/candle?symbol=${encodeURIComponent(feed)}&resolution=${res}&from=${from}&to=${to}&token=${FH_KEY}`;
+  const api = `https://finnhub.io/api/v1/${kind}/candle?symbol=${encodeURIComponent(feed)}&resolution=${res}&from=${from}&to=${to}&token=${fhKey}`;
   try {
     const r = await fetch(api, { cache: "no-store" });
     const d = await r.json();
@@ -54,10 +64,11 @@ export async function GET(req: Request) {
 
   let feed: string | null = null;
   try { const gs = await prisma.globalSymbol.findUnique({ where: { symbol } }); feed = gs?.feed || null; } catch {}
+  const { td: TD_KEY, fh: FH_KEY } = await feedKeys();
 
   // For symbols on a Finnhub (OANDA) feed, use Finnhub's OHLC first; fall back to TD.
   if (feed && feed.includes(":")) {
-    const fh = await finnhubCandles(feed, tf);
+    const fh = await finnhubCandles(feed, tf, FH_KEY);
     if (fh && fh.length) {
       fh.sort((a, b) => a.time - b.time);
       const seen = new Set<number>();
