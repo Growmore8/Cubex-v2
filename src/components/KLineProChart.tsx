@@ -119,9 +119,9 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         const sock: Socket = io({ path: "/socket.io" });
         sock.on("tick", (msg: any) => {
           if (msg.symbol !== sym.ticker) return;
-          // Build the candle from the REAL feed price (so candles match the
-          // market); fall back to the display price when no live feed.
-          const price = msg.real != null ? msg.real : msg.price;
+          // Use the SAME smooth display price as Market Watch, so the chart's
+          // price/last candle moves in lock-step with the live Market Watch price.
+          const price = msg.price;
           if (price == null) return;
           const t = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
           if (last && last.timestamp === t) { last.high = Math.max(last.high, price); last.low = Math.min(last.low, price); last.close = price; }
