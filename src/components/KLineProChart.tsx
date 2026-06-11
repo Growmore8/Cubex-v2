@@ -68,6 +68,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   onSymbolChange?: (sym: string) => void; // user picked a symbol in the chart dropdown
 }) {
   const onSymRef = useRef(onSymbolChange); onSymRef.current = onSymbolChange;
+  const symbolsRef = useRef(symbols); symbolsRef.current = symbols; // always the current full list
   const timerRef = useRef<HTMLDivElement | null>(null);
   const elRef = useRef<HTMLDivElement | null>(null);
   const proRef = useRef<any>(null);
@@ -86,7 +87,10 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     const datafeed = {
       searchSymbols: async (search?: string) => {
         const q = (search || "").toUpperCase();
-        return list.filter((s) => !q || s.symbol.toUpperCase().includes(q))
+        // Read the CURRENT full symbol list (not the mount-time snapshot), so
+        // every symbol is searchable regardless of which one the chart opened on.
+        const all = (symbolsRef.current && symbolsRef.current.length) ? symbolsRef.current : list;
+        return all.filter((s) => !q || s.symbol.toUpperCase().includes(q))
           .map((s) => ({ ticker: s.symbol, shortName: s.symbol, exchange: (s.category || "").toLowerCase(), pricePrecision: digits, volumePrecision: 0, type: (s.category || "forex").toLowerCase() }));
       },
       getHistoryKLineData: async (sym: any, period: any, from: number, to: number) => {
@@ -198,6 +202,17 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, [getCore]);
 
+  // Pre-warm: after the current chart paints, quietly fetch a few other symbols'
+  // candles for this timeframe so switching to them is instant (warms the 20s
+  // server cache + browser cache). Throttled + delayed to spare the data quota.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const others = (symbolsRef.current || []).map((s) => s.symbol).filter((s) => s && s !== symbol).slice(0, 8);
+      for (const sym of others) { fetch(`/api/candles?symbol=${encodeURIComponent(sym)}&tf=${tf}`).catch(() => {}); }
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [tf]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // theme sync (no rebuild)
   useEffect(() => { try { proRef.current?.setTheme(theme); } catch {} }, [theme]);
   // follow the app's symbol selection (skip if the chart already shows it, so a
@@ -227,7 +242,12 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         if (core && last) {
           const px: any = core.convertToPixel({ value: last.close }, { paneId: "candle_pane" });
           const y = Array.isArray(px) ? px[0]?.y : px?.y;
-          if (typeof y === "number") { el.style.top = y + 16 + "px"; el.style.visibility = "visible"; }
+          if (typeof y === "number") {
+            // sit just BELOW the current-price label, same colour as it (up=green/down=red)
+            el.style.top = y + 11 + "px";
+            el.style.background = last.close >= last.open ? "#26a69a" : "#ef5350";
+            el.style.visibility = "visible";
+          }
         }
       } catch {}
     };
@@ -277,7 +297,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
       <div ref={elRef} className={bare ? "kline-bare" : undefined} style={{ position: "absolute", inset: 0 }} />
       {!bare && (
-        <div ref={timerRef} style={{ position: "absolute", right: 2, visibility: "hidden", transform: "translateY(0)", background: "rgba(20,24,34,0.92)", color: "#cbd5e1", fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, pointerEvents: "none", zIndex: 5, fontVariantNumeric: "tabular-nums" }} />
+        <div ref={timerRef} style={{ position: "absolute", right: 0, visibility: "hidden", background: "#26a69a", color: "#fff", fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 2, pointerEvents: "none", zIndex: 5, fontVariantNumeric: "tabular-nums" }} />
       )}
     </div>
   );
