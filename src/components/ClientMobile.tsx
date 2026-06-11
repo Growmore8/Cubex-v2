@@ -808,9 +808,10 @@ export default function ClientMobile({ t }: { t: any }) {
                             const isTP = cr === "TP" || cr.includes("TAKE");
                             const isSL = cr === "SL" || cr.includes("STOP LOSS");
                             const isMC = cr === "MC" || cr.includes("MARGIN") || cr.includes("STOP OUT") || cr.includes("LIQUID");
-                            const lbl = isTP ? "TP" : isSL ? "SL" : isMC ? "MC" : "Manual";
-                            const col = isTP ? BUY : (isSL || isMC) ? SELL : null;
-                            return <span className="rounded px-1.5 py-0.5 text-[9px] font-bold" style={col ? { background: col, color: "#fff" } : { background: "var(--soft)", color: "var(--muted)" }} title={"Closed: " + lbl}>{lbl}</span>;
+                            if (!isTP && !isSL && !isMC) return null; // hide "Manual" on the client side
+                            const lbl = isTP ? "TP" : isSL ? "SL" : "MC";
+                            const col = isTP ? BUY : SELL;
+                            return <span className="rounded px-1.5 py-0.5 text-[9px] font-bold" style={{ background: col, color: "#fff" }} title={"Closed: " + lbl}>{lbl}</span>;
                           })()}
                         </div>
                         <div className="text-sm font-bold" style={{ color: Number(h.pnl) >= 0 ? BUY : SELL }}>{(Number(h.pnl) >= 0 ? "+" : "") + fmt(Number(h.pnl))}</div>

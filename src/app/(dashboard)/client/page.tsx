@@ -806,7 +806,7 @@ export default function ClientTerminal() {
                     <td className="px-2 py-1 text-right">{h.closePrice.toFixed(dg(h.symbol))}</td>
                     <td className="px-2 py-1 text-right" style={{ color: h.sl ? "#f43f5e" : "var(--muted)" }}>{h.sl ? Number(h.sl).toFixed(dg(h.symbol)) : "—"}</td>
                     <td className="px-2 py-1 text-right" style={{ color: h.tp ? "#10b981" : "var(--muted)" }}>{h.tp ? Number(h.tp).toFixed(dg(h.symbol)) : "—"}</td>
-                    <td className="px-2 py-1"><span style={{ color: rc, fontWeight: r !== "MANUAL" ? 600 : "normal" }}>{r}</span></td>
+                    <td className="px-2 py-1"><span style={{ color: rc, fontWeight: r !== "MANUAL" ? 600 : "normal" }}>{r === "MANUAL" ? "—" : r}</span></td>
                     <td className="px-2 py-1 text-right" style={{ color: h.pnl >= 0 ? BUY : SELL }}>{(h.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(h.pnl))}</td>
                   </tr>); })}
               </tbody>
