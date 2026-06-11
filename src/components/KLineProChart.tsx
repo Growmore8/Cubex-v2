@@ -123,12 +123,14 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         const sock: Socket = io({ path: "/socket.io" });
         sock.on("tick", (msg: any) => {
           if (msg.symbol !== sym.ticker) return;
-          // Use the SAME smooth display price as Market Watch, so the chart's
-          // price/last candle moves in lock-step with the live Market Watch price.
+          // `price` = smooth display value (so the close / price-line crawls in
+          // lock-step with Market Watch). `real` = the true feed price, folded into
+          // the candle's high/low so the WICKS reflect the real market range.
           const price = msg.price;
           if (price == null) return;
+          const real = msg.real != null ? msg.real : price;
           const t = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
-          if (last && last.timestamp === t) { last.high = Math.max(last.high, price); last.low = Math.min(last.low, price); last.close = price; }
+          if (last && last.timestamp === t) { last.high = Math.max(last.high, price, real); last.low = Math.min(last.low, price, real); last.close = price; }
           else {
             // Gap-fill any skipped buckets (e.g. the seam between delayed history
             // and live, or a brief stall) with flat bars so the chart never has
@@ -141,7 +143,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
             // the previous bar's close, so colour reflects the real move, not the
             // gap to the first tick.
             const open = last ? last.close : price;
-            last = { timestamp: t, open, high: Math.max(open, price), low: Math.min(open, price), close: price, volume: 0 };
+            last = { timestamp: t, open, high: Math.max(open, price, real), low: Math.min(open, price, real), close: price, volume: 0 };
           }
           callback({ ...last });
         });
