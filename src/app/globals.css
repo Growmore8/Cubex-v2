@@ -427,3 +427,5 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   .ui-card:hover, .hover-lift:hover, .ui-btn:active, .ui-btn-primary:hover { transform: none !important; }
   .ui-pop, .ui-fade-up, .ui-fade-up-stagger > * { animation: none !important; }
 }
+/* KLineChart Pro: hide the built-in centre logo watermark */
+.klinecharts-pro-watermark { display: none !important; }

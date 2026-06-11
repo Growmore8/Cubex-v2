@@ -23,6 +23,35 @@ const periodTf = (p: any) => p.timespan === "minute" ? (p.multiplier === 1 ? "1M
 const periodSec = (p: any) => (p.timespan === "minute" ? 60 : p.timespan === "hour" ? 3600 : 86400) * p.multiplier;
 const tfToPeriod = (tf: string) => PERIODS.find((p) => p.text.toUpperCase() === String(tf).toUpperCase()) || PERIODS[2];
 
+// Register a custom full-width horizontal level overlay (entry / SL / TP /
+// pending) once — draws a coloured dashed line + a label tag, independent of
+// the x-axis so it always spans the chart. Memoised so it runs a single time.
+let _ovReg: Promise<void> | null = null;
+function ensureLevelOverlay() {
+  if (!_ovReg) _ovReg = import("klinecharts").then((kc: any) => {
+    try {
+      kc.registerOverlay({
+        name: "cubexLevel",
+        totalStep: 1,
+        needDefaultPointFigure: false,
+        needDefaultXAxisFigure: false,
+        needDefaultYAxisFigure: true,
+        createPointFigures: ({ overlay, coordinates, bounding }: any) => {
+          const c = coordinates && coordinates[0];
+          if (!c || c.y == null) return [];
+          const color = overlay.extendData?.color || "#888";
+          const text = overlay.extendData?.text || "";
+          return [
+            { type: "line", attrs: { coordinates: [{ x: 0, y: c.y }, { x: bounding.width, y: c.y }] }, styles: { color, style: "dashed", size: 1 } },
+            { type: "text", ignoreEvent: true, attrs: { x: 4, y: c.y, text, align: "left", baseline: "middle" }, styles: { color: "#fff", backgroundColor: color, paddingLeft: 4, paddingRight: 4, paddingTop: 1, paddingBottom: 1, borderRadius: 2, size: 10 } },
+          ];
+        },
+      });
+    } catch {}
+  });
+  return _ovReg;
+}
+
 export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, positions }: {
   symbol: string;
   tf: string;
@@ -93,8 +122,8 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         symbol: { ticker: first.symbol, name: first.symbol, shortName: first.symbol, pricePrecision: digits, volumePrecision: 0, priceCurrency: "USD", type: "forex" },
         period: tfToPeriod(tf),
         periods: PERIODS,
-        mainIndicators: ["MA"],
-        subIndicators: ["VOL", "MACD"],
+        mainIndicators: [], // start clean — user adds indicators via the Indicator menu
+        subIndicators: [],
         datafeed: datafeed as any,
       });
     });
@@ -119,23 +148,24 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     const draw = () => {
       if (cancelled) return;
       const core = proRef.current?._chartApi;
-      if (!core || typeof core.createOverlay !== "function") { if (tries++ < 50) setTimeout(draw, 120); return; }
+      if (!core || typeof core.createOverlay !== "function") { if (tries++ < 80) setTimeout(draw, 120); return; }
       for (const id of overlayIds.current) { try { core.removeOverlay(id); } catch {} }
       overlayIds.current = [];
-      const add = (value: number, color: string) => {
+      const add = (value: number, color: string, text: string) => {
         try {
-          const id = core.createOverlay({ name: "priceLine", points: [{ value }], lock: true, styles: { line: { color, style: "dashed", size: 1 }, text: { color: "#fff", backgroundColor: color } } });
+          const id = core.createOverlay({ name: "cubexLevel", points: [{ value }], lock: true, extendData: { color, text } });
           if (typeof id === "string") overlayIds.current.push(id);
         } catch {}
       };
       for (const p of positions || []) {
         const pending = !!p.kind;
-        add(p.openPrice, pending ? "#f59e0b" : (p.type === "BUY" ? "#3b82f6" : "#ef4444"));
-        if (p.sl) add(p.sl, "#f43f5e");
-        if (p.tp) add(p.tp, "#10b981");
+        const side = p.type === "BUY" ? "BUY" : "SELL";
+        add(p.openPrice, pending ? "#f59e0b" : (p.type === "BUY" ? "#3b82f6" : "#ef4444"), `${pending ? (p.kind + " ") : ""}${side} ${p.openPrice}`);
+        if (p.sl) add(p.sl, "#f43f5e", `SL ${p.sl}`);
+        if (p.tp) add(p.tp, "#10b981", `TP ${p.tp}`);
       }
     };
-    draw();
+    ensureLevelOverlay().then(draw);
     return () => { cancelled = true; };
   }, [positions, symbol]);
 
