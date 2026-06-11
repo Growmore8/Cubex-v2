@@ -28,6 +28,27 @@ export async function nextTicket(tenantId: string): Promise<bigint> {
   return c.nextVal as bigint;
 }
 
+// Reject a new trade when the account's free margin can't cover it. Free margin
+// must be positive AND at least the margin required for this trade, otherwise
+// the new (net) margin would exceed equity. Shared by client + staff so the
+// "Not enough money" rule is identical on every side.
+export async function assertMargin(account: any, newTrade: { symbol: string; type: "BUY" | "SELL"; lots: number }, price: number) {
+  const lev = account.leverage || 100;
+  const existing = await prisma.trade.findMany({ where: { accountId: account.id } });
+  const priceMap: Record<string, number> = { [newTrade.symbol]: price };
+  for (const t of existing) if (priceMap[t.symbol] == null) priceMap[t.symbol] = (await getPrice(t.symbol)) ?? Number(t.openPrice);
+  let floating = 0;
+  for (const t of existing) floating += pnlFor(t.symbol, t.type as any, Number(t.openPrice), priceMap[t.symbol], Number(t.lots));
+  const balance = Number(account.deposit) - Number(account.withdrawal) + Number(account.credit) + Number(account.bonus) + Number(account.pnl);
+  const equity = balance + floating;
+  const usedBefore = usedMargin(existing.map((t) => ({ symbol: t.symbol, type: t.type as "BUY" | "SELL", lots: Number(t.lots) })), lev, (sym) => priceMap[sym] ?? price);
+  const after = [...existing.map((t) => ({ symbol: t.symbol, type: t.type as "BUY" | "SELL", lots: Number(t.lots) })), { symbol: newTrade.symbol, type: newTrade.type, lots: newTrade.lots }];
+  const usedAfter = usedMargin(after, lev, (sym) => priceMap[sym] ?? price);
+  const free = equity - usedBefore;
+  const required = usedAfter - usedBefore;
+  if (free <= 0 || required > free + 1e-6) throw new Error("Not enough money");
+}
+
 export async function placeOrder(tenantId: string, userId: string, input: any) {
   const account = input.accountId
     ? await prisma.account.findFirst({ where: { tenantId, userId, id: input.accountId } })
@@ -44,20 +65,9 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   const slErr = validateSlTp(input.side, price, input.sl, input.tp);
   if (slErr) throw new Error(slErr);
 
-  // Free-margin check using HEDGED (net) margin — opening an opposite position
-  // reduces net exposure, so a hedge needs no extra (or less) margin.
-  const lev = account.leverage || 100;
-  const existing = await prisma.trade.findMany({ where: { accountId: account.id } });
-  const priceMap: Record<string, number> = { [input.symbol]: price };
-  for (const t of existing) if (priceMap[t.symbol] == null) priceMap[t.symbol] = (await getPrice(t.symbol)) ?? Number(t.openPrice);
-  let floating = 0;
-  for (const t of existing) floating += pnlFor(t.symbol, t.type as any, Number(t.openPrice), priceMap[t.symbol], Number(t.lots));
-  const balance = Number(account.deposit) - Number(account.withdrawal) + Number(account.credit) + Number(account.bonus) + Number(account.pnl);
-  const equity = balance + floating;
-  // net margin AFTER adding this trade
-  const after = [...existing.map((t) => ({ symbol: t.symbol, type: t.type as "BUY" | "SELL", lots: Number(t.lots) })), { symbol: input.symbol, type: input.side, lots: Number(input.lots) }];
-  const usedAfter = usedMargin(after, lev, (s) => priceMap[s] ?? price);
-  if (usedAfter > equity + 1e-6) throw new Error("Not enough money");
+  // Free-margin check (shared rule) — free margin must be positive and cover
+  // this trade's required margin, else "Not enough money".
+  await assertMargin(account, { symbol: input.symbol, type: input.side, lots: Number(input.lots) }, price);
 
   const ticket = await nextTicket(tenantId);
   const trade = await prisma.trade.create({

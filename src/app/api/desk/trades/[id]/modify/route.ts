@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
 import { validateSlTp } from "@/lib/trademath";
-import { notifyStaff } from "@/services/notification.service";
+import { notifyStaff, notify } from "@/services/notification.service";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,6 +33,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await prisma.trade.update({ where: { id: t.id }, data });
     await audit(s.tenantId as string, "trade.modify", t.symbol + " " + JSON.stringify(data), s.email || "admin");
     notifyStaff(s.tenantId as string, { title: "Trade modified — " + (t.account.login || ""), body: t.symbol + " #" + t.ticket + " by " + (s.email || "staff"), type: "TRADE" }, t.account.managerId).catch(() => {});
+    if (t.account.userId) {
+      const bits: string[] = [];
+      if (data.sl !== undefined) bits.push("SL " + (newSl || "—"));
+      if (data.tp !== undefined) bits.push("TP " + (newTp || "—"));
+      if (data.lots !== undefined) bits.push(Number(b.lots) + " lot");
+      notify(s.tenantId as string, t.account.userId, "Trade updated", `Your ${t.symbol} trade on ${t.account.login} was updated${bits.length ? " — " + bits.join(", ") : ""}.`, "TRADE").catch(() => {});
+    }
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

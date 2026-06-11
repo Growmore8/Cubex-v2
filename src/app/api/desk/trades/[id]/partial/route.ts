@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { contractFor } from "@/config/contracts";
 import { pnlFor } from "@/lib/trademath";
-import { notifyStaff } from "@/services/notification.service";
+import { notifyStaff, notify } from "@/services/notification.service";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,6 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     try { await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: t.accountId, symbol: t.symbol, side: t.type as any, lots: lots, openPrice: Number(t.openPrice), closePrice: price, sl: t.sl, tp: t.tp, pnl: realized, closeReason: "MANUAL" as any, openedAt: t.openedAt } }); } catch (e) {}
     await audit(s.tenantId as string, "trade.partial", t.symbol + " -" + lots + " pnl=" + realized.toFixed(2), s.email || "admin");
     notifyStaff(s.tenantId as string, { title: "Partial close — " + (t.account.login || ""), body: t.symbol + " -" + lots + "L | P/L " + realized.toFixed(2), type: "TRADE" }, t.account.managerId).catch(() => {});
+    if (t.account.userId) notify(s.tenantId as string, t.account.userId, "Trade partially closed", `Your ${t.symbol} trade on ${t.account.login} was partially closed (${lots} lot) · P/L ${realized >= 0 ? "+" : ""}${realized.toFixed(2)}.`, "TRADE").catch(() => {});
     return NextResponse.json({ ok: true, realized });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

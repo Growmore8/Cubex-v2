@@ -5,8 +5,8 @@ import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
 import { pnlFor } from "@/lib/trademath";
 import { audit } from "@/lib/audit";
-import { notifyStaff } from "@/services/notification.service";
-import { nextTicket } from "@/services/trade.service";
+import { notifyStaff, notify } from "@/services/notification.service";
+import { nextTicket, assertMargin } from "@/services/trade.service";
 
 function accountWhere(s: any) {
   if (s.role === "ADMIN" || s.role === "SUPERADMIN") return { tenantId: s.tenantId };
@@ -93,6 +93,8 @@ export async function manualTrade(s: any, input: any) {
   const live = await getPrice(input.symbol);
   const openPrice = (input.openPrice != null && Number(input.openPrice) > 0) ? Number(input.openPrice) : live;
   if (openPrice == null) throw new Error("No price for " + input.symbol);
+  // Same margin rule as the client: free margin must cover this trade.
+  await assertMargin(acc, { symbol: input.symbol, type: input.type, lots: Number(input.lots) }, live ?? openPrice);
   const openedAt = input.openedAt ? new Date(input.openedAt) : undefined;
   const ticket = await nextTicket(acc.tenantId);
   const t = await prisma.trade.create({
@@ -104,6 +106,7 @@ export async function manualTrade(s: any, input: any) {
   const label = `${acc.login} ${input.type} ${input.symbol} ${input.lots}L @ ${openPrice} (manual)`;
   audit(acc.tenantId, "trade.manual", label, s.email || "staff", s.role);
   notifyStaff(acc.tenantId, { type: "TRADE", title: "Manual trade", body: label }, acc.managerId).catch(() => {});
+  if (acc.userId) notify(acc.tenantId, acc.userId, "Trade opened", `${input.type} ${input.symbol} ${input.lots} lot opened on your account ${acc.login} @ ${openPrice}.`, "TRADE").catch(() => {});
   return { id: t.id.toString(), ticket: t.ticket.toString(), openPrice };
 }
 
@@ -111,12 +114,13 @@ export async function manualTrade(s: any, input: any) {
 // not realized into the balance, so removing it needs no balance change — the
 // client's open positions / equity simply update. No client notification.
 export async function deleteOpen(s: any, tradeId: string) {
-  const trade = await prisma.trade.findFirst({ where: { id: BigInt(tradeId), account: accountWhere(s) }, include: { account: { select: { login: true, tenantId: true, managerId: true } } } });
+  const trade = await prisma.trade.findFirst({ where: { id: BigInt(tradeId), account: accountWhere(s) }, include: { account: { select: { login: true, tenantId: true, managerId: true, userId: true } } } });
   if (!trade) throw new Error("Position not found");
   await prisma.trade.delete({ where: { id: trade.id } });
   const label = `${trade.account.login} ${trade.symbol} ${trade.type} ${Number(trade.lots)}L deleted (by staff)`;
   audit(trade.account.tenantId, "trade.delete", label, s.email || "staff", s.role);
   notifyStaff(trade.account.tenantId, { type: "TRADE", title: "Trade deleted", body: label }, trade.account.managerId).catch(() => {});
+  if (trade.account.userId) notify(trade.account.tenantId, trade.account.userId, "Trade removed", `Your ${trade.symbol} ${trade.type} ${Number(trade.lots)} lot position was removed from account ${trade.account.login}.`, "TRADE").catch(() => {});
   return { tenantId: trade.account.tenantId };
 }
 
@@ -137,5 +141,6 @@ export async function forceClose(s: any, tradeId: string, opts?: { price?: numbe
   const label = `${trade.account.login} ${trade.symbol} closed @ ${price} | PnL ${pnl.toFixed(2)} (by staff)`;
   audit(trade.account.tenantId, "trade.close", label, s.email || "staff", s.role);
   notifyStaff(trade.account.tenantId, { type: "TRADE", title: "Trade closed", body: label }, trade.account.managerId).catch(() => {});
+  if (trade.account.userId) notify(trade.account.tenantId, trade.account.userId, "Trade closed", `Your ${trade.symbol} trade on ${trade.account.login} was closed @ ${price} · P/L ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}.`, "TRADE").catch(() => {});
   return { pnl, userId: trade.account.userId, tenantId: trade.account.tenantId };
 }
