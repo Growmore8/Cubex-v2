@@ -684,7 +684,7 @@ export default function ClientMobile({ t }: { t: any }) {
               </button>
             </div>
             <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
-              <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} symbols={symbols}
+              <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} symbols={symbols} onSymbolChange={(sm: string) => setSelSym(sm)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),

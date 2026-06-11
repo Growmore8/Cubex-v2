@@ -618,7 +618,7 @@ export default function ClientTerminal() {
           <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">{(() => { const pos = [
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-          ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} />; })()}</div>
+          ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} onSymbolChange={(sm) => setSelSym(sm)} />; })()}</div>
         </div>
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 

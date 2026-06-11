@@ -57,7 +57,7 @@ function ensureLevelOverlay() {
   return _ovReg;
 }
 
-export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, positions, bare }: {
+export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, positions, bare, onSymbolChange }: {
   symbol: string;
   tf: string;
   theme: "dark" | "light";
@@ -65,7 +65,10 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   symbols?: Sym[];
   positions?: ChartPosition[];
   bare?: boolean; // hide the period-bar + drawing-rail (preview); chart only
+  onSymbolChange?: (sym: string) => void; // user picked a symbol in the chart dropdown
 }) {
+  const onSymRef = useRef(onSymbolChange); onSymRef.current = onSymbolChange;
+  const timerRef = useRef<HTMLDivElement | null>(null);
   const elRef = useRef<HTMLDivElement | null>(null);
   const proRef = useRef<any>(null);
   const dfRef = useRef<any>(null);
@@ -105,6 +108,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         } catch { return []; }
       },
       subscribe: (sym: any, period: any, callback: (d: any) => void) => {
+        try { onSymRef.current?.(sym.ticker); } catch {} // sync app when the user picks a symbol in the chart
         const key = sym.ticker + "_" + period.text;
         const sec = periodSec(period);
         const seed = lastBar[key];
@@ -196,8 +200,41 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
 
   // theme sync (no rebuild)
   useEffect(() => { try { proRef.current?.setTheme(theme); } catch {} }, [theme]);
-  // follow the app's symbol selection
-  useEffect(() => { try { if (proRef.current && symbol) proRef.current.setSymbol({ ticker: symbol, name: symbol, shortName: symbol, pricePrecision: digits, volumePrecision: 0, priceCurrency: "USD", type: "forex" }); } catch {} }, [symbol, digits]);
+  // follow the app's symbol selection (skip if the chart already shows it, so a
+  // dropdown pick in the chart doesn't bounce back)
+  useEffect(() => {
+    try {
+      const cur = proRef.current?.getSymbol?.()?.ticker;
+      if (proRef.current && symbol && cur !== symbol) proRef.current.setSymbol({ ticker: symbol, shortName: symbol, pricePrecision: digits, volumePrecision: 0, type: "forex" });
+    } catch {}
+  }, [symbol, digits]);
+
+  // Candle-close countdown at the last price (TradingView-style "00:33").
+  useEffect(() => {
+    let stop = false;
+    const fmt = (s: number) => { const m = Math.floor(s / 60), ss = s % 60; const p = (n: number) => (n < 10 ? "0" + n : "" + n); return m >= 60 ? p(Math.floor(m / 60)) + ":" + p(m % 60) + ":" + p(ss) : p(m) + ":" + p(ss); };
+    const tick = async () => {
+      if (stop) return;
+      const el = timerRef.current; if (!el) return;
+      const core = await getCore();
+      try {
+        const period = proRef.current?.getPeriod?.() || tfToPeriod(tf);
+        const sec = periodSec(period);
+        const left = sec - (Math.floor(Date.now() / 1000) % sec);
+        el.textContent = fmt(left);
+        const dl = core?.getDataList?.() || [];
+        const last = dl[dl.length - 1];
+        if (core && last) {
+          const px: any = core.convertToPixel({ value: last.close }, { paneId: "candle_pane" });
+          const y = Array.isArray(px) ? px[0]?.y : px?.y;
+          if (typeof y === "number") { el.style.top = y + 16 + "px"; el.style.visibility = "visible"; }
+        }
+      } catch {}
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => { stop = true; clearInterval(id); };
+  }, [getCore, tf]);
 
   // Trade overlays (entry / SL / TP / pending) drawn on the REAL core chart.
   // Pro doesn't expose its chart, but klinecharts tags the chart element with a
@@ -236,5 +273,12 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   // Absolutely fill the (relative) parent so the widget always matches the
   // container box and shrinks/grows when panels are dragged — core klinecharts
   // has its own ResizeObserver, so it re-renders once the box changes.
-  return <div ref={elRef} className={bare ? "kline-bare" : undefined} style={{ position: "absolute", inset: 0, overflow: "hidden" }} />;
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      <div ref={elRef} className={bare ? "kline-bare" : undefined} style={{ position: "absolute", inset: 0 }} />
+      {!bare && (
+        <div ref={timerRef} style={{ position: "absolute", right: 2, visibility: "hidden", transform: "translateY(0)", background: "rgba(20,24,34,0.92)", color: "#cbd5e1", fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, pointerEvents: "none", zIndex: 5, fontVariantNumeric: "tabular-nums" }} />
+      )}
+    </div>
+  );
 }
