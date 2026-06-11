@@ -642,12 +642,12 @@ export default function AdminDeskPage() {
   const shown: { sym: string; i: number }[] = layout === 1 ? (openCharts[activeChart] ? [{ sym: openCharts[activeChart], i: activeChart }] : []) : openCharts.slice(0, layout).map((sym, i) => ({ sym, i }));
   const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const bid = p != null ? (p * 0.9999).toFixed(d) : "..."; const ask = p != null ? (p * 1.0001).toFixed(d) : "...";
     if (!showOC) return (
-      <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-2 top-2 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
+      <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-2 bottom-9 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
         <i className="fa-solid fa-bolt" /> Trade
       </button>
     );
     return (
-    <div className="absolute left-2 top-2 z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "rgba(9,12,18,0.90)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
+    <div className="absolute left-2 bottom-9 z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "rgba(9,12,18,0.90)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
       <button onClick={() => place(sym, "SELL")} className="flex flex-col items-center rounded-lg px-4 py-1.5 font-bold transition-opacity hover:opacity-90 active:scale-95" style={{ background: "rgba(224,82,96,0.92)", color: "#fff", minWidth: 72, lineHeight: 1.2 }}>
         <span style={{ fontSize: 13, letterSpacing: "0.02em" }}>Sell</span>
         <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{bid}</span>
@@ -920,43 +920,10 @@ export default function AdminDeskPage() {
               ))}
               <button onClick={() => { const a = symbols.find((s) => openCharts.indexOf(s.symbol) === -1); if (a) addChart(a.symbol); }} className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[var(--muted)]">+</button>
             </div>
-            <div className="ml-auto flex items-center gap-0.5">
-              {/* Drawing tools: H-line + trend line, next to the indicators */}
-              <button onClick={() => setChartTool((t) => t === "hline" ? "none" : "hline")} title="Horizontal line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "hline" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "hline" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "hline" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-minus text-[11px]" /></button>
-              <button onClick={() => setChartTool((t) => t === "trend" ? "none" : "trend")} title="Trend line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "trend" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "trend" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "trend" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-arrow-trend-up text-[11px]" /></button>
-              <button onClick={() => setChartTool((t) => t === "erase" ? "none" : "erase")} title="Erase one (click a line)" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "erase" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "erase" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "erase" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-eraser text-[11px]" /></button>
-              <button onClick={() => setChartClearKey((n) => n + 1)} title="Clear all drawings" className="mr-1 rounded px-1.5 py-0.5 text-[var(--muted)]" style={{ border: "1px solid transparent" }}><i className="fa-solid fa-trash-can text-[11px]" /></button>
-              {(["sma", "ema", "bb", "rsi", "macd", "psar", "cdl", "stoch", "atr", "adx", "sig", "ribbon"] as const).map((k) => (
-                <button key={k} onClick={() => setChartInd((v) => ({ ...v, [k]: !v[k] }))} title={k.toUpperCase()}
-                  className="rounded px-1.5 py-0.5 text-[10px] font-bold"
-                  style={{ background: chartInd[k] ? "rgba(90,169,255,0.18)" : "transparent", color: chartInd[k] ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartInd[k] ? "rgba(90,169,255,0.4)" : "transparent") }}>
-                  {k.toUpperCase()}
-                </button>
-              ))}
-            </div>
-            {/* indicator settings (periods) */}
-            <div className="relative">
-              <button onClick={() => setCfgOpen((o) => !o)} title="Indicator settings" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-gear text-[11px]" /></button>
-              {cfgOpen && (<><div className="fixed inset-0 z-[60]" onClick={() => setCfgOpen(false)} />
-                <div className="ui-pop absolute right-0 z-[70] mt-1 w-56 rounded-lg border p-2.5 text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
-                  <div className="mb-2 font-semibold text-[var(--text)]">Indicator Settings</div>
-                  {([["ma", "MA period (SMA/EMA)"], ["rsi", "RSI period"], ["bb", "Bollinger period"], ["macdF", "MACD fast"], ["macdS", "MACD slow"], ["macdSig", "MACD signal"]] as const).map(([k, lbl]) => (
-                    <div key={k} className="mb-1.5 flex items-center justify-between gap-2">
-                      <span className="text-[var(--muted)]">{lbl}</span>
-                      <input type="number" min={1} value={chartCfg[k]} onChange={(e) => setChartCfg((c: any) => ({ ...c, [k]: Math.max(1, Number(e.target.value) || 1) }))} className="w-14 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-right text-[var(--text)]" />
-                    </div>
-                  ))}
-                  <button onClick={() => setChartCfg({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 })} className="mt-1 w-full rounded border border-[var(--border)] py-1 text-[10px] text-[var(--muted)] hover:bg-[var(--soft)]">Reset to defaults</button>
-                </div></>)}
-            </div>
-            <span className="mx-1 h-3 w-px bg-[var(--border)]" />
-            <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[11px] text-[var(--text)]" style={{ cursor: "pointer" }}>
-              {TFS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
           </div>
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
-              <div key={sym + i} className="relative min-h-0 bg-[var(--bg)]" onClick={() => setActive(i)}>
+              <div key={sym + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
                 
                 {ocStrip(sym)}
                 {(() => { const pos = [

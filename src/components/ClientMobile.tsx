@@ -9,6 +9,7 @@ import { iconForNotification } from "@/lib/notif";
 // Lazy-load the chart lib — it's ~350 kB and only needed on the Chart tab.
 // Loads on first tab open; subsequent visits are instant (module cached).
 const LWChart = dynamic(() => import("@/components/LWChart"), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">Loading chart…</div> });
+const KLineProChart = dynamic(() => import("@/components/KLineProChart"), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">Loading chart…</div> });
 
 const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD@tv-basicstudies"], ["Stoch", "Stochastic@tv-basicstudies"], ["BBands", "BB@tv-basicstudies"], ["MA", "MASimple@tv-basicstudies"], ["ROC", "ROC@tv-basicstudies"]];
 
@@ -680,30 +681,16 @@ export default function ClientMobile({ t }: { t: any }) {
           <div className="fixed inset-0 z-[85] flex flex-col" style={{ background: "var(--bg)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
             <div className="flex items-center gap-2 border-b px-4" style={{ paddingTop: "calc(env(safe-area-inset-top) + 10px)", paddingBottom: 10, borderColor: "var(--border)", background: "var(--panel)" }}>
               <span className="font-bold text-sm">{selSym}</span>
-              <span className="text-[12px] tabular-nums" style={{ color: (price != null && baselineRef.current[selSym] != null && price >= baselineRef.current[selSym]) ? BUY : SELL }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</span>
-              <div className="ml-auto flex items-center gap-2">
-                <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--text)]">
-                  {(TFS || []).map((x: string) => <option key={x} value={x}>{x}</option>)}
-                </select>
-                <button onClick={() => setChartFull(false)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
-                  <i className="fa-solid fa-compress text-[12px]" />
-                </button>
-              </div>
+              <button onClick={() => setChartFull(false)} className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
+                <i className="fa-solid fa-compress text-[12px]" />
+              </button>
             </div>
-            {/* Full TradingView-clone indicator toggles + settings (full-screen only) */}
-            <div className="flex items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5" style={{ scrollbarWidth: "none" }}>
-              <button onClick={() => setCfgSheet(true)} className="sticky left-0 z-10 shrink-0 rounded-md bg-[var(--panel)] px-2 py-1 text-[var(--muted)]" title="Indicator settings"><i className="fa-solid fa-gear text-[11px]" /></button>
-              {(["sig", "ribbon", "ema", "bb", "psar", "cdl", "rsi", "macd", "stoch", "atr", "adx"] as const).map((k) => (
-                <button key={k} onClick={() => t.setChartInd && t.setChartInd((v: any) => ({ ...v, [k]: !v[k] }))} className="shrink-0 rounded-md px-2 py-1 text-[10px] font-bold" style={{ background: t.chartInd?.[k] ? "rgba(47,129,247,0.18)" : "transparent", color: t.chartInd?.[k] ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (t.chartInd?.[k] ? "rgba(47,129,247,0.4)" : "var(--border)") }}>{k === "sig" ? "SIGNALS" : k.toUpperCase()}</button>
-              ))}
-            </div>
-            <div style={{ flex: 1, minHeight: 0 }}>
-              <LWChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={true} ind={t.chartInd} cfg={t.chartCfg}
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+              <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} symbols={symbols}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]}
-                onClose={(id: string) => { if (id.startsWith("pnd-")) { t.cancelPending && t.cancelPending(id.slice(4)); } else close(id); }} />
+                ]} />
             </div>
           </div>
         )}

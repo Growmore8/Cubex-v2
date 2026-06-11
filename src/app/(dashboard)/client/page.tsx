@@ -615,39 +615,7 @@ export default function ClientTerminal() {
         <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
-            <b className="font-medium">{selSym}</b>
-            <div className="ml-auto flex items-center gap-0.5">
-              <button onClick={() => setChartTool((t) => t === "hline" ? "none" : "hline")} title="Horizontal line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "hline" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "hline" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "hline" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-minus text-[11px]" /></button>
-              <button onClick={() => setChartTool((t) => t === "trend" ? "none" : "trend")} title="Trend line" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "trend" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "trend" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "trend" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-arrow-trend-up text-[11px]" /></button>
-              <button onClick={() => setChartTool((t) => t === "erase" ? "none" : "erase")} title="Erase one (click a line)" className="rounded px-1.5 py-0.5" style={{ background: chartTool === "erase" ? "rgba(90,169,255,0.18)" : "transparent", color: chartTool === "erase" ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartTool === "erase" ? "rgba(90,169,255,0.4)" : "transparent") }}><i className="fa-solid fa-eraser text-[11px]" /></button>
-              <button onClick={() => setChartClearKey((n) => n + 1)} title="Clear all drawings" className="mr-1 rounded px-1.5 py-0.5 text-[var(--muted)]"><i className="fa-solid fa-trash-can text-[11px]" /></button>
-              {(["sma", "ema", "bb", "rsi", "macd", "psar", "cdl", "stoch", "atr", "adx", "sig", "ribbon"] as const).map((k) => (
-                <button key={k} onClick={() => setChartInd((v) => ({ ...v, [k]: !v[k] }))} title={k.toUpperCase()}
-                  className="rounded px-1.5 py-0.5 text-[10px] font-bold"
-                  style={{ background: chartInd[k] ? "rgba(90,169,255,0.18)" : "transparent", color: chartInd[k] ? "#5aa9ff" : "var(--muted)", border: "1px solid " + (chartInd[k] ? "rgba(90,169,255,0.4)" : "transparent") }}>
-                  {k.toUpperCase()}
-                </button>
-              ))}
-            </div>
-            <div className="relative">
-              <button onClick={() => setCfgOpen((o) => !o)} title="Indicator settings" className="rounded px-1.5 py-0.5 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-gear text-[11px]" /></button>
-              {cfgOpen && (<><div className="fixed inset-0 z-[60]" onClick={() => setCfgOpen(false)} />
-                <div className="ui-pop absolute right-0 z-[70] mt-1 w-56 rounded-lg border p-2.5 text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
-                  <div className="mb-2 font-semibold text-[var(--text)]">Indicator Settings</div>
-                  {([["ma", "MA period"], ["rsi", "RSI period"], ["bb", "Bollinger period"], ["macdF", "MACD fast"], ["macdS", "MACD slow"], ["macdSig", "MACD signal"]] as const).map(([k, lbl]) => (
-                    <div key={k} className="mb-1.5 flex items-center justify-between gap-2">
-                      <span className="text-[var(--muted)]">{lbl}</span>
-                      <input type="number" min={1} value={chartCfg[k]} onChange={(e) => setChartCfg((c: any) => ({ ...c, [k]: Math.max(1, Number(e.target.value) || 1) }))} className="w-14 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 py-0.5 text-right text-[var(--text)]" />
-                    </div>
-                  ))}
-                  <button onClick={() => setChartCfg({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 })} className="mt-1 w-full rounded border border-[var(--border)] py-1 text-[10px] text-[var(--muted)] hover:bg-[var(--soft)]">Reset to defaults</button>
-                </div></>)}
-            </div>
-            <span className="h-3 w-px bg-[var(--border)]" />
-            <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[10px] text-[var(--text)]" style={{ cursor: "pointer" }}>{TFS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
-          </div>
-          <div className="relative min-h-0 flex-1 bg-[var(--bg)]">{(() => { const pos = [
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">{(() => { const pos = [
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
           ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} />; })()}</div>
@@ -823,9 +791,9 @@ export default function ClientTerminal() {
           )}
           {botTab === "history" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><Sth tbl="chist" k="name" label="Name" /><Sth tbl="chist" k="opened" label="Opened" /><Sth tbl="chist" k="closed" label="Closed" /><Sth tbl="chist" k="qty" label="Qty" align="right" /><Sth tbl="chist" k="open" label="Open" align="right" /><Sth tbl="chist" k="close" label="Close" align="right" /><Sth tbl="chist" k="reason" label="Reason" /><Sth tbl="chist" k="pnl" label="P/L" align="right" /></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><Sth tbl="chist" k="name" label="Name" /><Sth tbl="chist" k="opened" label="Opened" /><Sth tbl="chist" k="closed" label="Closed" /><Sth tbl="chist" k="qty" label="Qty" align="right" /><Sth tbl="chist" k="open" label="Open" align="right" /><Sth tbl="chist" k="close" label="Close" align="right" /><Sth tbl="chist" k="sl" label="SL" align="right" /><Sth tbl="chist" k="tp" label="TP" align="right" /><Sth tbl="chist" k="reason" label="Reason" /><Sth tbl="chist" k="pnl" label="P/L" align="right" /></tr></thead>
               <tbody>
-                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={8}>No history.</td></tr> : sortRows("chist", histShown, { name: (h) => h.symbol, opened: (h) => h.openedAt ? new Date(h.openedAt).getTime() : null, closed: (h) => h.closedAt ? new Date(h.closedAt).getTime() : null, qty: (h) => Number(h.lots), open: (h) => Number(h.openPrice), close: (h) => Number(h.closePrice), reason: (h) => h.closeReason || "MANUAL", pnl: (h) => Number(h.pnl) }).map((h) => {
+                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={10}>No history.</td></tr> : sortRows("chist", histShown, { name: (h) => h.symbol, opened: (h) => h.openedAt ? new Date(h.openedAt).getTime() : null, closed: (h) => h.closedAt ? new Date(h.closedAt).getTime() : null, qty: (h) => Number(h.lots), open: (h) => Number(h.openPrice), close: (h) => Number(h.closePrice), sl: (h) => Number(h.sl), tp: (h) => Number(h.tp), reason: (h) => h.closeReason || "MANUAL", pnl: (h) => Number(h.pnl) }).map((h) => {
                   const r = h.closeReason || "MANUAL";
                   const rc = r === "TP" ? "#10b981" : r === "SL" ? "#f43f5e" : r === "MC" ? "#f59e0b" : "var(--muted)";
                   return (
@@ -836,6 +804,8 @@ export default function ClientTerminal() {
                     <td className="px-2 py-1 text-right">{h.lots}</td>
                     <td className="px-2 py-1 text-right">{h.openPrice.toFixed(dg(h.symbol))}</td>
                     <td className="px-2 py-1 text-right">{h.closePrice.toFixed(dg(h.symbol))}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: h.sl ? "#f43f5e" : "var(--muted)" }}>{h.sl ? Number(h.sl).toFixed(dg(h.symbol)) : "—"}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: h.tp ? "#10b981" : "var(--muted)" }}>{h.tp ? Number(h.tp).toFixed(dg(h.symbol)) : "—"}</td>
                     <td className="px-2 py-1"><span style={{ color: rc, fontWeight: r !== "MANUAL" ? 600 : "normal" }}>{r}</span></td>
                     <td className="px-2 py-1 text-right" style={{ color: h.pnl >= 0 ? BUY : SELL }}>{(h.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(h.pnl))}</td>
                   </tr>); })}
