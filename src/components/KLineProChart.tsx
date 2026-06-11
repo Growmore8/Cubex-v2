@@ -130,6 +130,13 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
           const t = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
           if (last && last.timestamp === t) { last.high = Math.max(last.high, price); last.low = Math.min(last.low, price); last.close = price; }
           else {
+            // Gap-fill any skipped buckets (e.g. the seam between delayed history
+            // and live, or a brief stall) with flat bars so the chart never has
+            // missing minutes / merged tall candles. Capped to avoid huge loops.
+            if (last && t > last.timestamp + sec * 1000) {
+              let ft = last.timestamp + sec * 1000; const c = last.close; let n = 0;
+              while (ft < t && n < 400) { const flat = { timestamp: ft, open: c, high: c, low: c, close: c, volume: 0 }; callback(flat); last = flat; ft += sec * 1000; n++; }
+            }
             // Continuous candles (forex/MT5/TradingView style): a new bar opens at
             // the previous bar's close, so colour reflects the real move, not the
             // gap to the first tick.
