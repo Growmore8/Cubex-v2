@@ -1031,7 +1031,7 @@ export default function ClientMobile({ t }: { t: any }) {
               ) : myReqs.length === 0 ? (
                 <div className="py-3 text-center text-[11px] text-[var(--muted)]">No requests yet.</div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 overflow-y-auto pr-0.5" style={{ maxHeight: 280 }}>
                   {myReqs.map((req: any) => {
                     const isAcc = req.kind === "ACCOUNT";
                     const ic = isAcc ? "fa-circle-plus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";

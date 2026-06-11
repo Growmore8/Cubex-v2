@@ -117,8 +117,12 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         const seed = lastBar[key];
         let last: any = seed && typeof seed.timestamp === "number" ? { ...seed } : null;
         const sock: Socket = io({ path: "/socket.io" });
-        sock.on("tick", ({ symbol: tk, price }: any) => {
-          if (tk !== sym.ticker || price == null) return;
+        sock.on("tick", (msg: any) => {
+          if (msg.symbol !== sym.ticker) return;
+          // Build the candle from the REAL feed price (so candles match the
+          // market); fall back to the display price when no live feed.
+          const price = msg.real != null ? msg.real : msg.price;
+          if (price == null) return;
           const t = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
           if (last && last.timestamp === t) { last.high = Math.max(last.high, price); last.low = Math.min(last.low, price); last.close = price; }
           else { last = { timestamp: t, open: price, high: price, low: price, close: price, volume: 0 }; }
