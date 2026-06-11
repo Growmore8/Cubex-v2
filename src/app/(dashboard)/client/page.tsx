@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
 import LWChart from "@/components/LWChart";
+import KLineChart from "@/components/KLineChart";
 import { playSound, soundForNotification } from "@/lib/sounds";
 import PriceCell from "@/components/PriceCell";
 import toast from "react-hot-toast";
@@ -76,6 +77,9 @@ export default function ClientTerminal() {
   const [mwSearch, setMwSearch] = useState("");
   const [chartTool, setChartTool] = useState<"none" | "hline" | "trend" | "erase">("none");
   const [chartClearKey, setChartClearKey] = useState(0);
+  const [chartEngine, setChartEngine] = useState<"classic" | "kline">("classic");
+  useEffect(() => { try { const e = localStorage.getItem("cubex-chart-engine"); if (e === "kline" || e === "classic") setChartEngine(e); } catch {} }, []);
+  const toggleEngine = () => setChartEngine((v) => { const n = v === "classic" ? "kline" : "classic"; try { localStorage.setItem("cubex-chart-engine", n); } catch {} return n; });
   const [stmtRep, setStmtRep] = useState(false);
   const [repPreset, setRepPreset] = useState("all");
   const [repFrom, setRepFrom] = useState("");
@@ -646,11 +650,15 @@ export default function ClientTerminal() {
             </div>
             <span className="h-3 w-px bg-[var(--border)]" />
             <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[10px] text-[var(--text)]" style={{ cursor: "pointer" }}>{TFS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+            <span className="h-3 w-px bg-[var(--border)]" />
+            <button onClick={toggleEngine} title="Switch chart engine" className="rounded border border-[var(--border)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text)] hover:bg-[var(--soft)]"><i className="fa-solid fa-chart-column mr-1 text-[9px]" style={{ color: "#2f81f7" }} />{chartEngine === "kline" ? "KLine" : "Classic"}</button>
           </div>
-          <div className="relative min-h-0 flex-1 bg-[var(--bg)]"><LWChart symbol={selSym} tf={tf} theme={theme} digits={d} ind={chartInd} cfg={chartCfg} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={[
+          <div className="relative min-h-0 flex-1 bg-[var(--bg)]">{(() => { const pos = [
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-          ]} calcPnl={(p: any, price: number) => pnlOf({ symbol: selSym, type: p.type, openPrice: p.openPrice, lots: p.lots } as any, price, csz(selSym))} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} /></div>
+          ]; return chartEngine === "kline"
+            ? <KLineChart symbol={selSym} tf={tf} theme={theme} digits={d} ind={chartInd} positions={pos} />
+            : <LWChart symbol={selSym} tf={tf} theme={theme} digits={d} ind={chartInd} cfg={chartCfg} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={pos} calcPnl={(p: any, price: number) => pnlOf({ symbol: selSym, type: p.type, openPrice: p.openPrice, lots: p.lots } as any, price, csz(selSym))} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} />; })()}</div>
         </div>
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
