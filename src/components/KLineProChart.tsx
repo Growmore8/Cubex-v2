@@ -9,7 +9,7 @@ import "@klinecharts/pro/dist/klinecharts-pro.css";
 // full screen, VOL + MACD sub-panes. Driven by a Datafeed adapter wired to our
 // own /api/candles history + Socket.IO "tick" stream. Locale forced to en-US.
 
-type Sym = { symbol: string; category?: string; digits?: number };
+type Sym = { symbol: string; category?: string; digits?: number; display?: string };
 
 const PERIODS = [
   { multiplier: 1, timespan: "minute", text: "1m" },
@@ -85,12 +85,16 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     // Datafeed: history from /api/candles, realtime from Socket.IO ticks.
     const datafeed = {
       searchSymbols: async (search?: string) => {
-        const q = (search || "").toUpperCase();
+        const q = (search || "").trim().toUpperCase();
         // Read the CURRENT full symbol list (not the mount-time snapshot), so
         // every symbol is searchable regardless of which one the chart opened on.
         const all = (symbolsRef.current && symbolsRef.current.length) ? symbolsRef.current : list;
-        return all.filter((s) => !q || s.symbol.toUpperCase().includes(q))
-          .map((s) => ({ ticker: s.symbol, shortName: s.symbol, exchange: (s.category || "").toLowerCase(), pricePrecision: (typeof s.digits === "number" ? s.digits : digits), volumePrecision: 0, type: (s.category || "forex").toLowerCase() }));
+        // Incremental filter: matches the typed characters anywhere in the symbol
+        // OR its display name. Narrows further with each character.
+        const hit = all.filter((s) => !q || s.symbol.toUpperCase().includes(q) || String(s.display || "").toUpperCase().includes(q));
+        // Prefix matches first, then alphabetical — so "e" -> EURUSD before XAUEUR.
+        hit.sort((a, b) => { const ap = a.symbol.toUpperCase().startsWith(q) ? 0 : 1, bp = b.symbol.toUpperCase().startsWith(q) ? 0 : 1; return ap !== bp ? ap - bp : a.symbol.localeCompare(b.symbol); });
+        return hit.map((s) => ({ ticker: s.symbol, shortName: s.symbol, exchange: (s.category || "").toLowerCase(), pricePrecision: (typeof s.digits === "number" ? s.digits : digits), volumePrecision: 0, type: (s.category || "forex").toLowerCase() }));
       },
       getHistoryKLineData: async (sym: any, period: any, from: number, to: number) => {
         const key = sym.ticker + "_" + period.text;

@@ -275,6 +275,23 @@ export default function ClientMobile({ t }: { t: any }) {
         ["trades", "fa-right-left", "Trades"], ["history", "fa-clock-rotate-left", "History"], ["profile", "fa-user", "Profile"],
       ];
   useEffect(() => { if (needKyc) setTab("profile"); }, [needKyc]);
+  // Sliding-pill bottom nav: track the active tab icon's box so a single pill
+  // can glide to it.
+  const navRef = useRef<HTMLDivElement | null>(null);
+  const navIconRefs = useRef<Record<string, HTMLSpanElement | null>>({});
+  const [navPill, setNavPill] = useState<{ left: number; top: number; w: number; h: number } | null>(null);
+  const measurePill = () => {
+    const cont = navRef.current; const el = navIconRefs.current[tab];
+    if (!cont || !el) return;
+    const cb = cont.getBoundingClientRect(); const eb = el.getBoundingClientRect();
+    setNavPill({ left: eb.left - cb.left, top: eb.top - cb.top, w: eb.width, h: eb.height });
+  };
+  useEffect(() => { measurePill(); }, [tab, navItems.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const cont = navRef.current; if (!cont || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => measurePill()); ro.observe(cont);
+    return () => ro.disconnect();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // If a tenant has no Crypto category, fall back to the first available tab.
   const catsKey = cats.join(",");
   const didCatInit = useRef(false);
@@ -1174,24 +1191,27 @@ export default function ClientMobile({ t }: { t: any }) {
 
       {/* BOTTOM NAV — premium floating glass bar */}
       <div className="px-3.5 pt-2" style={{ paddingBottom: "max(0.55rem, env(safe-area-inset-bottom))" }}>
-        <div className="glass relative flex items-stretch rounded-[24px] px-1.5 py-1.5"
+        <div ref={navRef} className="glass relative flex items-stretch rounded-[24px] px-1.5 py-1.5"
           style={{
             background: theme === "dark" ? "rgba(20,24,33,0.72)" : "rgba(255,255,255,0.74)",
             boxShadow: theme === "dark"
               ? "0 12px 32px -12px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.10)"
               : "0 12px 30px -14px rgba(15,23,42,0.45), inset 0 1px 0 rgba(255,255,255,0.7)",
           }}>
+          {/* sliding pill — glides to the active tab */}
+          {navPill && (
+            <div aria-hidden style={{
+              position: "absolute", left: navPill.left, top: navPill.top, width: navPill.w, height: navPill.h,
+              borderRadius: 14, background: "linear-gradient(135deg, #3b8bff, #2563eb)",
+              boxShadow: "0 8px 18px -6px rgba(47,129,247,0.65)", zIndex: 0, pointerEvents: "none",
+              transition: "left .42s cubic-bezier(.34,1.5,.5,1), top .3s ease, width .3s ease, height .3s ease",
+            }} />
+          )}
           {navItems.map(([k, icon, label]) => {
             const active = tab === k;
             return (
-              <button key={k} onClick={() => startTransition(() => setTab(k as any))} className="nav-ios-item relative flex flex-1 flex-col items-center justify-center gap-1 py-1">
-                <span className="flex h-9 w-9 items-center justify-center rounded-[14px]"
-                  style={{
-                    background: active ? "linear-gradient(135deg, #3b8bff, #2563eb)" : "transparent",
-                    boxShadow: active ? "0 8px 18px -6px rgba(47,129,247,0.65)" : "none",
-                    transform: active ? "translateY(-2px)" : "none",
-                    transition: "background .3s ease, box-shadow .3s ease, transform .28s cubic-bezier(.34,1.56,.64,1)",
-                  }}>
+              <button key={k} onClick={() => startTransition(() => setTab(k as any))} className="nav-ios-item relative z-10 flex flex-1 flex-col items-center justify-center gap-1 py-1">
+                <span ref={(el) => { navIconRefs.current[k] = el; }} className="flex h-9 w-9 items-center justify-center rounded-[14px]">
                   <i className={`fa-solid ${icon}`} style={{
                     fontSize: active ? 16 : 15,
                     // inactive = outline (transparent fill + muted stroke); active = filled
