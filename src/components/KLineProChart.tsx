@@ -125,7 +125,13 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
           if (price == null) return;
           const t = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
           if (last && last.timestamp === t) { last.high = Math.max(last.high, price); last.low = Math.min(last.low, price); last.close = price; }
-          else { last = { timestamp: t, open: price, high: price, low: price, close: price, volume: 0 }; }
+          else {
+            // Continuous candles (forex/MT5/TradingView style): a new bar opens at
+            // the previous bar's close, so colour reflects the real move, not the
+            // gap to the first tick.
+            const open = last ? last.close : price;
+            last = { timestamp: t, open, high: Math.max(open, price), low: Math.min(open, price), close: price, volume: 0 };
+          }
           callback({ ...last });
         });
         subs[key] = sock;
