@@ -685,7 +685,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 <i className="fa-solid fa-compress text-[12px]" />
               </button>
             </div>
-            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+            <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
               <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} symbols={symbols}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),

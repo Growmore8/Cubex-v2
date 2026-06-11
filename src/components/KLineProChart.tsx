@@ -173,5 +173,8 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     return () => { cancelled = true; };
   }, [positions, symbol]);
 
-  return <div ref={elRef} style={{ width: "100%", height: "100%", overflow: "hidden" }} />;
+  // Absolutely fill the (relative) parent so the widget always matches the
+  // container box and shrinks/grows when panels are dragged — core klinecharts
+  // has its own ResizeObserver, so it re-renders once the box changes.
+  return <div ref={elRef} style={{ position: "absolute", inset: 0, overflow: "hidden" }} />;
 }
