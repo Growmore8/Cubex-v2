@@ -7,7 +7,7 @@ import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds
 import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
 import RequestsPanel from "@/components/RequestsPanel";
-import KLineChart from "@/components/KLineChart";
+import KLineProChart from "@/components/KLineProChart";
 import ManagersModal from "@/components/admin/ManagersModal";
 import PaymentMethodsModal from "@/components/admin/PaymentMethodsModal";
 import DeskMarketWatch from "@/components/DeskMarketWatch";
@@ -969,7 +969,7 @@ export default function AdminDeskPage() {
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]; return chartEngine === "kline"
-                  ? <KLineChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} ind={chartInd} positions={pos} />
+                  ? <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} />
                   : <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} ind={chartInd} cfg={chartCfg} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={pos} calcPnl={(p: any, price: number) => pnlOf({ symbol: sym, type: p.type, openPrice: p.openPrice, lots: p.lots } as any, price, csz(sym))} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} />; })()}
               </div>
             ))}
