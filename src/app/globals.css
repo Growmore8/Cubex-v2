@@ -438,3 +438,8 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
    drawingBarVisible. Content then fills the full height. */
 .kline-bare .klinecharts-pro-period-bar { display: none !important; }
 .kline-bare .klinecharts-pro-content { height: 100% !important; }
+/* Chart background matches the app panels (navigator / toolbox). */
+.klinecharts-pro { --klinecharts-pro-background-color: var(--panel) !important; }
+/* Let the chart canvas own touch gestures (pinch / drag) on mobile, while
+   modals/lists keep normal scrolling. */
+.klinecharts-pro canvas { touch-action: none; }

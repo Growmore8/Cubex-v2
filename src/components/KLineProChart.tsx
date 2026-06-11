@@ -28,6 +28,8 @@ const tfToPeriod = (tf: string) => PERIODS.find((p) => p.text.toUpperCase() === 
 // the x-axis so it always spans the chart. Memoised so it runs a single time.
 let _kcMod: Promise<any> | null = null;
 const loadKc = () => (_kcMod || (_kcMod = import("klinecharts")));
+let _proMod: Promise<any> | null = null;
+const loadPro = () => (_proMod || (_proMod = import("@klinecharts/pro")));
 
 let _ovReg: Promise<void> | null = null;
 function ensureLevelOverlay() {
@@ -82,14 +84,22 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       searchSymbols: async (search?: string) => {
         const q = (search || "").toUpperCase();
         return list.filter((s) => !q || s.symbol.toUpperCase().includes(q))
-          .map((s) => ({ ticker: s.symbol, name: s.symbol, shortName: s.symbol, exchange: s.category || "CubeX", market: "forex", pricePrecision: digits, volumePrecision: 0, priceCurrency: "USD", type: "forex" }));
+          .map((s) => ({ ticker: s.symbol, shortName: s.symbol, exchange: (s.category || "").toLowerCase(), pricePrecision: digits, volumePrecision: 0, type: (s.category || "forex").toLowerCase() }));
       },
       getHistoryKLineData: async (sym: any, period: any, from: number, to: number) => {
+        const key = sym.ticker + "_" + period.text;
+        const ck = "cubex-kl:" + key;
+        // Instant load: serve a fresh (<30s) localStorage cache without the network.
+        try {
+          const c = JSON.parse(localStorage.getItem(ck) || "null");
+          if (c && c.d?.length && Date.now() - c.t < 30000) { lastBar[key] = c.d[c.d.length - 1]; return c.d.filter((d: any) => d.timestamp >= from && d.timestamp <= to); }
+        } catch {}
         try {
           const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}`, { cache: "no-store" }).then((x) => x.json());
           if (!r?.ok || !r.candles?.length) return [];
           const data = r.candles.map((b: any) => ({ timestamp: b.time * 1000, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume ?? 0 }));
-          lastBar[sym.ticker + "_" + period.text] = data[data.length - 1];
+          lastBar[key] = data[data.length - 1];
+          try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), d: data.slice(-400) })); } catch {}
           // honour the requested window so Pro's left-scroll paging terminates cleanly
           return data.filter((d: any) => d.timestamp >= from && d.timestamp <= to);
         } catch { return []; }
@@ -117,7 +127,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     };
     dfRef.current = { subs };
 
-    import("@klinecharts/pro").then(({ KLineChartPro }) => {
+    loadPro().then(({ KLineChartPro }) => {
       if (disposed || !elRef.current) return;
       const first = list.find((s) => s.symbol === symbol) || list[0];
       proRef.current = new KLineChartPro({
@@ -128,7 +138,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         drawingBarVisible: !bare, // preview hides the left drawing rail
         // OHLC shown in a floating box that follows the mouse pointer
         styles: { candle: { tooltip: { showType: "rect", showRule: "follow_cross", rect: { position: "pointer" } } } } as any,
-        symbol: { ticker: first.symbol, name: first.symbol, shortName: first.symbol, pricePrecision: digits, volumePrecision: 0, priceCurrency: "USD", type: "forex" },
+        symbol: { ticker: first.symbol, shortName: first.symbol, pricePrecision: digits, volumePrecision: 0, type: "forex" },
         period: tfToPeriod(tf),
         periods: PERIODS,
         mainIndicators: [], // start clean — user adds indicators via the Indicator menu
@@ -153,7 +163,14 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     if (coreRef.current) return coreRef.current;
     const kc: any = await loadKc();
     const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
-    if (host) { if (!host.id) host.id = host.getAttribute("k-line-chart-id") || ""; try { coreRef.current = kc.init(host); } catch {} }
+    if (host) {
+      if (!host.id) host.id = host.getAttribute("k-line-chart-id") || "";
+      try {
+        coreRef.current = kc.init(host);
+        // make sure dragging (scroll/zoom) + wheel zoom are on for mouse & touch
+        try { coreRef.current?.setScrollEnabled?.(true); coreRef.current?.setZoomEnabled?.(true); } catch {}
+      } catch {}
+    }
     return coreRef.current;
   }, []);
 
