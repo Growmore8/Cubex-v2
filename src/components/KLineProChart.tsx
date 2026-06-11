@@ -46,7 +46,7 @@ function ensureLevelOverlay() {
           const text = overlay.extendData?.text || "";
           return [
             { type: "line", attrs: { coordinates: [{ x: 0, y: c.y }, { x: bounding.width, y: c.y }] }, styles: { color, style: "dashed", size: 1 } },
-            { type: "text", ignoreEvent: true, attrs: { x: 4, y: c.y, text, align: "left", baseline: "middle" }, styles: { color: "#fff", backgroundColor: color, paddingLeft: 4, paddingRight: 4, paddingTop: 1, paddingBottom: 1, borderRadius: 2, size: 10 } },
+            { type: "text", ignoreEvent: true, attrs: { x: bounding.width - 4, y: c.y, text, align: "right", baseline: "middle" }, styles: { color: "#fff", backgroundColor: color, paddingLeft: 4, paddingRight: 4, paddingTop: 1, paddingBottom: 1, borderRadius: 2, size: 10 } },
           ];
         },
       });
