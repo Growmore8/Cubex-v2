@@ -1192,9 +1192,16 @@ export default function ClientMobile({ t }: { t: any }) {
                     transform: active ? "translateY(-2px)" : "none",
                     transition: "background .3s ease, box-shadow .3s ease, transform .28s cubic-bezier(.34,1.56,.64,1)",
                   }}>
-                  <i className={`fa-solid ${icon}`} style={{ fontSize: active ? 16 : 15, color: active ? "#fff" : "var(--muted)", transition: "color .25s ease, font-size .2s ease" }} />
+                  <i className={`fa-solid ${icon}`} style={{
+                    fontSize: active ? 16 : 15,
+                    // inactive = outline (transparent fill + muted stroke); active = filled
+                    color: active ? "#fff" : "transparent",
+                    WebkitTextStroke: active ? "0px transparent" : "1.2px var(--muted)",
+                    transition: "color .25s ease, font-size .2s ease, -webkit-text-stroke .25s ease",
+                    animation: active ? "nav-pop .22s cubic-bezier(.34,1.56,.64,1)" : undefined,
+                  }} />
                 </span>
-                <span className="text-[9px] font-semibold tracking-tight" style={{ color: active ? BLUE : "var(--muted)", transition: "color .25s ease" }}>{label}</span>
+                <span className={"text-[9px] tracking-tight " + (active ? "font-bold" : "font-medium")} style={{ color: active ? BLUE : "var(--muted)", transition: "color .25s ease" }}>{label}</span>
               </button>
             );
           })}

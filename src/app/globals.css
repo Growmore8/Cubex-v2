@@ -443,3 +443,6 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 /* Let the chart canvas own touch gestures (pinch / drag) on mobile, while
    modals/lists keep normal scrolling. */
 .klinecharts-pro canvas { touch-action: none; }
+
+/* Mobile bottom-nav: scale pop when a tab becomes active (overshoot + settle) */
+@keyframes nav-pop { 0% { transform: scale(1); } 45% { transform: scale(1.16); } 70% { transform: scale(0.97); } 100% { transform: scale(1); } }

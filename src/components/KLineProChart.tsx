@@ -9,7 +9,7 @@ import "@klinecharts/pro/dist/klinecharts-pro.css";
 // full screen, VOL + MACD sub-panes. Driven by a Datafeed adapter wired to our
 // own /api/candles history + Socket.IO "tick" stream. Locale forced to en-US.
 
-type Sym = { symbol: string; category?: string };
+type Sym = { symbol: string; category?: string; digits?: number };
 
 const PERIODS = [
   { multiplier: 1, timespan: "minute", text: "1m" },
@@ -90,7 +90,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         // every symbol is searchable regardless of which one the chart opened on.
         const all = (symbolsRef.current && symbolsRef.current.length) ? symbolsRef.current : list;
         return all.filter((s) => !q || s.symbol.toUpperCase().includes(q))
-          .map((s) => ({ ticker: s.symbol, shortName: s.symbol, exchange: (s.category || "").toLowerCase(), pricePrecision: digits, volumePrecision: 0, type: (s.category || "forex").toLowerCase() }));
+          .map((s) => ({ ticker: s.symbol, shortName: s.symbol, exchange: (s.category || "").toLowerCase(), pricePrecision: (typeof s.digits === "number" ? s.digits : digits), volumePrecision: 0, type: (s.category || "forex").toLowerCase() }));
       },
       getHistoryKLineData: async (sym: any, period: any, from: number, to: number) => {
         const key = sym.ticker + "_" + period.text;
