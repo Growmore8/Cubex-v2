@@ -11,7 +11,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await assertCan(s, "closeTrades");
     const b = await req.json().catch(() => ({}));
     const opts = { price: b.price != null ? Number(b.price) : undefined, closedAt: b.closedAt ? new Date(b.closedAt) : undefined };
-    const { pnl } = await forceClose(s, id, opts); // forceClose notifies the client
+    const { pnl } = await forceClose(s, id, opts);
     return NextResponse.json({ ok: true, pnl });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Close failed" }, { status: 400 });
