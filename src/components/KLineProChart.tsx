@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { io, type Socket } from "socket.io-client";
+import type { ChartPosition } from "./LWChart";
 import "@klinecharts/pro/dist/klinecharts-pro.css";
 
 // Full KLineChart Pro widget (MIT) — the packaged pro UI from the reference:
@@ -22,16 +23,18 @@ const periodTf = (p: any) => p.timespan === "minute" ? (p.multiplier === 1 ? "1M
 const periodSec = (p: any) => (p.timespan === "minute" ? 60 : p.timespan === "hour" ? 3600 : 86400) * p.multiplier;
 const tfToPeriod = (tf: string) => PERIODS.find((p) => p.text.toUpperCase() === String(tf).toUpperCase()) || PERIODS[2];
 
-export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols }: {
+export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, positions }: {
   symbol: string;
   tf: string;
   theme: "dark" | "light";
   digits?: number;
   symbols?: Sym[];
+  positions?: ChartPosition[];
 }) {
   const elRef = useRef<HTMLDivElement | null>(null);
   const proRef = useRef<any>(null);
   const dfRef = useRef<any>(null);
+  const overlayIds = useRef<string[]>([]);
 
   // build once
   useEffect(() => {
@@ -108,6 +111,33 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols }
   useEffect(() => { try { proRef.current?.setTheme(theme); } catch {} }, [theme]);
   // follow the app's symbol selection
   useEffect(() => { try { if (proRef.current && symbol) proRef.current.setSymbol({ ticker: symbol, name: symbol, shortName: symbol, pricePrecision: digits, volumePrecision: 0, priceCurrency: "USD", type: "forex" }); } catch {} }, [symbol, digits]);
+
+  // Trade overlays (entry / SL / TP) drawn on Pro's underlying core chart
+  // instance (`_chartApi`) — keeps the full Pro UI but still shows live positions.
+  useEffect(() => {
+    let tries = 0, cancelled = false;
+    const draw = () => {
+      if (cancelled) return;
+      const core = proRef.current?._chartApi;
+      if (!core || typeof core.createOverlay !== "function") { if (tries++ < 50) setTimeout(draw, 120); return; }
+      for (const id of overlayIds.current) { try { core.removeOverlay(id); } catch {} }
+      overlayIds.current = [];
+      const add = (value: number, color: string) => {
+        try {
+          const id = core.createOverlay({ name: "priceLine", points: [{ value }], lock: true, styles: { line: { color, style: "dashed", size: 1 }, text: { color: "#fff", backgroundColor: color } } });
+          if (typeof id === "string") overlayIds.current.push(id);
+        } catch {}
+      };
+      for (const p of positions || []) {
+        const pending = !!p.kind;
+        add(p.openPrice, pending ? "#f59e0b" : (p.type === "BUY" ? "#3b82f6" : "#ef4444"));
+        if (p.sl) add(p.sl, "#f43f5e");
+        if (p.tp) add(p.tp, "#10b981");
+      }
+    };
+    draw();
+    return () => { cancelled = true; };
+  }, [positions, symbol]);
 
   return <div ref={elRef} style={{ width: "100%", height: "100%" }} />;
 }
