@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
-import LWChart from "@/components/LWChart";
 import PriceCell from "@/components/PriceCell";
 import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds";
 import PaymentsPanel from "@/components/PaymentsPanel";
@@ -163,9 +162,6 @@ export default function AdminDeskPage() {
   const [cfgOpen, setCfgOpen] = useState(false);
   const [chartTool, setChartTool] = useState<"none" | "hline" | "trend" | "erase">("none");
   const [chartClearKey, setChartClearKey] = useState(0);
-  const [chartEngine, setChartEngine] = useState<"classic" | "kline">("classic");
-  useEffect(() => { try { const e = localStorage.getItem("cubex-chart-engine"); if (e === "kline" || e === "classic") setChartEngine(e); } catch {} }, []);
-  const toggleEngine = () => setChartEngine((v) => { const n = v === "classic" ? "kline" : "classic"; try { localStorage.setItem("cubex-chart-engine", n); } catch {} return n; });
   const [stmtModal, setStmtModal] = useState(false);
   const [stmtEmailModal, setStmtEmailModal] = useState(false);
   const [stmtPreset, setStmtPreset] = useState("all");
@@ -957,8 +953,6 @@ export default function AdminDeskPage() {
             <select value={tf} onChange={(e) => setTf(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[11px] text-[var(--text)]" style={{ cursor: "pointer" }}>
               {TFS.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
-            <span className="mx-1 h-3 w-px bg-[var(--border)]" />
-            <button onClick={toggleEngine} title="Switch chart engine" className="rounded border border-[var(--border)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text)] hover:bg-[var(--soft)]"><i className="fa-solid fa-chart-column mr-1 text-[10px]" style={{ color: "#2f81f7" }} />{chartEngine === "kline" ? "KLine" : "Classic"}</button>
           </div>
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
@@ -968,9 +962,7 @@ export default function AdminDeskPage() {
                 {(() => { const pos = [
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]; return chartEngine === "kline"
-                  ? <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} />
-                  : <LWChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} ind={chartInd} cfg={chartCfg} tool={chartTool} onTool={setChartTool} clearKey={chartClearKey} positions={pos} calcPnl={(p: any, price: number) => pnlOf({ symbol: sym, type: p.type, openPrice: p.openPrice, lots: p.lots } as any, price, csz(sym))} onClose={(id) => { if (id.startsWith("pnd-")) cancelPending(id.slice(4)); else close(id); }} />; })()}
+                ]; return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} />; })()}
               </div>
             ))}
           </div>
