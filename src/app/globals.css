@@ -433,3 +433,8 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
    container instead, so it resizes correctly when the desk toolbox / panels
    are dragged (otherwise the chart overflows into the panel below). */
 .klinecharts-pro { height: 100% !important; width: 100% !important; }
+/* Bare preview (mobile dashboard): hide the period bar so only candles show;
+   the app's own header provides symbol / timeframe. Drawing rail is hidden via
+   drawingBarVisible. Content then fills the full height. */
+.kline-bare .klinecharts-pro-period-bar { display: none !important; }
+.kline-bare .klinecharts-pro-content { height: 100% !important; }

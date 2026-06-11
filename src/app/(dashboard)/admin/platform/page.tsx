@@ -642,12 +642,12 @@ export default function AdminDeskPage() {
   const shown: { sym: string; i: number }[] = layout === 1 ? (openCharts[activeChart] ? [{ sym: openCharts[activeChart], i: activeChart }] : []) : openCharts.slice(0, layout).map((sym, i) => ({ sym, i }));
   const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const bid = p != null ? (p * 0.9999).toFixed(d) : "..."; const ask = p != null ? (p * 1.0001).toFixed(d) : "...";
     if (!showOC) return (
-      <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-2 top-12 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
+      <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-16 top-12 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
         <i className="fa-solid fa-bolt" /> Trade
       </button>
     );
     return (
-    <div className="absolute left-2 top-12 z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "rgba(9,12,18,0.90)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
+    <div className="absolute left-16 top-12 z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "rgba(9,12,18,0.90)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
       <button onClick={() => place(sym, "SELL")} className="flex flex-col items-center rounded-lg px-4 py-1.5 font-bold transition-opacity hover:opacity-90 active:scale-95" style={{ background: "rgba(224,82,96,0.92)", color: "#fff", minWidth: 72, lineHeight: 1.2 }}>
         <span style={{ fontSize: 13, letterSpacing: "0.02em" }}>Sell</span>
         <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{bid}</span>

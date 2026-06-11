@@ -55,13 +55,14 @@ function ensureLevelOverlay() {
   return _ovReg;
 }
 
-export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, positions }: {
+export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, positions, bare }: {
   symbol: string;
   tf: string;
   theme: "dark" | "light";
   digits?: number;
   symbols?: Sym[];
   positions?: ChartPosition[];
+  bare?: boolean; // hide the period-bar + drawing-rail (preview); chart only
 }) {
   const elRef = useRef<HTMLDivElement | null>(null);
   const proRef = useRef<any>(null);
@@ -124,8 +125,9 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         locale: "en-US",
         timezone: "Etc/UTC", // chart times default to UTC
         theme,
-        // OHLC shown in a floating box that follows the crosshair (mouse)
-        styles: { candle: { tooltip: { showType: "rect", showRule: "follow_cross" } } } as any,
+        drawingBarVisible: !bare, // preview hides the left drawing rail
+        // OHLC shown in a floating box that follows the mouse pointer
+        styles: { candle: { tooltip: { showType: "rect", showRule: "follow_cross", rect: { position: "pointer" } } } } as any,
         symbol: { ticker: first.symbol, name: first.symbol, shortName: first.symbol, pricePrecision: digits, volumePrecision: 0, priceCurrency: "USD", type: "forex" },
         period: tfToPeriod(tf),
         periods: PERIODS,
@@ -211,5 +213,5 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   // Absolutely fill the (relative) parent so the widget always matches the
   // container box and shrinks/grows when panels are dragged — core klinecharts
   // has its own ResizeObserver, so it re-renders once the box changes.
-  return <div ref={elRef} style={{ position: "absolute", inset: 0, overflow: "hidden" }} />;
+  return <div ref={elRef} className={bare ? "kline-bare" : undefined} style={{ position: "absolute", inset: 0, overflow: "hidden" }} />;
 }
