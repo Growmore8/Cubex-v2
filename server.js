@@ -84,6 +84,12 @@ function presenceDisconnect(socket) {
   p.offTimer = setTimeout(() => { presence.delete(uid); presenceMarkOffline(p.info); }, PRESENCE_GRACE_MS);
 }
 const TD_KEY = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
+// EXACT real-time mode (Option C): when a real data feed key is present, show the
+// real ticks AS-IS (no smoothing / synthetic jitter) so prices + candles match
+// the real market (TradingView/MT5). Set REALTIME_EXACT=0 to keep the smoothed
+// look. With no feed key, the platform falls back to the synthetic engine.
+const REAL_EXACT = process.env.REALTIME_EXACT !== "0" && !!TD_KEY;
+const REAL_TTL = 20000; // a fed symbol holds its real price for this long before synthetic fallback
 
 const CANDLE_MS = 5000, HISTORY = 300, MONITOR_MS = 2000;
 const state = {}, meta = {}, feedToSym = {}, tdToSym = {}, fhLast = {};
@@ -162,7 +168,7 @@ function contractFor(cat, sym) {
   return 100000;
 }
 function toTD(sym, cat) {
-  if (cat === "crypto" || sym.endsWith("USDT")) return sym.replace(/USDT$/, "") + "/USD";
+  if (cat === "crypto" || sym.endsWith("USDT")) return sym.replace(/USDT?$/, "") + "/USD";
   if (sym.length === 6 || /^(XAU|XAG|XPT|XPD)/.test(sym)) return sym.slice(0, 3) + "/" + sym.slice(3);
   return sym;
 }
@@ -203,7 +209,9 @@ function applyPrice(sym, price, source) {
   if (source === "TD") fhLast["__td_" + sym] = Date.now();
   const d = meta[sym].digits, p = r(price, d), st = state[sym];
   st.target = p;
-  if (st.price == null) commitPrice(sym, p); // first price for this symbol: show at once
+  st.realAt = Date.now();                 // a real feed price just arrived
+  if (REAL_EXACT) commitPrice(sym, p);     // exact mode: show the real tick right now
+  else if (st.price == null) commitPrice(sym, p); // smoothed mode: only seed the first price
 }
 
 // Commit an actual DISPLAY price: update the forming candle, cache it, broadcast
@@ -331,6 +339,11 @@ function microTick() {
     const st = state[sym];
     if (!st || st.price == null) continue;
     if (!isMarketOpen(sym, meta[sym] && meta[sym].cat)) continue; // market closed → freeze price
+    // Exact real-time mode: a symbol with a fresh real tick holds it (the feed
+    // drives the candle). Don't add synthetic walk/jitter on top, so candles
+    // match the real market. After REAL_TTL of silence, resume synthetic so it
+    // never looks frozen (feed gap / illiquid period).
+    if (REAL_EXACT && st.realAt && Date.now() - st.realAt < REAL_TTL) continue;
     const d = (meta[sym] && meta[sym].digits) || 2;
     const step = Math.pow(10, -d);
     let np;
