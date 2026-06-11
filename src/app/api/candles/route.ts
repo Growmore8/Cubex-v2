@@ -54,6 +54,11 @@ function tdSymbol(sym: string, feed?: string | null): string {
   return s; // stocks/indices as-is
 }
 
+// Short in-memory cache (custom server is long-lived) so symbol switches and
+// multiple users don't refetch the provider every time — much faster loads.
+const candleCache = new Map<string, { t: number; candles: any[]; source?: string }>();
+const CACHE_MS = 20000;
+
 export async function GET(req: Request) {
   const s = await getSession();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
@@ -61,6 +66,10 @@ export async function GET(req: Request) {
   const symbol = url.searchParams.get("symbol") || "";
   const tf = url.searchParams.get("tf") || "1M";
   if (!symbol) return NextResponse.json({ ok: false, error: "symbol required" }, { status: 400 });
+
+  const ckey = symbol + "|" + tf;
+  const hit = candleCache.get(ckey);
+  if (hit && Date.now() - hit.t < CACHE_MS) return NextResponse.json({ ok: true, candles: hit.candles, source: hit.source, cached: true });
 
   let feed: string | null = null;
   try { const gs = await prisma.globalSymbol.findUnique({ where: { symbol } }); feed = gs?.feed || null; } catch {}
@@ -73,13 +82,15 @@ export async function GET(req: Request) {
       fh.sort((a, b) => a.time - b.time);
       const seen = new Set<number>();
       const clean = fh.filter((c) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
+      candleCache.set(ckey, { t: Date.now(), candles: clean, source: "finnhub" });
       return NextResponse.json({ ok: true, candles: clean, source: "finnhub" });
     }
   }
 
   const tdSym = tdSymbol(symbol, feed);
   const interval = INTERVAL[tf] || "1min";
-  const api = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(tdSym)}&interval=${interval}&outputsize=5000&order=ASC&timezone=UTC&format=JSON&apikey=${TD_KEY}`;
+  // ~1500 bars: fast first paint while still giving plenty of scrollback.
+  const api = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(tdSym)}&interval=${interval}&outputsize=1500&order=ASC&timezone=UTC&format=JSON&apikey=${TD_KEY}`;
 
   try {
     const r = await fetch(api, { cache: "no-store" });
@@ -100,6 +111,7 @@ export async function GET(req: Request) {
     candles.sort((a: any, b: any) => a.time - b.time);
     const seen = new Set<number>();
     const clean = candles.filter((c: any) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
+    candleCache.set(ckey, { t: Date.now(), candles: clean });
     return NextResponse.json({ ok: true, candles: clean });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Fetch failed", candles: [] });

@@ -564,6 +564,8 @@ export default function AdminDeskPage() {
 
   function setActive(i: number) { setActiveChart(i); if (openCharts[i]) setSelSym(openCharts[i]); }
   function setTile(sym: string) { setOpenCharts((prev) => { if (prev.length === 0) return [sym]; const n = prev.slice(); n[activeChart] = sym; return n; }); setSelSym(sym); }
+  // User picked a symbol inside a specific chart tile's dropdown → switch that tile.
+  function replaceTile(i: number, sym: string) { setOpenCharts((prev) => { if (!prev.length) return [sym]; if (prev[i] === sym) return prev; const n = prev.slice(); n[i] = sym; return n; }); if (i === activeChart) setSelSym(sym); }
   function addChart(sym: string) { setOpenCharts((prev) => prev.indexOf(sym) !== -1 ? prev : prev.concat([sym])); }
   function removeChart(i: number) { setOpenCharts((prev) => prev.filter((_, j) => j !== i)); setActiveChart((a) => a >= i && a > 0 ? a - 1 : a); }
   function openTicket(sym: string) { setTicket(sym); setTform({ vol: lot, sl: 0, tp: 0, type: "Market", price: 0 }); }
@@ -929,7 +931,7 @@ export default function AdminDeskPage() {
                 {(() => { const pos = [
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]; return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} />; })()}
+                ]; return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
               </div>
             ))}
           </div>
