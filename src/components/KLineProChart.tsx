@@ -45,8 +45,8 @@ function ensureLevelOverlay() {
           const color = overlay.extendData?.color || "#888";
           const text = overlay.extendData?.text || "";
           return [
-            { type: "line", attrs: { coordinates: [{ x: 0, y: c.y }, { x: bounding.width, y: c.y }] }, styles: { color, style: "dashed", size: 1 } },
-            { type: "text", ignoreEvent: true, attrs: { x: bounding.width - 4, y: c.y, text, align: "right", baseline: "middle" }, styles: { color: "#fff", backgroundColor: color, paddingLeft: 4, paddingRight: 4, paddingTop: 1, paddingBottom: 1, borderRadius: 2, size: 10 } },
+            { type: "line", attrs: { coordinates: [{ x: 0, y: c.y }, { x: bounding.width, y: c.y }] }, styles: { color, style: "dashed", size: 1, dashedValue: [4, 3] } },
+            { type: "text", ignoreEvent: true, attrs: { x: bounding.width - 6, y: c.y, text, align: "right", baseline: "middle" }, styles: { color: "#ffffff", backgroundColor: color, borderColor: color, borderSize: 1, paddingLeft: 7, paddingRight: 7, paddingTop: 3, paddingBottom: 3, borderRadius: 4, size: 11, weight: "bold" } },
           ];
         },
       });
@@ -122,7 +122,10 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       proRef.current = new KLineChartPro({
         container: elRef.current,
         locale: "en-US",
+        timezone: "Etc/UTC", // chart times default to UTC
         theme,
+        // OHLC shown in a floating box that follows the crosshair (mouse)
+        styles: { candle: { tooltip: { showType: "rect", showRule: "follow_cross" } } } as any,
         symbol: { ticker: first.symbol, name: first.symbol, shortName: first.symbol, pricePrecision: digits, volumePrecision: 0, priceCurrency: "USD", type: "forex" },
         period: tfToPeriod(tf),
         periods: PERIODS,
