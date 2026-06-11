@@ -429,3 +429,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 /* KLineChart Pro: hide the built-in centre logo watermark */
 .klinecharts-pro-watermark { display: none !important; }
+/* KLineChart Pro ships height:80vh on its root — make it fill our chart
+   container instead, so it resizes correctly when the desk toolbox / panels
+   are dragged (otherwise the chart overflows into the panel below). */
+.klinecharts-pro { height: 100% !important; width: 100% !important; }

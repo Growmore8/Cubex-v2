@@ -151,9 +151,13 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       if (!core || typeof core.createOverlay !== "function") { if (tries++ < 80) setTimeout(draw, 120); return; }
       for (const id of overlayIds.current) { try { core.removeOverlay(id); } catch {} }
       overlayIds.current = [];
+      // anchor to the latest bar's timestamp so klinecharts always resolves a
+      // coordinate (a value-only point can be skipped on some builds)
+      let ts: number | undefined;
+      try { const dl = core.getDataList?.() || []; if (dl.length) ts = dl[dl.length - 1].timestamp; } catch {}
       const add = (value: number, color: string, text: string) => {
         try {
-          const id = core.createOverlay({ name: "cubexLevel", points: [{ value }], lock: true, extendData: { color, text } });
+          const id = core.createOverlay({ name: "cubexLevel", points: [{ timestamp: ts, value }], lock: true, extendData: { color, text } });
           if (typeof id === "string") overlayIds.current.push(id);
         } catch {}
       };
@@ -169,5 +173,5 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     return () => { cancelled = true; };
   }, [positions, symbol]);
 
-  return <div ref={elRef} style={{ width: "100%", height: "100%" }} />;
+  return <div ref={elRef} style={{ width: "100%", height: "100%", overflow: "hidden" }} />;
 }
