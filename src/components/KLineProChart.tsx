@@ -69,7 +69,6 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
 }) {
   const onSymRef = useRef(onSymbolChange); onSymRef.current = onSymbolChange;
   const symbolsRef = useRef(symbols); symbolsRef.current = symbols; // always the current full list
-  const timerRef = useRef<HTMLDivElement | null>(null);
   const elRef = useRef<HTMLDivElement | null>(null);
   const proRef = useRef<any>(null);
   const dfRef = useRef<any>(null);
@@ -224,38 +223,6 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     } catch {}
   }, [symbol, digits]);
 
-  // Candle-close countdown at the last price (TradingView-style "00:33").
-  useEffect(() => {
-    let stop = false;
-    const fmt = (s: number) => { const m = Math.floor(s / 60), ss = s % 60; const p = (n: number) => (n < 10 ? "0" + n : "" + n); return m >= 60 ? p(Math.floor(m / 60)) + ":" + p(m % 60) + ":" + p(ss) : p(m) + ":" + p(ss); };
-    const tick = async () => {
-      if (stop) return;
-      const el = timerRef.current; if (!el) return;
-      const core = await getCore();
-      try {
-        const period = proRef.current?.getPeriod?.() || tfToPeriod(tf);
-        const sec = periodSec(period);
-        const left = sec - (Math.floor(Date.now() / 1000) % sec);
-        el.textContent = fmt(left);
-        const dl = core?.getDataList?.() || [];
-        const last = dl[dl.length - 1];
-        if (core && last) {
-          const px: any = core.convertToPixel({ value: last.close }, { paneId: "candle_pane" });
-          const y = Array.isArray(px) ? px[0]?.y : px?.y;
-          if (typeof y === "number") {
-            // sit just BELOW the current-price label, same colour as it (up=green/down=red)
-            el.style.top = y + 11 + "px";
-            el.style.background = last.close >= last.open ? "#26a69a" : "#ef5350";
-            el.style.visibility = "visible";
-          }
-        }
-      } catch {}
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => { stop = true; clearInterval(id); };
-  }, [getCore, tf]);
-
   // Trade overlays (entry / SL / TP / pending) drawn on the REAL core chart.
   // Pro doesn't expose its chart, but klinecharts tags the chart element with a
   // `k-line-chart-id` attribute and init() is idempotent — so re-init on that
@@ -293,12 +260,5 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   // Absolutely fill the (relative) parent so the widget always matches the
   // container box and shrinks/grows when panels are dragged — core klinecharts
   // has its own ResizeObserver, so it re-renders once the box changes.
-  return (
-    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-      <div ref={elRef} className={bare ? "kline-bare" : undefined} style={{ position: "absolute", inset: 0 }} />
-      {!bare && (
-        <div ref={timerRef} style={{ position: "absolute", right: 0, visibility: "hidden", background: "#26a69a", color: "#fff", fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 2, pointerEvents: "none", zIndex: 5, fontVariantNumeric: "tabular-nums" }} />
-      )}
-    </div>
-  );
+  return <div ref={elRef} className={bare ? "kline-bare" : undefined} style={{ position: "absolute", inset: 0, overflow: "hidden" }} />;
 }
