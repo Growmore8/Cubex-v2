@@ -17,7 +17,7 @@ const webpush = require("web-push");
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "";
-const FINNHUB_KEY = process.env.FINNHUB_KEY || "";
+let FINNHUB_KEY = process.env.FINNHUB_KEY || "";
 
 // ── Realtime presence: derive identity from the session cookie on every socket
 // (all sockets a tab opens carry it). When the LAST socket for a client stays
@@ -83,13 +83,38 @@ function presenceDisconnect(socket) {
   // Last socket gone — wait out the grace window (covers reloads / brief drops).
   p.offTimer = setTimeout(() => { presence.delete(uid); presenceMarkOffline(p.info); }, PRESENCE_GRACE_MS);
 }
-const TD_KEY = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
+let TD_KEY = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
+// Primary feed ("TD" or "FH"). The other feed is a fallback used only when the
+// primary hasn't priced a symbol recently. Configurable from the SuperAdmin UI.
+let PRIMARY = "TD";
 // EXACT real-time mode (Option C): when a real data feed key is present, show the
 // real ticks AS-IS (no smoothing / synthetic jitter) so prices + candles match
 // the real market (TradingView/MT5). Set REALTIME_EXACT=0 to keep the smoothed
 // look. With no feed key, the platform falls back to the synthetic engine.
-const REAL_EXACT = process.env.REALTIME_EXACT !== "0" && !!TD_KEY;
+let REAL_EXACT = process.env.REALTIME_EXACT !== "0" && !!TD_KEY;
 const REAL_TTL = 20000; // a fed symbol holds its real price for this long before synthetic fallback
+function recomputeExact() { REAL_EXACT = process.env.REALTIME_EXACT !== "0" && (!!TD_KEY || !!FINNHUB_KEY); }
+// Load feed keys + primary from the DB (SuperAdmin UI). DB overrides env.
+async function loadFeedConfig() {
+  try {
+    const rec = await prisma.setting.findUnique({ where: { key: "feeds" } });
+    const v = (rec && rec.value) || {};
+    if (typeof v.tdKey === "string" && v.tdKey.trim()) TD_KEY = v.tdKey.trim();
+    if (typeof v.finnhubKey === "string" && v.finnhubKey.trim()) FINNHUB_KEY = v.finnhubKey.trim();
+    if (v.primary === "TD" || v.primary === "FH") PRIMARY = v.primary;
+  } catch (e) { console.error("[feed] config load failed:", e.message); }
+  recomputeExact();
+  console.log("[feed] config:", { td: TD_KEY ? "set" : "none", fh: FINNHUB_KEY ? "set" : "none", primary: PRIMARY, exact: REAL_EXACT });
+}
+// Tear down and re-open both feed sockets with the current keys (after a config change).
+function reconnectFeeds() {
+  try { if (tdWs) { tdWs.removeAllListeners(); tdWs.close(); } } catch (e) {}
+  tdWs = null;
+  try { if (fhWs) { fhWs.removeAllListeners(); fhWs.close(); } } catch (e) {}
+  fhWs = null;
+  connectFinnhub();
+  connectTD();
+}
 
 const CANDLE_MS = 5000, HISTORY = 300, MONITOR_MS = 2000;
 const state = {}, meta = {}, feedToSym = {}, tdToSym = {}, fhLast = {};
@@ -204,9 +229,12 @@ async function loadCatalog() {
 function applyPrice(sym, price, source) {
   if (!state[sym] || !price || isNaN(price) || price <= 0) return;
   if (DERIVED_SET.has(sym)) return; // derived symbols are computed, never fed externally
-  // TwelveData is primary; Finnhub is a fallback only when TD hasn't priced recently.
-  if (source === "FH" && fhLast["__td_" + sym] && Date.now() - fhLast["__td_" + sym] < 12000) return;
-  if (source === "TD") fhLast["__td_" + sym] = Date.now();
+  // Primary feed wins; the other feed is used only when the primary is quiet.
+  const grp = source === "TD" ? "TD" : "FH";          // FH-Q counts as FH
+  const secondary = PRIMARY === "TD" ? "FH" : "TD";
+  const pk = "__prim_" + sym;
+  if (grp === secondary && fhLast[pk] && Date.now() - fhLast[pk] < 12000) return;
+  if (grp === PRIMARY) fhLast[pk] = Date.now();
   const d = meta[sym].digits, p = r(price, d), st = state[sym];
   st.target = p;
   st.realAt = Date.now();                 // a real feed price just arrived
@@ -612,8 +640,11 @@ app.prepare().then(async () => {
   const io = new Server(server, { path: "/socket.io" });
   global.__io = io;
   const sub = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
-  sub.subscribe("cubex:refresh").catch(() => {});
-  sub.on("message", (ch, msg) => { if (ch === "cubex:refresh" && global.__io) { try { global.__io.emit("refresh", JSON.parse(msg)); } catch (e) { global.__io.emit("refresh", {}); } } });
+  sub.subscribe("cubex:refresh", "cubex:feeds").catch(() => {});
+  sub.on("message", (ch, msg) => {
+    if (ch === "cubex:refresh" && global.__io) { try { global.__io.emit("refresh", JSON.parse(msg)); } catch (e) { global.__io.emit("refresh", {}); } }
+    else if (ch === "cubex:feeds") { (async () => { await loadFeedConfig(); reconnectFeeds(); console.log("[feed] reloaded from SuperAdmin"); })().catch((e) => console.error("[feed] reload failed:", e.message)); }
+  });
   io.on("connection", (socket) => {
     const h = {}; for (const s of symbols) h[s] = state[s].candles; socket.emit("history", h);
     // Snapshot of current prices so clients (incl. for FROZEN/closed markets) know the
@@ -629,6 +660,7 @@ app.prepare().then(async () => {
     }
   });
   await seedFromRedis();        // resume last-known prices (survives restarts)
+  await loadFeedConfig();       // keys + primary from SuperAdmin (DB overrides env)
   connectFinnhub();
   connectTD();
   pollPrices();

@@ -8,3 +8,8 @@ function getPub() {
 export function emitRefresh(payload?: any) {
   try { const p = getPub(); if (p) p.publish("cubex:refresh", JSON.stringify(payload || {})); } catch (e) {}
 }
+
+// Tell the price engine (server.js) to reload feed keys/primary and reconnect.
+export function reloadFeeds() {
+  try { const p = getPub(); if (p) p.publish("cubex:feeds", "1"); } catch (e) {}
+}
