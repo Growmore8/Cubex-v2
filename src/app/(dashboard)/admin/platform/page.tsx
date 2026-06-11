@@ -259,7 +259,7 @@ export default function AdminDeskPage() {
       fetch("/api/admin/groups").then((r) => r.json()).catch(() => ({ ok: false })),
     ]);
     if (c.ok) setClients(c.clients);
-    if (sy.ok) { const seen = new Set<string>(); const uniq = (sy.symbols || []).filter((s: any) => { if (seen.has(s.symbol)) return false; seen.add(s.symbol); return true; }); setSymbols(uniq); if (!selSymRef.current && uniq.length) setSelSym(uniq[0].symbol); }
+    if (sy.ok) { const seen = new Set<string>(); const uniq = (sy.symbols || []).filter((s: any) => { if (seen.has(s.symbol)) return false; seen.add(s.symbol); return true; }); setSymbols(uniq); if (!selSymRef.current && uniq.length) setSelSym((uniq.find((s: any) => s.symbol === "BTCUSD") || uniq[0]).symbol); }
     if (o.ok) setOpen(o.trades);
     if (h.ok) setHistory(h.history);
     if (a.ok) setAudit(a.logs);
@@ -305,7 +305,7 @@ export default function AdminDeskPage() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
   }
   useEffect(() => { if (ok) toast(ok, "ok"); }, [ok]);
-  useEffect(() => { if (symbols.length && openCharts.length === 0) { const init = symbols.slice(0, 4).map((s) => s.symbol); setOpenCharts(init); setSelSym(init[0]); } }, [symbols]);
+  useEffect(() => { if (symbols.length && openCharts.length === 0) { const btc = symbols.find((s) => s.symbol === "BTCUSD"); const rest = symbols.filter((s) => s.symbol !== "BTCUSD").slice(0, btc ? 3 : 4).map((s) => s.symbol); const init = btc ? ["BTCUSD", ...rest] : rest; setOpenCharts(init); setSelSym(init[0]); } }, [symbols]);
   // Remember the last market setup (open charts / timeframe / indicators / layout /
   // panels) across refreshes. Restoring openCharts (non-empty) stops the default
   // init effect above from overwriting it.

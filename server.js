@@ -377,30 +377,31 @@ function microTick() {
     if (REAL_EXACT && st.realAt && Date.now() - st.realAt < REAL_TTL) continue;
     const d = (meta[sym] && meta[sym].digits) || 2;
     const step = Math.pow(10, -d);
+    const tgt = st.target != null ? st.target : st.price; // real (or computed) anchor
+    const gapPts = Math.round((tgt - st.price) / step);
+    const ag = Math.abs(gapPts);
     let np;
-    if (st.target != null && st.target !== st.price) {
-      // Walk toward the latest true (or computed) price. Tiny moves crawl ONE
-      // point at a time (smooth last-digit: 4100.31 -> .32 -> .33); larger real
-      // moves catch up proportionally so the price tracks the market without lag;
-      // a huge jump snaps.
-      const gapPts = Math.round((st.target - st.price) / step);
-      const ag = Math.abs(gapPts);
-      const mv = ag <= 4 ? Math.sign(gapPts) : (ag > 400 ? gapPts : Math.sign(gapPts) * Math.ceil(ag / 6));
-      np = r(st.price + mv * step, d);
-    } else if (!DERIVED_SET.has(sym) && (!st.realAt || Date.now() - st.realAt > REAL_TTL)) {
-      // No live feed for this symbol: idle jitter with momentum so the last digit
-      // keeps ticking instead of freezing. Symbols WITH a recent real tick skip
-      // this — they hold the real price and move only on real updates (like
-      // TradingView), so they don't fake-oscillate between two values.
+    if (ag > 3) {
+      // Far from the real price → catch up: small moves crawl, bigger real moves
+      // catch up proportionally (so it tracks the market without lag), huge snaps.
+      const mv = ag > 400 ? gapPts : Math.sign(gapPts) * Math.ceil(ag / 6);
+      np = st.price + mv * step;
+    } else if (!DERIVED_SET.has(sym)) {
+      // Near the real price → WANDER one point each tick with momentum, bounded to
+      // a small band around the real anchor. This keeps the last digit moving every
+      // tick (real-time feel on market watch / chart / P&L) WITHOUT snapping back
+      // into a tight two-value loop. Real feed updates re-anchor `tgt` continuously.
+      const band = step * 3;
       if (st.drift == null) st.drift = Math.random() < 0.5 ? -1 : 1;
-      const rr = Math.random();
-      if (rr < 0.12) st.drift = -st.drift; // reverse direction
-      else if (rr < 0.30) continue;        // pause this tick (no change)
-      np = r(st.price + st.drift * step, d);
+      if (Math.random() < 0.08) st.drift = -st.drift; // occasional reversal (trends)
+      np = st.price + st.drift * step;
+      if (np > tgt + band) { np = tgt + band; st.drift = -1; }
+      else if (np < tgt - band) { np = tgt - band; st.drift = 1; }
     } else {
       continue; // derived symbol caught up: hold until a base moves it again
     }
-    if (np > 0) commitPrice(sym, np);
+    np = r(np, d);
+    if (np > 0 && np !== st.price) commitPrice(sym, np);
   }
 }
 
