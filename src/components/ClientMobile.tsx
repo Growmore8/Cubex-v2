@@ -111,6 +111,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mSl, setMSl] = useState("");
   const [mTp, setMTp] = useState("");
   const [notisOpen, setNotisOpen] = useState(false);
+  const [reqsOpen, setReqsOpen] = useState(false);
   const [cfgSheet, setCfgSheet] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [bioOn, setBioOn] = useState(false);
@@ -127,6 +128,25 @@ export default function ClientMobile({ t }: { t: any }) {
     setMyReqsLoaded(true);
   });
   useEffect(() => { if (tab === "profile" && !myReqsLoaded) loadMyReqs(); }, [tab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  const reqRow = (req: any) => {
+    const isAcc = req.kind === "ACCOUNT";
+    const ic = isAcc ? "fa-circle-plus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";
+    const col = isAcc ? BLUE : req.kind === "DEPOSIT" ? BUY : SELL;
+    return (
+      <div key={req.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] px-3 py-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: col + "26" }}>
+            <i className={"fa-solid text-sm " + ic} style={{ color: col }} />
+          </div>
+          <div>
+            <div className="text-[12px] font-semibold">{isAcc ? <>New {req.type === "DEMO" ? "Demo" : "Live"} Account <span className="font-normal text-[var(--muted)]">{req.currency}</span></> : <>{req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} <span className="font-bold">${Number(req.amount).toFixed(2)}</span></>}</div>
+            <div className="text-[10px] text-[var(--muted)]">{isAcc ? `1:${req.leverage}` : (req.method || "—")} · {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : "—"}</div>
+          </div>
+        </div>
+        <span className="rounded-full px-2.5 py-1 text-[9px] font-bold" style={{ background: req.status === "APPROVED" ? "rgba(22,163,74,0.15)" : req.status === "REJECTED" ? "rgba(220,38,38,0.15)" : "rgba(227,168,85,0.18)", color: req.status === "APPROVED" ? BUY : req.status === "REJECTED" ? SELL : GOLD }}>{req.status}</span>
+      </div>
+    );
+  };
   useEffect(() => { try { setBioOn(localStorage.getItem("cubex-bio") === "1"); } catch {} }, []);
   // Await the enable/disable, THEN read the real subscription state (the old inline
   // handler raced the check before subscribe() finished, so the toggle never flipped).
@@ -400,6 +420,25 @@ export default function ClientMobile({ t }: { t: any }) {
                 );
               })}
             </div>
+          </div>
+        </>
+      )}
+
+      {/* MY REQUESTS — full list bottom sheet (View all) */}
+      {reqsOpen && (
+        <>
+          <div className="fixed inset-0 z-[70]" style={{ background: "rgba(0,0,0,0.5)", animation: "fadeIn 0.2s ease" }} onClick={() => setReqsOpen(false)} />
+          <div className="fixed inset-x-0 bottom-0 z-[80] flex flex-col rounded-t-3xl shadow-2xl" style={{ background: "var(--panel)", maxHeight: "82vh", animation: "slideUp 0.28s cubic-bezier(0.32,0.72,0,1)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+            <div className="flex justify-center pt-3 pb-1"><div className="h-1 w-10 rounded-full" style={{ background: "var(--border)" }} /></div>
+            <div className="flex items-center justify-between px-5 pb-3 pt-1">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: GOLD + "20" }}><i className="fa-solid fa-clock-rotate-left text-sm" style={{ color: GOLD }} /></div>
+                <div><div className="text-[15px] font-bold text-[var(--text)]">My Requests</div><div className="text-[10px]" style={{ color: "var(--muted)" }}>{myReqs.length} total</div></div>
+              </div>
+              <button onClick={() => setReqsOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-base transition-opacity active:opacity-60" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <div className="mx-5 mb-2 h-px" style={{ background: "var(--border)" }} />
+            <div className="space-y-2 overflow-auto px-3 pb-4">{myReqs.map(reqRow)}</div>
           </div>
         </>
       )}
@@ -1030,29 +1069,12 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="py-3 text-center text-[11px] text-[var(--muted)]">Loading…</div>
               ) : myReqs.length === 0 ? (
                 <div className="py-3 text-center text-[11px] text-[var(--muted)]">No requests yet.</div>
-              ) : (
-                <div className="space-y-2 overflow-y-auto pr-0.5" style={{ maxHeight: 280 }}>
-                  {myReqs.map((req: any) => {
-                    const isAcc = req.kind === "ACCOUNT";
-                    const ic = isAcc ? "fa-circle-plus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";
-                    const col = isAcc ? BLUE : req.kind === "DEPOSIT" ? BUY : SELL;
-                    return (
-                      <div key={req.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] px-3 py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: col + "26" }}>
-                            <i className={"fa-solid text-sm " + ic} style={{ color: col }} />
-                          </div>
-                          <div>
-                            <div className="text-[12px] font-semibold">{isAcc ? <>New {req.type === "DEMO" ? "Demo" : "Live"} Account <span className="font-normal text-[var(--muted)]">{req.currency}</span></> : <>{req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} <span className="font-bold">${Number(req.amount).toFixed(2)}</span></>}</div>
-                            <div className="text-[10px] text-[var(--muted)]">{isAcc ? `1:${req.leverage}` : (req.method || "—")} · {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : "—"}</div>
-                          </div>
-                        </div>
-                        <span className="rounded-full px-2.5 py-1 text-[9px] font-bold" style={{ background: req.status === "APPROVED" ? "rgba(22,163,74,0.15)" : req.status === "REJECTED" ? "rgba(220,38,38,0.15)" : "rgba(227,168,85,0.18)", color: req.status === "APPROVED" ? BUY : req.status === "REJECTED" ? SELL : GOLD }}>{req.status}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              ) : (<>
+                <div className="space-y-2">{myReqs.slice(0, 5).map(reqRow)}</div>
+                {myReqs.length > 5 && (
+                  <button onClick={() => setReqsOpen(true)} className="mt-2.5 w-full rounded-xl py-2 text-[12px] font-semibold" style={{ background: "var(--soft)", color: BLUE }}>View all ({myReqs.length})</button>
+                )}
+              </>)}
             </div>
 
             {/* export */}
