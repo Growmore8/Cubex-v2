@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { io, type Socket } from "socket.io-client";
 import type { ChartPosition } from "./LWChart";
 import "@klinecharts/pro/dist/klinecharts-pro.css";
@@ -141,6 +141,31 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reach the REAL core klinecharts chart that Pro draws with — Pro tags its
+  // element with `k-line-chart-id` and init() is idempotent, so re-init returns
+  // the same instance (full API: createOverlay, resize, …).
+  const getCore = useCallback(async () => {
+    if (coreRef.current) return coreRef.current;
+    const kc: any = await loadKc();
+    const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
+    if (host) { if (!host.id) host.id = host.getAttribute("k-line-chart-id") || ""; try { coreRef.current = kc.init(host); } catch {} }
+    return coreRef.current;
+  }, []);
+
+  // Force the core chart to resize whenever our container box changes (panels /
+  // toolbox dragged) — Pro's internal observer doesn't always fire.
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => { getCore().then((c) => { if (c && typeof c.resize === "function") { try { c.resize(); } catch {} } }); });
+    });
+    ro.observe(el);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+  }, [getCore]);
+
   // theme sync (no rebuild)
   useEffect(() => { try { proRef.current?.setTheme(theme); } catch {} }, [theme]);
   // follow the app's symbol selection
@@ -154,12 +179,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     let tries = 0, cancelled = false;
     const draw = async () => {
       if (cancelled) return;
-      let core = coreRef.current;
-      if (!core) {
-        const kc: any = await loadKc();
-        const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
-        if (host) { if (!host.id) host.id = host.getAttribute("k-line-chart-id") || ""; try { core = kc.init(host); coreRef.current = core; } catch {} }
-      }
+      const core = await getCore();
       if (!core || typeof core.createOverlay !== "function") { if (tries++ < 80) setTimeout(draw, 150); return; }
       for (const id of overlayIds.current) { try { core.removeOverlay(id); } catch {} }
       overlayIds.current = [];
@@ -183,7 +203,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     };
     ensureLevelOverlay().then(draw);
     return () => { cancelled = true; };
-  }, [positions, symbol]);
+  }, [positions, symbol, getCore]);
 
   // Absolutely fill the (relative) parent so the widget always matches the
   // container box and shrinks/grows when panels are dragged — core klinecharts
