@@ -925,7 +925,7 @@ export default function AdminDeskPage() {
           </div>
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
-              <div key={sym + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
+              <div key={"tile" + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
                 
                 {ocStrip(sym)}
                 {(() => { const pos = [
