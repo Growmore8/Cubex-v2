@@ -26,9 +26,12 @@ const tfToPeriod = (tf: string) => PERIODS.find((p) => p.text.toUpperCase() === 
 // Register a custom full-width horizontal level overlay (entry / SL / TP /
 // pending) once — draws a coloured dashed line + a label tag, independent of
 // the x-axis so it always spans the chart. Memoised so it runs a single time.
+let _kcMod: Promise<any> | null = null;
+const loadKc = () => (_kcMod || (_kcMod = import("klinecharts")));
+
 let _ovReg: Promise<void> | null = null;
 function ensureLevelOverlay() {
-  if (!_ovReg) _ovReg = import("klinecharts").then((kc: any) => {
+  if (!_ovReg) _ovReg = loadKc().then((kc: any) => {
     try {
       kc.registerOverlay({
         name: "cubexLevel",
@@ -64,6 +67,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   const proRef = useRef<any>(null);
   const dfRef = useRef<any>(null);
   const overlayIds = useRef<string[]>([]);
+  const coreRef = useRef<any>(null); // the REAL core klinecharts chart (reached via re-init)
 
   // build once
   useEffect(() => {
@@ -133,6 +137,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       for (const k of Object.keys(subs)) { try { subs[k].disconnect(); } catch {} }
       try { if (elRef.current) elRef.current.innerHTML = ""; } catch {}
       proRef.current = null;
+      coreRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -141,14 +146,21 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   // follow the app's symbol selection
   useEffect(() => { try { if (proRef.current && symbol) proRef.current.setSymbol({ ticker: symbol, name: symbol, shortName: symbol, pricePrecision: digits, volumePrecision: 0, priceCurrency: "USD", type: "forex" }); } catch {} }, [symbol, digits]);
 
-  // Trade overlays (entry / SL / TP) drawn on Pro's underlying core chart
-  // instance (`_chartApi`) — keeps the full Pro UI but still shows live positions.
+  // Trade overlays (entry / SL / TP / pending) drawn on the REAL core chart.
+  // Pro doesn't expose its chart, but klinecharts tags the chart element with a
+  // `k-line-chart-id` attribute and init() is idempotent — so re-init on that
+  // element returns the existing core instance (full access: createOverlay etc.).
   useEffect(() => {
     let tries = 0, cancelled = false;
-    const draw = () => {
+    const draw = async () => {
       if (cancelled) return;
-      const core = proRef.current?._chartApi;
-      if (!core || typeof core.createOverlay !== "function") { if (tries++ < 80) setTimeout(draw, 120); return; }
+      let core = coreRef.current;
+      if (!core) {
+        const kc: any = await loadKc();
+        const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
+        if (host) { if (!host.id) host.id = host.getAttribute("k-line-chart-id") || ""; try { core = kc.init(host); coreRef.current = core; } catch {} }
+      }
+      if (!core || typeof core.createOverlay !== "function") { if (tries++ < 80) setTimeout(draw, 150); return; }
       for (const id of overlayIds.current) { try { core.removeOverlay(id); } catch {} }
       overlayIds.current = [];
       // anchor to the latest bar's timestamp so klinecharts always resolves a
