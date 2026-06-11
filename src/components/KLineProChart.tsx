@@ -167,8 +167,14 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       if (!host.id) host.id = host.getAttribute("k-line-chart-id") || "";
       try {
         coreRef.current = kc.init(host);
-        // make sure dragging (scroll/zoom) + wheel zoom are on for mouse & touch
-        try { coreRef.current?.setScrollEnabled?.(true); coreRef.current?.setZoomEnabled?.(true); } catch {}
+        // make sure dragging (scroll/zoom) + wheel zoom are on for mouse & touch,
+        // and give candles a roomier default width + right padding (TradingView-like)
+        try {
+          coreRef.current?.setScrollEnabled?.(true);
+          coreRef.current?.setZoomEnabled?.(true);
+          coreRef.current?.setBarSpace?.(9);
+          coreRef.current?.setOffsetRightDistance?.(60);
+        } catch {}
       } catch {}
     }
     return coreRef.current;
