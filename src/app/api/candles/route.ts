@@ -3,16 +3,18 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // Feed keys come from the SuperAdmin Feeds UI (DB), falling back to env.
-async function feedKeys(): Promise<{ td: string; fh: string }> {
+async function feedKeys(): Promise<{ td: string; fh: string; primary: string }> {
   let td = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
   let fh = process.env.FINNHUB_KEY || "";
+  let primary = "TD";
   try {
     const rec = await prisma.setting.findUnique({ where: { key: "feeds" } });
     const v: any = (rec && rec.value) || {};
     if (typeof v.tdKey === "string" && v.tdKey.trim()) td = v.tdKey.trim();
     if (typeof v.finnhubKey === "string" && v.finnhubKey.trim()) fh = v.finnhubKey.trim();
+    if (v.primary === "TD" || v.primary === "FH") primary = v.primary;
   } catch {}
-  return { td, fh };
+  return { td, fh, primary };
 }
 
 const INTERVAL: Record<string, string> = {
@@ -73,47 +75,36 @@ export async function GET(req: Request) {
 
   let feed: string | null = null;
   try { const gs = await prisma.globalSymbol.findUnique({ where: { symbol } }); feed = gs?.feed || null; } catch {}
-  const { td: TD_KEY, fh: FH_KEY } = await feedKeys();
+  const { td: TD_KEY, fh: FH_KEY, primary } = await feedKeys();
 
-  // For symbols on a Finnhub (OANDA) feed, use Finnhub's OHLC first; fall back to TD.
-  if (feed && feed.includes(":")) {
+  const dedupe = (arr: any[]) => { arr.sort((a, b) => a.time - b.time); const seen = new Set<number>(); return arr.filter((c) => isFinite(c.time) && isFinite(c.close) && !seen.has(c.time) && seen.add(c.time)); };
+
+  // Twelve Data time_series (the paid, reliable feed). ~1500 bars = fast paint.
+  const getTD = async (): Promise<any[] | null> => {
+    if (!TD_KEY) return null;
+    const tdSym = tdSymbol(symbol, feed);
+    const interval = INTERVAL[tf] || "1min";
+    const api = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(tdSym)}&interval=${interval}&outputsize=1500&order=ASC&timezone=UTC&format=JSON&apikey=${TD_KEY}`;
+    try {
+      const d = await (await fetch(api, { cache: "no-store" })).json();
+      if (!d || d.status === "error" || !Array.isArray(d.values)) return null;
+      const out = d.values.map((v: any) => { const dt = String(v.datetime); const iso = dt.includes(" ") ? dt.replace(" ", "T") + "Z" : dt + "T00:00:00Z"; return { time: Math.floor(new Date(iso).getTime() / 1000), open: Number(v.open), high: Number(v.high), low: Number(v.low), close: Number(v.close) }; });
+      const clean = dedupe(out);
+      return clean.length ? clean : null;
+    } catch { return null; }
+  };
+  // Finnhub (OANDA) — only when the symbol has a Finnhub feed.
+  const getFH = async (): Promise<any[] | null> => {
+    if (!feed || !feed.includes(":")) return null;
     const fh = await finnhubCandles(feed, tf, FH_KEY);
-    if (fh && fh.length) {
-      fh.sort((a, b) => a.time - b.time);
-      const seen = new Set<number>();
-      const clean = fh.filter((c) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
-      candleCache.set(ckey, { t: Date.now(), candles: clean, source: "finnhub" });
-      return NextResponse.json({ ok: true, candles: clean, source: "finnhub" });
-    }
-  }
+    return fh && fh.length ? dedupe(fh) : null;
+  };
 
-  const tdSym = tdSymbol(symbol, feed);
-  const interval = INTERVAL[tf] || "1min";
-  // ~1500 bars: fast first paint while still giving plenty of scrollback.
-  const api = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(tdSym)}&interval=${interval}&outputsize=1500&order=ASC&timezone=UTC&format=JSON&apikey=${TD_KEY}`;
-
-  try {
-    const r = await fetch(api, { cache: "no-store" });
-    const d = await r.json();
-    if (!d || d.status === "error" || !Array.isArray(d.values)) {
-      return NextResponse.json({ ok: false, error: d?.message || "No data", candles: [] });
-    }
-    // TD returns datetime strings; convert to unix seconds OHLC, ascending
-    const candles = d.values.map((v: any) => {
-      const dt: string = String(v.datetime);
-      const iso = dt.includes(" ") ? dt.replace(" ", "T") + "Z" : dt + "T00:00:00Z"; // date-only for 1day
-      return {
-        time: Math.floor(new Date(iso).getTime() / 1000),
-        open: Number(v.open), high: Number(v.high), low: Number(v.low), close: Number(v.close),
-      };
-    }).filter((c: any) => isFinite(c.time) && isFinite(c.close));
-    // Defensive: ascending + de-duplicated by time (lightweight-charts requires it)
-    candles.sort((a: any, b: any) => a.time - b.time);
-    const seen = new Set<number>();
-    const clean = candles.filter((c: any) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
-    candleCache.set(ckey, { t: Date.now(), candles: clean });
-    return NextResponse.json({ ok: true, candles: clean });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message || "Fetch failed", candles: [] });
+  // Try the configured PRIMARY feed first, the other as fallback.
+  const order = primary === "FH" ? [getFH, getTD] : [getTD, getFH];
+  for (const fn of order) {
+    const candles = await fn();
+    if (candles && candles.length) { candleCache.set(ckey, { t: Date.now(), candles }); return NextResponse.json({ ok: true, candles }); }
   }
+  return NextResponse.json({ ok: false, error: "No data", candles: [] });
 }
