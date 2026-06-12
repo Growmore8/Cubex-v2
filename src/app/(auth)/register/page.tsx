@@ -122,7 +122,7 @@ function RegisterForm() {
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full" style={{ background: "rgba(37,99,235,.12)" }}>
           <i className="fa-solid fa-envelope-open-text text-2xl" style={{ color: "var(--brand-primary)" }} />
         </div>
-        <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Check your email</h1>
+        <h1 className="text-xl font-bold tracking-tight" style={{ color: "var(--foreground)" }}>Check your email</h1>
         <p className="mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
           We sent a 6-digit code to <strong>{verifyEmail}</strong>. Enter it below to activate your account.
         </p>
@@ -153,8 +153,8 @@ function RegisterForm() {
   return (
     <form onSubmit={submit} className="auth-stagger space-y-4">
       <div>
-        <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Create account</h1>
-        <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Choose an account type to get started</p>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--foreground)" }}>Create account</h1>
+        <p className="mt-1 text-[13px]" style={{ color: "var(--muted-foreground)" }}>Choose an account type to get started</p>
       </div>
 
       {/* Segmented Demo / Live toggle with a sliding highlight */}

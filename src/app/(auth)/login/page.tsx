@@ -84,8 +84,8 @@ export default function LoginPage() {
   return (
     <form onSubmit={submit} className="auth-stagger space-y-3">
       <div>
-        <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Welcome back</h1>
-        <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Sign in to your trading account</p>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--foreground)" }}>Welcome back</h1>
+        <p className="mt-1 text-[13px]" style={{ color: "var(--muted-foreground)" }}>Sign in to access your trading account</p>
       </div>
 
       {notice && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{notice}</p>}
