@@ -29,8 +29,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (b.primaryColor) data.primaryColor = b.primaryColor;
       if (b.accentColor) data.accentColor = b.accentColor;
       if (b.smtpEmail !== undefined) data.smtpEmail = b.smtpEmail || null;
-      if (b.smtpPassword !== undefined) data.smtpPassword = b.smtpPassword || null;
+      // Blank password = KEEP the current one (the form shows "leave blank to keep
+      // current"); only overwrite when a new password is actually typed.
+      if (b.smtpPassword) data.smtpPassword = b.smtpPassword;
       if (b.smtpHost !== undefined) data.smtpHost = b.smtpHost || null;
+      if (b.allowRegistration !== undefined) data.allowRegistration = !!b.allowRegistration;
       await prisma.tenant.update({ where: { id: t.id }, data });
       // Plan can also be changed here; seats follow the (live) package limit.
       if (b.plan) {
