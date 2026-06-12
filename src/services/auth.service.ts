@@ -208,7 +208,14 @@ export async function sendForgotPassword(host: string | null, email: string): Pr
   if (!user) return;
   const token = makeCode() + makeCode(); // 12-digit reset token
   await (prisma.user.update as any)({ where: { id: user.id }, data: { emailToken: "reset:" + token } });
-  const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || `https://${tenant.subdomain}.cubexenterprises.com`}/reset-password?email=${encodeURIComponent(lowerEmail)}&token=${token}`;
+  // Build the link from the domain the user is actually on (request host), then
+  // the tenant's custom domain — so every tenant's reset email points back to a
+  // real, working domain instead of the placeholder *.cubexenterprises.com.
+  const hostBase = host ? host.replace(/^https?:\/\//, "").replace(/\/+$/, "") : "";
+  const base = process.env.NEXT_PUBLIC_APP_URL
+    || (hostBase ? `https://${hostBase}` : "")
+    || (tenant.customDomain ? `https://${tenant.customDomain}` : `https://${tenant.subdomain}.cubexenterprises.com`);
+  const resetLink = `${base}/reset-password?email=${encodeURIComponent(lowerEmail)}&token=${token}`;
   const brand: BrandInfo = { brandName: tenant.brandName || tenant.name, primaryColor: tenant.primaryColor, accentColor: tenant.accentColor, logoUrl: tenant.logoUrl };
   await sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
     to: lowerEmail,
