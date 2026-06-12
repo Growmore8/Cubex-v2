@@ -113,7 +113,7 @@ export async function createTenant(input: {
 
 export function updateTenant(id: string, data: {
   name?: string; brandName?: string; logoUrl?: string; primaryColor?: string; accentColor?: string;
-  supportEmail?: string; status?: any; customDomain?: string | null;
+  supportEmail?: string; status?: any; customDomain?: string | null; allowRegistration?: boolean;
 }) {
   return prisma.tenant.update({ where: { id }, data });
 }

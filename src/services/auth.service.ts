@@ -114,6 +114,7 @@ export async function registerClient(
     });
   }
   if (!tenant) throw new Error("Registration is only available on a brand site");
+  if ((tenant as any).allowRegistration === false) throw new Error("Registration is currently disabled for this broker.");
 
   const lowerEmail = email.toLowerCase();
   name = titleCaseName(name); // store the submitted name capitalised

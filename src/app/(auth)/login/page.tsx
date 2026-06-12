@@ -13,6 +13,11 @@ export default function LoginPage() {
   const [pinMode, setPinMode] = useState(false);
   const [pin, setPin] = useState("");
   const [pinBusy, setPinBusy] = useState(false);
+  const [canRegister, setCanRegister] = useState(false); // tenant login + registration enabled
+
+  useEffect(() => {
+    fetch("/api/public/brand").then((r) => r.json()).then((d) => { if (d.ok) setCanRegister(!!d.tenantId && !!d.allowRegistration); }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const reason = new URLSearchParams(window.location.search).get("reason");
@@ -157,14 +162,16 @@ export default function LoginPage() {
         </div>
       )}
 
-      <div className="space-y-1 pt-1 text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
-        <div>New here?{" "}
-          <a href="/register?type=DEMO" className="font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}><i className="fa-solid fa-circle-play mr-1 text-[10px]" />Open Demo Account</a>
+      {canRegister && (
+        <div className="space-y-1 pt-1 text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
+          <div>New here?{" "}
+            <a href="/register?type=DEMO" className="font-semibold hover:underline" style={{ color: "var(--brand-primary)" }}><i className="fa-solid fa-circle-play mr-1 text-[10px]" />Open Demo Account</a>
+          </div>
+          <div>Ready to trade?{" "}
+            <a href="/register?type=LIVE" className="font-semibold hover:underline" style={{ color: "var(--brand-accent)" }}><i className="fa-solid fa-bolt mr-1 text-[10px]" />Open Live Account</a>
+          </div>
         </div>
-        <div>Ready to trade?{" "}
-          <a href="/register?type=LIVE" className="font-semibold hover:underline" style={{ color: "var(--brand-accent)" }}><i className="fa-solid fa-bolt mr-1 text-[10px]" />Open Live Account</a>
-        </div>
-      </div>
+      )}
     </form>
   );
 }

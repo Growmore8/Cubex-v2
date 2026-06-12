@@ -11,9 +11,11 @@ export interface Brand {
   logoUrl: string | null;
   faviconUrl: string | null;
   tenantId: string | null;
+  allowRegistration: boolean;
 }
 
-const DEFAULT_BRAND: Brand = { name: process.env.APP_NAME || "Cubex", slogan: null, companyInfo: null, supportEmail: null, primaryColor: "#2563eb", accentColor: "#22c55e", logoUrl: null, faviconUrl: null, tenantId: null };
+// No tenant (SuperAdmin / apex) → never offer client registration.
+const DEFAULT_BRAND: Brand = { name: process.env.APP_NAME || "Cubex", slogan: null, companyInfo: null, supportEmail: null, primaryColor: "#2563eb", accentColor: "#22c55e", logoUrl: null, faviconUrl: null, tenantId: null, allowRegistration: false };
 
 export async function getBrand(): Promise<Brand> {
   // Branding must never crash a page: if the DB is unreachable or not yet migrated,
@@ -32,6 +34,7 @@ export async function getBrand(): Promise<Brand> {
       logoUrl: tenant.logoUrl,
       faviconUrl: (tenant as any).faviconUrl || null,
       tenantId: tenant.id,
+      allowRegistration: (tenant as any).allowRegistration !== false,
     };
   } catch (e) {
     console.error("[brand] failed to resolve tenant brand:", (e as any)?.message);

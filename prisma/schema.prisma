@@ -26,6 +26,7 @@ model Tenant {
   smtpPassword String?
   smtpHost     String? // explicit SMTP server (e.g. mail.privateemail.com); blank = auto-detect from email domain
   permissions  Json          @default("{}")
+  allowRegistration Boolean   @default(true) // show the client Register link on this tenant's login
   subscription Subscription?
   invoices     Invoice[]
   users        User[]

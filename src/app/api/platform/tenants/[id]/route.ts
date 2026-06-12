@@ -17,6 +17,7 @@ const patchSchema = z.object({
   supportEmail: z.string().optional(),
   status: z.enum(["ACTIVE", "SUSPENDED", "PENDING"]).optional(),
   customDomain: z.string().nullable().optional(),
+  allowRegistration: z.boolean().optional(),
   subscription: z.object({
     plan: z.enum(["STARTER", "PRO", "ENTERPRISE"]).optional(),
     status: z.enum(["TRIALING", "ACTIVE", "PAST_DUE", "CANCELED"]).optional(),

@@ -102,6 +102,7 @@ export default function SATenantsPage() {
       plan: t.subscription?.plan || "STARTER",
       smtpEmail: t.smtpEmail || "", smtpPassword: "", smtpHost: t.smtpHost || "",
       contactName: t.contactName || "", contactPhone: t.contactPhone || "",
+      allowRegistration: t.allowRegistration !== false,
     });
     setEditFor(t);
   }
@@ -442,6 +443,10 @@ export default function SATenantsPage() {
               </div>
               <div><label className="text-xs text-gray-500 block mb-1">Primary Color</label><div className="flex gap-2"><input type="color" className="rounded border h-9 w-12 cursor-pointer" value={editForm.primaryColor} onChange={(e) => setEditForm({ ...editForm, primaryColor: e.target.value })} /><input className={inp} value={editForm.primaryColor} onChange={(e) => setEditForm({ ...editForm, primaryColor: e.target.value })} /></div></div>
               <div><label className="text-xs text-gray-500 block mb-1">Accent Color</label><div className="flex gap-2"><input type="color" className="rounded border h-9 w-12 cursor-pointer" value={editForm.accentColor} onChange={(e) => setEditForm({ ...editForm, accentColor: e.target.value })} /><input className={inp} value={editForm.accentColor} onChange={(e) => setEditForm({ ...editForm, accentColor: e.target.value })} /></div></div>
+              <label className="col-span-2 mt-1 flex cursor-pointer select-none items-center gap-2 text-sm">
+                <input type="checkbox" className="h-4 w-4" checked={editForm.allowRegistration !== false} onChange={(e) => setEditForm({ ...editForm, allowRegistration: e.target.checked })} />
+                <span>Allow client self-registration <span className="text-gray-400">(shows the Open Account / Register link on this tenant's login)</span></span>
+              </label>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setEditFor(null)}>Cancel</button>
