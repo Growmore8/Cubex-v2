@@ -11,6 +11,7 @@ model Tenant {
   slug         String        @unique
   subdomain    String        @unique
   customDomain String?       @unique
+  websiteUrl   String? // marketing site for the "Back to website" link on login
   status       TenantStatus  @default(ACTIVE)
   brandName    String?
   slogan       String? // tagline shown under the brand name on login/register

@@ -14,9 +14,10 @@ export default function LoginPage() {
   const [pin, setPin] = useState("");
   const [pinBusy, setPinBusy] = useState(false);
   const [canRegister, setCanRegister] = useState(false); // tenant login + registration enabled
+  const [siteUrl, setSiteUrl] = useState(""); // tenant marketing site for "Back to website"
 
   useEffect(() => {
-    fetch("/api/public/brand").then((r) => r.json()).then((d) => { if (d.ok) setCanRegister(!!d.tenantId && !!d.allowRegistration); }).catch(() => {});
+    fetch("/api/public/brand").then((r) => r.json()).then((d) => { if (d.ok) { setCanRegister(!!d.tenantId && !!d.allowRegistration); setSiteUrl(d.websiteUrl || ""); } }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -170,6 +171,14 @@ export default function LoginPage() {
           <div>Ready to trade?{" "}
             <a href="/register?type=LIVE" className="font-semibold hover:underline" style={{ color: "var(--brand-accent)" }}><i className="fa-solid fa-bolt mr-1 text-[10px]" />Open Live Account</a>
           </div>
+        </div>
+      )}
+
+      {siteUrl && (
+        <div className="pt-1 text-center">
+          <a href={siteUrl} className="text-xs font-medium hover:underline" style={{ color: "var(--muted-foreground)" }}>
+            <i className="fa-solid fa-arrow-left mr-1 text-[10px]" />Back to website
+          </a>
         </div>
       )}
     </form>

@@ -20,6 +20,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (b.brandName !== undefined) data.brandName = b.brandName || null;
       if (b.subdomain) data.subdomain = b.subdomain.toLowerCase();
       if (b.customDomain !== undefined) data.customDomain = b.customDomain || null;
+      if (b.websiteUrl !== undefined) data.websiteUrl = b.websiteUrl || null;
       if (b.supportEmail !== undefined) data.supportEmail = b.supportEmail || null;
       if (b.slogan !== undefined) data.slogan = b.slogan || null;
       if (b.companyInfo !== undefined) data.companyInfo = b.companyInfo || null;

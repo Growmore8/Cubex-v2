@@ -12,10 +12,19 @@ export interface Brand {
   faviconUrl: string | null;
   tenantId: string | null;
   allowRegistration: boolean;
+  websiteUrl: string | null;
 }
 
 // No tenant (SuperAdmin / apex) → never offer client registration.
-const DEFAULT_BRAND: Brand = { name: process.env.APP_NAME || "Cubex", slogan: null, companyInfo: null, supportEmail: null, primaryColor: "#2563eb", accentColor: "#22c55e", logoUrl: null, faviconUrl: null, tenantId: null, allowRegistration: false };
+const DEFAULT_BRAND: Brand = { name: process.env.APP_NAME || "Cubex", slogan: null, companyInfo: null, supportEmail: null, primaryColor: "#2563eb", accentColor: "#22c55e", logoUrl: null, faviconUrl: null, tenantId: null, allowRegistration: false, websiteUrl: null };
+
+// Normalise an explicit website URL, or derive the marketing site from the
+// platform domain (trades.brand.com -> https://brand.com) as a fallback.
+function siteFor(websiteUrl: string | null | undefined, customDomain: string | null | undefined): string | null {
+  if (websiteUrl && websiteUrl.trim()) { const u = websiteUrl.trim(); return /^https?:\/\//.test(u) ? u : `https://${u}`; }
+  if (customDomain) { const parts = customDomain.split("."); const apex = parts.length > 2 ? parts.slice(1).join(".") : customDomain; return `https://${apex}`; }
+  return null;
+}
 
 export async function getBrand(): Promise<Brand> {
   // Branding must never crash a page: if the DB is unreachable or not yet migrated,
@@ -35,6 +44,7 @@ export async function getBrand(): Promise<Brand> {
       faviconUrl: (tenant as any).faviconUrl || null,
       tenantId: tenant.id,
       allowRegistration: (tenant as any).allowRegistration !== false,
+      websiteUrl: siteFor((tenant as any).websiteUrl, tenant.customDomain),
     };
   } catch (e) {
     console.error("[brand] failed to resolve tenant brand:", (e as any)?.message);

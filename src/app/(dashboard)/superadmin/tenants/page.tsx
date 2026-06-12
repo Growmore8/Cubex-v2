@@ -96,7 +96,7 @@ export default function SATenantsPage() {
   function openEdit(t: any) {
     setEditForm({
       name: t.name || "", brandName: t.brandName || "", subdomain: t.subdomain || "",
-      customDomain: t.customDomain || "", supportEmail: t.supportEmail || "",
+      customDomain: t.customDomain || "", websiteUrl: t.websiteUrl || "", supportEmail: t.supportEmail || "",
       slogan: t.slogan || "", companyInfo: t.companyInfo || "", logoUrl: t.logoUrl || "",
       primaryColor: t.primaryColor || "#2563eb", accentColor: t.accentColor || "#22c55e",
       plan: t.subscription?.plan || "STARTER",
@@ -426,6 +426,7 @@ export default function SATenantsPage() {
               <div><label className="text-xs text-gray-500 block mb-1">Brand Name</label><input className={inp} value={editForm.brandName} onChange={(e) => setEditForm({ ...editForm, brandName: e.target.value })} /></div>
               <div><label className="text-xs text-gray-500 block mb-1">Subdomain *</label><input className={inp} value={editForm.subdomain} onChange={(e) => setEditForm({ ...editForm, subdomain: e.target.value })} /></div>
               <div><label className="text-xs text-gray-500 block mb-1">Custom Domain</label><input className={inp} placeholder="e.g. trade.acme.com" value={editForm.customDomain} onChange={(e) => setEditForm({ ...editForm, customDomain: e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\s/g, "") })} /></div>
+              <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Website URL <span className="text-gray-400">(for the "Back to website" link — blank = use the domain)</span></label><input className={inp} placeholder="https://acme.com" value={editForm.websiteUrl} onChange={(e) => setEditForm({ ...editForm, websiteUrl: e.target.value })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Plan (sets the account limit)</label><select className={inp} value={editForm.plan} onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}>{PLAN_KEYS.map((k) => <option key={k} value={k}>{pkgs[k]?.name || PACKAGES[k].name} — up to {seatsOf(k)} accounts (${pkgs[k]?.price ?? PACKAGES[k].price}/mo)</option>)}</select></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Contact Email <span className="text-gray-400">(private — not shown publicly)</span></label><input className={inp} type="email" value={editForm.supportEmail} onChange={(e) => setEditForm({ ...editForm, supportEmail: e.target.value })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Logo</label><LogoField value={editForm.logoUrl} which="edit" /></div>
