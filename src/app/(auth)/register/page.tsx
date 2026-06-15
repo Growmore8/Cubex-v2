@@ -45,6 +45,7 @@ function RegisterForm() {
   const [country, setCountry] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
+  const [existing, setExisting] = useState(false); // email already a client -> offer Sign in
   const [loading, setLoading] = useState(false);
 
   // Email verification state
@@ -63,6 +64,7 @@ function RegisterForm() {
     e.preventDefault();
     setLoading(true);
     setErr("");
+    setExisting(false);
     const dc = DIAL_CODES.find((d) => d.code === dialCode);
     const fullPhone = phone ? (dc ? dc.dial + phone : phone) : undefined;
     const r = await fetch("/api/auth/register", {
@@ -78,7 +80,7 @@ function RegisterForm() {
     });
     const d = await r.json();
     setLoading(false);
-    if (!d.ok) { setErr(d.error || "Registration failed"); return; }
+    if (!d.ok) { setErr(d.error || "Registration failed"); if (d.existing) setExisting(true); return; }
     if (d.needsVerification) {
       setVerifyEmail(d.email);
       setResendIn(120); // a code was just sent — start the 2-min resend cooldown
@@ -176,7 +178,21 @@ function RegisterForm() {
         ))}
       </div>
 
-      {err && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</p>}
+      {err && !existing && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</p>}
+
+      {existing && (
+        <div className="space-y-2 rounded-xl border px-3 py-3 text-sm" style={{ borderColor: "var(--border)", background: "var(--secondary)" }}>
+          <p style={{ color: "var(--foreground)" }}>
+            <i className="fa-solid fa-circle-info mr-1.5" style={{ color: "var(--brand-primary)" }} />
+            You already have an account with this email. Sign in to open an additional Demo or Live account from your dashboard.
+          </p>
+          <a href="/login"
+            style={{ background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))` }}
+            className="auth-btn flex w-full items-center justify-center gap-2 rounded-xl py-2 text-sm font-semibold text-white">
+            Sign in <i className="fa-solid fa-arrow-right text-xs" />
+          </a>
+        </div>
+      )}
 
       <div className="relative">
         <i className="fa-solid fa-user pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }} />

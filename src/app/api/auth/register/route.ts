@@ -37,6 +37,8 @@ export async function POST(req: Request) {
     });
     return res;
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message || "Registration failed" }, { status: 400 });
+    // existing=true lets the register page offer a "Sign in" CTA instead of a
+    // confusing dead-end when the email already belongs to a client.
+    return NextResponse.json({ ok: false, error: e.message || "Registration failed", existing: e?.code === "EMAIL_EXISTS" }, { status: 400 });
   }
 }

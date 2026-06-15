@@ -128,7 +128,15 @@ export async function registerClient(
 
   const session = await prisma.$transaction(async (tx) => {
     const exists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail, role: "CLIENT" } });
-    if (exists) throw new Error("Email already registered");
+    if (exists) {
+      // The email is already a client identity. Self-signup creates a NEW identity,
+      // so we can't reuse it here — but the client CAN open an additional account
+      // (demo/live) from their dashboard once signed in. Tag the error so the
+      // register page can offer a "Sign in" CTA instead of a dead-end.
+      const e: any = new Error("You already have an account with this email. Please sign in — you can open a Demo or Live account from your dashboard.");
+      e.code = "EMAIL_EXISTS";
+      throw e;
+    }
     // One identity per person: an email used by a staff member can't also be a client.
     const staffExists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail, role: { in: ["ADMIN", "MANAGER"] } } });
     if (staffExists) throw new Error("This email is already in use. Please use a different email.");
