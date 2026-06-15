@@ -24,6 +24,7 @@ const NAV: Item[] = [
   { href: "/superadmin/payments", label: "Payment Methods", icon: "fa-credit-card", sub: true },
   { section: "Settings", href: "/superadmin/platform", label: "Platform Control", icon: "fa-lock", sub: true },
   { href: "/superadmin/feeds", label: "Market Data Feeds", icon: "fa-satellite-dish", sub: true },
+  { href: "/superadmin/api-keys", label: "API Keys", icon: "fa-key", sub: true },
   { href: "/superadmin/audit", label: "Audit Log", icon: "fa-clipboard-list", sub: true },
   { href: "/superadmin/notify", label: "Send Notification", icon: "fa-paper-plane", sub: true },
   { href: "/superadmin/settings", label: "SA Settings", icon: "fa-sliders", sub: true },

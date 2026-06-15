@@ -287,6 +287,21 @@ model Setting {
   value     Json     @default("{}")
   updatedAt DateTime @updatedAt
 }
+
+// Server-to-server API key for external integrations (e.g. a tenant's website
+// pulling a pool account's P&L). Scoped to ONE tenant. We store only the sha256
+// hash of the secret + a short prefix for display — the raw key is shown once.
+model ApiKey {
+  id         String    @id @default(uuid())
+  tenantId   String
+  label      String
+  keyHash    String    @unique
+  prefix     String
+  active     Boolean   @default(true)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  @@index([tenantId])
+}
 model CryptoWallet {
   id        String   @id @default(uuid())
   // null = global default created by SuperAdmin, available to every tenant.
