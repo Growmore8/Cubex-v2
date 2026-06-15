@@ -18,7 +18,7 @@ export default function CountrySelect({ value, onChange, className = "", style, 
   const code = codeForCountry(value);
   const list = COUNTRIES.filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()));
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className={"relative" + (open ? " z-[300]" : "")}>
       <button type="button" onClick={() => setOpen((o) => !o)} className={className + " flex w-full items-center gap-2 text-left"} style={style}>
         {code && <img src={flagUrl(code)} alt="" className="h-[14px] w-[19px] shrink-0 rounded-sm object-cover" />}
         <span className={value ? "truncate" : "truncate text-gray-400"}>{value || placeholder}</span>
