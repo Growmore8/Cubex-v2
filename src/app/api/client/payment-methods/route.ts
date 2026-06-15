@@ -24,6 +24,10 @@ export async function GET() {
   const crypto = all.filter((w) => w.type === "CRYPTO").map((w) => ({ id: w.id, network: w.network, asset: w.asset, address: w.address }));
   const upi = all.filter((w) => w.type === "UPI").map((w) => ({ id: w.id, label: w.label || "UPI", address: w.address }));
   const links = all.filter((w) => w.type === "LINK" && w.url).map((w) => ({ id: w.id, label: w.label || "Local Payment", url: w.url }));
+  const bank = all.filter((w) => w.type === "BANK").map((w) => {
+    const d: any = (w.details as any) || {};
+    return { id: w.id, accountNumber: d.accountNumber || w.address || "", accountName: d.accountName || "", bankName: d.bankName || w.label || "", ifsc: d.ifsc || "" };
+  });
 
   // legacy single Xynder setting -> surface as a link if no LINK methods configured
   const setting = await prisma.setting.findUnique({ where: { key: "payments" } }).catch(() => null);
@@ -35,6 +39,7 @@ export async function GET() {
     wallets: crypto, // back-compat
     crypto,
     upi,
+    bank,
     links,
     xynder: { url: links[0]?.url || "", active: links.length > 0 }, // back-compat
   });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
+import { buildWalletData, assertWalletValid } from "@/lib/paymentMethod";
 
 async function allowed(tenantId: string): Promise<boolean> {
   const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { permissions: true } });
@@ -23,25 +24,15 @@ export async function POST(req: Request) {
   try {
     if (!(await allowed(s.tenantId!))) throw new Error("Your plan does not allow adding payment methods");
     const b = await req.json();
-    const type = (b.type || "CRYPTO").toUpperCase();
-    const data = {
-      type,
-      network: type === "CRYPTO" ? (b.network || "BEP20") : "",
-      asset: b.asset || "USDT",
-      address: b.address || "",
-      label: b.label || null,
-      url: b.url || null,
-      active: b.active !== false,
-    };
+    const data = buildWalletData(b);
     if (b.action === "add") {
-      if (type === "CRYPTO" && !data.address) throw new Error("Address required");
-      if (type === "UPI" && !data.address) throw new Error("UPI id required");
-      if (type === "LINK" && !data.url) throw new Error("Link URL required");
+      assertWalletValid(data);
       await prisma.cryptoWallet.create({ data: { ...data, tenantId: s.tenantId! } });
     } else if (b.action === "update") {
       // scope the update to this tenant so an admin can't touch globals/other tenants
       const existing = await prisma.cryptoWallet.findUnique({ where: { id: b.id } });
       if (!existing || existing.tenantId !== s.tenantId) throw new Error("Not found");
+      assertWalletValid(data);
       await prisma.cryptoWallet.update({ where: { id: b.id }, data });
     } else if (b.action === "delete") {
       const existing = await prisma.cryptoWallet.findUnique({ where: { id: b.id } });

@@ -12,6 +12,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const [tab, setTab] = useState<"deposit" | "withdraw" | "kyc">(initialTab);
   const [crypto, setCrypto] = useState<any[]>([]);
   const [upi, setUpi] = useState<any[]>([]);
+  const [bank, setBank] = useState<any[]>([]);
   const [links, setLinks] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
@@ -25,7 +26,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const [sending, setSending] = useState(false);
 
   // Deposit: which method is open (null = list view)
-  const [depSel, setDepSel] = useState<{ kind: "crypto" | "upi"; id: string } | null>(null);
+  const [depSel, setDepSel] = useState<{ kind: "crypto" | "upi" | "bank"; id: string } | null>(null);
   const [dAmount, setDAmount] = useState("");
 
   // Withdraw: inline destination
@@ -41,7 +42,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
       fetch("/api/client/kyc").then((r) => r.json()).catch(() => ({})),
       fetch("/api/client/account" + (accountId ? "?accountId=" + encodeURIComponent(accountId) : "")).then((r) => r.json()).catch(() => ({})),
     ]);
-    if (pm.ok) { setCrypto(pm.crypto || pm.wallets || []); setUpi(pm.upi || []); setLinks(pm.links || []); }
+    if (pm.ok) { setCrypto(pm.crypto || pm.wallets || []); setUpi(pm.upi || []); setBank(pm.bank || []); setLinks(pm.links || []); }
     if (k.ok) setDocs(k.docs || []);
     if (ac.ok && ac.account) {
       setWithdrawable(typeof ac.withdrawable === "number" ? ac.withdrawable : Math.max(0, Number(ac.account.pnl || 0)));
@@ -55,15 +56,17 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const netColor = (n: string) => /BEP/i.test(n) ? "#f0b90b" : /ERC/i.test(n) ? "#627eea" : /TRC/i.test(n) ? "#ef4444" : "#3b82f6";
   const depWallet = depSel?.kind === "crypto" ? crypto.find((w) => w.id === depSel.id) : null;
   const depUpi = depSel?.kind === "upi" ? upi.find((u) => u.id === depSel.id) : null;
+  const depBank = depSel?.kind === "bank" ? bank.find((b) => b.id === depSel.id) : null;
+  const copy = (text: string, what: string) => { navigator.clipboard.writeText(text); setMsg(what + " copied"); };
 
   async function submitDeposit(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setMsg("");
     const amt = Number(dAmount); if (!(amt > 0)) { setErr("Enter an amount"); return; }
     const fd = new FormData(e.target as HTMLFormElement);
     fd.set("kind", "DEPOSIT"); fd.set("amount", String(amt));
-    const label = depWallet ? (depWallet.asset + " " + depWallet.network) : depUpi ? ("UPI " + (depUpi.label || "")) : "Crypto";
+    const label = depWallet ? (depWallet.asset + " " + depWallet.network) : depUpi ? ("UPI " + (depUpi.label || "")) : depBank ? "Bank Transfer" : "Crypto";
     fd.set("method", label);
-    const dest = depWallet ? (depWallet.network + " " + depWallet.address) : depUpi ? depUpi.address : "";
+    const dest = depWallet ? (depWallet.network + " " + depWallet.address) : depUpi ? depUpi.address : depBank ? `${depBank.bankName} A/C ${depBank.accountNumber}${depBank.ifsc ? " IFSC " + depBank.ifsc : ""}` : "";
     if (!(fd.get("note") as string)) fd.set("note", "Deposit to " + dest);
     setSending(true);
     const r = await fetch("/api/client/payments", { method: "POST", body: fd });
@@ -147,6 +150,16 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
           <div className="font-semibold">{depUpi.label || "UPI"}</div>
           <div><div className={lbl}>UPI ID</div><div className="flex items-center gap-2"><code className="min-w-0 flex-1 break-all rounded-lg bg-[var(--soft)] px-2 py-1.5 text-xs">{depUpi.address}</code><button type="button" className="ui-btn ui-btn-primary px-2.5 py-1.5" onClick={() => { navigator.clipboard.writeText(depUpi.address); setMsg("UPI id copied"); }}><i className="fa-solid fa-copy" /></button></div></div>
         </>)}
+        {depBank && (<>
+          <div className="flex items-center gap-2"><span className="rounded bg-indigo-500 px-2 py-0.5 text-[10px] font-bold text-white">BANK</span><span className="font-semibold">{depBank.bankName}</span></div>
+          <div><div className={lbl}>Account Number</div><div className="flex items-center gap-2"><code className="min-w-0 flex-1 break-all rounded-lg bg-[var(--soft)] px-2 py-1.5 text-xs">{depBank.accountNumber}</code><button type="button" className="ui-btn ui-btn-primary px-2.5 py-1.5" onClick={() => copy(depBank.accountNumber, "Account number")}><i className="fa-solid fa-copy" /></button></div></div>
+          {depBank.accountName && <div><div className={lbl}>Account Name</div><div className="rounded-lg bg-[var(--soft)] px-2 py-1.5 text-xs">{depBank.accountName}</div></div>}
+          <div className="grid grid-cols-2 gap-3">
+            <div><div className={lbl}>Bank Name</div><div className="rounded-lg bg-[var(--soft)] px-2 py-1.5 text-xs">{depBank.bankName}</div></div>
+            {depBank.ifsc && <div><div className={lbl}>IFSC Code</div><div className="flex items-center gap-2"><code className="min-w-0 flex-1 break-all rounded-lg bg-[var(--soft)] px-2 py-1.5 text-xs">{depBank.ifsc}</code><button type="button" className="ui-btn ui-btn-primary px-2.5 py-1.5" onClick={() => copy(depBank.ifsc, "IFSC code")}><i className="fa-solid fa-copy" /></button></div></div>}
+          </div>
+          <div className="text-[11px] font-medium" style={{ color: "#f0b829" }}>Transfer to the account above, then enter the amount and upload your slip.</div>
+        </>)}
         <div className="grid grid-cols-2 gap-3">
           <div><div className={lbl}>Amount (USD)</div><input className={input} type="number" step="0.01" value={dAmount} onChange={(e) => setDAmount(e.target.value)} placeholder="0.00" required /></div>
           <div><div className={lbl}>Slip (image or PDF)</div><input className={input} type="file" name="file" accept="image/*,application/pdf" /></div>
@@ -156,9 +169,10 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
       </form>
     ) : (
       <div className="ui-card ui-fade-up space-y-3 p-4">
-        {crypto.length === 0 && upi.length === 0 && links.length === 0 ? <p className="text-sm text-[var(--muted)]">No payment methods configured yet. Please contact support.</p> : (<>
+        {crypto.length === 0 && upi.length === 0 && bank.length === 0 && links.length === 0 ? <p className="text-sm text-[var(--muted)]">No payment methods configured yet. Please contact support.</p> : (<>
           {crypto.length > 0 && (<><div className={lbl}>Crypto (USDT)</div><div className="space-y-2">{crypto.map((w) => methodRow(w.id, netBadge(w.network), w.asset, w.address, () => { setDepSel({ kind: "crypto", id: w.id }); setMsg(""); setErr(""); }))}</div></>)}
           {upi.length > 0 && (<><div className={lbl}>UPI</div><div className="space-y-2">{upi.map((u) => methodRow(u.id, <span className="rounded bg-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white">UPI</span>, u.label || "UPI", u.address, () => { setDepSel({ kind: "upi", id: u.id }); setMsg(""); setErr(""); }))}</div></>)}
+          {bank.length > 0 && (<><div className={lbl}>Bank Transfer</div><div className="space-y-2">{bank.map((b) => methodRow(b.id, <span className="rounded bg-indigo-500 px-2 py-0.5 text-[10px] font-bold text-white">BANK</span>, b.bankName || "Bank Transfer", "A/C " + b.accountNumber, () => { setDepSel({ kind: "bank", id: b.id }); setMsg(""); setErr(""); }))}</div></>)}
           {links.length > 0 && (<><div className={lbl}>Local Payment</div><div className="space-y-2">{links.map((l) => (<a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="ui-transition flex w-full items-center gap-3 rounded-xl border p-3 hover:bg-[var(--soft)]" style={{ borderColor: "var(--border)", background: "var(--card)" }}><span className="rounded bg-blue-500 px-2 py-0.5 text-[10px] font-bold text-white">{(l.label || "Pay").split(" ")[0]}</span><div className="flex-1 text-sm font-semibold">{l.label}</div><i className="fa-solid fa-chevron-right text-[var(--muted)]" /></a>))}</div></>)}
         </>)}
       </div>

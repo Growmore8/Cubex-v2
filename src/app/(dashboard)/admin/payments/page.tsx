@@ -44,16 +44,25 @@ export default function AdminPaymentsPage() {
   }
   function saveMethod() {
     const e = edit; if (!e) return;
+    if (e.type === "BANK") {
+      const bk = e.bank || {};
+      if (!bk.accountNumber || !bk.accountName || !bk.bankName) { setErr("Account number, account name and bank name are required"); return; }
+      const payload = { type: "BANK", bank: bk, active: e.active !== false };
+      postMethod(e.id ? { ...payload, action: "update", id: e.id } : { ...payload, action: "add" }, () => setEdit(null));
+      return;
+    }
     if (e.type === "CRYPTO" && !e.address) { setErr("Address required"); return; }
     if (e.type === "UPI" && !e.address) { setErr("UPI id required"); return; }
     if (e.type === "LINK" && !e.url) { setErr("Link URL required"); return; }
     const payload = { type: e.type, network: e.network, asset: e.asset, address: e.address, label: e.label, url: e.url, active: e.active !== false };
     postMethod(e.id ? { ...payload, action: "update", id: e.id } : { ...payload, action: "add" }, () => setEdit(null));
   }
+  const openEdit = (w: any) => setEdit(w.type === "BANK" ? { ...w, bank: { ...(w.details || {}) } } : { ...w });
   function newMethod(type: string) {
     setEdit(type === "CRYPTO" ? { type, network: "BEP20", asset: "USDT", address: "", active: true }
       : type === "UPI" ? { type, asset: "UPI", address: "", label: "", active: true }
-        : { type, label: "Local Payment", url: "", active: true });
+        : type === "BANK" ? { type, bank: { accountNumber: "", accountName: "", bankName: "", ifsc: "" }, active: true }
+          : { type, label: "Local Payment", url: "", active: true });
   }
 
   const badge = (s: string) => "rounded px-2 py-0.5 text-xs " + (s === "APPROVED" ? "bg-green-100 text-green-700" : s === "REJECTED" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700");
@@ -67,7 +76,7 @@ export default function AdminPaymentsPage() {
       <div className="flex-1 min-w-0"><div className="text-sm font-medium">{w.label || w.asset}</div><div className="break-all text-xs text-gray-400">{w.type === "LINK" ? w.url : w.address}</div></div>
       {readOnly ? <span className="text-xs text-gray-400">Global</span> : (<>
         <span className="text-xs" style={{ color: w.active ? "#16a34a" : "#94a3b8" }}>{w.active ? "Active" : "Off"}</span>
-        <button title="Edit" className="ui-btn ui-btn-ghost mx-0.5 px-2 py-1" style={{ color: "var(--accent2)" }} onClick={() => setEdit({ ...w })}><i className="fa-solid fa-pen"></i></button>
+        <button title="Edit" className="ui-btn ui-btn-ghost mx-0.5 px-2 py-1" style={{ color: "var(--accent2)" }} onClick={() => openEdit(w)}><i className="fa-solid fa-pen"></i></button>
         <button title="Delete" className="ui-btn ui-btn-ghost mx-0.5 px-2 py-1" style={{ color: "#b91c1c" }} onClick={() => setConfirmDel(w)}><i className="fa-solid fa-trash"></i></button>
       </>)}
     </div>);
@@ -112,6 +121,7 @@ export default function AdminPaymentsPage() {
             <div className="flex gap-1">
               <button className="ui-btn ui-btn-primary px-2.5 py-1.5 text-xs" onClick={() => newMethod("CRYPTO")}>+ Crypto</button>
               <button className="ui-btn px-2.5 py-1.5 text-xs" onClick={() => newMethod("UPI")}>+ UPI</button>
+              <button className="ui-btn px-2.5 py-1.5 text-xs" onClick={() => newMethod("BANK")}>+ Bank</button>
               <button className="ui-btn px-2.5 py-1.5 text-xs" onClick={() => newMethod("LINK")}>+ Local Link</button>
             </div>
           </div>
@@ -129,8 +139,14 @@ export default function AdminPaymentsPage() {
       {/* Edit modal */}
       {edit && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
         <div className="ui-card ui-pop w-[420px] p-4" onClick={(e) => e.stopPropagation()}>
-          <div className="mb-2 text-sm font-semibold">{edit.id ? "Edit" : "Add"} {edit.type === "CRYPTO" ? "Crypto Wallet" : edit.type === "UPI" ? "UPI" : "Local Link"}</div>
+          <div className="mb-2 text-sm font-semibold">{edit.id ? "Edit" : "Add"} {edit.type === "CRYPTO" ? "Crypto Wallet" : edit.type === "UPI" ? "UPI" : edit.type === "BANK" ? "Bank Transfer" : "Local Link"}</div>
           <div className="space-y-2">
+            {edit.type === "BANK" && (<>
+              <input className={inp + " w-full"} placeholder="Account number" value={edit.bank?.accountNumber || ""} onChange={(e) => setEdit({ ...edit, bank: { ...edit.bank, accountNumber: e.target.value } })} />
+              <input className={inp + " w-full"} placeholder="Account name" value={edit.bank?.accountName || ""} onChange={(e) => setEdit({ ...edit, bank: { ...edit.bank, accountName: e.target.value } })} />
+              <input className={inp + " w-full"} placeholder="Bank name" value={edit.bank?.bankName || ""} onChange={(e) => setEdit({ ...edit, bank: { ...edit.bank, bankName: e.target.value } })} />
+              <input className={inp + " w-full"} placeholder="IFSC code" value={edit.bank?.ifsc || ""} onChange={(e) => setEdit({ ...edit, bank: { ...edit.bank, ifsc: e.target.value.toUpperCase() } })} />
+            </>)}
             {edit.type === "CRYPTO" && (<>
               <select className={inp + " w-full"} value={edit.network} onChange={(e) => setEdit({ ...edit, network: e.target.value })}>{NETS.map((n) => <option key={n}>{n}</option>)}</select>
               <input className={inp + " w-full"} placeholder="Asset (e.g. USDT)" value={edit.asset || ""} onChange={(e) => setEdit({ ...edit, asset: e.target.value })} />

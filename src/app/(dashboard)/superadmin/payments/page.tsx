@@ -30,12 +30,21 @@ export default function SAPayments() {
   function save() {
     const e = edit;
     if (!e) return;
+    if (e.type === "BANK") {
+      const bk = e.bank || {};
+      if (!bk.accountNumber || !bk.accountName || !bk.bankName) { setErr("Account number, account name and bank name are required"); return; }
+      const payload = { kind: "wallet", scope, type: "BANK", bank: bk, active: e.active !== false };
+      post(e.id ? { ...payload, action: "update", id: e.id } : { ...payload, action: "add" }, () => setEdit(null));
+      return;
+    }
     if (e.type === "CRYPTO" && !e.address) { setErr("Address required"); return; }
     if (e.type === "UPI" && !e.address) { setErr("UPI id required"); return; }
     if (e.type === "LINK" && !e.url) { setErr("Link URL required"); return; }
     const payload = { kind: "wallet", scope, type: e.type, network: e.network, asset: e.asset, address: e.address, label: e.label, url: e.url, active: e.active !== false };
     post(e.id ? { ...payload, action: "update", id: e.id } : { ...payload, action: "add" }, () => setEdit(null));
   }
+  // Existing BANK rows store fields in details — surface them as edit.bank for the form.
+  const openEdit = (w: any) => setEdit(w.type === "BANK" ? { ...w, bank: { ...(w.details || {}) } } : { ...w });
   async function togglePerm(t: Tenant, allow: boolean) {
     await post({ kind: "perm", tenantId: t.id, allow });
     setTenants((prev) => prev.map((x) => (x.id === t.id ? { ...x, ownPaymentMethods: allow } : x)));
@@ -48,7 +57,8 @@ export default function SAPayments() {
   function newMethod(type: string) {
     setEdit(type === "CRYPTO" ? { type, network: "BEP20", asset: "USDT", address: "", active: true }
       : type === "UPI" ? { type, asset: "UPI", address: "", label: "", active: true }
-        : { type, label: "Local Payment", url: "", active: true });
+        : type === "BANK" ? { type, bank: { accountNumber: "", accountName: "", bankName: "", ifsc: "" }, active: true }
+          : { type, label: "Local Payment", url: "", active: true });
   }
 
   return (<div className="max-w-5xl space-y-4 ui-fade-up">
@@ -72,6 +82,7 @@ export default function SAPayments() {
         <div className="flex gap-1">
           <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#2563eb", borderColor: "transparent" }} onClick={() => newMethod("CRYPTO")}>+ Crypto</button>
           <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#0891b2", borderColor: "transparent" }} onClick={() => newMethod("UPI")}>+ UPI</button>
+          <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#4f46e5", borderColor: "transparent" }} onClick={() => newMethod("BANK")}>+ Bank</button>
           <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#d97706", borderColor: "transparent" }} onClick={() => newMethod("LINK")}>+ Local Link</button>
         </div>
       </div>
@@ -83,7 +94,7 @@ export default function SAPayments() {
             <div className="break-all text-xs text-gray-400">{w.type === "LINK" ? w.url : w.address}</div>
           </div>
           <span className="text-xs" style={{ color: w.active ? "#16a34a" : "#94a3b8" }}>{w.active ? "Active" : "Off"}</span>
-          <button title="Edit" className="mx-0.5 rounded px-2 py-1" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent2)" }} onClick={() => setEdit({ ...w })}><i className="fa-solid fa-pen"></i></button>
+          <button title="Edit" className="mx-0.5 rounded px-2 py-1" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent2)" }} onClick={() => openEdit(w)}><i className="fa-solid fa-pen"></i></button>
           <button title="Delete" className="mx-0.5 rounded px-2 py-1" style={{ background: "color-mix(in srgb, var(--red) 16%, transparent)", color: "#b91c1c" }} onClick={() => setConfirmDel(w)}><i className="fa-solid fa-trash"></i></button>
         </div>); })}
         {wallets.length === 0 && <div className="text-sm text-gray-400">No methods for this scope yet.</div>}
@@ -106,8 +117,14 @@ export default function SAPayments() {
     {/* Edit modal */}
     {edit && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
       <div className="ui-card ui-pop w-[420px] bg-white p-4" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-2 text-sm font-semibold">{edit.id ? "Edit" : "Add"} {edit.type === "CRYPTO" ? "Crypto Wallet" : edit.type === "UPI" ? "UPI" : "Local Link"} — {scopeName}</div>
+        <div className="mb-2 text-sm font-semibold">{edit.id ? "Edit" : "Add"} {edit.type === "CRYPTO" ? "Crypto Wallet" : edit.type === "UPI" ? "UPI" : edit.type === "BANK" ? "Bank Transfer" : "Local Link"} — {scopeName}</div>
         <div className="space-y-2">
+          {edit.type === "BANK" && (<>
+            <input className={inp + " w-full"} placeholder="Account number" value={edit.bank?.accountNumber || ""} onChange={(e) => setEdit({ ...edit, bank: { ...edit.bank, accountNumber: e.target.value } })} />
+            <input className={inp + " w-full"} placeholder="Account name" value={edit.bank?.accountName || ""} onChange={(e) => setEdit({ ...edit, bank: { ...edit.bank, accountName: e.target.value } })} />
+            <input className={inp + " w-full"} placeholder="Bank name" value={edit.bank?.bankName || ""} onChange={(e) => setEdit({ ...edit, bank: { ...edit.bank, bankName: e.target.value } })} />
+            <input className={inp + " w-full"} placeholder="IFSC code" value={edit.bank?.ifsc || ""} onChange={(e) => setEdit({ ...edit, bank: { ...edit.bank, ifsc: e.target.value.toUpperCase() } })} />
+          </>)}
           {edit.type === "CRYPTO" && (<>
             <select className={inp + " w-full"} value={edit.network} onChange={(e) => setEdit({ ...edit, network: e.target.value })}>{NETS.map((n) => <option key={n}>{n}</option>)}</select>
             <input className={inp + " w-full"} placeholder="Asset (e.g. USDT)" value={edit.asset || ""} onChange={(e) => setEdit({ ...edit, asset: e.target.value })} />

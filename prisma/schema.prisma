@@ -292,12 +292,13 @@ model CryptoWallet {
   // null = global default created by SuperAdmin, available to every tenant.
   // set   = belongs to a specific tenant (added by SA per-tenant or by tenant admin).
   tenantId  String?
-  type      String   @default("CRYPTO") // CRYPTO | UPI | LINK
+  type      String   @default("CRYPTO") // CRYPTO | UPI | LINK | BANK
   network   String   @default("") // crypto: BEP20 / ERC20 / TRC20
   asset     String   @default("USDT")
-  address   String   @default("") // crypto address or UPI id
-  label     String? // display name (e.g. "Local Pay", "GPay UPI")
+  address   String   @default("") // crypto address / UPI id / bank account number
+  label     String? // display name (e.g. "Local Pay", "GPay UPI", bank name)
   url       String? // for LINK type (local payment partner)
+  details   Json? // BANK: { accountNumber, accountName, bankName, ifsc }
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   @@index([tenantId])
