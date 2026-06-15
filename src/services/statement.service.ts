@@ -5,10 +5,13 @@ import { statementEmail, type BrandInfo, type StatementSummary } from "@/lib/ema
 import { codeForCountry } from "@/config/countries";
 import { pnlFor } from "@/lib/trademath";
 import { runningContext } from "@/lib/livePrices";
+import { gprice } from "@/lib/format";
 
 function money(n: number): string {
   return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+// Grouped price keeping natural decimals; "—" for 0/empty.
+function px(v: unknown): string { const n = Number(v); return n ? gprice(n) : "—"; }
 function dt(d: Date | null | undefined): string {
   return d ? new Date(d).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 }
@@ -188,7 +191,7 @@ export function buildStatementPdf(data: StatementData, periodLabel: string): Pro
         account.trades.map((o) => {
           const cur = prices[o.symbol];
           const pl = runPnlOf(o);
-          return [o.ticket.toString(), o.symbol, o.type, Number(o.lots).toFixed(2), String(Number(o.openPrice)), cur != null ? String(cur) : "—", Number(o.sl) ? String(Number(o.sl)) : "—", Number(o.tp) ? String(Number(o.tp)) : "—", pl != null ? money(pl) : "—", dt(o.openedAt)];
+          return [o.ticket.toString(), o.symbol, o.type, Number(o.lots).toFixed(2), px(o.openPrice), cur != null ? gprice(cur) : "—", px(o.sl), px(o.tp), pl != null ? money(pl) : "—", dt(o.openedAt)];
         }),
         "No open trades.",
       );
@@ -196,7 +199,7 @@ export function buildStatementPdf(data: StatementData, periodLabel: string): Pro
       heading("Closed Trades");
       table(
         [{ label: "Ticket", w: 52 }, { label: "Symbol", w: 50 }, { label: "Side", w: 30 }, { label: "Lots", w: 34, align: "right" }, { label: "Open", w: 46, align: "right" }, { label: "Close", w: 46, align: "right" }, { label: "P/L", w: 52, align: "right" }, { label: "Opened", w: 82 }, { label: "Closed", w: 82 }],
-        account.history.map((h) => [h.ticket.toString(), h.symbol, h.side, Number(h.lots).toFixed(2), String(Number(h.openPrice)), String(Number(h.closePrice)), money(Number(h.pnl)), dt((h as any).openedAt), dt(h.closedAt)]),
+        account.history.map((h) => [h.ticket.toString(), h.symbol, h.side, Number(h.lots).toFixed(2), px(h.openPrice), px(h.closePrice), money(Number(h.pnl)), dt((h as any).openedAt), dt(h.closedAt)]),
         "No closed trades in this period.",
       );
 

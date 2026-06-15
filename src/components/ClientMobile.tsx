@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, startTransition } from "react";
 import dynamic from "next/dynamic";
 import WalletPanel from "@/components/WalletPanel";
 import WorldMapBg from "@/components/ui/WorldMapBg";
-import { titleCaseName } from "@/lib/format";
+import { titleCaseName, gnum } from "@/lib/format";
 import { iconForNotification } from "@/lib/notif";
 
 // Lazy-load the chart lib — it's ~350 kB and only needed on the Chart tab.
@@ -139,7 +139,7 @@ export default function ClientMobile({ t }: { t: any }) {
             <i className={"fa-solid text-sm " + ic} style={{ color: col }} />
           </div>
           <div>
-            <div className="text-[12px] font-semibold">{isAcc ? <>New {req.type === "DEMO" ? "Demo" : "Live"} Account <span className="font-normal text-[var(--muted)]">{req.currency}</span></> : <>{req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} <span className="font-bold">${Number(req.amount).toFixed(2)}</span></>}</div>
+            <div className="text-[12px] font-semibold">{isAcc ? <>New {req.type === "DEMO" ? "Demo" : "Live"} Account <span className="font-normal text-[var(--muted)]">{req.currency}</span></> : <>{req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} <span className="font-bold">${gnum(req.amount, 2)}</span></>}</div>
             <div className="text-[10px] text-[var(--muted)]">{isAcc ? `1:${req.leverage}` : (req.method || "—")} · {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : "—"}</div>
           </div>
         </div>
@@ -583,7 +583,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       return (
                         <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
                           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-up" /></span>
-                          <div className="w-24 shrink-0 text-left"><div className="truncate text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
+                          <div className="w-24 shrink-0 text-left"><div className="truncate text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price != null ? gnum(s.price, dg(s.symbol)) : "…"}</div></div>
                           <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={true} /></div>
                           <span className="w-[52px] shrink-0 text-right text-[12px] font-semibold tabular-nums" style={{ color: BUY }}>{(p >= 0 ? "+" : "") + p.toFixed(2)}%</span>
                         </button>
@@ -597,7 +597,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       return (
                         <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
                           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-down" /></span>
-                          <div className="w-24 shrink-0 text-left"><div className="truncate text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price?.toFixed(dg(s.symbol))}</div></div>
+                          <div className="w-24 shrink-0 text-left"><div className="truncate text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price != null ? gnum(s.price, dg(s.symbol)) : "…"}</div></div>
                           <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={false} /></div>
                           <span className="w-[52px] shrink-0 text-right text-[12px] font-semibold tabular-nums" style={{ color: SELL }}>{p.toFixed(2)}%</span>
                         </button>
@@ -647,11 +647,11 @@ export default function ClientMobile({ t }: { t: any }) {
                     </div>
                     <div className="grid grid-cols-3 items-center gap-2">
                       <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "SELL"); }} className="rounded-lg py-2 text-center text-white" style={{ background: SELL }}>
-                        <div className="text-[10px] opacity-80">SELL</div><div className="text-sm font-bold tabular-nums">{sBid != null ? sBid.toFixed(dd) : "…"}</div>
+                        <div className="text-[10px] opacity-80">SELL</div><div className="text-sm font-bold tabular-nums">{sBid != null ? gnum(sBid, dd) : "…"}</div>
                       </button>
                       <LotStepper vol={vol} setVol={setVol} small />
                       <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "BUY"); }} className="rounded-lg py-2 text-center text-white" style={{ background: BUY }}>
-                        <div className="text-[10px] opacity-80">BUY</div><div className="text-sm font-bold tabular-nums">{sAsk != null ? sAsk.toFixed(dd) : "…"}</div>
+                        <div className="text-[10px] opacity-80">BUY</div><div className="text-sm font-bold tabular-nums">{sAsk != null ? gnum(sAsk, dd) : "…"}</div>
                       </button>
                     </div>
                   </div>
@@ -678,8 +678,8 @@ export default function ClientMobile({ t }: { t: any }) {
                       </div>
                     </button>
                     <div className="text-right">
-                      <div className="text-[28px] font-extrabold leading-none tabular-nums" style={{ color: upC ? BUY : SELL }}>{price != null ? price.toFixed(dg(selSym)) : "…"}</div>
-                      <div className="mt-1 text-[12px] font-semibold tabular-nums" style={{ color: upC ? BUY : SELL }}>{upC ? "▲" : "▼"} {chg >= 0 ? "+" : ""}{chg.toFixed(dg(selSym))} ({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</div>
+                      <div className="text-[28px] font-extrabold leading-none tabular-nums" style={{ color: upC ? BUY : SELL }}>{price != null ? gnum(price, dg(selSym)) : "…"}</div>
+                      <div className="mt-1 text-[12px] font-semibold tabular-nums" style={{ color: upC ? BUY : SELL }}>{upC ? "▲" : "▼"} {chg >= 0 ? "+" : ""}{gnum(chg, dg(selSym))} ({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</div>
                     </div>
                   </div>
                   <div className="mt-2 flex items-center gap-1.5">
@@ -719,11 +719,11 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
             <div className="glass flex items-stretch gap-2 border-t border-[var(--border)] p-2.5" style={{ background: theme === "dark" ? "rgba(20,24,34,0.6)" : "rgba(255,255,255,0.6)" }}>
               <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: SELL, touchAction: "manipulation" }}>
-                <div className="text-[10px] opacity-80">SELL</div><div className="text-base font-bold tabular-nums">{price != null ? bid.toFixed(dg(selSym)) : "…"}</div>
+                <div className="text-[10px] opacity-80">SELL</div><div className="text-base font-bold tabular-nums">{price != null ? gnum(bid, dg(selSym)) : "…"}</div>
               </button>
               <div className="flex items-center"><LotStepper vol={vol} setVol={setVol} /></div>
               <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: BUY, touchAction: "manipulation" }}>
-                <div className="text-[10px] opacity-80">BUY</div><div className="text-base font-bold tabular-nums">{price != null ? ask.toFixed(dg(selSym)) : "…"}</div>
+                <div className="text-[10px] opacity-80">BUY</div><div className="text-base font-bold tabular-nums">{price != null ? gnum(ask, dg(selSym)) : "…"}</div>
               </button>
             </div>
             {err && <div className="bg-[var(--panel)] pb-1 text-center text-[11px]" style={{ color: SELL }}>{err}</div>}
@@ -764,11 +764,11 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div onClick={() => setExpanded(open ? null : p.id)} className="flex cursor-pointer select-none items-center justify-between p-3 active:bg-[var(--soft)]">
                     <div>
                       <div className="text-sm font-bold">{p.symbol} <span className="text-[12px] font-semibold" style={{ color: p.type === "BUY" ? BLUE : SELL }}>{p.type} {p.lots}</span></div>
-                      <div className="text-[10px] text-[var(--muted)]">{Number(p.openPrice).toFixed(dd)} → {cur.toFixed(dd)}</div>
+                      <div className="text-[10px] text-[var(--muted)]">{gnum(Number(p.openPrice), dd)} → {gnum(cur, dd)}</div>
                       {(p.sl > 0 || p.tp > 0) && (
                         <div className="mt-0.5 flex gap-2 text-[9px] font-semibold tabular-nums">
-                          {p.sl > 0 && <span style={{ color: "#f43f5e" }}>SL {Number(p.sl).toFixed(dd)}</span>}
-                          {p.tp > 0 && <span style={{ color: "#10b981" }}>TP {Number(p.tp).toFixed(dd)}</span>}
+                          {p.sl > 0 && <span style={{ color: "#f43f5e" }}>SL {gnum(Number(p.sl), dd)}</span>}
+                          {p.tp > 0 && <span style={{ color: "#10b981" }}>TP {gnum(Number(p.tp), dd)}</span>}
                         </div>
                       )}
                     </div>
@@ -782,10 +782,10 @@ export default function ClientMobile({ t }: { t: any }) {
                       <div className="mb-2 text-[10px] text-[var(--muted)]">#{p.ticket} · opened {p.openedAt ? new Date(p.openedAt).toLocaleString() : "—"}</div>
                       <div className="grid grid-cols-3 gap-2 text-[11px]">
                         <div><div className="text-[var(--muted)]">LOTS</div><div className="font-semibold">{p.lots}</div></div>
-                        <div><div className="text-[var(--muted)]">OPEN</div><div className="font-semibold">{Number(p.openPrice).toFixed(dd)}</div></div>
-                        <div><div className="text-[var(--muted)]">CURRENT</div><div className="font-semibold">{cur.toFixed(dd)}</div></div>
-                        <div><div className="text-[var(--muted)]">S/L</div><div className="font-semibold">{p.sl ? Number(p.sl).toFixed(dd) : "—"}</div></div>
-                        <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{p.tp ? Number(p.tp).toFixed(dd) : "—"}</div></div>
+                        <div><div className="text-[var(--muted)]">OPEN</div><div className="font-semibold">{gnum(Number(p.openPrice), dd)}</div></div>
+                        <div><div className="text-[var(--muted)]">CURRENT</div><div className="font-semibold">{gnum(cur, dd)}</div></div>
+                        <div><div className="text-[var(--muted)]">S/L</div><div className="font-semibold">{p.sl ? gnum(Number(p.sl), dd) : "—"}</div></div>
+                        <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{p.tp ? gnum(Number(p.tp), dd) : "—"}</div></div>
                         <div><div className="text-[var(--muted)]">TYPE</div><div className="font-semibold">{p.type}</div></div>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -829,11 +829,11 @@ export default function ClientMobile({ t }: { t: any }) {
                     <button onClick={() => cancelPending(o.id)} className="flex h-7 w-7 items-center justify-center rounded-full border" style={{ borderColor: SELL, color: SELL }}><i className="fa-solid fa-xmark" /></button>
                   </div>
                   <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
-                    <div><div className="text-[var(--muted)]">TRIGGER</div><div className="font-semibold">{trig.toFixed(dd)}</div></div>
-                    <div><div className="text-[var(--muted)]">CURRENT</div><div className="font-semibold">{cur != null ? cur.toFixed(dd) : "…"}</div></div>
-                    <div><div className="text-[var(--muted)]">DISTANCE</div><div className="font-semibold">{dist != null ? dist.toFixed(dd) : "—"}</div></div>
-                    <div><div className="text-[var(--muted)]">S/L</div><div className="font-semibold">{o.sl ? Number(o.sl).toFixed(dd) : "—"}</div></div>
-                    <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{o.tp ? Number(o.tp).toFixed(dd) : "—"}</div></div>
+                    <div><div className="text-[var(--muted)]">TRIGGER</div><div className="font-semibold">{gnum(trig, dd)}</div></div>
+                    <div><div className="text-[var(--muted)]">CURRENT</div><div className="font-semibold">{cur != null ? gnum(cur, dd) : "…"}</div></div>
+                    <div><div className="text-[var(--muted)]">DISTANCE</div><div className="font-semibold">{dist != null ? gnum(dist, dd) : "—"}</div></div>
+                    <div><div className="text-[var(--muted)]">S/L</div><div className="font-semibold">{o.sl ? gnum(Number(o.sl), dd) : "—"}</div></div>
+                    <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{o.tp ? gnum(Number(o.tp), dd) : "—"}</div></div>
                   </div>
                 </div>
               );
@@ -872,7 +872,7 @@ export default function ClientMobile({ t }: { t: any }) {
                         </div>
                         <div className="text-sm font-bold" style={{ color: Number(h.pnl) >= 0 ? BUY : SELL }}>{(Number(h.pnl) >= 0 ? "+" : "") + fmt(Number(h.pnl))}</div>
                       </div>
-                      <div className="mt-1 text-[10px] text-[var(--muted)]">{Number(h.openPrice).toFixed(dd)} → {Number(h.closePrice).toFixed(dd)}</div>
+                      <div className="mt-1 text-[10px] text-[var(--muted)]">{gnum(Number(h.openPrice), dd)} → {gnum(Number(h.closePrice), dd)}</div>
                       <div className="mt-1 flex gap-3 text-[9px] text-[var(--muted)]">
                         <span><i className="fa-solid fa-play mr-1" />{h.openedAt ? new Date(h.openedAt).toLocaleString() : "—"}</span>
                         <span><i className="fa-solid fa-stop mr-1" />{h.closedAt ? new Date(h.closedAt).toLocaleString() : "—"}</span>
@@ -1147,7 +1147,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 ))}
               </div>
               <div className="mb-2"><div className="mb-1 text-[10px] text-[var(--muted)]">Lots</div><input type="number" step="0.01" className={inp} style={ist} value={noForm.lots} onChange={(e) => setNoForm({ ...noForm, lots: e.target.value })} /></div>
-              {tab === "pending" && <div className="mb-2"><div className="mb-1 text-[10px] text-[var(--muted)]">Trigger price</div><input type="number" className={inp} style={ist} placeholder={price ? price.toFixed(dd) : "price"} value={noForm.trigger} onChange={(e) => setNoForm({ ...noForm, trigger: e.target.value })} /></div>}
+              {tab === "pending" && <div className="mb-2"><div className="mb-1 text-[10px] text-[var(--muted)]">Trigger price</div><input type="number" className={inp} style={ist} placeholder={price ? gnum(price, dd) : "price"} value={noForm.trigger} onChange={(e) => setNoForm({ ...noForm, trigger: e.target.value })} /></div>}
               <div className="mb-3 grid grid-cols-2 gap-2">
                 <div><div className="mb-1 text-[10px] text-[var(--muted)]">Stop Loss</div><input type="number" className={inp} style={ist} value={noForm.sl} onChange={(e) => setNoForm({ ...noForm, sl: e.target.value })} /></div>
                 <div><div className="mb-1 text-[10px] text-[var(--muted)]">Take Profit</div><input type="number" className={inp} style={ist} value={noForm.tp} onChange={(e) => setNoForm({ ...noForm, tp: e.target.value })} /></div>
@@ -1155,8 +1155,8 @@ export default function ClientMobile({ t }: { t: any }) {
               {err && <div className="mb-2 text-center text-[11px]" style={{ color: SELL }}>{err}</div>}
               {tab === "trade" ? (
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => place("SELL", "MARKET")} className="flex flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white active:scale-[0.98]" style={{ background: SELL }}><span className="text-[11px] uppercase tracking-wide opacity-90">Sell</span><span className="text-[15px] tabular-nums">{price != null ? bid.toFixed(dd) : "…"}</span></button>
-                  <button onClick={() => place("BUY", "MARKET")} className="flex flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white active:scale-[0.98]" style={{ background: BLUE }}><span className="text-[11px] uppercase tracking-wide opacity-90">Buy</span><span className="text-[15px] tabular-nums">{price != null ? ask.toFixed(dd) : "…"}</span></button>
+                  <button onClick={() => place("SELL", "MARKET")} className="flex flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white active:scale-[0.98]" style={{ background: SELL }}><span className="text-[11px] uppercase tracking-wide opacity-90">Sell</span><span className="text-[15px] tabular-nums">{price != null ? gnum(bid, dd) : "…"}</span></button>
+                  <button onClick={() => place("BUY", "MARKET")} className="flex flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white active:scale-[0.98]" style={{ background: BLUE }}><span className="text-[11px] uppercase tracking-wide opacity-90">Buy</span><span className="text-[15px] tabular-nums">{price != null ? gnum(ask, dd) : "…"}</span></button>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -1286,7 +1286,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div className="text-[10px] uppercase text-[var(--muted)]">{x.category || "other"}</div>
                   </div>
                   <div className="ml-2 flex shrink-0 items-center gap-2">
-                    <span className="text-[12px] font-semibold tabular-nums text-[var(--muted)]">{pr != null ? pr.toFixed(dg(x.symbol)) : "…"}</span>
+                    <span className="text-[12px] font-semibold tabular-nums text-[var(--muted)]">{pr != null ? gnum(pr, dg(x.symbol)) : "…"}</span>
                     {x.symbol === selSym && <i className="fa-solid fa-check" style={{ color: BUY }} />}
                   </div>
                 </button>

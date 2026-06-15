@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { pnlFor, validateSlTp, usedMargin } from "@/lib/trademath";
 import { notifyStaff } from "@/services/notification.service";
 import { audit } from "@/lib/audit";
+import { gnum, gprice } from "@/lib/format";
 import { isMarketOpen } from "@/lib/market";
 
 // Throws if the symbol's market is closed (weekend forex/metals, etc.). Used to
@@ -107,7 +108,7 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
     await tx.account.update({ where: { id: trade.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnl) } } });
     await tx.trade.delete({ where: { id: trade.id } });
   });
-  const label = `${trade.account.login} ${trade.symbol} closed @ ${price} | PnL ${pnl.toFixed(2)}`;
+  const label = `${trade.account.login} ${trade.symbol} closed @ ${gprice(price)} | PnL ${gnum(pnl, 2)}`;
   audit(tenantId, "trade.close", label, trade.account.login, "CLIENT" as any);
   notifyStaff(tenantId, { type: "TRADE", title: "Trade closed", body: label }, trade.account.managerId).catch(() => {});
   return { pnl };

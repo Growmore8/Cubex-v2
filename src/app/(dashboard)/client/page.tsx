@@ -6,7 +6,7 @@ import { playSound, soundForNotification } from "@/lib/sounds";
 import PriceCell from "@/components/PriceCell";
 import toast from "react-hot-toast";
 import WalletPanel from "@/components/WalletPanel";
-import { titleCaseName } from "@/lib/format";
+import { titleCaseName, gnum, gmoney } from "@/lib/format";
 import { iconForNotification } from "@/lib/notif";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
@@ -337,7 +337,7 @@ export default function ClientTerminal() {
     if (account?.locked) { setErr("Your account is read-only. Closing is disabled."); return; }
     const r = await fetch("/api/client/orders/" + id + "/close", { method: "POST" });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Close failed"); return; }
-    pushToast({ title: "Trade closed" + (d.pnl != null ? ` · P/L $${Number(d.pnl).toFixed(2)}` : ""), type: "TRADE" }); load();
+    pushToast({ title: "Trade closed" + (d.pnl != null ? ` · P/L $${gnum(d.pnl, 2)}` : ""), type: "TRADE" }); load();
   }
   function switchAcc(id: string) { accIdRef.current = id; setAccId(id); load(); }
   async function doTransfer() {
@@ -406,7 +406,7 @@ export default function ClientTerminal() {
   const d = dg(selSym);
   const bid = price ?? 0, ask = price != null ? price + Math.pow(10, -d) * 2 : 0;
   const margin = price != null ? ((vol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0;
-  const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (v: number) => gmoney(v);
   const groups: Record<string, any[]> = {};
   const mwq = mwSearch.trim().toLowerCase();
   symbols.filter((s) => !mwq || (s.symbol + " " + (s.display || "")).toLowerCase().includes(mwq)).forEach((s) => { const c = s.category || "other"; (groups[c] || (groups[c] = [])).push(s); });
@@ -591,8 +591,8 @@ export default function ClientTerminal() {
                 {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const b = p != null ? p * 0.9999 : null; const a = p != null ? p * 1.0001 : null; const dir = dirs[s.symbol] || 0; return (
                   <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="truncate text-left">{s.symbol}</button>
-                    <PriceCell value={b != null ? b.toFixed(dd) : "..."} dir={dir} />
-                    <PriceCell value={a != null ? a.toFixed(dd) : "..."} dir={dir} />
+                    <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
+                    <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
                   </div>); })}
               </div>
             )}
@@ -602,8 +602,8 @@ export default function ClientTerminal() {
                 {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const b = p != null ? p * 0.9999 : null; const a = p != null ? p * 1.0001 : null; const dir = dirs[s.symbol] || 0; const fc = dir > 0 ? BUY : dir < 0 ? SELL : "var(--text)"; const bg = dir > 0 ? "rgba(22,199,132,0.32)" : dir < 0 ? "rgba(224,82,96,0.32)" : "transparent"; return (
                   <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="truncate text-left">{s.symbol}</button>
-                    <PriceCell value={b != null ? b.toFixed(dd) : "..."} dir={dir} />
-                    <PriceCell value={a != null ? a.toFixed(dd) : "..."} dir={dir} /><span style={{ display: "none" }}>
+                    <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
+                    <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} /><span style={{ display: "none" }}>
                       
                       
                     </span>
@@ -627,7 +627,7 @@ export default function ClientTerminal() {
             <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide" style={{ color: "var(--text)" }}><i className="fa-solid fa-bolt text-[10px]" style={{ color: "#2f81f7" }} />NEW ORDER</div>
             <div className="flex items-center gap-1.5">
               <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "var(--soft)", color: "#2f81f7" }}>{selSym}</span>
-              {price != null && <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{price.toFixed(d)}</span>}
+              {price != null && <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{gnum(price, d)}</span>}
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-auto">
@@ -679,10 +679,10 @@ export default function ClientTerminal() {
               {entryTab === "trade" ? (
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg, #ff6b78, #e0394a 70%, #b9293a)" }}>
-                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down text-[9px]" />Sell</span><span className="text-[15px] tabular-nums">{bid?.toFixed(d) ?? "…"}</span>
+                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down text-[9px]" />Sell</span><span className="text-[15px] tabular-nums">{bid != null ? gnum(bid, d) : "…"}</span>
                   </button>
                   <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg, #5aa0ff, #2f81f7 70%, #1e63cc)" }}>
-                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up text-[9px]" />Buy</span><span className="text-[15px] tabular-nums">{ask?.toFixed(d) ?? "…"}</span>
+                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up text-[9px]" />Buy</span><span className="text-[15px] tabular-nums">{ask != null ? gnum(ask, d) : "…"}</span>
                   </button>
                 </div>
               ) : (
@@ -735,20 +735,20 @@ export default function ClientTerminal() {
                   <tr key={p.id} className="border-t border-[var(--border)]">
                     <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span></td>
                     <td className="px-2 py-1 text-[var(--muted)]">{new Date(p.openedAt).toLocaleDateString()}</td>
-                    <td className="px-2 py-1 text-right">{p.lots}</td><td className="px-2 py-1 text-right">{p.openPrice.toFixed(dg(p.symbol))}</td>
-                    <td className="px-2 py-1 text-right tabular-nums" style={{ color: cdir > 0 ? "#16c784" : cdir < 0 ? "#e05260" : "var(--text)", transition: "color 0.3s ease" }}>{cur.toFixed(dg(p.symbol))}</td>
+                    <td className="px-2 py-1 text-right">{p.lots}</td><td className="px-2 py-1 text-right">{gnum(p.openPrice, dg(p.symbol))}</td>
+                    <td className="px-2 py-1 text-right tabular-nums" style={{ color: cdir > 0 ? "#16c784" : cdir < 0 ? "#e05260" : "var(--text)", transition: "color 0.3s ease" }}>{gnum(cur, dg(p.symbol))}</td>
                     <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "tp", val: p.tp ? String(p.tp) : "" }); }} title="Click to edit TP" style={{ cursor: "pointer" }}>
                       {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "tp" ? (
                         <input type="text" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "tp", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-20 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#10b981", color: "#10b981" }} onClick={(e) => e.stopPropagation()} />
                       ) : (
-                        <span style={{ color: p.tp ? "#10b981" : "var(--muted)" }}>{p.tp ? Number(p.tp).toFixed(dg(p.symbol)) : <span className="text-[9px]">+ TP</span>}</span>
+                        <span style={{ color: p.tp ? "#10b981" : "var(--muted)" }}>{p.tp ? gnum(p.tp, dg(p.symbol)) : <span className="text-[9px]">+ TP</span>}</span>
                       )}
                     </td>
                     <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "sl", val: p.sl ? String(p.sl) : "" }); }} title="Click to edit SL" style={{ cursor: "pointer" }}>
                       {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "sl" ? (
                         <input type="text" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "sl", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-20 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#f43f5e", color: "#f43f5e" }} onClick={(e) => e.stopPropagation()} />
                       ) : (
-                        <span style={{ color: p.sl ? "#f43f5e" : "var(--muted)" }}>{p.sl ? Number(p.sl).toFixed(dg(p.symbol)) : <span className="text-[9px]">+ SL</span>}</span>
+                        <span style={{ color: p.sl ? "#f43f5e" : "var(--muted)" }}>{p.sl ? gnum(p.sl, dg(p.symbol)) : <span className="text-[9px]">+ SL</span>}</span>
                       )}
                     </td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">0.00</td>
@@ -774,11 +774,11 @@ export default function ClientTerminal() {
                     <td className="px-2 py-1"><i className="fa-regular fa-clock mr-1 text-[var(--muted)]" />{o.symbol}</td>
                     <td className="px-2 py-1"><span className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: c + "22", color: c }}>{label}</span></td>
                     <td className="px-2 py-1 text-right">{o.lots}</td>
-                    <td className="px-2 py-1 text-right font-semibold">{trig.toFixed(d)}</td>
-                    <td className="px-2 py-1 text-right text-[var(--muted)]">{cur != null ? cur.toFixed(d) : "…"}</td>
-                    <td className="px-2 py-1 text-right text-[var(--muted)]">{dist != null ? dist.toFixed(d) : "—"}</td>
-                    <td className="px-2 py-1 text-right text-[var(--muted)]">{o.sl ? Number(o.sl).toFixed(d) : "-"}</td>
-                    <td className="px-2 py-1 text-right text-[var(--muted)]">{o.tp ? Number(o.tp).toFixed(d) : "-"}</td>
+                    <td className="px-2 py-1 text-right font-semibold">{gnum(trig, d)}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{cur != null ? gnum(cur, d) : "…"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{dist != null ? gnum(dist, d) : "—"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{o.sl ? gnum(o.sl, d) : "-"}</td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{o.tp ? gnum(o.tp, d) : "-"}</td>
                     <td className="px-2 py-1 text-right"><button title="Cancel order" style={{ color: SELL }} onClick={() => cancelPending(o.id)}><i className="fa-solid fa-xmark" /></button></td>
                   </tr>); })}
               </tbody>
@@ -802,10 +802,10 @@ export default function ClientTerminal() {
                     <td className="px-2 py-1 text-[var(--muted)]">{h.openedAt ? new Date(h.openedAt).toLocaleString() : "—"}</td>
                     <td className="px-2 py-1 text-[var(--muted)]">{h.closedAt ? new Date(h.closedAt).toLocaleString() : "—"}</td>
                     <td className="px-2 py-1 text-right">{h.lots}</td>
-                    <td className="px-2 py-1 text-right">{h.openPrice.toFixed(dg(h.symbol))}</td>
-                    <td className="px-2 py-1 text-right">{h.closePrice.toFixed(dg(h.symbol))}</td>
-                    <td className="px-2 py-1 text-right" style={{ color: h.sl ? "#f43f5e" : "var(--muted)" }}>{h.sl ? Number(h.sl).toFixed(dg(h.symbol)) : "—"}</td>
-                    <td className="px-2 py-1 text-right" style={{ color: h.tp ? "#10b981" : "var(--muted)" }}>{h.tp ? Number(h.tp).toFixed(dg(h.symbol)) : "—"}</td>
+                    <td className="px-2 py-1 text-right">{gnum(h.openPrice, dg(h.symbol))}</td>
+                    <td className="px-2 py-1 text-right">{gnum(h.closePrice, dg(h.symbol))}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: h.sl ? "#f43f5e" : "var(--muted)" }}>{h.sl ? gnum(h.sl, dg(h.symbol)) : "—"}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: h.tp ? "#10b981" : "var(--muted)" }}>{h.tp ? gnum(h.tp, dg(h.symbol)) : "—"}</td>
                     <td className="px-2 py-1"><span style={{ color: rc, fontWeight: r !== "MANUAL" ? 600 : "normal" }}>{r === "MANUAL" ? "—" : r}</span></td>
                     <td className="px-2 py-1 text-right" style={{ color: h.pnl >= 0 ? BUY : SELL }}>{(h.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(h.pnl))}</td>
                   </tr>); })}
@@ -914,7 +914,7 @@ export default function ClientTerminal() {
                               {isAcc ? `New ${r.type === "DEMO" ? "Demo" : "Live"} Account` : r.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"}
                             </span>
                           </td>
-                          <td className="px-2 py-1 text-right font-semibold tabular-nums">{isAcc ? <span className="text-[var(--muted)]">1:{r.leverage}</span> : "$" + Number(r.amount).toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right font-semibold tabular-nums">{isAcc ? <span className="text-[var(--muted)]">1:{r.leverage}</span> : "$" + gmoney(r.amount)}</td>
                           <td className="px-2 py-1 text-[var(--muted)]">{isAcc ? r.currency : (r.method || "—")}</td>
                           <td className="px-2 py-1">
                             <span className="rounded-full px-2 py-0.5 text-[9px] font-semibold" style={{ background: r.status === "APPROVED" ? "rgba(22,163,74,0.15)" : r.status === "REJECTED" ? "rgba(220,38,38,0.15)" : "rgba(240,180,41,0.15)", color: r.status === "APPROVED" ? BUY : r.status === "REJECTED" ? SELL : GOLD }}>{r.status}</span>

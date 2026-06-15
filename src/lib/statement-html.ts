@@ -3,13 +3,16 @@
 // layout/styles so the two routes no longer duplicate ~90 lines each.
 
 import { pnlFor } from "@/lib/trademath";
+import { gprice } from "@/lib/format";
 
 export function esc(s: unknown): string {
   return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 }
 export function money(n: number): string {
-  return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+// Grouped price (thousands separators), keeping natural decimals. "—" when 0/empty.
+function px(v: unknown): string { const n = Number(v); return n ? gprice(n) : "—"; }
 function dt(d: Date | null | undefined): string {
   return d ? new Date(d).toLocaleString() : "";
 }
@@ -54,9 +57,9 @@ export function statementHtml(input: StatementHtmlInput): string {
     return `<tr>
       <td>${esc(o.ticket.toString())}</td><td>${esc(o.symbol)}</td>
       <td${isDesk ? ` style="color:${sideColor(o.type)}"` : ""}>${esc(o.type)}</td>
-      <td class="r">${Number(o.lots).toFixed(2)}</td><td class="r">${Number(o.openPrice)}</td>
-      <td class="r">${cur != null ? cur : "—"}</td>
-      <td class="r">${Number(o.sl) || "—"}</td><td class="r">${Number(o.tp) || "—"}</td>
+      <td class="r">${Number(o.lots).toFixed(2)}</td><td class="r">${px(o.openPrice)}</td>
+      <td class="r">${cur != null ? gprice(cur) : "—"}</td>
+      <td class="r">${px(o.sl)}</td><td class="r">${px(o.tp)}</td>
       <td class="r ${pl != null && pl >= 0 ? "pos" : "neg"}">${pl != null ? money(pl) : "—"}</td>
       <td>${dt(o.openedAt)}</td></tr>`;
   }).join("");
@@ -68,13 +71,13 @@ export function statementHtml(input: StatementHtmlInput): string {
       <td style="color:${sideColor(h.side)}">${esc(h.side)}</td>
       <td class="r">${Number(h.lots).toFixed(2)}</td>
       <td class="r">${h.openedAt ? dt(h.openedAt) : "—"}</td>
-      <td class="r">${Number(h.openPrice)}</td><td class="r">${Number(h.closePrice)}</td>
+      <td class="r">${px(h.openPrice)}</td><td class="r">${px(h.closePrice)}</td>
       <td><span style="color:${reasonColor(h.closeReason || "")};font-weight:600">${esc(h.closeReason || "MANUAL")}</span></td>
       <td class="r ${Number(h.pnl) >= 0 ? "pos" : "neg"}">${money(Number(h.pnl))}</td>
       <td>${dt(h.closedAt)}</td></tr>`;
     return `<tr>
       <td>${esc(h.ticket.toString())}</td><td>${esc(h.symbol)}</td><td>${esc(h.side)}</td>
-      <td class="r">${Number(h.lots).toFixed(2)}</td><td class="r">${Number(h.openPrice)}</td><td class="r">${Number(h.closePrice)}</td>
+      <td class="r">${Number(h.lots).toFixed(2)}</td><td class="r">${px(h.openPrice)}</td><td class="r">${px(h.closePrice)}</td>
       <td class="r ${Number(h.pnl) >= 0 ? "pos" : "neg"}">${money(Number(h.pnl))}</td>
       <td>${dt(h.closedAt)}</td></tr>`;
   }).join("");
@@ -86,8 +89,8 @@ export function statementHtml(input: StatementHtmlInput): string {
   // Client-only sections
   const pendRows = (input.pendings || []).map((p: any) => `<tr>
       <td>${esc(p.symbol)}</td><td>${esc(p.side)}</td><td>${esc(p.kind)}</td>
-      <td class="r">${Number(p.lots).toFixed(2)}</td><td class="r">${Number(p.price)}</td>
-      <td class="r">${Number(p.sl) || "—"}</td><td class="r">${Number(p.tp) || "—"}</td>
+      <td class="r">${Number(p.lots).toFixed(2)}</td><td class="r">${px(p.price)}</td>
+      <td class="r">${px(p.sl)}</td><td class="r">${px(p.tp)}</td>
       <td>${dt(p.createdAt)}</td></tr>`).join("");
   const reqRows = (input.requests || []).map((r: any) => `<tr>
       <td>${esc(r.kind)}</td><td class="r">${money(Number(r.amount))}</td><td>${esc(r.method || "")}</td>

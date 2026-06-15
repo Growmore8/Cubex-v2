@@ -18,6 +18,7 @@ import { iconForNotification } from "@/lib/notif";
 import { isOnline as presenceOnline } from "@/components/ui/Presence";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
+import { gnum, gmoney, gsign } from "@/lib/format";
 import { DARK, LIGHT, BUY, SELL, GOLD } from "@/config/theme";
 
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
@@ -233,17 +234,30 @@ export default function AdminDeskPage() {
   const digitsMap: Record<string, number> = Object.fromEntries(symbols.map((s) => [s.symbol, s.digits]));
   function dg(sym: string) { return digitsMap[sym] ?? instruments[sym]?.digits ?? 2; }
   // Magnitude-aware: never lose precision on small-value symbols (e.g. ADAUSDT 0.18940)
-  function pxFmt(sym: string, val: any) {
-    if (val == null || val === "") return "-";
-    const n = Number(val);
-    if (!isFinite(n)) return "-";
+  function pxDigits(sym: string, n: number) {
     let d = dg(sym);
     const a = Math.abs(n);
     if (a > 0 && a < 1) d = Math.max(d, 5);
     else if (a < 10) d = Math.max(d, 4);
     else if (a < 100) d = Math.max(d, 3);
-    return n.toFixed(d);
+    return d;
   }
+  // Grouped (thousands separators) price for DISPLAY.
+  function pxFmt(sym: string, val: any) {
+    if (val == null || val === "") return "-";
+    const n = Number(val);
+    if (!isFinite(n)) return "-";
+    return gnum(n, pxDigits(sym, n));
+  }
+  // Plain (no commas) price — for <input type="number"> default values.
+  function pxRaw(sym: string, val: any) {
+    if (val == null || val === "") return "";
+    const n = Number(val);
+    if (!isFinite(n)) return "";
+    return n.toFixed(pxDigits(sym, n));
+  }
+  // Grouped price for direct prices[sym] displays.
+  const gpx = (sym: string, val: any) => pxFmt(sym, val);
   const catMap: Record<string, string> = Object.fromEntries(symbols.map((s) => [s.symbol, s.category || "forex"]));
   function csz(sym: string) { return contractFor(catMap[sym] || "forex", sym); }
 
@@ -601,8 +615,8 @@ export default function AdminDeskPage() {
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
 
-  const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const px = (sym: string) => prices[sym]?.toFixed(dg(sym)) ?? "...";
+  const fmt = (v: number) => gmoney(v);
+  const px = (sym: string) => (prices[sym] != null ? gpx(sym, prices[sym]) : "...");
   const dot = (c: string) => (<span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: c }} />);
   const inp = "ui-input mt-1 w-full bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--text)]";
   const lab = "text-[10px] text-[var(--muted)]";
@@ -642,7 +656,7 @@ export default function AdminDeskPage() {
   );
 
   const shown: { sym: string; i: number }[] = layout === 1 ? (openCharts[activeChart] ? [{ sym: openCharts[activeChart], i: activeChart }] : []) : openCharts.slice(0, layout).map((sym, i) => ({ sym, i }));
-  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const bid = p != null ? (p * 0.9999).toFixed(d) : "..."; const ask = p != null ? (p * 1.0001).toFixed(d) : "...";
+  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const bid = p != null ? gnum(p * 0.9999, d) : "..."; const ask = p != null ? gnum(p * 1.0001, d) : "...";
     if (!showOC) return (
       <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-16 top-12 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
         <i className="fa-solid fa-bolt" /> Trade
@@ -988,13 +1002,13 @@ export default function AdminDeskPage() {
               const tradePL = plRows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
               const deposits = fin(["DEPOSIT"]); const withdrawals = fin(["WITHDRAWAL"]); const credit = fin(["CREDIT_IN", "CREDIT_OUT", "BONUS", "INSURANCE"]);
               const net = rows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
-              const cell = (label: string, val: number) => (<span className="whitespace-nowrap"><span className="text-[var(--muted)]">{label} </span><span style={{ color: val > 0 ? BUY : val < 0 ? SELL : "var(--text)", fontWeight: 700 }}>{val > 0 ? "+" : ""}{val.toFixed(2)}</span></span>);
+              const cell = (label: string, val: number) => (<span className="whitespace-nowrap"><span className="text-[var(--muted)]">{label} </span><span style={{ color: val > 0 ? BUY : val < 0 ? SELL : "var(--text)", fontWeight: 700 }}>{val > 0 ? "+" : ""}{gnum(val, 2)}</span></span>);
               return (
                 <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap pb-1 pr-2 text-[10px]" style={{ scrollbarWidth: "none", maxWidth: "62vw" }}>
                   <span><span className="text-[var(--muted)]">Records </span><b>{rows.length}</b></span>
                   {cell("Deposits", deposits)}{cell("Withdrawals", withdrawals)}{cell("Credit/Bonus", credit)}
-                  <span><span className="text-[var(--muted)]">Trade P/L </span><span style={{ color: tradePL >= 0 ? BUY : SELL, fontWeight: 700 }}>{tradePL >= 0 ? "+" : ""}{tradePL.toFixed(2)}</span></span>
-                  <span className="rounded px-2 py-0.5" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)" }}><span className="text-[var(--muted)]">Net </span><span style={{ color: net >= 0 ? BUY : SELL, fontWeight: 800 }}>{net >= 0 ? "+" : ""}{net.toFixed(2)}</span></span>
+                  <span><span className="text-[var(--muted)]">Trade P/L </span><span style={{ color: tradePL >= 0 ? BUY : SELL, fontWeight: 700 }}>{tradePL >= 0 ? "+" : ""}{gnum(tradePL, 2)}</span></span>
+                  <span className="rounded px-2 py-0.5" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)" }}><span className="text-[var(--muted)]">Net </span><span style={{ color: net >= 0 ? BUY : SELL, fontWeight: 800 }}>{net >= 0 ? "+" : ""}{gnum(net, 2)}</span></span>
                 </div>
               );
             })()}
@@ -1052,7 +1066,7 @@ export default function AdminDeskPage() {
                             {isEditing ? <input type="number" step="0.01" min="0.01" className={tInp} value={ei("lots", p.lots)} onChange={(e) => setIe("lots", e.target.value)} /> : p.lots}
                           </td>
                           <td className="px-2 py-1 text-right">
-                            {isEditing ? <input type="number" step="0.00001" className={tInp} value={ei("openPrice", pxFmt(p.symbol, p.openPrice))} onChange={(e) => setIe("openPrice", e.target.value)} /> : pxFmt(p.symbol, p.openPrice)}
+                            {isEditing ? <input type="number" step="0.00001" className={tInp} value={ei("openPrice", pxRaw(p.symbol, p.openPrice))} onChange={(e) => setIe("openPrice", e.target.value)} /> : pxFmt(p.symbol, p.openPrice)}
                           </td>
                           <td className="px-2 py-1 text-right">
                             <input type="number" step="0.00001" className={tInp} placeholder="0" value={ei("sl", p.sl ? Number(p.sl).toFixed(dg(p.symbol)) : "")} onChange={(e) => { setIe("sl", e.target.value); }} />
@@ -1061,7 +1075,7 @@ export default function AdminDeskPage() {
                             <input type="number" step="0.00001" className={tInp} placeholder="0" value={ei("tp", p.tp ? Number(p.tp).toFixed(dg(p.symbol)) : "")} onChange={(e) => { setIe("tp", e.target.value); }} />
                           </td>
                           <td className="px-2 py-1 text-right">{pxFmt(p.symbol, cur)}</td>
-                          <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{pl.toFixed(2)}</td>
+                          <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{gnum(pl, 2)}</td>
                           <td className="px-2 py-1 text-right whitespace-nowrap">
                             {isEditing ? (<>
                               <button onClick={() => modifyTrade(p.id, { sl: ie.sl !== undefined ? Number(ie.sl) : Number(p.sl) || 0, tp: ie.tp !== undefined ? Number(ie.tp) : Number(p.tp) || 0, ...(ie.lots ? { lots: ie.lots } : {}), ...(ie.openPrice ? { openPrice: ie.openPrice } : {}), ...(ie.type ? { type: ie.type } : {}), ...(ie.openedAt ? { openedAt: ie.openedAt } : {}) })} className="mr-1 rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: BUY, color: "#fff" }}>Save</button>
@@ -1161,10 +1175,10 @@ export default function AdminDeskPage() {
                             <td className="px-2 py-1">{(() => { const r = h.closeReason || h.description || h.desc; const col = r === "TP" ? "#10b981" : r === "SL" ? "#f43f5e" : r === "MC" ? "#f59e0b" : "var(--muted)"; return <span style={{ color: col, fontWeight: r && r !== "MANUAL" ? 600 : "normal" }}>{r || "—"}</span>; })()}</td>
                             <td className="px-2 py-1 text-right">{h.openPrice != null && Number(h.openPrice) !== 0 ? pxFmt(h.symbol, h.openPrice) : "-"}</td>
                             <td className="px-2 py-1 text-right">{h.closePrice != null && Number(h.closePrice) !== 0 ? pxFmt(h.symbol, h.closePrice) : "-"}</td>
-                            <td className="px-2 py-1 text-right">{h.sl ? Number(h.sl).toFixed(dg(h.symbol)) : "-"}</td>
-                            <td className="px-2 py-1 text-right">{h.tp ? Number(h.tp).toFixed(dg(h.symbol)) : "-"}</td>
+                            <td className="px-2 py-1 text-right">{h.sl ? pxFmt(h.symbol, h.sl) : "-"}</td>
+                            <td className="px-2 py-1 text-right">{h.tp ? pxFmt(h.symbol, h.tp) : "-"}</td>
                             <td className="px-2 py-1 text-[var(--muted)]">{hdt(h) ? new Date(hdt(h)).toLocaleString() : "-"}</td>
-                            <td className="px-2 py-1 text-right" style={{ color: (h.pnl ?? 0) >= 0 ? BUY : SELL }}>{h.pnl != null ? Number(h.pnl).toFixed(2) : "-"}</td>
+                            <td className="px-2 py-1 text-right" style={{ color: (h.pnl ?? 0) >= 0 ? BUY : SELL }}>{h.pnl != null ? gnum(h.pnl, 2) : "-"}</td>
                             <td className="px-2 py-1 text-right whitespace-nowrap"><button title="Edit" onClick={() => openHEdit(h)} className="mr-1.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen" /></button><button title="Delete" onClick={() => delHist(h)} className="rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button></td>
                           </tr>
                         ))}
@@ -1469,10 +1483,10 @@ export default function AdminDeskPage() {
               <div><div className={lab}>T/P</div><input type="number" className={inp} value={tform.tp} onChange={(e) => setTform({ ...tform, tp: Number(e.target.value) })} /></div>
             </div>
             {tform.type !== "Market" && (<div className="mt-2"><div className={lab}>Trigger price</div><input type="number" className={inp} value={tform.price} onChange={(e) => setTform({ ...tform, price: Number(e.target.value) })} /></div>)}
-            <div className="mt-2 text-center text-[10px] text-[var(--muted)]">{prices[ticket] != null ? prices[ticket].toFixed(dg(ticket)) : "..."}</div>
+            <div className="mt-2 text-center text-[10px] text-[var(--muted)]">{prices[ticket] != null ? gpx(ticket, prices[ticket]) : "..."}</div>
             <div className="mt-3 flex gap-2">
-              <button onClick={() => placeTicket("SELL")} className="flex-1 rounded py-2 text-xs" style={{ background: "rgba(224,82,96,0.16)", color: SELL, border: "0.5px solid rgba(224,82,96,0.4)" }}>Sell {prices[ticket] != null ? (prices[ticket] * 0.9999).toFixed(dg(ticket)) : ""}</button>
-              <button onClick={() => placeTicket("BUY")} className="flex-1 rounded py-2 text-xs" style={{ background: "rgba(47,129,247,0.18)", color: "#6ab0ff", border: "0.5px solid rgba(47,129,247,0.4)" }}>Buy {prices[ticket] != null ? (prices[ticket] * 1.0001).toFixed(dg(ticket)) : ""}</button>
+              <button onClick={() => placeTicket("SELL")} className="flex-1 rounded py-2 text-xs" style={{ background: "rgba(224,82,96,0.16)", color: SELL, border: "0.5px solid rgba(224,82,96,0.4)" }}>Sell {prices[ticket] != null ? gnum(prices[ticket] * 0.9999, dg(ticket)) : ""}</button>
+              <button onClick={() => placeTicket("BUY")} className="flex-1 rounded py-2 text-xs" style={{ background: "rgba(47,129,247,0.18)", color: "#6ab0ff", border: "0.5px solid rgba(47,129,247,0.4)" }}>Buy {prices[ticket] != null ? gnum(prices[ticket] * 1.0001, dg(ticket)) : ""}</button>
             </div>
             {err && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
             <button onClick={() => setTicket(null)} className="mt-2 w-full rounded border border-[var(--border)] py-1.5 text-xs">Cancel</button>
@@ -1503,8 +1517,8 @@ export default function AdminDeskPage() {
               const est = pnlOf({ symbol: pos.t.symbol, type: pos.t.type, lots: Number(pos.t.lots), openPrice: Number(pos.t.openPrice) }, cp, csz(pos.t.symbol));
               return (<>
                 <div className="mb-3 grid grid-cols-2 gap-2">
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--soft)] px-3 py-2 text-center"><div className="text-[9px] uppercase tracking-wide text-[var(--muted)]">Live Price</div><div className="text-sm font-bold" style={{ color: "var(--accent)" }}>{live != null ? live.toFixed(dg(pos.t.symbol)) : "…"}</div></div>
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--soft)] px-3 py-2 text-center"><div className="text-[9px] uppercase tracking-wide text-[var(--muted)]">Est. P/L</div><div className="text-sm font-bold" style={{ color: est >= 0 ? BUY : SELL }}>{est >= 0 ? "+" : ""}{est.toFixed(2)}</div></div>
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--soft)] px-3 py-2 text-center"><div className="text-[9px] uppercase tracking-wide text-[var(--muted)]">Live Price</div><div className="text-sm font-bold" style={{ color: "var(--accent)" }}>{live != null ? gpx(pos.t.symbol, live) : "…"}</div></div>
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--soft)] px-3 py-2 text-center"><div className="text-[9px] uppercase tracking-wide text-[var(--muted)]">Est. P/L</div><div className="text-sm font-bold" style={{ color: est >= 0 ? BUY : SELL }}>{est >= 0 ? "+" : ""}{gnum(est, 2)}</div></div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div><div className="flex items-center justify-between"><span className={lab}>Close Price *</span>{pform.follow ? <span className="text-[9px]" style={{ color: GOLD }}>live</span> : <button onClick={() => setPform({ ...pform, follow: true, closePrice: live ?? pform.closePrice })} className="text-[9px] underline" style={{ color: "var(--accent)" }}>use live</button>}</div><input type="number" className={inp} value={pform.follow ? (live != null ? live.toFixed(dg(pos.t.symbol)) : pform.closePrice) : pform.closePrice} onChange={(e) => setPform({ ...pform, closePrice: e.target.value, follow: false })} autoFocus /></div>
@@ -1513,7 +1527,7 @@ export default function AdminDeskPage() {
               </>);
             })() : (<>
               <div className={lab}>Lots to close (max {pos.t.lots})</div><input type="number" step="0.01" className={inp} value={pform.lots} onChange={(e) => setPform({ ...pform, lots: e.target.value })} autoFocus />
-              <div className="mt-1 text-[10px] text-[var(--muted)]">At price {prices[pos.t.symbol] != null ? prices[pos.t.symbol].toFixed(dg(pos.t.symbol)) : pos.t.openPrice}</div>
+              <div className="mt-1 text-[10px] text-[var(--muted)]">At price {prices[pos.t.symbol] != null ? gpx(pos.t.symbol, prices[pos.t.symbol]) : pos.t.openPrice}</div>
             </>)}
             {err && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
             <div className="mt-3 flex gap-2">
@@ -1565,8 +1579,8 @@ export default function AdminDeskPage() {
               <div><div className={flab}>Note</div><input className={inp} value={aform.note || ""} onChange={(e) => af("note", e.target.value)} /></div>
             </>)}
             {act.kind === "transfer" && (<>
-              <div><div className={flab}>From Account</div><select className={inp} value={aform.fromId || act.acc.id} onChange={(e) => af("fromId", e.target.value)}>{clients.map((c: any) => <option key={c.id} value={c.id}>{c.login} — {c.name} (${acctBal(c).toFixed(2)})</option>)}</select></div>
-              <div><div className={flab}>To Account</div><select className={inp} value={aform.toId || ""} onChange={(e) => af("toId", e.target.value)}><option value="">- select -</option>{clients.map((c: any) => <option key={c.id} value={c.id}>{c.login} — {c.name} (${acctBal(c).toFixed(2)})</option>)}</select></div>
+              <div><div className={flab}>From Account</div><select className={inp} value={aform.fromId || act.acc.id} onChange={(e) => af("fromId", e.target.value)}>{clients.map((c: any) => <option key={c.id} value={c.id}>{c.login} — {c.name} (${gmoney(acctBal(c))})</option>)}</select></div>
+              <div><div className={flab}>To Account</div><select className={inp} value={aform.toId || ""} onChange={(e) => af("toId", e.target.value)}><option value="">- select -</option>{clients.map((c: any) => <option key={c.id} value={c.id}>{c.login} — {c.name} (${gmoney(acctBal(c))})</option>)}</select></div>
               <div><div className={flab}>Amount (USD)</div><input type="number" step="0.01" className={inp} value={aform.amount || ""} onChange={(e) => af("amount", e.target.value)} placeholder="0.00" /></div>
               <div><div className={flab}>Note (optional)</div><input className={inp} value={aform.note || ""} onChange={(e) => af("note", e.target.value)} placeholder="e.g. balance adjustment" /></div>
               <div className="rounded-lg p-2 text-[10px] leading-snug" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)", color: "var(--muted)" }}><i className="fa-solid fa-circle-info mr-1" />Transfer logs to financial history (one row each side) and the audit log. Closed balance only — floating P/L stays at risk on the source.</div>
@@ -1584,18 +1598,18 @@ export default function AdminDeskPage() {
                 <div><div className={flab}>Manager / Group</div><input className={inp} value={(act.acc.manager?.name || "Unassigned") + (act.acc.group?.name ? " / " + act.acc.group.name : "")} disabled /></div>
               </div>
               {linked.length > 0 && (<div className="rounded-lg border" style={{ borderColor: "var(--border)" }}>
-                <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold text-[var(--muted)]"><span><i className="fa-solid fa-link mr-1" />LINKED ACCOUNTS ({linked.length})</span><span>TOTAL: ${linked.reduce((s: number, c: any) => s + acctBal(c), 0).toFixed(2)}</span></div>
+                <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold text-[var(--muted)]"><span><i className="fa-solid fa-link mr-1" />LINKED ACCOUNTS ({linked.length})</span><span>TOTAL: ${gmoney(linked.reduce((s: number, c: any) => s + acctBal(c), 0))}</span></div>
                 {linked.map((c: any) => (<div key={c.id} className="flex items-center justify-between gap-2 border-t px-2 py-1 text-[11px]" style={{ borderColor: "var(--border)", background: c.id === act.acc.id ? "var(--soft)" : undefined }}>
                   <span style={{ color: "var(--accent2)" }}>#{c.login} <span className="rounded px-1 text-[8px]" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)" }}>{c.type}</span>{c.parentId ? <span className="ml-1 rounded px-1 text-[8px] text-[var(--muted)]" style={{ background: "var(--soft)" }}>sub</span> : null}{c.id === act.acc.id ? " · current" : ""}</span>
-                  <span className="flex items-center gap-2"><span className="font-medium">${acctBal(c).toFixed(2)}</span>{c.parentId && !isManager && <button title="Unlink from parent" onClick={() => unlinkSub(c)} className="rounded px-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-link-slash" /></button>}</span>
+                  <span className="flex items-center gap-2"><span className="font-medium">${gmoney(acctBal(c))}</span>{c.parentId && !isManager && <button title="Unlink from parent" onClick={() => unlinkSub(c)} className="rounded px-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-link-slash" /></button>}</span>
                 </div>))}
               </div>)}
               <div className="grid grid-cols-3 gap-2 rounded-lg border p-2 text-[10px]" style={{ borderColor: "var(--border)" }}>
-                <div><div className="text-[var(--muted)]">Deposit</div><div className="font-semibold" style={{ color: BUY }}>+{Number(act.acc.deposit || 0).toFixed(2)}</div></div>
-                <div><div className="text-[var(--muted)]">Withdrawal</div><div className="font-semibold" style={{ color: SELL }}>-{Number(act.acc.withdrawal || 0).toFixed(2)}</div></div>
-                <div><div className="text-[var(--muted)]">Closed P/L</div><div className="font-semibold">{Number(act.acc.pnl || 0).toFixed(2)}</div></div>
-                <div><div className="text-[var(--muted)]">Credit</div><div className="font-semibold">{Number(act.acc.credit || 0).toFixed(2)}</div></div>
-                <div><div className="text-[var(--muted)]">Balance</div><div className="font-semibold">{acctBal(act.acc).toFixed(2)}</div></div>
+                <div><div className="text-[var(--muted)]">Deposit</div><div className="font-semibold" style={{ color: BUY }}>+{gmoney(act.acc.deposit || 0)}</div></div>
+                <div><div className="text-[var(--muted)]">Withdrawal</div><div className="font-semibold" style={{ color: SELL }}>-{gmoney(act.acc.withdrawal || 0)}</div></div>
+                <div><div className="text-[var(--muted)]">Closed P/L</div><div className="font-semibold">{gmoney(act.acc.pnl || 0)}</div></div>
+                <div><div className="text-[var(--muted)]">Credit</div><div className="font-semibold">{gmoney(act.acc.credit || 0)}</div></div>
+                <div><div className="text-[var(--muted)]">Balance</div><div className="font-semibold">{gmoney(acctBal(act.acc))}</div></div>
                 <div><div className="text-[var(--muted)]">MC Level</div><div className="font-semibold">{Number(act.acc.mcLevel || 0).toFixed(2)}%</div></div>
               </div>
             </>)}
@@ -1846,7 +1860,7 @@ export default function AdminDeskPage() {
               const cur = prices[mt.symbol];
               const op = mt.follow ? (cur ?? Number(mt.openPrice)) : Number(mt.openPrice);
               const pv = (cur != null && op) ? pnlOf({ symbol: mt.symbol, type: mt.type, lots: Number(mt.lots) || 0, openPrice: op }, cur, csz(mt.symbol)) : 0;
-              return <>Live: {cur != null ? cur.toFixed(dg(mt.symbol)) : "..."} | PnL Preview: <span style={{ color: pv >= 0 ? BUY : SELL, fontWeight: 700 }}>{pv.toFixed(2)}</span></>;
+              return <>Live: {cur != null ? gpx(mt.symbol, cur) : "..."} | PnL Preview: <span style={{ color: pv >= 0 ? BUY : SELL, fontWeight: 700 }}>{gnum(pv, 2)}</span></>;
             })()}</div>
             {err && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
             <div className="mt-3 flex gap-2">

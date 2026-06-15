@@ -7,6 +7,7 @@ import { pnlFor } from "@/lib/trademath";
 import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
 import { nextTicket, assertMargin } from "@/services/trade.service";
+import { gnum, gprice } from "@/lib/format";
 
 function accountWhere(s: any) {
   if (s.role === "ADMIN" || s.role === "SUPERADMIN") return { tenantId: s.tenantId };
@@ -136,7 +137,7 @@ export async function forceClose(s: any, tradeId: string, opts?: { price?: numbe
     await tx.account.update({ where: { id: trade.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnl) } } });
     await tx.trade.delete({ where: { id: trade.id } });
   });
-  const label = `${trade.account.login} ${trade.symbol} closed @ ${price} | PnL ${pnl.toFixed(2)} (by staff)`;
+  const label = `${trade.account.login} ${trade.symbol} closed @ ${gprice(price)} | PnL ${gnum(pnl, 2)} (by staff)`;
   audit(trade.account.tenantId, "trade.close", label, s.email || "staff", s.role);
   notifyStaff(trade.account.tenantId, { type: "TRADE", title: "Trade closed", body: label }, trade.account.managerId).catch(() => {});
   return { pnl, userId: trade.account.userId, tenantId: trade.account.tenantId };

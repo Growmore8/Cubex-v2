@@ -2,6 +2,7 @@
 import { memo, useEffect, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
 import PriceCell from "./PriceCell";
+import { gnum } from "@/lib/format";
 
 type Sym = { symbol: string; display?: string; category?: string; digits?: number };
 
@@ -67,7 +68,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, onDisable }: { symbols: Sym[
         {ordered.map(([cat, list]) => (
           <div key={cat}>
             <div onClick={() => setCollapsed((o) => ({ ...o, [cat]: !o[cat] }))} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[cat] ? "▸" : "▾"} {cat.toUpperCase()}</div>
-            {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dgFor(s); const bid = p != null ? (p * 0.9999).toFixed(d) : "—"; const ask = p != null ? (p * 1.0001).toFixed(d) : "—"; const dir = dirs[s.symbol] || 0;
+            {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dgFor(s); const bid = p != null ? gnum(p * 0.9999, d) : "—"; const ask = p != null ? gnum(p * 1.0001, d) : "—"; const dir = dirs[s.symbol] || 0;
               return (
                 <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)} onContextMenu={onDisable ? (e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); } : undefined} className={"grid cursor-pointer grid-cols-[1fr_72px_72px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")} style={{ borderRadius: 3, minHeight: 22 }}>
                   <span className="truncate pl-2 text-left">{s.symbol}</span>
