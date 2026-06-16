@@ -95,8 +95,16 @@ export default function SAApiKeys() {
 Header:  x-api-key: ck_live_xxxxxxxxxxxx
 
 Response:
-{ "ok": true, "accountId": "900050", "pnl": 1261.48, "currency": "USD" }`}</code></pre>
-      <p className="mt-2 text-xs text-gray-400">Returns the account&apos;s <b>closed P&amp;L</b>. A key only reads its own tenant&apos;s accounts. Limit: 120 requests/min per key. Errors: 401 (bad key), 404 (no such account), 429 (rate limit).</p>
+{
+  "ok": true,
+  "accountId": "900050",
+  "closedPnl": 1261.48,    // realized (closed trades)
+  "floatingPnl": 84.20,    // unrealized (open trades, live)
+  "totalPnl": 1345.68,     // closedPnl + floatingPnl
+  "pnl": 1261.48,          // = closedPnl (back-compat)
+  "currency": "USD"
+}`}</code></pre>
+      <p className="mt-2 text-xs text-gray-400">Returns <b>closed</b>, <b>floating</b> and <b>total</b> P&amp;L. A key only reads its own tenant&apos;s accounts. Limit: 120 requests/min per key. Errors: 401 (bad key), 404 (no such account), 429 (rate limit).</p>
     </div>
 
     {/* Delete confirm */}
