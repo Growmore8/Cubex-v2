@@ -229,9 +229,19 @@ export async function sendForgotPassword(host: string | null, email: string): Pr
   if (!tenant) throw new Error("Tenant not found");
   if (!tenant.smtpEmail || !tenant.smtpPassword) throw new Error("Password reset emails are not configured for this broker. Please contact support.");
   const lowerEmail = email.toLowerCase();
-  const user = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: lowerEmail } });
-  // Always return success (don't reveal if email exists)
-  if (!user) return;
+  let user = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: lowerEmail } });
+  if (!user) {
+    // Fall back to the per-account email copy — covers clients whose login email
+    // differs from account.email (or legacy data) — resolving to the owning user.
+    const acc = await prisma.account.findFirst({ where: { tenantId: tenant.id, email: lowerEmail, userId: { not: null } }, select: { userId: true } });
+    if (acc?.userId) user = await prisma.user.findUnique({ where: { id: acc.userId } });
+  }
+  // Always return success to the caller (don't reveal whether the email exists),
+  // but log server-side so "no reset mail" is diagnosable.
+  if (!user) { console.warn(`[forgot-password] no account matches "${lowerEmail}" in tenant ${tenant.id} — no mail sent`); return; }
+  // Use the user's CANONICAL login email for the link + recipient, so the reset
+  // page (which looks the user up by email) resolves correctly.
+  const target = user.email;
   const token = makeCode() + makeCode(); // 12-digit reset token
   await (prisma.user.update as any)({ where: { id: user.id }, data: { emailToken: "reset:" + token } });
   // Build the link from the domain the user is actually on (request host), then
@@ -241,15 +251,21 @@ export async function sendForgotPassword(host: string | null, email: string): Pr
   const base = process.env.NEXT_PUBLIC_APP_URL
     || (hostBase ? `https://${hostBase}` : "")
     || (tenant.customDomain ? `https://${tenant.customDomain}` : `https://${tenant.subdomain}.cubexenterprises.com`);
-  const resetLink = `${base}/reset-password?email=${encodeURIComponent(lowerEmail)}&token=${token}`;
+  const resetLink = `${base}/reset-password?email=${encodeURIComponent(target)}&token=${token}`;
   const brand: BrandInfo = { brandName: tenant.brandName || tenant.name, primaryColor: tenant.primaryColor, accentColor: tenant.accentColor, logoUrl: tenant.logoUrl };
-  await sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
-    to: lowerEmail,
-    subject: `Reset your password — ${brand.brandName}`,
-    fromName: brand.brandName,
-    replyTo: noReplyAddress(tenant.smtpEmail),
-    html: resetPasswordEmail(brand, resetLink),
-  }, (tenant as any).smtpHost);
+  try {
+    await sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
+      to: target,
+      subject: `Reset your password — ${brand.brandName}`,
+      fromName: brand.brandName,
+      replyTo: noReplyAddress(tenant.smtpEmail),
+      html: resetPasswordEmail(brand, resetLink),
+    }, (tenant as any).smtpHost);
+    console.log(`[forgot-password] reset email sent to ${target} (tenant ${tenant.id})`);
+  } catch (e: any) {
+    console.error(`[forgot-password] send failed to ${target}: ${e?.message || e}`);
+    throw e;
+  }
 }
 
 export async function resetPassword(host: string | null, email: string, token: string, newPassword: string): Promise<void> {
