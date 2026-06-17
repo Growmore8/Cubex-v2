@@ -125,18 +125,46 @@ export async function registerClient(
   const hasSmtp = !!(tenant.smtpEmail && tenant.smtpPassword);
   if (!hasSmtp) throw new Error("Registration is temporarily unavailable for this broker (email verification is not configured). Please contact support.");
   const emailToken = makeCode();
+  const brand: BrandInfo = { brandName: tenant.brandName || tenant.name, primaryColor: tenant.primaryColor, accentColor: tenant.accentColor, logoUrl: tenant.logoUrl };
+  // Send (or re-send) the OTP to the address. Throws on delivery failure.
+  const sendOtp = async () => {
+    await sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
+      to: lowerEmail,
+      subject: `Verify your email — ${brand.brandName}`,
+      fromName: brand.brandName,
+      replyTo: noReplyAddress(tenant.smtpEmail),
+      html: verificationEmail(brand, emailToken),
+    }, (tenant as any).smtpHost);
+  };
 
-  const session = await prisma.$transaction(async (tx) => {
-    const exists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail, role: "CLIENT" } });
-    if (exists) {
-      // The email is already a client identity. Self-signup creates a NEW identity,
-      // so we can't reuse it here — but the client CAN open an additional account
-      // (demo/live) from their dashboard once signed in. Tag the error so the
-      // register page can offer a "Sign in" CTA instead of a dead-end.
+  // Existing client identity with this email?
+  const existing = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: lowerEmail, role: "CLIENT" } });
+  if (existing) {
+    const pending = !!(existing as any).emailToken && !String((existing as any).emailToken).startsWith("reset:");
+    if (!pending) {
+      // Verified account — block self-signup, guide them to sign in (open an extra
+      // account from the dashboard). Tag so the register page shows a "Sign in" CTA.
       const e: any = new Error("You already have an account with this email. Please sign in — you can open a Demo or Live account from your dashboard.");
       e.code = "EMAIL_EXISTS";
       throw e;
     }
+    // Unverified (OTP never completed) — this is effectively a retry/resend. Refresh
+    // the latest name + password and re-send a fresh code; do NOT create a second
+    // account. This is what makes the "Resend code" button and re-submits work.
+    await (prisma.user.update as any)({ where: { id: existing.id }, data: { name, passwordHash, emailToken } });
+    try { await sendOtp(); }
+    catch (e: any) {
+      console.error("[register] OTP resend failed:", e?.message);
+      throw new Error("We couldn't send the verification code to your email. Please check the address and try again, or contact support.");
+    }
+    return { needsVerification: true, email: lowerEmail };
+  }
+
+  const session = await prisma.$transaction(async (tx) => {
+    // Race-safety: another request may have created this client between the check
+    // above and here.
+    const dupe = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail, role: "CLIENT" } });
+    if (dupe) { const e: any = new Error("Email already registered"); e.code = "EMAIL_EXISTS"; throw e; }
     // One identity per person: an email used by a staff member can't also be a client.
     const staffExists = await tx.user.findFirst({ where: { tenantId: tenant!.id, email: lowerEmail, role: { in: ["ADMIN", "MANAGER"] } } });
     if (staffExists) throw new Error("This email is already in use. Please use a different email.");
@@ -165,28 +193,17 @@ export async function registerClient(
   audit(tenant!.id, "client.register", name + " <" + lowerEmail + "> (" + (type || "LIVE") + ")", lowerEmail, "CLIENT").catch(() => {});
   notifyStaff(tenant!.id, { title: "New client registered", body: name + " (" + lowerEmail + ")", type: "NOTICE" }).catch(() => {});
 
-  if (hasSmtp && emailToken) {
-    const brand: BrandInfo = { brandName: tenant.brandName || tenant.name, primaryColor: tenant.primaryColor, accentColor: tenant.accentColor, logoUrl: tenant.logoUrl };
-    // Send the verification code and WAIT for it. If delivery fails we must not
-    // leave behind an account that can never be verified — roll it back and tell
-    // the user, instead of silently creating an account with no OTP delivered.
-    try {
-      await sendTenantMail(tenant.smtpEmail, tenant.smtpPassword, {
-        to: lowerEmail,
-        subject: `Verify your email — ${brand.brandName}`,
-        fromName: brand.brandName,
-        replyTo: noReplyAddress(tenant.smtpEmail),
-        html: verificationEmail(brand, emailToken),
-      }, (tenant as any).smtpHost);
-    } catch (e: any) {
-      await prisma.account.deleteMany({ where: { userId: session.sub } }).catch(() => {});
-      await prisma.user.delete({ where: { id: session.sub } }).catch(() => {});
-      throw new Error("We couldn't send the verification code to your email. Please check the address and try again, or contact support.");
-    }
-    return { needsVerification: true, email: lowerEmail };
+  // Send the verification code and WAIT for it. If delivery fails we must not leave
+  // behind an account that can never be verified — roll it back and tell the user.
+  try {
+    await sendOtp();
+  } catch (e: any) {
+    console.error("[register] OTP send failed:", e?.message);
+    await prisma.account.deleteMany({ where: { userId: session.sub } }).catch(() => {});
+    await prisma.user.delete({ where: { id: session.sub } }).catch(() => {});
+    throw new Error("We couldn't send the verification code to your email. Please check the address and try again, or contact support.");
   }
-
-  return { ...session, needsVerification: false };
+  return { needsVerification: true, email: lowerEmail };
 }
 
 export async function verifyEmail(

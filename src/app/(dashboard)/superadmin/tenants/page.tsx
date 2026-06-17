@@ -31,6 +31,7 @@ export default function SATenantsPage() {
   const [subForm, setSubForm] = useState<any>({});
   const [editFor, setEditFor] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const [smtpTest, setSmtpTest] = useState<string>("");
   // Live package definitions (defaults merged with super-admin overrides) so the plan
   // dropdowns show the real account limit set in Packages & Pricing.
   const [pkgs, setPkgs] = useState<any>(PACKAGES);
@@ -104,12 +105,21 @@ export default function SATenantsPage() {
       contactName: t.contactName || "", contactPhone: t.contactPhone || "",
       allowRegistration: t.allowRegistration !== false,
     });
+    setSmtpTest("");
     setEditFor(t);
   }
   async function saveEdit() {
     if (!editFor) return;
     await act(editFor.id, "edit", editForm);
     setEditFor(null);
+  }
+  async function testSmtp() {
+    if (!editFor) return;
+    const to = window.prompt("Send a test email to (leave blank to just check the SMTP login):", editFor.supportEmail || "");
+    if (to === null) return; // cancelled
+    setSmtpTest("Testing…");
+    const r = await fetch("/api/superadmin/smtp-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenantId: editFor.id, to: to.trim() }) }).then((x) => x.json()).catch(() => ({ ok: false, error: "Request failed" }));
+    setSmtpTest(r.ok ? (r.sent ? `✓ Sent to ${r.sent} (host ${r.host})` : `✓ Login OK (host ${r.host})`) : `✗ ${r.error}`);
   }
 
   function openPerms(t: any) { setPermFor(t); setPerms(t.permissions || {}); }
@@ -440,6 +450,11 @@ export default function SATenantsPage() {
                   <div><label className="text-xs text-gray-500 block mb-1">SMTP Email</label><input className={inp} type="email" autoComplete="off" placeholder="info@yourbrand.com" value={editForm.smtpEmail} onChange={(e) => setEditForm({ ...editForm, smtpEmail: e.target.value })} /></div>
                   <div><label className="text-xs text-gray-500 block mb-1">Email / App Password {editFor?.smtpEmail ? <span className="text-gray-400">(leave blank to keep current)</span> : null}</label><PasswordInput wrap="relative" className={inp} autoComplete="new-password" placeholder={editFor?.smtpEmail ? "Leave blank to keep" : "App password"} value={editForm.smtpPassword} onChange={(e) => setEditForm({ ...editForm, smtpPassword: e.target.value })} /></div>
                   <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">SMTP Host <span className="text-gray-400">(optional — custom domains, e.g. mail.privateemail.com)</span></label><input className={inp} autoComplete="off" placeholder="Blank = auto-detect from email domain" value={editForm.smtpHost} onChange={(e) => setEditForm({ ...editForm, smtpHost: e.target.value })} /></div>
+                  <div className="col-span-2 flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={testSmtp} className="rounded-lg border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: "#cbd5e1" }}><i className="fa-solid fa-paper-plane mr-1" />Test SMTP</button>
+                    <span className="text-[11px] text-gray-400">Tests the <b>saved</b> settings — save first if you changed them.</span>
+                    {smtpTest && <span className="text-xs font-medium" style={{ color: smtpTest.startsWith("✓") ? "#16a34a" : smtpTest.startsWith("✗") ? "#dc2626" : "#64748b" }}>{smtpTest}</span>}
+                  </div>
                 </div>
               </div>
               <div><label className="text-xs text-gray-500 block mb-1">Primary Color</label><div className="flex gap-2"><input type="color" className="rounded border h-9 w-12 cursor-pointer" value={editForm.primaryColor} onChange={(e) => setEditForm({ ...editForm, primaryColor: e.target.value })} /><input className={inp} value={editForm.primaryColor} onChange={(e) => setEditForm({ ...editForm, primaryColor: e.target.value })} /></div></div>

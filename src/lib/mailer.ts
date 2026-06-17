@@ -37,30 +37,64 @@ export function noReplyAddress(smtpEmail: string): string {
   return `no-reply@${domain}`;
 }
 
+function buildTransport(smtpEmail: string, smtpPassword: string, smtpHost?: string | null) {
+  const host = (smtpHost && smtpHost.trim()) || inferSmtpHost(smtpEmail);
+  // Port 587 + STARTTLS is the common submission port. Timeouts keep a wrong/
+  // unreachable host from hanging the request (which looks like "mail not coming").
+  const transporter = nodemailer.createTransport({
+    host,
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    auth: { user: smtpEmail, pass: smtpPassword },
+    tls: { rejectUnauthorized: false },
+    connectionTimeout: 15_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+  });
+  return { transporter, host };
+}
+
 export async function sendTenantMail(
   smtpEmail: string,
   smtpPassword: string,
   opts: MailOptions,
   smtpHost?: string | null,
 ) {
-  const host = (smtpHost && smtpHost.trim()) || inferSmtpHost(smtpEmail);
-  const transporter = nodemailer.createTransport({
-    host,
-    port: 587,
-    secure: false,
-    auth: { user: smtpEmail, pass: smtpPassword },
-    tls: { rejectUnauthorized: false },
-  });
-  await transporter.sendMail({
-    from: opts.from || `"${opts.fromName || "CubeX"}" <${smtpEmail}>`,
-    to: opts.to,
-    subject: opts.subject,
-    html: opts.html,
-    ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
-    ...(opts.attachments ? { attachments: opts.attachments } : {}),
-    // Discourage auto-responders / out-of-office replies to automated mail.
-    headers: { "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All" },
-  });
+  const { transporter, host } = buildTransport(smtpEmail, smtpPassword, smtpHost);
+  try {
+    await transporter.sendMail({
+      from: opts.from || `"${opts.fromName || "CubeX"}" <${smtpEmail}>`,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+      ...(opts.attachments ? { attachments: opts.attachments } : {}),
+      // Discourage auto-responders / out-of-office replies to automated mail.
+      headers: { "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All" },
+    });
+  } catch (e: any) {
+    // Log the real SMTP reason (host + provider message) so "mail not coming" is
+    // diagnosable in server logs; rethrow so callers can surface a friendly error.
+    console.error(`[mailer] send failed via ${host} as ${smtpEmail}: ${e?.message || e}`);
+    throw e;
+  }
+}
+
+// Validate SMTP credentials/host without sending — powers the "Test SMTP" tool.
+// Returns { ok } on success or { ok:false, error } with the real reason.
+export async function verifySmtp(
+  smtpEmail: string,
+  smtpPassword: string,
+  smtpHost?: string | null,
+): Promise<{ ok: boolean; host: string; error?: string }> {
+  const { transporter, host } = buildTransport(smtpEmail, smtpPassword, smtpHost);
+  try {
+    await transporter.verify();
+    return { ok: true, host };
+  } catch (e: any) {
+    return { ok: false, host, error: e?.message || String(e) };
+  }
 }
 
 // For platform-level emails (superadmin) — uses env vars
