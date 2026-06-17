@@ -18,6 +18,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
   const [pnlOnly, setPnlOnly] = useState(false);
   const [acctName, setAcctName] = useState("");
+  const [acctType, setAcctType] = useState(""); // DEMO accounts can't deposit/withdraw/transfer
   // Bank Transfer fields
   const [bankAcctNo, setBankAcctNo] = useState("");
   const [bankName, setBankName] = useState("");
@@ -48,6 +49,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
       setWithdrawable(typeof ac.withdrawable === "number" ? ac.withdrawable : Math.max(0, Number(ac.account.pnl || 0)));
       setPnlOnly(!!ac.pnlOnly);
       setAcctName(ac.account.name || ac.account.ownerName || "");
+      setAcctType(ac.account.type || "");
     }
   }
   useEffect(() => { load(); }, []);
@@ -68,6 +70,9 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     fd.set("method", label);
     const dest = depWallet ? (depWallet.network + " " + depWallet.address) : depUpi ? depUpi.address : depBank ? `${depBank.bankName} A/C ${depBank.accountNumber}${depBank.ifsc ? " IFSC " + depBank.ifsc : ""}` : "";
     if (!(fd.get("note") as string)) fd.set("note", "Deposit to " + dest);
+    // Attribute the request to the account the client is on (else the server
+    // would fall back to their first/primary account — often the demo).
+    if (accountId) fd.set("accountId", accountId);
     setSending(true);
     const r = await fetch("/api/client/payments", { method: "POST", body: fd });
     const d = await r.json(); setSending(false);
@@ -122,6 +127,16 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     </button>
   );
 
+  // Demo accounts have no real funds — block deposit / withdraw / transfer.
+  const isDemo = acctType === "DEMO";
+  const demoNotice = (
+    <div className="ui-card ui-fade-up p-6 text-center">
+      <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgba(245,158,11,.14)" }}><i className="fa-solid fa-vial text-xl" style={{ color: "#f59e0b" }} /></div>
+      <div className="text-sm font-semibold">Not available for demo accounts</div>
+      <p className="mt-1 text-xs text-[var(--muted)]">Deposits, withdrawals and transfers are for live accounts only. Switch to a live account to manage funds.</p>
+    </div>
+  );
+
   return (<div className="space-y-4 text-[var(--text)]">
     <div className="flex items-center justify-between">
       <h1 className="text-lg font-bold">{tab === "deposit" ? "↓ Deposit Funds" : tab === "withdraw" ? "↑ Withdraw Funds" : panelTitle}</h1>
@@ -137,7 +152,8 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     )}
 
     {/* ── DEPOSIT ── */}
-    {tab === "deposit" && (depSel ? (
+    {tab === "deposit" && isDemo && demoNotice}
+    {tab === "deposit" && !isDemo && (depSel ? (
       <form onSubmit={submitDeposit} className="ui-card ui-fade-up space-y-3 p-4">
         <button type="button" onClick={() => setDepSel(null)} className="text-sm font-medium text-blue-600 hover:text-blue-700"><i className="fa-solid fa-chevron-left mr-1" />Back</button>
         {depWallet && (<>
@@ -179,7 +195,8 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     ))}
 
     {/* ── WITHDRAW ── */}
-    {tab === "withdraw" && (<form onSubmit={submitWithdraw} className="ui-card ui-fade-up space-y-3 p-4">
+    {tab === "withdraw" && isDemo && demoNotice}
+    {tab === "withdraw" && !isDemo && (<form onSubmit={submitWithdraw} className="ui-card ui-fade-up space-y-3 p-4">
       <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--border)", background: "var(--soft)" }}>
         <div className={lbl + " text-center"}>{pnlOnly ? "Available Profit To Withdraw" : "Available Balance To Withdraw"}</div>
         <div className="text-xl font-bold" style={{ color: "#22d3ee" }}>{withdrawable != null ? fmtUsd(withdrawable) : "—"}</div>

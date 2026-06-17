@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
 import { emitRefresh } from "@/lib/realtime";
+import { audit } from "@/lib/audit";
+import { notifyStaff } from "@/services/notification.service";
 
 export async function POST(req: Request) {
   const s = await requireClient();
@@ -17,6 +19,8 @@ export async function POST(req: Request) {
     const from = await prisma.account.findFirst({ where: { id: b.fromId, tenantId: s.tenantId ?? undefined, userId: s.sub ?? undefined } });
     const to = await prisma.account.findFirst({ where: { id: b.toId, tenantId: s.tenantId ?? undefined, userId: s.sub ?? undefined } });
     if (!from || !to) throw new Error("Account not found");
+    // Demo accounts have no real funds — block transfers in or out of them.
+    if (from.type === "DEMO" || to.type === "DEMO") throw new Error("Transfers are not available for demo accounts.");
     const pnlOnly = await getFundsPnlOnly(s.tenantId!);
     const movable = withdrawableBalance(from, pnlOnly);
     if (amount > movable) throw new Error(pnlOnly ? "Only your profit (PNL) balance is transferable" : "Insufficient balance");
@@ -28,6 +32,9 @@ export async function POST(req: Request) {
       await tx.financialHistory.create({ data: { accountId: from.id, type: "TRANSFER_OUT" as any, amount: amt, description: "Transfer to " + to.login, reference: ref, mode: "MANUAL", createdBy: s.email } });
       await tx.financialHistory.create({ data: { accountId: to.id, type: "TRANSFER_IN" as any, amount: amt, description: "Transfer from " + from.login, reference: ref, mode: "MANUAL", createdBy: s.email } });
     });
+    // Record in the platform audit log + notify staff (which account → which account).
+    await audit(s.tenantId!, "client.transfer", `${from.login} → ${to.login} ${amount}`, s.email || from.login, "CLIENT").catch(() => {});
+    await notifyStaff(s.tenantId!, { type: "FUNDS", title: "Account transfer", body: `${from.login} → ${to.login}: ${amount}` }, from.managerId).catch(() => {});
     emitRefresh(); // sync the client's other open devices
     return NextResponse.json({ ok: true });
   } catch (e: any) {

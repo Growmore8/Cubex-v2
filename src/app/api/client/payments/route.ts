@@ -29,6 +29,9 @@ export async function POST(req: Request) {
     let account: any = reqAccId
       ? await prisma.account.findFirst({ where: { id: reqAccId, tenantId: s.tenantId!, userId: s.sub } })
       : null;
+    // No explicit account → prefer the oldest LIVE account (never default to the
+    // demo for money operations), falling back to any account only as a last resort.
+    if (!account) account = await prisma.account.findFirst({ where: { tenantId: s.tenantId!, userId: s.sub, type: "LIVE" }, orderBy: { createdAt: "asc" } });
     if (!account) account = await clientAccount(s.tenantId!, s.sub);
     if (!account) throw new Error("No account");
     const kind = String(form.get("kind"));
@@ -37,6 +40,8 @@ export async function POST(req: Request) {
     const note = form.get("note") ? String(form.get("note")) : undefined;
     if (!["DEPOSIT", "WITHDRAWAL"].includes(kind)) throw new Error("Invalid kind");
     if (!(amount > 0)) throw new Error("Amount must be positive");
+    // Demo accounts have no real funds — no deposits/withdrawals.
+    if (account.type === "DEMO") throw new Error("Deposits and withdrawals are not available for demo accounts.");
     if (kind === "WITHDRAWAL") {
       const pnlOnly = await getFundsPnlOnly(s.tenantId!);
       const movable = withdrawableBalance(account as any, pnlOnly);
