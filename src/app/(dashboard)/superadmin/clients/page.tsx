@@ -304,6 +304,19 @@ export default function SAClientsPage() {
                     <button title="Statement / Report" style={btnStyle("#eff6ff")} onClick={() => { setRepEmail(r.email || ""); setRepMsg(""); setRepRow(r); }} className="mr-0.5">
                       <i className="fa-solid fa-file-invoice text-xs" style={{ color: "#2563eb" }} />
                     </button>
+                    {/* Repair login — only for orphaned accounts (login identity was deleted) */}
+                    {r.hasUser === false && (
+                      <button title="Repair login (rebuild this account's sign-in identity & password)" style={btnStyle("#fefce8")} onClick={async () => {
+                        if (!r.email) { alert("Set an email on this account first (Edit), then repair."); return; }
+                        const pw = window.prompt(`Rebuild login for ${r.email}. Set a new password (min 6 chars) — give it to the client:`);
+                        if (pw === null) return;
+                        if (pw.length < 6) { alert("Password must be at least 6 characters."); return; }
+                        const ok = await act(r.id, "repairLogin", { email: r.email, password: pw });
+                        if (ok) alert("Login repaired. The client can now sign in (and use forgot-password) with " + r.email);
+                      }} className="mr-0.5">
+                        <i className="fa-solid fa-user-shield text-xs" style={{ color: "#ca8a04" }} />
+                      </button>
+                    )}
                     <button title="Delete" style={btnStyle("#fff1f2")} onClick={() => setDelRow(r)}>
                       <i className="fa-solid fa-trash text-xs" style={{ color: "#dc2626" }} />
                     </button>

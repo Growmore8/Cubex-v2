@@ -23,6 +23,7 @@ export async function GET() {
     login: a.login,
     name: a.name,
     email: (a.user && a.user.email) || a.email || null,
+    hasUser: !!a.userId, // false = orphaned (login identity was deleted) → needs repair
     phone: a.phone,
     country: a.country,
     company: a.tenant ? (a.tenant.brandName || a.tenant.name) : "—",

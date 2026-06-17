@@ -59,6 +59,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!acc.userId) throw new Error("No login user for this account");
       if (!b.password || b.password.length < 6) throw new Error("Password too short");
       await prisma.user.update({ where: { id: acc.userId }, data: { passwordHash: await hashPassword(b.password) } });
+    } else if (b.action === "repairLogin") {
+      // Rebuild the login identity for an orphaned account (its shared User was
+      // deleted when another of the client's accounts was removed). Recreates/links
+      // a User from the email and sets a password so the client can sign in again.
+      const email = String(b.email || acc.email || "").trim().toLowerCase();
+      if (!email) throw new Error("Set an email on this account first, then repair.");
+      if (!b.password || b.password.length < 6) throw new Error("Password must be at least 6 characters");
+      await applyClientEmail(acc.tenantId, acc.id, email); // recreate/link the User
+      const fresh = await prisma.account.findUnique({ where: { id: acc.id }, select: { userId: true } });
+      if (!fresh?.userId) throw new Error("Could not rebuild the login identity");
+      await prisma.user.update({ where: { id: fresh.userId }, data: { passwordHash: await hashPassword(b.password) } });
     } else if (b.action === "delete") {
       await prisma.$transaction(async (tx) => {
         await tx.account.delete({ where: { id: acc.id } });
