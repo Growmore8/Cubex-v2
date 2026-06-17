@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { assertCan } from "@/lib/perms";
 import { notify } from "@/services/notification.service";
 import { assertSeatAvailable } from "@/services/tenant.service";
+import { applyClientEmail } from "@/services/account.service";
 import { titleCaseName } from "@/lib/format";
 
 const MANAGER_ALLOWED = ["status", "deactivate", "statusAll", "deactivateAll", "rename", "pool", "clearPin", "assign"];
@@ -78,6 +79,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           }
         }
         await prisma.account.update({ where: { id: acc.id }, data });
+        // Email is the LOGIN identity — persist it to User.email (source of truth)
+        // and repair an orphaned account if its login user was previously deleted.
+        if (b.email !== undefined) await applyClientEmail(tenantId, acc.id, b.email);
         // Profile details are shared across ALL of a client's accounts (live + demo)
         // so an edit reflects everywhere — no matter which account (or which is the
         // oldest "parent") was edited, and regardless of live/demo type.

@@ -22,7 +22,7 @@ export async function GET() {
     tenantId: a.tenantId,
     login: a.login,
     name: a.name,
-    email: a.user ? a.user.email : null,
+    email: (a.user && a.user.email) || a.email || null,
     phone: a.phone,
     country: a.country,
     company: a.tenant ? (a.tenant.brandName || a.tenant.name) : "—",

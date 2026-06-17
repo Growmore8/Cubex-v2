@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { notify, notifyStaff } from "@/services/notification.service";
 import { assertSeatAvailable } from "@/services/tenant.service";
 import { titleCaseName } from "@/lib/format";
+import { randomUUID } from "crypto";
 
 export function listClients(tenantId: string, managerId?: string | null) {
   return prisma.account.findMany({
@@ -192,7 +193,49 @@ export async function deleteClient(tenantId: string, id: string, by = "admin") {
   const acc = await prisma.account.findFirst({ where: { tenantId, id } });
   if (!acc) throw new Error("Account not found");
   await prisma.account.delete({ where: { id } });
-  if (acc.userId) await prisma.user.delete({ where: { id: acc.userId } }).catch(() => {});
+  // The login User is SHARED across all of a client's accounts (demo + live), so
+  // only delete it when this was their LAST account — otherwise we'd orphan the
+  // remaining accounts (their userId is SetNull → no login identity / email).
+  if (acc.userId) {
+    const remaining = await prisma.account.count({ where: { userId: acc.userId } });
+    if (remaining === 0) await prisma.user.delete({ where: { id: acc.userId } }).catch(() => {});
+  }
   await audit(tenantId, "client.delete", acc.login, by);
   return { ok: true };
+}
+
+// Apply an email change to a client account, keeping the LOGIN identity
+// (User.email) as the source of truth and the per-account copy (Account.email)
+// in sync. Handles three cases:
+//  - account has a user        -> update that user's email (or re-own to an
+//                                  existing user that already has the email = merge)
+//  - account is orphaned + match -> re-link to the existing user with that email
+//  - account is orphaned + none  -> recreate a login user (password must then be
+//                                    set via "Reset Password" before they can log in)
+export async function applyClientEmail(tenantId: string, accountId: string, rawEmail: string) {
+  const email = String(rawEmail || "").trim().toLowerCase();
+  const acc = await prisma.account.findFirst({ where: { tenantId, id: accountId } });
+  if (!acc) throw new Error("Account not found");
+
+  // Keep the per-account copy in sync (used as the desk display fallback).
+  await prisma.account.update({ where: { id: acc.id }, data: { email: email || null } });
+  if (!email) return; // clearing the email leaves the login identity untouched
+
+  const matchUser = await prisma.user.findFirst({ where: { tenantId, email, role: "CLIENT" } });
+  if (acc.userId) {
+    if (matchUser && matchUser.id !== acc.userId) {
+      // Email belongs to another existing client — re-own this account to them.
+      await prisma.account.update({ where: { id: acc.id }, data: { userId: matchUser.id } });
+    } else {
+      await prisma.user.update({ where: { id: acc.userId }, data: { email } });
+    }
+  } else if (matchUser) {
+    // Orphaned account whose email matches an existing user — re-link.
+    await prisma.account.update({ where: { id: acc.id }, data: { userId: matchUser.id } });
+  } else {
+    // Orphaned account (login user was deleted) with no match — recreate identity.
+    const passwordHash = await hashPassword(randomUUID() + randomUUID());
+    const user = await prisma.user.create({ data: { tenantId, email, name: acc.name || email, role: "CLIENT" as any, passwordHash } });
+    await prisma.account.update({ where: { id: acc.id }, data: { userId: user.id } });
+  }
 }

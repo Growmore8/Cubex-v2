@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
-import { adjustBalance } from "@/services/account.service";
+import { adjustBalance, applyClientEmail } from "@/services/account.service";
 import { audit } from "@/lib/audit";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -27,10 +27,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     } else if (b.action === "rename") {
       const data: any = {};
       if (b.name) data.name = b.name;
-      if (b.email !== undefined) data.email = b.email || null;
       if (b.phone !== undefined) data.phone = b.phone || null;
       if (b.country !== undefined) data.country = b.country || null;
-      await prisma.account.update({ where: { id: acc.id }, data });
+      if (Object.keys(data).length) await prisma.account.update({ where: { id: acc.id }, data });
+      // Email is the LOGIN identity — route it through the helper so it updates
+      // User.email (source of truth) and repairs orphaned accounts.
+      if (b.email !== undefined) await applyClientEmail(acc.tenantId, acc.id, b.email);
     } else if (b.action === "accountId") {
       const login = String(b.login || "").trim();
       if (!login) throw new Error("Login ID required");
@@ -60,7 +62,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     } else if (b.action === "delete") {
       await prisma.$transaction(async (tx) => {
         await tx.account.delete({ where: { id: acc.id } });
-        if (acc.userId) await tx.user.delete({ where: { id: acc.userId } }).catch(() => {});
+        // Only delete the shared login User when this was the client's LAST account,
+        // else the remaining accounts get orphaned (userId SetNull → no identity).
+        if (acc.userId) {
+          const remaining = await tx.account.count({ where: { userId: acc.userId } });
+          if (remaining === 0) await tx.user.delete({ where: { id: acc.userId } }).catch(() => {});
+        }
       });
     } else {
       throw new Error("Unknown action");
