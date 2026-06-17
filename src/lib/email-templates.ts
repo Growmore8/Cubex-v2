@@ -70,6 +70,25 @@ export function resetPasswordEmail(brand: BrandInfo, resetLink: string): string 
     <p style="font-size:12px;color:#9ca3af;margin:0 0 16px">This link expires in 15 minutes. If you didn't request a reset, ignore this email — your password won't change.</p>`);
 }
 
+// Creative, fully-branded "your email works" confirmation (the SMTP test mail).
+export function smtpTestEmail(brand: BrandInfo): string {
+  const primary = esc(brand.primaryColor || "#2563eb");
+  const accent = esc(brand.accentColor || "#22c55e");
+  const name = esc(brand.brandName);
+  return brandedEmail(brand, "Your email is working 🎉", `
+    <div style="text-align:center;margin:6px 0 20px">
+      <div style="display:inline-block;width:86px;height:86px;line-height:86px;border-radius:50%;text-align:center;color:#fff;font-size:46px;font-weight:800;background:linear-gradient(135deg,${primary},${accent});box-shadow:0 10px 26px -8px ${accent}">&#10003;</div>
+    </div>
+    <p style="font-size:16px;line-height:1.6;color:#111827;font-weight:700;margin:0 0 10px;text-align:center">All set — email delivery is working.</p>
+    <p style="font-size:13px;line-height:1.7;color:#6b7280;margin:0 0 18px;text-align:center">This is a test message confirming that <strong>${name}</strong> can reach your clients. Verification codes, password resets and account statements will now be delivered from this address.</p>
+    <table role="presentation" style="width:100%;border-collapse:separate;border-spacing:0 8px;margin:4px 0 14px">
+      <tr><td style="padding:10px 14px;background:#f6f8fc;border-radius:9px;font-size:13px;color:#374151">&#9993;&nbsp; Email verification (OTP)</td></tr>
+      <tr><td style="padding:10px 14px;background:#f6f8fc;border-radius:9px;font-size:13px;color:#374151">&#128274;&nbsp; Password reset links</td></tr>
+      <tr><td style="padding:10px 14px;background:#f6f8fc;border-radius:9px;font-size:13px;color:#374151">&#128196;&nbsp; Account statements (PDF)</td></tr>
+    </table>
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px;text-align:center">No action needed — you can safely ignore this email.</p>`);
+}
+
 export interface StatementSummary {
   holderName: string;
   periodLabel: string;
