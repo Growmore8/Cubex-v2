@@ -328,23 +328,41 @@ export default function ClientMobile({ t }: { t: any }) {
       background: `radial-gradient(620px 380px at -5% -2%, color-mix(in srgb, ${brand?.primaryColor || "#7c3aed"} 34%, transparent), transparent 60%), radial-gradient(620px 380px at 105% 8%, color-mix(in srgb, ${brand?.accentColor || "#2563eb"} 30%, transparent), transparent 58%), radial-gradient(520px 320px at 50% 112%, rgba(16,199,132,0.13), transparent 60%), var(--bg)` }} className="flex flex-col overflow-hidden text-[var(--text)]">
       <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarRef} onChange={uploadAvatar} />
 
-      {/* TOP HEADER — iOS glass */}
-      <div className="glass sticky top-0 z-20 flex items-center justify-between border-b px-3 py-2.5" style={{ borderColor: "var(--border)", background: theme === "dark" ? "rgba(20,24,34,0.6)" : "rgba(255,255,255,0.6)" }}>
-        <div className="flex items-center gap-2.5">
-          <Avatar size={38} />
-          <div className="leading-tight">
-            <div className="text-sm font-bold uppercase">{titleCaseName(account?.ownerName || account?.name) || "Trader"}</div>
-            <div className="text-[10px] text-[var(--muted)]">{account?.type === "LIVE" ? "Live" : "Demo"} #{account?.login} · 1:{account?.leverage}</div>
+      {/* TOP HEADER — premium glass */}
+      {(() => {
+        const hPrimary = brand?.primaryColor || "#7c3aed";
+        const hAccent = brand?.accentColor || "#2563eb";
+        const live = account?.type === "LIVE";
+        return (
+        <div className="glass sticky top-0 z-20 flex items-center justify-between px-3.5 py-2.5" style={{ background: theme === "dark" ? "rgba(16,20,29,0.68)" : "rgba(255,255,255,0.68)", borderBottom: "1px solid color-mix(in srgb, var(--border) 70%, transparent)", boxShadow: theme === "dark" ? "0 1px 0 rgba(255,255,255,0.04)" : "0 1px 12px -8px rgba(15,23,42,0.4)" }}>
+          <div className="flex items-center gap-2.5">
+            {/* avatar with brand gradient ring + presence dot */}
+            <span className="relative inline-flex shrink-0">
+              <span className="rounded-full p-[2px]" style={{ background: `linear-gradient(135deg, ${hPrimary}, ${hAccent})`, boxShadow: `0 4px 12px -4px ${hPrimary}66` }}>
+                <span className="block rounded-full p-[1.5px]" style={{ background: "var(--bg)" }}><Avatar size={34} /></span>
+              </span>
+              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full" style={{ background: "#22c55e", border: "2px solid var(--bg)", boxShadow: "0 0 6px #22c55e" }} />
+            </span>
+            <div className="leading-tight">
+              <div className="text-[10px] font-medium text-[var(--muted)]">Welcome back</div>
+              <div className="text-[14px] font-extrabold tracking-tight">{titleCaseName(account?.ownerName || account?.name) || "Trader"}</div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-[9px] font-semibold" style={{ color: "var(--muted)" }}>
+                <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: live ? "#22c55e" : GOLD }} />
+                <span className="uppercase tracking-wide" style={{ color: live ? "#22c55e" : GOLD }}>{live ? "Live" : "Demo"}</span>
+                <span className="text-[var(--muted)]">#{account?.login} · 1:{account?.leverage}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {brand?.name && <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "color-mix(in srgb, var(--soft) 80%, transparent)", color: "var(--text)", border: "1px solid var(--border)" }}>{brand?.logoUrl ? <img src={brand.logoUrl} alt="" className="h-3.5 w-3.5 rounded object-contain" /> : <i className="fa-solid fa-cube" style={{ color: hPrimary }} />} {brand.name}</span>}
+            <button onClick={() => { setNotisOpen((o) => !o); if (!notisOpen && unread > 0) fetch("/api/client/notifications", { method: "POST" }).then(() => {}).catch(() => {}); }} className="relative flex h-9 w-9 items-center justify-center rounded-full transition-transform active:scale-90" style={{ background: "var(--soft)", border: "1px solid var(--border)" }}>
+              <i className="fa-solid fa-bell text-[13px]" style={{ color: unread > 0 ? GOLD : "var(--muted)" }} />
+              {unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: SELL, border: "1.5px solid var(--bg)", boxShadow: `0 0 8px ${SELL}99` }}>{unread > 9 ? "9+" : unread}</span>}
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: "var(--soft)", color: GOLD }}>{brand?.logoUrl ? <img src={brand.logoUrl} alt="" className="h-3.5 w-3.5 rounded object-contain" /> : <i className="fa-solid fa-cube" />} {brand?.name || ""}</span>
-          <button onClick={() => { setNotisOpen((o) => !o); if (!notisOpen && unread > 0) fetch("/api/client/notifications", { method: "POST" }).then(() => {}).catch(() => {}); }} className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[var(--soft)]">
-            <i className="fa-solid fa-bell" style={{ color: unread > 0 ? GOLD : "var(--muted)" }} />
-            {unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: SELL }}>{unread > 9 ? "9+" : unread}</span>}
-          </button>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Read-only banner */}
       {t.readOnly && (
