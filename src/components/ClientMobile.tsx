@@ -1174,10 +1174,12 @@ export default function ClientMobile({ t }: { t: any }) {
 
       {/* BOTTOM NAV — connected "goo" blob bar; active item pops out as a white bead */}
       {(() => {
-        const BLOB = theme === "dark" ? "#20242e" : "#15181f"; // dark connected body
+        const primary = brand?.primaryColor || "#7c3aed";
+        const accent = brand?.accentColor || "#2563eb";
+        const BODY = `linear-gradient(135deg, ${primary}, ${accent})`; // brand-themed connected body
         const SLOT = 46;   // blob / hit-area diameter
         const LIFT = 24;   // how far the active bead pops up
-        const H = SLOT + LIFT + 4; // container height with headroom for the pop
+        const H = SLOT + LIFT + 6; // container height with headroom for the pop
         const slot = (active: boolean): React.CSSProperties => ({ width: SLOT, height: SLOT, marginBottom: active ? LIFT : 0, flex: "0 0 auto", transition: "margin-bottom .4s cubic-bezier(.34,1.5,.5,1)" });
         return (
           <div className="px-4 pt-2" style={{ paddingBottom: "max(0.6rem, env(safe-area-inset-bottom))" }}>
@@ -1191,11 +1193,11 @@ export default function ClientMobile({ t }: { t: any }) {
                 </filter>
               </defs>
             </svg>
-            <div className="relative" style={{ height: H, filter: "drop-shadow(0 10px 22px rgba(0,0,0,0.35))" }}>
-              {/* connected dark body (filtered) */}
+            <div className="relative" style={{ height: H, filter: `drop-shadow(0 12px 22px ${primary}59)` }}>
+              {/* connected brand-coloured body (filtered into one blob) */}
               <div className="absolute inset-x-0 bottom-0 flex items-end justify-around" style={{ height: H, filter: "url(#cubex-goo)" }}>
-                <div className="absolute bottom-0" style={{ left: 4, right: 4, height: SLOT - 2, borderRadius: 999, background: BLOB }} />
-                {navItems.map(([k]) => <div key={k} style={{ ...slot(tab === k), borderRadius: 999, background: BLOB }} />)}
+                <div className="absolute bottom-0" style={{ left: 4, right: 4, height: SLOT - 2, borderRadius: 999, background: BODY }} />
+                {navItems.map(([k]) => <div key={k} style={{ ...slot(tab === k), borderRadius: 999, background: BODY }} />)}
               </div>
               {/* icons + active white bead (NOT filtered, so they stay crisp) */}
               <div className="absolute inset-x-0 bottom-0 flex items-end justify-around" style={{ height: H }}>
@@ -1204,8 +1206,9 @@ export default function ClientMobile({ t }: { t: any }) {
                   return (
                     <button key={k} onClick={() => startTransition(() => setTab(k as any))} aria-label={k}
                       className="relative flex items-center justify-center" style={slot(active)}>
-                      {active && <span className="absolute inset-0 rounded-full" style={{ background: "#fff", animation: "nav-pop .3s cubic-bezier(.34,1.56,.64,1)" }} />}
-                      <i className={`fa-solid ${icon}`} style={{ position: "relative", fontSize: active ? 17 : 15, color: active ? "#111418" : "rgba(255,255,255,0.92)", transition: "color .25s ease, font-size .2s ease" }} />
+                      {/* active bead: white disc with a subtle brand-tinted ring + pop */}
+                      {active && <span className="absolute inset-0 rounded-full" style={{ background: "#fff", boxShadow: `inset 0 0 0 2px ${accent}33`, animation: "nav-pop .3s cubic-bezier(.34,1.56,.64,1)" }} />}
+                      <i className={`fa-solid ${icon}`} style={{ position: "relative", fontSize: active ? 17 : 15, color: active ? primary : "rgba(255,255,255,0.95)", transition: "color .25s ease, font-size .2s ease" }} />
                     </button>
                   );
                 })}
