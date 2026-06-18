@@ -334,7 +334,7 @@ export default function ClientMobile({ t }: { t: any }) {
         const hAccent = brand?.accentColor || "#2563eb";
         const live = account?.type === "LIVE";
         return (
-        <div className="glass sticky top-0 z-20 flex items-center justify-between px-3.5 py-2.5" style={{ background: theme === "dark" ? "rgba(16,20,29,0.55)" : "rgba(255,255,255,0.6)", boxShadow: theme === "dark" ? "0 18px 30px -24px rgba(0,0,0,0.9)" : "0 18px 28px -24px rgba(15,23,42,0.35)" }}>
+        <div className="sticky top-0 z-20 flex items-center justify-between px-3.5 py-2.5" style={{ background: "transparent" }}>
           <div className="flex items-center gap-2.5">
             {/* avatar with brand gradient ring + presence dot */}
             <span className="relative inline-flex shrink-0">
@@ -1190,37 +1190,42 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
       )}
 
-      {/* BOTTOM NAV — solid rounded bar; active item = brand squircle with white icon */}
+      {/* BOTTOM NAV — stylish rounded bar; active item = brand-gradient squircle */}
       {(() => {
         const primary = brand?.primaryColor || "#2563eb";
+        const accent = brand?.accentColor || "#1d4ed8";
         const dark = theme === "dark";
-        const barBg = dark ? "#21242b" : "#ffffff";
+        const barBg = dark ? "linear-gradient(180deg,#262a33,#1a1d24)" : "linear-gradient(180deg,#ffffff,#eef1f7)";
+        const activeFill = `linear-gradient(140deg, ${primary}, ${accent})`; // gradient, not flat
         const inactive = dark ? "rgba(255,255,255,0.6)" : "#64748b"; // outline-icon stroke colour
+        const spring = "cubic-bezier(.34,1.56,.64,1)";
         return (
           <div className="px-4 pt-2" style={{ paddingBottom: "max(0.6rem, env(safe-area-inset-bottom))" }}>
-            <div className="flex items-center justify-around rounded-[26px] px-2 py-2" style={{
+            <div className="flex items-center justify-around rounded-[28px] px-2 py-2" style={{
               background: barBg,
-              border: dark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(15,23,42,0.06)",
-              boxShadow: dark ? "0 14px 34px -14px rgba(0,0,0,0.75)" : "0 14px 30px -14px rgba(15,23,42,0.28)",
+              border: dark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(15,23,42,0.05)",
+              boxShadow: dark
+                ? "0 18px 38px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.06)"
+                : "0 18px 34px -16px rgba(15,23,42,0.3), inset 0 1px 0 rgba(255,255,255,0.9)",
             }}>
               {navItems.map(([k, icon]) => {
                 const active = tab === k;
                 return (
                   <button key={k} onClick={() => startTransition(() => setTab(k as any))} aria-label={k}
-                    className="flex items-center justify-center rounded-[15px]" style={{
+                    className="flex items-center justify-center rounded-[16px]" style={{
                       width: 46, height: 46,
-                      background: active ? primary : "transparent",
-                      boxShadow: active ? `0 8px 18px -6px ${primary}80` : "none",
-                      transform: active ? "translateY(-1px)" : "none",
-                      transition: "background .25s ease, box-shadow .25s ease, transform .25s cubic-bezier(.34,1.56,.64,1)",
+                      background: active ? activeFill : "transparent",
+                      boxShadow: active ? `0 10px 22px -6px ${primary}99, inset 0 1px 0 rgba(255,255,255,0.35)` : "none",
+                      transform: active ? "translateY(-2px) scale(1.08)" : "translateY(0) scale(1)",
+                      transition: `background .3s ease, box-shadow .3s ease, transform .4s ${spring}`,
                     }}>
                     <i className={`fa-solid ${icon}`} style={{
-                      fontSize: 17,
+                      fontSize: active ? 18 : 16,
                       // active = solid white; inactive = outline (transparent fill + muted stroke)
                       color: active ? "#fff" : "transparent",
                       WebkitTextStroke: active ? "0px transparent" : `1.4px ${inactive}`,
-                      transition: "color .25s ease, -webkit-text-stroke .25s ease",
-                      animation: active ? "nav-pop .25s cubic-bezier(.34,1.56,.64,1)" : undefined,
+                      transition: `color .3s ease, font-size .3s ${spring}, -webkit-text-stroke .3s ease`,
+                      animation: active ? `nav-pop .4s ${spring}` : undefined,
                     }} />
                   </button>
                 );
