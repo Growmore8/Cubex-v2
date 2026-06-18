@@ -334,7 +334,7 @@ export default function ClientMobile({ t }: { t: any }) {
         const hAccent = brand?.accentColor || "#2563eb";
         const live = account?.type === "LIVE";
         return (
-        <div className="glass sticky top-0 z-20 flex items-center justify-between px-3.5 py-2.5" style={{ background: theme === "dark" ? "rgba(16,20,29,0.68)" : "rgba(255,255,255,0.68)", borderBottom: "1px solid color-mix(in srgb, var(--border) 70%, transparent)", boxShadow: theme === "dark" ? "0 1px 0 rgba(255,255,255,0.04)" : "0 1px 12px -8px rgba(15,23,42,0.4)" }}>
+        <div className="glass sticky top-0 z-20 flex items-center justify-between px-3.5 py-2.5" style={{ background: theme === "dark" ? "rgba(16,20,29,0.55)" : "rgba(255,255,255,0.6)", boxShadow: theme === "dark" ? "0 18px 30px -24px rgba(0,0,0,0.9)" : "0 18px 28px -24px rgba(15,23,42,0.35)" }}>
           <div className="flex items-center gap-2.5">
             {/* avatar with brand gradient ring + presence dot */}
             <span className="relative inline-flex shrink-0">
