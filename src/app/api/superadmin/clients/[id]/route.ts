@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { adjustBalance, applyClientEmail } from "@/services/account.service";
 import { audit } from "@/lib/audit";
+import { titleCaseName } from "@/lib/format";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const s = await requireSuperAdmin();
@@ -26,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await prisma.account.update({ where: { id: acc.id }, data: { isPool: !!b.promote } });
     } else if (b.action === "rename") {
       const data: any = {};
-      if (b.name) data.name = b.name;
+      if (b.name) data.name = titleCaseName(b.name);
       if (b.phone !== undefined) data.phone = b.phone || null;
       if (b.country !== undefined) data.country = b.country || null;
       if (Object.keys(data).length) await prisma.account.update({ where: { id: acc.id }, data });

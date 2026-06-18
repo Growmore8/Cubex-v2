@@ -18,7 +18,7 @@ import { iconForNotification } from "@/lib/notif";
 import { isOnline as presenceOnline } from "@/components/ui/Presence";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
-import { gnum, gmoney, gsign } from "@/lib/format";
+import { gnum, gmoney, gsign, titleCaseName } from "@/lib/format";
 import { DARK, LIGHT, BUY, SELL, GOLD } from "@/config/theme";
 
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
@@ -635,7 +635,7 @@ export default function AdminDeskPage() {
   const acctRow = (c: any) => (
     <button key={c.id} onClick={() => setSelAcc(c)} onContextMenu={(e) => { e.preventDefault(); setSelAcc(c); setMenu({ x: e.clientX, y: e.clientY, acc: c }); }}
       className="flex w-full items-center gap-1 rounded px-1.5 py-1 text-left" style={selAcc?.id === c.id ? { background: "var(--soft)", color: GOLD } : undefined}>
-      {dot(presenceOnline(c.user?.lastSeenAt) ? "#16a34a" : c.deactivated ? "var(--muted)" : c.locked ? SELL : BUY)}<span className="flex-1 truncate uppercase">{c.login} - {c.name}</span>
+      {dot(presenceOnline(c.user?.lastSeenAt) ? "#16a34a" : c.deactivated ? "var(--muted)" : c.locked ? SELL : BUY)}<span className="flex-1 truncate">{c.login} - {titleCaseName(c.name)}</span>
       <span className="flex shrink-0 items-center gap-1.5">
         {/* device icon only — left dot already encodes online/offline */}
         {c.user?.lastDevice && sIco(String(c.user.lastDevice).toLowerCase() === "mobile" ? "fa-mobile-screen-button" : String(c.user.lastDevice).toLowerCase() === "tablet" ? "fa-tablet-screen-button" : "fa-laptop", "#8b97a8", c.user.lastDevice)}
@@ -968,7 +968,7 @@ export default function AdminDeskPage() {
         <span>Level: <span className="text-[var(--text)]">{selAcc && level ? level.toFixed(1) + "%" : "--"}</span></span>
         {selAcc && <span>MC: <span style={{ color: Number(selAcc.mcLevel) > 0 ? SELL : "var(--muted)" }}>{Number(selAcc.mcLevel) > 0 ? selAcc.mcLevel + "%" : "Off"}</span></span>}
         {selAcc && <span>DNL: <span style={{ color: selAcc.doNotLiquidate ? GOLD : "var(--muted)" }}>{selAcc.doNotLiquidate ? "On" : "Off"}</span></span>}
-        <span>{selAcc ? selAcc.login + " - " + selAcc.name : "No account selected"}</span>
+        <span>{selAcc ? selAcc.login + " - " + titleCaseName(selAcc.name) : "No account selected"}</span>
       </div>
       {err && !act && !modal && !ticket && <div className="px-3 py-1 text-[11px]" style={{ color: SELL }}>{err}</div>}
 
@@ -1243,7 +1243,7 @@ export default function AdminDeskPage() {
                                 <button onClick={() => setSelAcc(c)} title="Select account">{c.login}</button>
                                 {c.isPool && <span className="ml-1 text-[9px] rounded px-0.5" style={{ background: GOLD + "22", color: GOLD }}>POOL</span>}
                               </td>
-                              <td className="px-2 py-1 uppercase">{c.name}</td>
+                              <td className="px-2 py-1">{titleCaseName(c.name)}</td>
                               <td className="px-2 py-1 text-[var(--muted)]">{email}</td>
                               <td className="px-2 py-1 text-[var(--muted)]">{c.phone || "-"}</td>
                               <td className="px-2 py-1 text-[var(--muted)]">{c.country || "-"}</td>
@@ -1332,7 +1332,7 @@ export default function AdminDeskPage() {
                 <span className="truncate font-bold" style={{ color: GOLD }}>{menu.acc.login}</span>
                 <span className="rounded px-1 py-px text-[8px] font-semibold" style={{ background: (menu.acc.type === "LIVE" ? BUY : "#6366f1") + "22", color: menu.acc.type === "LIVE" ? BUY : "#818cf8" }}>{menu.acc.type}</span>
               </div>
-              <div className="truncate text-[9px] uppercase" style={{ color: "var(--muted)" }}>{menu.acc.name}</div>
+              <div className="truncate text-[9px]" style={{ color: "var(--muted)" }}>{titleCaseName(menu.acc.name)}</div>
             </div>
             <div className="flex flex-col items-end gap-0.5">
               {menu.acc.locked && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: SELL + "22", color: SELL }}>LOCKED</span>}
@@ -1554,7 +1554,7 @@ export default function AdminDeskPage() {
           <div className="ui-pop desk-modal w-[420px] max-w-[95vw] max-h-[90vh] overflow-auto rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent2)" }}><i className={"fa-solid " + actIcon()} /></span>
-              <div className="min-w-0 flex-1"><div className="text-sm font-semibold">{actTitle()}</div><div className="truncate text-[11px] text-[var(--muted)]">{act.acc.login} - {act.acc.name}</div></div>
+              <div className="min-w-0 flex-1"><div className="text-sm font-semibold">{actTitle()}</div><div className="truncate text-[11px] text-[var(--muted)]">{act.acc.login} - {titleCaseName(act.acc.name)}</div></div>
               <button onClick={() => setActMin(true)} title="Minimize" className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-window-minimize text-[10px]" /></button>
               <button onClick={() => setAct(null)} className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
             </div>

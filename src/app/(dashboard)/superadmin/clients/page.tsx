@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import CountrySelect from "@/components/ui/CountrySelect";
+import { titleCaseName } from "@/lib/format";
 
 export default function SAClientsPage() {
   const [rows, setRows] = useState<any[]>([]);
@@ -242,7 +243,7 @@ export default function SAClientsPage() {
                   </td>
                   <td className="px-3 py-2.5 max-w-[220px]">
                     <div className="font-medium flex items-center gap-1.5">
-                      <span className="truncate uppercase">{r.name}</span>
+                      <span className="truncate">{titleCaseName(r.name)}</span>
                       {r.kyc === "APPROVED" && <span className="sab sab-green shrink-0" style={{ fontSize: 9 }}>KYC</span>}
                       {r.kyc === "PENDING" && <span className="sab sab-amber shrink-0" style={{ fontSize: 9 }}>KYC</span>}
                       {r.kyc === "REJECTED" && <span className="sab sab-red shrink-0" style={{ fontSize: 9 }}>KYC</span>}
