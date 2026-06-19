@@ -98,7 +98,6 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
                   )}
                   <span className="text-lg font-bold text-white">{brand.name}</span>
                 </div>
-                {brand.slogan && <div className="mt-2 text-sm text-white/70">{brand.slogan}</div>}
               </div>
 
               {/* CENTER: big centered statement (2 lines) */}
