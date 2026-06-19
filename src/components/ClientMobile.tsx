@@ -341,7 +341,6 @@ export default function ClientMobile({ t }: { t: any }) {
               <span className="rounded-full p-[2px]" style={{ background: `linear-gradient(135deg, ${hPrimary}, ${hAccent})`, boxShadow: `0 4px 12px -4px ${hPrimary}66` }}>
                 <span className="block rounded-full p-[1.5px]" style={{ background: "var(--bg)" }}><Avatar size={34} /></span>
               </span>
-              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full" style={{ background: "#22c55e", border: "2px solid var(--bg)", boxShadow: "0 0 6px #22c55e" }} />
             </span>
             <div className="leading-tight">
               <div className="text-[10px] font-medium text-[var(--muted)]">Welcome back</div>
