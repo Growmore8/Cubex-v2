@@ -97,6 +97,47 @@ export type RegisterResult =
   | { needsVerification: true; email: string }
   | (SessionPayload & { needsVerification: false });
 
+// Google sign-in / sign-up. The email is already verified by Google, so there's
+// no OTP step. Existing users (any role) are signed in; unknown emails become a
+// CLIENT (a DEMO account by default — no seat). Returns a session payload.
+export async function googleSignIn(
+  host: string | null,
+  email: string,
+  name: string,
+  type: "DEMO" | "LIVE" = "DEMO",
+): Promise<SessionPayload> {
+  const tenant: any = await resolveTenant(host);
+  if (!tenant) throw new Error("Sign-in is only available on a brand site");
+  if (tenant.status === "SUSPENDED") throw new Error("This brokerage has been suspended. Please contact support.");
+  const lowerEmail = email.toLowerCase();
+
+  // Existing identity (client or staff) → sign in.
+  const existing = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: lowerEmail }, orderBy: { createdAt: "asc" } });
+  if (existing) {
+    if (existing.status === "SUSPENDED") throw new Error("Your account has been deactivated. Please contact support.");
+    // A pending (unverified) password signup: Google verified the email, clear the OTP.
+    if ((existing as any).emailToken && !String((existing as any).emailToken).startsWith("reset:")) {
+      await (prisma.user.update as any)({ where: { id: existing.id }, data: { emailToken: null } }).catch(() => {});
+    }
+    return { sub: existing.id, role: existing.role as Role, tenantId: existing.tenantId, email: lowerEmail, name: existing.name };
+  }
+
+  // New email → register a client (if the broker allows self-registration).
+  if (tenant.allowRegistration === false) throw new Error("Registration is currently disabled for this broker.");
+  const cleanName = titleCaseName(name) || lowerEmail.split("@")[0];
+  const passwordHash = await hashPassword(makeCode() + makeCode()); // unusable; user signs in via Google
+  const session = await prisma.$transaction(async (tx) => {
+    await assertSeatAvailable(tx, tenant.id, type);
+    const user = await (tx.user.create as any)({ data: { tenantId: tenant.id, email: lowerEmail, name: cleanName, passwordHash, role: "CLIENT" } });
+    const login = await nextLogin(tx, tenant.id, type);
+    await tx.account.create({ data: { tenantId: tenant.id, login, userId: user.id, name: cleanName, type, leverage: 100, currency: "USD", mcLevel: new Prisma.Decimal(50), deposit: type === "DEMO" ? new Prisma.Decimal(10000) : new Prisma.Decimal(0) } });
+    return { sub: user.id, role: "CLIENT" as Role, tenantId: tenant.id, email: lowerEmail, name: cleanName };
+  });
+  audit(tenant.id, "client.register", cleanName + " <" + lowerEmail + "> (Google " + type + ")", lowerEmail, "CLIENT").catch(() => {});
+  notifyStaff(tenant.id, { title: "New client registered", body: cleanName + " (" + lowerEmail + ") via Google", type: "NOTICE" }).catch(() => {});
+  return session;
+}
+
 export async function registerClient(
   host: string | null,
   name: string,

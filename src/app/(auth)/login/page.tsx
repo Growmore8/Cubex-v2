@@ -15,9 +15,10 @@ export default function LoginPage() {
   const [pinBusy, setPinBusy] = useState(false);
   const [canRegister, setCanRegister] = useState(false); // tenant login + registration enabled
   const [siteUrl, setSiteUrl] = useState(""); // tenant marketing site for "Back to website"
+  const [googleOn, setGoogleOn] = useState(false);
 
   useEffect(() => {
-    fetch("/api/public/brand").then((r) => r.json()).then((d) => { if (d.ok) { setCanRegister(!!d.tenantId && !!d.allowRegistration); setSiteUrl(d.websiteUrl || ""); } }).catch(() => {});
+    fetch("/api/public/brand").then((r) => r.json()).then((d) => { if (d.ok) { setCanRegister(!!d.tenantId && !!d.allowRegistration); setSiteUrl(d.websiteUrl || ""); setGoogleOn(!!d.googleEnabled); } }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -133,6 +134,12 @@ export default function LoginPage() {
         <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>or sign in with</span>
         <div className="h-px flex-1" style={{ background: "var(--border)" }} />
       </div>
+
+      {googleOn && (
+        <a href="/api/auth/google/start?mode=login" className={altBtn + " bg-white text-gray-700"} style={{ borderColor: "var(--border)" }}>
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" className="h-4 w-4" /> Continue with Google
+        </a>
+      )}
 
       {!pinMode ? (
         <div className="grid grid-cols-2 gap-2">

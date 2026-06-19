@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getBrand } from "@/lib/brand";
+import { googleEnabled } from "@/lib/google";
 
 // Public brand summary for the auth pages (no auth required).
 export async function GET() {
   const b = await getBrand();
-  return NextResponse.json({ ok: true, tenantId: b.tenantId, allowRegistration: b.allowRegistration, name: b.name, websiteUrl: b.websiteUrl, logoUrl: b.logoUrl, slogan: b.slogan, primaryColor: b.primaryColor, accentColor: b.accentColor });
+  return NextResponse.json({ ok: true, tenantId: b.tenantId, allowRegistration: b.allowRegistration, name: b.name, websiteUrl: b.websiteUrl, logoUrl: b.logoUrl, slogan: b.slogan, primaryColor: b.primaryColor, accentColor: b.accentColor, googleEnabled: googleEnabled() });
 }

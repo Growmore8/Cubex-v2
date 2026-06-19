@@ -47,6 +47,8 @@ function RegisterForm() {
   const [err, setErr] = useState("");
   const [existing, setExisting] = useState(false); // email already a client -> offer Sign in
   const [loading, setLoading] = useState(false);
+  const [googleOn, setGoogleOn] = useState(false);
+  useEffect(() => { fetch("/api/public/brand").then((r) => r.json()).then((d) => { if (d.ok) setGoogleOn(!!d.googleEnabled); }).catch(() => {}); }, []);
 
   // Email verification state
   const [verifyEmail, setVerifyEmail] = useState("");
@@ -222,6 +224,17 @@ function RegisterForm() {
         className="auth-btn flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60">
         {loading ? <><i className="fa-solid fa-circle-notch fa-spin" /> Creating…</> : <>Create {type === "LIVE" ? "Live" : "Demo"} account <i className="fa-solid fa-arrow-right text-xs" /></>}
       </button>
+
+      {googleOn && (<>
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>or</span>
+          <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+        </div>
+        <a href={`/api/auth/google/start?mode=register&type=${type}`} className="flex w-full items-center justify-center gap-2 rounded-xl border bg-white py-2.5 text-sm font-semibold text-gray-700" style={{ borderColor: "var(--border)" }}>
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" className="h-4 w-4" /> Continue with Google
+        </a>
+      </>)}
 
       <p className="text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
         Already have an account?{" "}
