@@ -37,42 +37,64 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
             </div>
           </div>
 
-          {/* ── BRAND / TRADING PANEL (desktop only) ── */}
-          <div className="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex" style={{ background: `linear-gradient(150deg, ${primary}, ${accent})` }}>
-            {/* depth + trading motif */}
-            <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(700px 500px at 80% 10%, rgba(255,255,255,0.16), transparent 60%), radial-gradient(600px 500px at 0% 100%, rgba(0,0,0,0.35), transparent 55%)" }} />
-            <svg className="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" viewBox="0 0 400 600" aria-hidden>
-              <defs>
-                <linearGradient id="auth-line" x1="0" y1="1" x2="1" y2="0">
-                  <stop offset="0" stopColor="#ffffff" stopOpacity="0.0" />
-                  <stop offset="1" stopColor="#ffffff" stopOpacity="0.85" />
-                </linearGradient>
-              </defs>
-              {/* faint grid */}
-              {Array.from({ length: 7 }).map((_, i) => (<line key={"h" + i} x1="0" y1={i * 90} x2="400" y2={i * 90} stroke="#fff" strokeOpacity="0.06" />))}
-              {Array.from({ length: 5 }).map((_, i) => (<line key={"v" + i} x1={i * 100} y1="0" x2={i * 100} y2="600" stroke="#fff" strokeOpacity="0.06" />))}
-              {/* candlesticks */}
-              {[[60, 360, 300, 230, 270], [110, 320, 250, 200, 230], [160, 300, 210, 160, 195], [210, 250, 170, 120, 150], [260, 210, 130, 90, 120], [310, 160, 95, 55, 80]].map((c, i) => {
-                const [x, lo, oTop, hi, oBot] = c as number[];
-                const up = i % 2 === 0;
-                return (<g key={i} stroke="#fff" strokeOpacity={0.5}>
-                  <line x1={x} y1={hi} x2={x} y2={lo} strokeWidth="2" />
-                  <rect x={x - 9} y={oTop} width="18" height={Math.max(8, oBot - oTop)} rx="2" fill={up ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.25)"} stroke="none" />
-                </g>);
-              })}
-              {/* uptrend line */}
-              <polyline points="40,400 100,360 160,300 220,250 280,180 360,90" fill="none" stroke="url(#auth-line)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          {/* ── BRAND / TRADING PANEL (desktop only) — dark, animated chart in brand colours ── */}
+          {(() => {
+            // One period (W) of candles, repeated 3× so the scroll loops seamlessly.
+            const W = 460, n = 11, sx = W / n;
+            const seed = [0.42, 0.34, 0.5, 0.4, 0.56, 0.46, 0.62, 0.52, 0.7, 0.6, 0.78];
+            const yOf = (h: number) => 500 - h * 360; // chart band: y 140..500
+            const cells = Array.from({ length: n * 3 }, (_, i) => ({ i, cx: i * sx + sx / 2, y: yOf(seed[i % n]), up: seed[i % n] >= seed[(i - 1 + n) % n] }));
+            const linePts = cells.map((c) => `${c.cx.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+            return (
+            <div className="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex" style={{ background: `radial-gradient(820px 620px at 78% 22%, color-mix(in srgb, ${primary} 34%, transparent), transparent 60%), radial-gradient(720px 620px at 18% 102%, color-mix(in srgb, ${accent} 28%, transparent), transparent 60%), linear-gradient(165deg, #0b1020, #070a12)` }}>
+              {/* animated scrolling chart */}
+              <svg className="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" viewBox="0 0 460 600" aria-hidden>
+                <defs>
+                  <linearGradient id="auth-line" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stopColor={accent} stopOpacity="0.2" />
+                    <stop offset="1" stopColor={accent} stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                {/* faint grid (static) */}
+                {Array.from({ length: 7 }).map((_, i) => (<line key={"h" + i} x1="0" y1={i * 100} x2="460" y2={i * 100} stroke="#fff" strokeOpacity="0.05" />))}
+                <g style={{ filter: `drop-shadow(0 0 6px ${accent})` }}>
+                  <animateTransform attributeName="transform" type="translate" from="0 0" to={`-${W} 0`} dur="22s" repeatCount="indefinite" />
+                  {cells.map((c) => (
+                    <g key={c.i}>
+                      <line x1={c.cx} y1={c.y - 24} x2={c.cx} y2={c.y + 24} stroke={c.up ? accent : primary} strokeOpacity="0.5" strokeWidth="2" />
+                      <rect x={c.cx - 6} y={c.y - 12} width="12" height="24" rx="2" fill={c.up ? accent : primary} fillOpacity={c.up ? 0.85 : 0.4} />
+                    </g>
+                  ))}
+                  <polyline points={linePts} fill="none" stroke="url(#auth-line)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </g>
+              </svg>
 
-            <div className="relative">{logoMark}</div>
-            <div className="relative">
-              <h2 className="text-3xl font-extrabold leading-tight text-white drop-shadow">{brand.slogan || "Trade smarter, anywhere."}</h2>
-              <p className="mt-3 max-w-[340px] text-sm text-white/80">{brand.companyInfo || `Your ${brand.name || ""} trading account — markets, charts and funds in one place.`}</p>
+              {/* TOP: logo + brand name + slogan */}
+              <div className="relative z-10">
+                <div className="flex items-center gap-2.5">
+                  {brand.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={brand.logoUrl} alt={brand.name} className="h-10 w-auto max-w-[190px] object-contain" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg text-base font-extrabold text-white" style={{ background: `linear-gradient(135deg, ${primary}, ${accent})` }}>{(brand.name || "?").trim().charAt(0).toUpperCase()}</div>
+                  )}
+                  <span className="text-lg font-bold text-white">{brand.name}</span>
+                </div>
+                {brand.slogan && <div className="mt-2 text-sm text-white/70">{brand.slogan}</div>}
+              </div>
+
+              {/* CENTER: big centered statement */}
+              <div className="relative z-10 flex flex-1 items-center justify-center">
+                <h2 className="max-w-[440px] text-center text-[40px] font-extrabold leading-tight text-white drop-shadow">Trade the markets — anytime, anywhere.</h2>
+              </div>
+
+              {/* BOTTOM */}
+              <div className="relative z-10 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-white/65">
+                <i className="fa-solid fa-shield-halved" /> Secure · Encrypted · 24/7
+              </div>
             </div>
-            <div className="relative flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-white/70">
-              <i className="fa-solid fa-shield-halved" /> Secure · Encrypted · 24/7
-            </div>
-          </div>
+            );
+          })()}
 
         </div>
       </div>
