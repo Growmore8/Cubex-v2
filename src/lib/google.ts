@@ -28,10 +28,42 @@ export async function verifyState(token: string): Promise<OAuthState | null> {
   } catch { return null; }
 }
 
-export function redirectUriFor(host: string): string {
+function hostToOrigin(host: string): string {
   const h = host.replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const proto = h.startsWith("localhost") || h.startsWith("127.0.0.1") ? "http" : "https";
-  return `${proto}://${h}/api/auth/google/callback`;
+  return `${proto}://${h}`;
+}
+
+export function originFor(host: string): string { return hostToOrigin(host); }
+
+// ONE central callback for ALL tenants — set GOOGLE_CALLBACK_BASE (e.g.
+// https://trade.cubexenterprises.com). Only THIS one redirect URI needs to be
+// registered in the Google client; new tenant domains need no Google changes.
+// (Falls back to the per-host callback if the env var isn't set.)
+export function redirectUriFor(host: string): string {
+  const base = (process.env.GOOGLE_CALLBACK_BASE || "").trim();
+  if (base) return `${hostToOrigin(base)}/api/auth/google/callback`;
+  return `${hostToOrigin(host)}/api/auth/google/callback`;
+}
+
+export function sameHost(a: string, b: string): boolean {
+  const n = (h: string) => h.replace(/^https?:\/\//, "").replace(/\/+$/, "").toLowerCase();
+  return n(a) === n(b);
+}
+
+// One-time handoff token: the central callback signs it after Google verifies the
+// user, then redirects to the TENANT domain, which exchanges it for a session
+// cookie on its own domain (cookies can't be set cross-domain).
+export type Handoff = { host: string; email: string; name: string; type: "DEMO" | "LIVE" };
+export async function signHandoff(h: Handoff): Promise<string> {
+  return new SignJWT({ ...h, kind: "ghandoff" }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("2m").sign(secret());
+}
+export async function verifyHandoff(token: string): Promise<Handoff | null> {
+  try {
+    const { payload } = await jwtVerify(token, secret());
+    if ((payload as any).kind !== "ghandoff") return null;
+    return { host: (payload as any).host, email: (payload as any).email, name: (payload as any).name, type: (payload as any).type };
+  } catch { return null; }
 }
 
 export function googleAuthUrl(redirectUri: string, state: string): string {
