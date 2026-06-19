@@ -24,11 +24,11 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         <div className="min-h-full lg:grid lg:grid-cols-2">
 
           {/* ── FORM SIDE ── */}
-          <div className="relative flex items-center justify-center px-4 py-8" style={{ paddingTop: "max(2rem, env(safe-area-inset-top))", paddingBottom: "max(2rem, env(safe-area-inset-bottom))", background: "radial-gradient(900px 480px at 50% -10%, color-mix(in srgb, var(--brand-primary) 12%, #0b1322), #0a0f1c 62%)" }}>
-            <div className="w-full max-w-[400px]">
+          <div className="relative flex min-h-full items-center justify-center px-4 py-6" style={{ paddingTop: "max(1.5rem, env(safe-area-inset-top))", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))", background: "radial-gradient(900px 480px at 50% -10%, color-mix(in srgb, var(--brand-primary) 12%, #0b1322), #0a0f1c 62%)" }}>
+            <div className="w-full max-w-[340px] lg:max-w-[400px]">
               {/* logo — shown here on mobile (brand panel carries it on desktop) */}
-              <div className="mb-6 flex justify-center lg:hidden">{logoMark}</div>
-              <div className="auth-card rounded-2xl border p-7" style={{ background: "var(--card)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", boxShadow: "0 24px 60px -24px rgba(0,0,0,0.55), 0 2px 8px -4px rgba(0,0,0,0.3)" }}>
+              <div className="mb-5 flex justify-center lg:hidden">{logoMark}</div>
+              <div className="auth-card rounded-2xl border p-5 lg:p-7" style={{ background: "var(--card)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", boxShadow: "0 24px 60px -24px rgba(0,0,0,0.55), 0 2px 8px -4px rgba(0,0,0,0.3)" }}>
                 {children}
                 {brand.companyInfo && (
                   <div className="mt-6 border-t pt-3 text-[10px] leading-snug" style={{ borderColor: "var(--border)", color: "var(--muted-foreground)" }}>{brand.companyInfo}</div>
