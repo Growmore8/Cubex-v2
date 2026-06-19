@@ -45,29 +45,47 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
             const yOf = (h: number) => 500 - h * 360; // chart band: y 140..500
             const cells = Array.from({ length: n * 3 }, (_, i) => ({ i, cx: i * sx + sx / 2, y: yOf(seed[i % n]), up: seed[i % n] >= seed[(i - 1 + n) % n] }));
             const linePts = cells.map((c) => `${c.cx.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+            // Live-market ticker chips (forex/crypto/metal) — float gently for a "live" feel.
+            const quotes = [
+              { sym: "BTCUSD", sell: "64,178.20", buy: "64,182.50", up: true, style: { top: "14%", left: "7%" }, delay: "0s" },
+              { sym: "XAUUSD", sell: "2,412.10", buy: "2,412.65", up: false, style: { top: "30%", right: "8%" }, delay: "1.1s" },
+              { sym: "EURUSD", sell: "1.08402", buy: "1.08418", up: true, style: { bottom: "16%", left: "9%" }, delay: "0.6s" },
+            ];
             return (
-            <div className="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex" style={{ background: `radial-gradient(820px 620px at 78% 22%, color-mix(in srgb, ${primary} 34%, transparent), transparent 60%), radial-gradient(720px 620px at 18% 102%, color-mix(in srgb, ${accent} 28%, transparent), transparent 60%), linear-gradient(165deg, #0b1020, #070a12)` }}>
-              {/* animated scrolling chart */}
-              <svg className="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" viewBox="0 0 460 600" aria-hidden>
+            <div className="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex" style={{ background: `radial-gradient(760px 600px at 80% 16%, color-mix(in srgb, ${primary} 18%, transparent), transparent 62%), radial-gradient(680px 600px at 16% 104%, color-mix(in srgb, ${accent} 15%, transparent), transparent 62%), linear-gradient(165deg, #0a0d18, #05070d)` }}>
+              {/* animated scrolling chart (dim, behind everything) */}
+              <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-45" preserveAspectRatio="xMidYMid slice" viewBox="0 0 460 600" aria-hidden>
                 <defs>
                   <linearGradient id="auth-line" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0" stopColor={accent} stopOpacity="0.2" />
-                    <stop offset="1" stopColor={accent} stopOpacity="1" />
+                    <stop offset="0" stopColor={accent} stopOpacity="0.15" />
+                    <stop offset="1" stopColor={accent} stopOpacity="0.9" />
                   </linearGradient>
                 </defs>
-                {/* faint grid (static) */}
-                {Array.from({ length: 7 }).map((_, i) => (<line key={"h" + i} x1="0" y1={i * 100} x2="460" y2={i * 100} stroke="#fff" strokeOpacity="0.05" />))}
-                <g style={{ filter: `drop-shadow(0 0 6px ${accent})` }}>
-                  <animateTransform attributeName="transform" type="translate" from="0 0" to={`-${W} 0`} dur="22s" repeatCount="indefinite" />
+                {Array.from({ length: 7 }).map((_, i) => (<line key={"h" + i} x1="0" y1={i * 100} x2="460" y2={i * 100} stroke="#fff" strokeOpacity="0.04" />))}
+                <g>
+                  <animateTransform attributeName="transform" type="translate" from="0 0" to={`-${W} 0`} dur="26s" repeatCount="indefinite" />
                   {cells.map((c) => (
                     <g key={c.i}>
-                      <line x1={c.cx} y1={c.y - 24} x2={c.cx} y2={c.y + 24} stroke={c.up ? accent : primary} strokeOpacity="0.5" strokeWidth="2" />
-                      <rect x={c.cx - 6} y={c.y - 12} width="12" height="24" rx="2" fill={c.up ? accent : primary} fillOpacity={c.up ? 0.85 : 0.4} />
+                      <line x1={c.cx} y1={c.y - 22} x2={c.cx} y2={c.y + 22} stroke={c.up ? accent : primary} strokeOpacity="0.4" strokeWidth="2" />
+                      <rect x={c.cx - 6} y={c.y - 11} width="12" height="22" rx="2" fill={c.up ? accent : primary} fillOpacity={c.up ? 0.6 : 0.3} />
                     </g>
                   ))}
-                  <polyline points={linePts} fill="none" stroke="url(#auth-line)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  <polyline points={linePts} fill="none" stroke="url(#auth-line)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 </g>
               </svg>
+              {/* dark cover so the centred text stays readable */}
+              <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(520px 360px at 60% 50%, rgba(0,0,0,0.55), transparent 70%), linear-gradient(180deg, rgba(5,7,13,0.35), rgba(5,7,13,0.55))" }} />
+
+              {/* floating live-market quote chips */}
+              {quotes.map((q) => (
+                <div key={q.sym} className="absolute z-[5] rounded-xl border px-3 py-2 shadow-lg" style={{ ...q.style, background: "rgba(10,14,24,0.6)", borderColor: "rgba(255,255,255,0.1)", backdropFilter: "blur(6px)", animation: `auth-float 5.5s ease-in-out ${q.delay} infinite` }}>
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-white">{q.sym}<i className={"fa-solid text-[8px] " + (q.up ? "fa-arrow-trend-up" : "fa-arrow-trend-down")} style={{ color: q.up ? "#22c55e" : "#ff6b6b" }} /></div>
+                  <div className="mt-1 flex gap-3 text-[10px] tabular-nums">
+                    <span className="text-white/55">Sell <b style={{ color: "#ff6b6b" }}>{q.sell}</b></span>
+                    <span className="text-white/55">Buy <b style={{ color: "#22c55e" }}>{q.buy}</b></span>
+                  </div>
+                </div>
+              ))}
 
               {/* TOP: logo + brand name + slogan */}
               <div className="relative z-10">
@@ -83,9 +101,11 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
                 {brand.slogan && <div className="mt-2 text-sm text-white/70">{brand.slogan}</div>}
               </div>
 
-              {/* CENTER: big centered statement */}
+              {/* CENTER: big centered statement (2 lines) */}
               <div className="relative z-10 flex flex-1 items-center justify-center">
-                <h2 className="max-w-[440px] text-center text-[40px] font-extrabold leading-tight text-white drop-shadow">Trade the markets — anytime, anywhere.</h2>
+                <h2 className="text-center text-white" style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.15, letterSpacing: "0.01em", textShadow: "0 6px 30px rgba(0,0,0,0.7)" }}>
+                  Trade the markets<br />anytime, anywhere
+                </h2>
               </div>
 
               {/* BOTTOM */}
