@@ -24,7 +24,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         <div className="min-h-full lg:grid lg:grid-cols-2">
 
           {/* ── FORM SIDE ── */}
-          <div className="relative flex min-h-full items-center justify-center px-4 py-6" style={{ paddingTop: "max(1.5rem, env(safe-area-inset-top))", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))", background: "radial-gradient(900px 480px at 50% -10%, color-mix(in srgb, var(--brand-primary) 12%, #0b1322), #0a0f1c 62%)" }}>
+          <div className="relative flex min-h-[100dvh] items-center justify-center px-4 py-6 lg:min-h-full" style={{ paddingTop: "max(1.5rem, env(safe-area-inset-top))", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))", background: "radial-gradient(900px 480px at 50% -10%, color-mix(in srgb, var(--brand-primary) 12%, #0b1322), #0a0f1c 62%)" }}>
             <div className="w-full max-w-[340px] lg:max-w-[400px]">
               {/* logo — shown here on mobile (brand panel carries it on desktop) */}
               <div className="mb-5 flex justify-center lg:hidden">{logoMark}</div>
