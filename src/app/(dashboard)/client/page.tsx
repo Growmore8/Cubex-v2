@@ -43,8 +43,10 @@ export default function ClientTerminal() {
   // Branded loading splash: fast brand fetch for the logo/slogan, hidden once the
   // first account/prices load completes.
   const [splashBrand, setSplashBrand] = useState<any>(null);
-  const [booted, setBooted] = useState(false);
+  const [dataReady, setDataReady] = useState(false); // first account/prices loaded
+  const [minElapsed, setMinElapsed] = useState(false); // 3s branding minimum
   const [splashGone, setSplashGone] = useState(false);
+  const booted = dataReady && minElapsed; // start fade only when both are true
   const [kycVerified, setKycVerified] = useState(true); // assume ok until /account resolves
   const [accts, setAccts] = useState<any[]>([]);
   const [xferModal, setXferModal] = useState(false);
@@ -170,7 +172,7 @@ export default function ClientTerminal() {
     fetch("/api/client/accounts").then((r) => r.json()).then((ad) => { if (ad.ok) { setAccts(ad.accounts || []); if (!accIdRef.current && ad.accounts && ad.accounts.length) { accIdRef.current = ad.accounts[0].id; setAccId(ad.accounts[0].id); } } }).catch((e) => console.warn("[client] accounts fetch failed", e));
     loadNotifs();
     fetch("/api/client/pending?accountId=" + (accIdRef.current || "")).then((r) => r.json()).then((pd) => { if (pd.ok) setPending(pd.pending || []); }).catch(() => {});
-    setBooted(true); // first data is in — let the splash fade out
+    setDataReady(true); // first data is in (splash also waits for the 3s minimum)
   }
   // Lightweight notifications-only refresh (used when a notification ping arrives, so
   // the bell updates live without reloading the whole account).
@@ -184,7 +186,9 @@ export default function ClientTerminal() {
   useEffect(() => { load(); }, []);
   // Fast brand fetch so the splash shows the logo/slogan immediately.
   useEffect(() => { fetch("/api/public/brand").then((r) => r.json()).then((b) => { if (b.ok) setSplashBrand(b); }).catch(() => {}); }, []);
-  // Once booted, fade the splash out then unmount it.
+  // Keep the splash up for at least 3s (branding), regardless of how fast data loads.
+  useEffect(() => { const t = setTimeout(() => setMinElapsed(true), 3000); return () => clearTimeout(t); }, []);
+  // Once booted (data ready AND 3s elapsed), fade the splash out then unmount it.
   useEffect(() => { if (!booted) return; const t = setTimeout(() => setSplashGone(true), 480); return () => clearTimeout(t); }, [booted]);
   useEffect(() => { fetch("/api/client/pin").then((r) => r.json()).then((d) => { if (d.ok && d.hasPin) { setPinHasPin(true); if (sessionStorage.getItem("cubex-pin-ok") !== "1") setPinLock(true); } }).catch(() => {}); }, []);
 
