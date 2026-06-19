@@ -26,18 +26,19 @@ export default function ClientSplash({
         background: `radial-gradient(680px 420px at 50% 28%, color-mix(in srgb, ${primary} 30%, transparent), transparent 62%), radial-gradient(560px 380px at 50% 110%, color-mix(in srgb, ${accent} 26%, transparent), transparent 60%), var(--bg)`,
       }}
     >
-      <div style={{ animation: "splash-in .5s cubic-bezier(.16,1,.3,1) both", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        {brand?.logoUrl ? (
-          <img src={brand.logoUrl} alt={brand?.name || ""} style={{ height: 64, width: "auto", maxWidth: 200, objectFit: "contain", filter: "drop-shadow(0 8px 22px rgba(0,0,0,0.28))" }} />
-        ) : (
-          <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em", color: fg, textShadow: "0 6px 22px rgba(0,0,0,0.25)" }}>{brand?.name || ""}</div>
+      <div style={{ animation: "splash-in .5s cubic-bezier(.16,1,.3,1) both", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+        {brand?.logoUrl && (
+          <img src={brand.logoUrl} alt={brand?.name || ""} style={{ height: 72, width: "auto", maxWidth: 220, objectFit: "contain", filter: "drop-shadow(0 8px 22px rgba(0,0,0,0.22))" }} />
         )}
-        {brand?.slogan && <div style={{ marginTop: 12, fontSize: 13, fontWeight: 500, color: muted, textAlign: "center", maxWidth: 280 }}>{brand.slogan}</div>}
+        {brand?.name && (
+          <div style={{ marginTop: brand?.logoUrl ? 14 : 0, fontSize: 26, fontWeight: 800, letterSpacing: "-0.01em", color: fg, textShadow: "0 6px 22px rgba(0,0,0,0.18)" }}>{brand.name}</div>
+        )}
+        {brand?.slogan && <div style={{ marginTop: 8, fontSize: 13, fontWeight: 500, color: muted, maxWidth: 300 }}>{brand.slogan}</div>}
       </div>
 
       {/* sweeping progress bar */}
-      <div style={{ marginTop: 30, width: 168, height: 4, borderRadius: 999, overflow: "hidden", background: dark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.1)" }}>
-        <div style={{ height: "100%", width: 56, borderRadius: 999, background: `linear-gradient(90deg, ${primary}, ${accent})`, animation: "splash-sweep 1.15s cubic-bezier(.45,0,.55,1) infinite" }} />
+      <div style={{ marginTop: 28, width: 180, height: 5, borderRadius: 999, overflow: "hidden", background: dark ? "rgba(255,255,255,0.16)" : "rgba(15,23,42,0.14)" }}>
+        <div style={{ height: "100%", width: 60, borderRadius: 999, background: `linear-gradient(90deg, ${primary}, ${accent})`, animation: "splash-sweep 1.15s cubic-bezier(.45,0,.55,1) infinite" }} />
       </div>
     </div>
   );
