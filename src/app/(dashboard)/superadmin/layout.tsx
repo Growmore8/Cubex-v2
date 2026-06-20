@@ -32,10 +32,10 @@ const NAV: Item[] = [
 
 const CSS = `
 .sa-shell{position:fixed;inset:0;z-index:40;display:flex;font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:13px;
-  /* ADSS palette — deep-black, green accent (matches desk/client/app) */
-  --navy:#0b0f17;--gold:#16c79a;--accent:#16c79a;--accent2:#16c79a;--green:#16c784;--red:#f6465d;--amber:#eab308;
-  --bg:#0a0d12;--bg2:#11151d;--card:#11151d;--border:#1c2330;--border-strong:#2a3344;--text:#e7ecf3;--text2:#8a93a6;--text3:#5b6577;
-  --shadow:0 2px 12px rgba(0,0,0,.4);--shadow-lg:0 10px 28px rgba(0,0,0,.55);--ring:rgba(22,199,154,.25);
+  /* ADSS palette — green accent + dark sidebar. Light mode by default; .dark = deep-black. */
+  --navy:#0b0f17;--gold:#16c79a;--accent:#16c79a;--accent2:#16c79a;--green:#16a34a;--red:#dc2626;--amber:#d97706;
+  --bg:#f3f5f9;--bg2:#eef2f6;--card:#ffffff;--border:#e6eaf0;--border-strong:#d4dbe6;--text:#0f172a;--text2:#64748b;--text3:#94a3b8;
+  --shadow:0 2px 12px rgba(13,27,62,.10);--shadow-lg:0 8px 28px rgba(13,27,62,.16);--ring:rgba(22,199,154,.2);
   background:var(--bg);color:var(--text);}
 .sa-shell.dark{--bg:#0a0d12;--bg2:#11151d;--card:#11151d;--border:#1c2330;--border-strong:#2a3344;--text:#e7ecf3;--text2:#8a93a6;--text3:#5b6577;--shadow:0 2px 12px rgba(0,0,0,.4);--shadow-lg:0 10px 28px rgba(0,0,0,.55);--ring:rgba(22,199,154,.25);}
 .sa-shell *{box-sizing:border-box;}
@@ -115,7 +115,6 @@ const CSS = `
 .sa-shell .border{border-color:var(--border)!important;}
 .sa-shell .ui-card{background:var(--card)!important;border-color:var(--border)!important;}
 .sa-shell .bg-amber-50{background:color-mix(in srgb,var(--amber) 12%,transparent)!important;}
-.sa-shell select{color-scheme:dark;}
 .sa-shell input:not([type=range]):not([type=checkbox]):not([type=radio]),.sa-shell select,.sa-shell textarea{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:8px;}
 .sa-shell input:focus,.sa-shell select:focus,.sa-shell textarea:focus{border-color:var(--accent2);box-shadow:0 0 0 3px var(--ring);}
 .sa-shell.dark select{color-scheme:dark;}
