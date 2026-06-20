@@ -7,14 +7,16 @@ import PriceCell from "@/components/PriceCell";
 import toast from "react-hot-toast";
 import WalletPanel from "@/components/WalletPanel";
 import ClientSplash from "@/components/ClientSplash";
+import { SymIcon } from "@/lib/symIcon";
 import { titleCaseName, gnum, gmoney } from "@/lib/format";
 import { iconForNotification } from "@/lib/notif";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
 import ClientMobile from "@/components/ClientMobile";
 
-const DARK: any = { "--bg": "#131722", "--panel": "#1e222d", "--border": "#363a45", "--text": "#d1d4dc", "--muted": "#848e9c", "--soft": "#2a2e39" };
-const LIGHT: any = { "--bg": "#f1f5f9", "--panel": "#ffffff", "--border": "#e2e8f0", "--text": "#0f172a", "--muted": "#64748b", "--soft": "#eef2f7" };
+// ADSS palette (matches the admin desk) — fixed, not tenant colour.
+const DARK: any = { "--bg": "#0a0d12", "--panel": "#11151d", "--border": "#1c2330", "--text": "#e7ecf3", "--muted": "#8a93a6", "--soft": "#151b25", "--accent": "#16c79a" };
+const LIGHT: any = { "--bg": "#f3f5f9", "--panel": "#ffffff", "--border": "#e6eaf0", "--text": "#0f172a", "--muted": "#64748b", "--soft": "#eef2f6", "--accent": "#0f9d77" };
 const BUY = "#26a69a", SELL = "#ef5350", GOLD = "#0078d7";
 const LOTS = [0.01, 0.05, 0.1, 0.5, 1];
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
@@ -436,7 +438,7 @@ export default function ClientTerminal() {
 
   if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
   return (
-    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "Tahoma, 'Segoe UI', sans-serif" }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {needKyc && (
         <div className="flex items-center gap-3 px-3 py-2 text-[12px] font-medium" style={{ background: "linear-gradient(90deg, rgba(240,180,41,0.22), rgba(240,180,41,0.08))", borderBottom: "1px solid rgba(240,180,41,0.4)", color: "#f0b829" }}>
           <i className="fa-solid fa-triangle-exclamation" />
@@ -609,7 +611,7 @@ export default function ClientTerminal() {
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
                 {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const b = p != null ? p * 0.9999 : null; const a = p != null ? p * 1.0001 : null; const dir = dirs[s.symbol] || 0; return (
                   <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
-                    <button onClick={() => setSelSym(s.symbol)} className="truncate text-left">{s.symbol}</button>
+                    <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
                   </div>); })}
@@ -620,7 +622,7 @@ export default function ClientTerminal() {
                 <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
                 {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const b = p != null ? p * 0.9999 : null; const a = p != null ? p * 1.0001 : null; const dir = dirs[s.symbol] || 0; const fc = dir > 0 ? BUY : dir < 0 ? SELL : "var(--text)"; const bg = dir > 0 ? "rgba(22,199,132,0.32)" : dir < 0 ? "rgba(224,82,96,0.32)" : "transparent"; return (
                   <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
-                    <button onClick={() => setSelSym(s.symbol)} className="truncate text-left">{s.symbol}</button>
+                    <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} /><span style={{ display: "none" }}>
                       

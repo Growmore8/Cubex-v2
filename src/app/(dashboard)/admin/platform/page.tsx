@@ -635,12 +635,12 @@ export default function AdminDeskPage() {
   const acctRow = (c: any) => (
     <button key={c.id} onClick={() => setSelAcc(c)} onContextMenu={(e) => { e.preventDefault(); setSelAcc(c); setMenu({ x: e.clientX, y: e.clientY, acc: c }); }}
       className="flex w-full items-center gap-1 rounded px-1.5 py-1 text-left" style={selAcc?.id === c.id ? { background: "var(--soft)", color: GOLD } : undefined}>
-      {dot(presenceOnline(c.user?.lastSeenAt) ? "#16a34a" : c.deactivated ? "var(--muted)" : c.locked ? SELL : BUY)}<span className="flex-1 truncate">{c.login} - {titleCaseName(c.name)}</span>
+      {(() => { const on = presenceOnline(c.user?.lastSeenAt); return <span className="inline-block h-2 w-2 shrink-0 rounded-full" title={on ? "Online" : "Offline"} style={{ background: on ? "#22c55e" : "#5b6577", boxShadow: on ? "0 0 6px #22c55e" : "none" }} />; })()}<span className="flex-1 truncate">{c.login} - {titleCaseName(c.name)}</span>
       <span className="flex shrink-0 items-center gap-1.5">
         {/* device icon only — left dot already encodes online/offline */}
         {c.user?.lastDevice && sIco(String(c.user.lastDevice).toLowerCase() === "mobile" ? "fa-mobile-screen-button" : String(c.user.lastDevice).toLowerCase() === "tablet" ? "fa-tablet-screen-button" : "fa-laptop", "#8b97a8", c.user.lastDevice)}
-        {/* Active / Deactivated */}
-        {c.deactivated ? sIco("fa-ban", "#8b97a8", "Deactivated") : sIco("fa-circle-check", BUY, "Active")}
+        {/* Deactivated only — active is the default, no extra dot needed */}
+        {c.deactivated ? sIco("fa-ban", "#8b97a8", "Deactivated") : null}
         {/* Locked */}
         {c.locked ? sIco("fa-lock", SELL, "Locked") : null}
         {/* Do Not Liquidate */}
