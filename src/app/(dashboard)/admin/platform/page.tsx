@@ -19,7 +19,7 @@ import { isOnline as presenceOnline } from "@/components/ui/Presence";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
 import { gnum, gmoney, gsign, titleCaseName } from "@/lib/format";
-import { DARK, LIGHT, BUY, SELL, GOLD } from "@/config/theme";
+import { ADSS_DARK, ADSS_LIGHT, ADSS_FONT, BUY, SELL, GOLD, BUYBTN, SELLBTN } from "@/config/theme";
 
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
 const TABS: [string, string][] = [["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"]];
@@ -664,7 +664,7 @@ export default function AdminDeskPage() {
     );
     return (
     <div className="absolute left-16 top-12 z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "rgba(9,12,18,0.90)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
-      <button onClick={() => place(sym, "SELL")} className="flex flex-col items-center rounded-lg px-4 py-1.5 font-bold transition-opacity hover:opacity-90 active:scale-95" style={{ background: "rgba(224,82,96,0.92)", color: "#fff", minWidth: 72, lineHeight: 1.2 }}>
+      <button onClick={() => place(sym, "SELL")} className="flex flex-col items-center rounded-xl px-4 py-1.5 font-bold shadow-md transition-all hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", minWidth: 72, lineHeight: 1.2, boxShadow: `0 6px 16px -6px ${SELLBTN}aa` }}>
         <span style={{ fontSize: 13, letterSpacing: "0.02em" }}>Sell</span>
         <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{bid}</span>
       </button>
@@ -672,14 +672,14 @@ export default function AdminDeskPage() {
         <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Lots</div>
         <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} className="w-14 rounded border text-center font-mono" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", color: "#e2e8f0", padding: "3px 4px", fontSize: 12, outline: "none" }} />
       </div>
-      <button onClick={() => place(sym, "BUY")} className="flex flex-col items-center rounded-lg px-4 py-1.5 font-bold transition-opacity hover:opacity-90 active:scale-95" style={{ background: "rgba(47,129,247,0.92)", color: "#fff", minWidth: 72, lineHeight: 1.2 }}>
+      <button onClick={() => place(sym, "BUY")} className="flex flex-col items-center rounded-xl px-4 py-1.5 font-bold shadow-md transition-all hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff", minWidth: 72, lineHeight: 1.2, boxShadow: `0 6px 16px -6px ${BUYBTN}aa` }}>
         <span style={{ fontSize: 13, letterSpacing: "0.02em" }}>Buy</span>
         <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{ask}</span>
       </button>
       <button onClick={(e) => { e.stopPropagation(); setShowOC(false); }} className="ml-1 self-start text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }} title="Hide buy/sell"><i className="fa-solid fa-eye-slash" /></button>
     </div>); };
   return (
-    <div style={theme === "dark" ? DARK : LIGHT} className="relative flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+    <div style={{ ...(theme === "dark" ? ADSS_DARK : ADSS_LIGHT), fontFamily: ADSS_FONT }} className="relative flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <div className="flex items-stretch border-b border-[var(--border)] bg-[var(--panel)] text-[11px]">
         <div className="flex items-center gap-2 border-r border-[var(--border)] px-3 py-1.5" style={{ width: panels.nav ? navW + 1 : undefined }}>
           {brand.logoUrl ? <img src={brand.logoUrl} alt="" className="h-4 w-4 rounded object-contain" /> : <span className="inline-block h-4 w-4 rounded" style={{ background: "var(--accent)" }} />}<b className="font-medium">{brand.name || "Platform"}</b>
