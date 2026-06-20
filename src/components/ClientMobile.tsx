@@ -19,6 +19,8 @@ const LIGHT: any = { "--bg": "#f3f5f9", "--panel": "#ffffff", "--card": "#ffffff
 // Fixed ADSS accent pair for in-app highlights (NOT the tenant brand colour).
 const A1 = "#16c79a", A2 = "#0ea5e9";
 const BUY = "#16a34a", SELL = "#dc2626", GOLD = "#e3a855", BLUE = "#2563eb";
+// ADSS buy/sell BUTTON colours (blue buy / red sell).
+const BUYBTN = "#2f81f7", SELLBTN = "#f6465d";
 const LOTS = [0.01, 0.05, 0.1, 0.5, 1];
 
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
@@ -651,11 +653,11 @@ export default function ClientMobile({ t }: { t: any }) {
                       </div>
                     </div>
                     <div className="grid grid-cols-3 items-center gap-2">
-                      <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "SELL"); }} className="rounded-lg py-2 text-center text-white" style={{ background: SELL }}>
+                      <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "SELL"); }} className="rounded-lg py-2 text-center text-white" style={{ background: SELLBTN }}>
                         <div className="text-[10px] opacity-80">SELL</div><div className="text-sm font-bold tabular-nums">{sBid != null ? gnum(sBid, dd) : "…"}</div>
                       </button>
                       <LotStepper vol={vol} setVol={setVol} small />
-                      <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "BUY"); }} className="rounded-lg py-2 text-center text-white" style={{ background: BUY }}>
+                      <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "BUY"); }} className="rounded-lg py-2 text-center text-white" style={{ background: BUYBTN }}>
                         <div className="text-[10px] opacity-80">BUY</div><div className="text-sm font-bold tabular-nums">{sAsk != null ? gnum(sAsk, dd) : "…"}</div>
                       </button>
                     </div>
@@ -671,15 +673,17 @@ export default function ClientMobile({ t }: { t: any }) {
           <div className="flex h-full flex-col">
             {/* Chart header — big price block (symbol + name · large price + change) */}
             {(() => {
-              const disp = (symbols || []).find((x: any) => x.symbol === selSym)?.display;
+              const symMeta = (symbols || []).find((x: any) => x.symbol === selSym);
+              const disp = symMeta?.display; const cat = symMeta?.category;
               const base = baselineRef.current[selSym]; const chg = (base != null && price != null) ? price - base : 0; const pct = pctOf(selSym); const upC = chg >= 0;
               return (
                 <div className="border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
                   <div className="flex items-start justify-between gap-2">
-                    <button onPointerDown={(e) => { e.preventDefault(); setSymSearch(""); setSymPickerOpen(true); }} className="flex items-center gap-1.5 text-left" style={{ touchAction: "manipulation" }}>
+                    <button onPointerDown={(e) => { e.preventDefault(); setSymSearch(""); setSymPickerOpen(true); }} className="flex items-center gap-2.5 text-left" style={{ touchAction: "manipulation" }}>
+                      <SymIcon symbol={selSym} size={32} />
                       <div>
-                        <div className="flex items-center gap-1.5 text-[16px] font-extrabold leading-none text-[var(--text)]">{selSym || "Symbol"}<i className="fa-solid fa-chevron-down text-[9px] opacity-50" /></div>
-                        {disp && disp !== selSym && <div className="mt-0.5 text-[10px] text-[var(--muted)]">{disp}</div>}
+                        <div className="flex items-center gap-1.5 text-[17px] font-extrabold leading-none text-[var(--text)]">{selSym || "Symbol"}<i className="fa-solid fa-chevron-down text-[9px] opacity-50" /></div>
+                        <div className="mt-1 text-[10px] capitalize text-[var(--muted)]">{cat || disp || "Markets"}{disp && disp !== selSym ? " · " + disp : ""}</div>
                       </div>
                     </button>
                     <div className="text-right">
@@ -723,12 +727,12 @@ export default function ClientMobile({ t }: { t: any }) {
                 ]} />
             </div>
             <div className="glass flex items-stretch gap-2 border-t border-[var(--border)] p-2.5" style={{ background: theme === "dark" ? "rgba(20,24,34,0.6)" : "rgba(255,255,255,0.6)" }}>
-              <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: SELL, touchAction: "manipulation" }}>
-                <div className="text-[10px] opacity-80">SELL</div><div className="text-base font-bold tabular-nums">{price != null ? gnum(bid, dg(selSym)) : "…"}</div>
+              <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, boxShadow: `0 8px 18px -8px ${SELLBTN}`, touchAction: "manipulation" }}>
+                <div className="text-[10px] font-semibold uppercase tracking-wide opacity-85">Sell</div><div className="text-base font-bold tabular-nums">{price != null ? gnum(bid, dg(selSym)) : "…"}</div>
               </button>
               <div className="flex items-center"><LotStepper vol={vol} setVol={setVol} /></div>
-              <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white disabled:opacity-50" style={{ background: BUY, touchAction: "manipulation" }}>
-                <div className="text-[10px] opacity-80">BUY</div><div className="text-base font-bold tabular-nums">{price != null ? gnum(ask, dg(selSym)) : "…"}</div>
+              <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, boxShadow: `0 8px 18px -8px ${BUYBTN}`, touchAction: "manipulation" }}>
+                <div className="text-[10px] font-semibold uppercase tracking-wide opacity-85">Buy</div><div className="text-base font-bold tabular-nums">{price != null ? gnum(ask, dg(selSym)) : "…"}</div>
               </button>
             </div>
             {err && <div className="bg-[var(--panel)] pb-1 text-center text-[11px]" style={{ color: SELL }}>{err}</div>}
@@ -1194,50 +1198,23 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
       )}
 
-      {/* BOTTOM NAV — stylish rounded bar; active item = brand-gradient squircle */}
-      {(() => {
-        const primary = A1;
-        const accent = A2;
-        const dark = theme === "dark";
-        const barBg = dark ? "linear-gradient(180deg,#262a33,#1a1d24)" : "linear-gradient(180deg,#ffffff,#eef1f7)";
-        const activeFill = `linear-gradient(140deg, ${primary}, ${accent})`; // gradient, not flat
-        const inactive = dark ? "rgba(255,255,255,0.6)" : "#64748b"; // outline-icon stroke colour
-        const spring = "cubic-bezier(.34,1.56,.64,1)";
-        return (
-          <div className="px-4 pt-2" style={{ paddingBottom: "max(0.6rem, env(safe-area-inset-bottom))" }}>
-            <div className="flex items-center justify-around rounded-[28px] px-2 py-2" style={{
-              background: barBg,
-              border: dark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(15,23,42,0.05)",
-              boxShadow: dark
-                ? "0 18px 38px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.06)"
-                : "0 18px 34px -16px rgba(15,23,42,0.3), inset 0 1px 0 rgba(255,255,255,0.9)",
-            }}>
-              {navItems.map(([k, icon]) => {
-                const active = tab === k;
-                return (
-                  <button key={k} onClick={() => startTransition(() => setTab(k as any))} aria-label={k}
-                    className="flex items-center justify-center rounded-[16px]" style={{
-                      width: 46, height: 46,
-                      background: active ? activeFill : "transparent",
-                      boxShadow: active ? `0 10px 22px -6px ${primary}99, inset 0 1px 0 rgba(255,255,255,0.35)` : "none",
-                      transform: active ? "translateY(-2px) scale(1.08)" : "translateY(0) scale(1)",
-                      transition: `background .3s ease, box-shadow .3s ease, transform .4s ${spring}`,
-                    }}>
-                    <i className={`fa-solid ${icon}`} style={{
-                      fontSize: active ? 18 : 16,
-                      // active = solid white; inactive = outline (transparent fill + muted stroke)
-                      color: active ? "#fff" : "transparent",
-                      WebkitTextStroke: active ? "0px transparent" : `1.4px ${inactive}`,
-                      transition: `color .3s ease, font-size .3s ${spring}, -webkit-text-stroke .3s ease`,
-                      animation: active ? `nav-pop .4s ${spring}` : undefined,
-                    }} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
+      {/* BOTTOM NAV — clean professional tab bar (icon + label, accent active) */}
+      <div style={{ background: "var(--panel)", borderTop: "1px solid var(--border)", paddingBottom: "max(0.45rem, env(safe-area-inset-bottom))" }} className="px-1 pt-1">
+        <div className="flex items-stretch justify-around">
+          {navItems.map(([k, icon, label]) => {
+            const active = tab === k;
+            const col = active ? A1 : "var(--muted)";
+            return (
+              <button key={k} onClick={() => startTransition(() => setTab(k as any))} aria-label={label}
+                className="relative flex flex-1 flex-col items-center gap-1 py-1.5 active:opacity-70">
+                <span className="absolute top-0 h-[3px] rounded-full transition-all duration-300" style={{ width: active ? 24 : 0, background: A1, opacity: active ? 1 : 0 }} />
+                <i className={`fa-solid ${icon}`} style={{ fontSize: 17, color: col, transition: "color .22s ease, transform .3s cubic-bezier(.34,1.56,.64,1)", transform: active ? "translateY(-1px) scale(1.06)" : "none" }} />
+                <span className="text-[9.5px] font-semibold tracking-tight" style={{ color: col, transition: "color .22s ease" }}>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* TRANSFER MODAL */}
       {xferModal && (
