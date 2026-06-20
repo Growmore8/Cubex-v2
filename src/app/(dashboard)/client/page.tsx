@@ -678,10 +678,10 @@ export default function ClientTerminal() {
 
               {/* Volume */}
               <div className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Volume (lots)</div>
-              <div className="mb-1 flex items-center gap-1.5">
-                <button onClick={() => setVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--soft)]">−</button>
-                <input type="number" step="0.01" value={vol} onChange={(e) => setVol(Number(e.target.value))} className="h-8 flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-center text-[13px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" />
-                <button onClick={() => setVol((v) => +(v + 0.01).toFixed(2))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--soft)]">+</button>
+              <div className="mb-1 flex items-center justify-center gap-2">
+                <button onClick={() => setVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] transition-colors hover:bg-[var(--soft)] hover:text-[var(--text)] active:scale-95">−</button>
+                <input type="number" step="0.01" value={vol} onChange={(e) => setVol(Number(e.target.value))} className="h-9 w-20 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[14px] font-bold tabular-nums text-[var(--text)] outline-none focus:border-[#2f81f7]" />
+                <button onClick={() => setVol((v) => +(v + 0.01).toFixed(2))} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] transition-colors hover:bg-[var(--soft)] hover:text-[var(--text)] active:scale-95">+</button>
               </div>
               <div className="mb-2 flex gap-1">{LOTS.map((l) => <button key={l} onClick={() => setVol(l)} className="flex-1 rounded-md py-1 text-[9px] font-medium transition-colors" style={vol === l ? { background: "#2f81f7", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{l}</button>)}</div>
 
