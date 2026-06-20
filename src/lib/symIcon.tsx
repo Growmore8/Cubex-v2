@@ -16,27 +16,37 @@ const CRYPTO: Record<string, [string, string]> = {
 const METAL: Record<string, [string, string]> = {
   XAU: ["Au", "#eab308"], XAG: ["Ag", "#9ca3af"], XPT: ["Pt", "#94a3b8"], XPD: ["Pd", "#a3a3a3"],
 };
+// Quote tokens to strip from the end (longest first so USDT beats USD).
+const QUOTES = ["USDT", "USDC", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD", "BTC", "ETH"];
 
-function flag(iso: string, size: number, ml = 0): React.ReactNode {
+function flagEl(iso: string, size: number, ml = 0): React.ReactNode {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={`https://flagcdn.com/w40/${iso}.png`} alt="" loading="lazy" referrerPolicy="no-referrer"
       style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #0a0d12", marginLeft: ml, flex: "none" }} />
   );
 }
-function chip(glyph: string, bg: string, size: number): React.ReactNode {
-  return <span style={{ width: size, height: size, borderRadius: "50%", background: bg, color: "#fff", fontSize: size * 0.52, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "none", lineHeight: 1 }}>{glyph}</span>;
+function chipEl(glyph: string, bg: string, size: number, ml = 0): React.ReactNode {
+  return <span style={{ width: size, height: size, borderRadius: "50%", background: bg, color: "#fff", fontSize: size * 0.5, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "none", lineHeight: 1, border: "1.5px solid #0a0d12", marginLeft: ml }}>{glyph}</span>;
+}
+// One icon for a single asset/currency code, or null if unknown.
+function iconFor(code: string, size: number, ml = 0): React.ReactNode {
+  if (CCY[code]) return flagEl(CCY[code], size, ml);
+  if (CRYPTO[code]) return chipEl(CRYPTO[code][0], CRYPTO[code][1], size, ml);
+  if (METAL[code]) return chipEl(METAL[code][0], METAL[code][1], size, ml);
+  return null;
 }
 
 export function SymIcon({ symbol, size = 18 }: { symbol: string; size?: number }) {
   const s = (symbol || "").toUpperCase();
-  for (const k of Object.keys(CRYPTO)) if (s.startsWith(k)) return <>{chip(CRYPTO[k][0], CRYPTO[k][1], size)}</>;
-  for (const k of Object.keys(METAL)) if (s.startsWith(k)) return <>{chip(METAL[k][0], METAL[k][1], size)}</>;
-  const base = s.slice(0, 3), quote = s.slice(3, 6);
-  if (CCY[base] && CCY[quote]) {
-    // forex pair → two overlapping circular flags (like the reference)
-    return <span style={{ display: "inline-flex", alignItems: "center", flex: "none" }}>{flag(CCY[base], size)}{flag(CCY[quote], size, -size * 0.42)}</span>;
-  }
-  if (CCY[base]) return <>{flag(CCY[base], size)}</>;
-  return <>{chip(s.charAt(0) || "?", "#475569", size)}</>;
+  // Split BASE + QUOTE (e.g. XAUUSD -> XAU + USD, BTCUSDT -> BTC + USDT).
+  let base = s, quote = "";
+  for (const q of QUOTES) { if (s.length > q.length && s.endsWith(q)) { quote = q; base = s.slice(0, s.length - q.length); break; } }
+  const quoteCode = quote === "USDT" || quote === "USDC" ? "USD" : quote;
+  const baseEl = iconFor(base, size);
+  const quoteEl = quoteCode ? iconFor(quoteCode, size, -size * 0.42) : null;
+  if (baseEl && quoteEl) return <span style={{ display: "inline-flex", alignItems: "center", flex: "none" }}>{baseEl}{quoteEl}</span>;
+  if (baseEl) return <>{baseEl}</>;
+  // stocks / indices / unknown → single lettered chip
+  return <>{chipEl(s.charAt(0) || "?", "#475569", size)}</>;
 }
