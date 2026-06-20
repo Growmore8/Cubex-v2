@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import WalletPanel from "@/components/WalletPanel";
 import WorldMapBg from "@/components/ui/WorldMapBg";
 import { titleCaseName, gnum } from "@/lib/format";
+import { SymIcon } from "@/lib/symIcon";
 import { iconForNotification } from "@/lib/notif";
 
 // Lazy-load the chart lib — it's ~350 kB and only needed on the Chart tab.
@@ -12,8 +13,11 @@ const KLineProChart = dynamic(() => import("@/components/KLineProChart"), { ssr:
 
 const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD@tv-basicstudies"], ["Stoch", "Stochastic@tv-basicstudies"], ["BBands", "BB@tv-basicstudies"], ["MA", "MASimple@tv-basicstudies"], ["ROC", "ROC@tv-basicstudies"]];
 
-const DARK: any = { "--bg": "#0b0e14", "--panel": "#131722", "--card": "#1a1f2b", "--border": "#242a38", "--text": "#e8eaed", "--muted": "#8a93a6", "--soft": "#1e2433" };
-const LIGHT: any = { "--bg": "#f1f5f9", "--panel": "#ffffff", "--card": "#ffffff", "--border": "#e2e8f0", "--text": "#0f172a", "--muted": "#64748b", "--soft": "#eef2f7" };
+// ADSS palette (matches admin desk + client desktop) — fixed, not tenant colour.
+const DARK: any = { "--bg": "#0a0d12", "--panel": "#11151d", "--card": "#141a24", "--border": "#1c2330", "--text": "#e7ecf3", "--muted": "#8a93a6", "--soft": "#151b25", "--accent": "#16c79a" };
+const LIGHT: any = { "--bg": "#f3f5f9", "--panel": "#ffffff", "--card": "#ffffff", "--border": "#e6eaf0", "--text": "#0f172a", "--muted": "#64748b", "--soft": "#eef2f6", "--accent": "#0f9d77" };
+// Fixed ADSS accent pair for in-app highlights (NOT the tenant brand colour).
+const A1 = "#16c79a", A2 = "#0ea5e9";
 const BUY = "#16a34a", SELL = "#dc2626", GOLD = "#e3a855", BLUE = "#2563eb";
 const LOTS = [0.01, 0.05, 0.1, 0.5, 1];
 
@@ -325,13 +329,13 @@ export default function ClientMobile({ t }: { t: any }) {
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", top: 0, bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 540, zIndex: 1, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation", boxShadow: "0 0 60px rgba(0,0,0,0.45)",
       // Frosted-glass design: faint brand-tinted glows behind the content so the
       // .glass-card surfaces have colour to blur (design "A").
-      background: `radial-gradient(620px 380px at -5% -2%, color-mix(in srgb, ${brand?.primaryColor || "#7c3aed"} 34%, transparent), transparent 60%), radial-gradient(620px 380px at 105% 8%, color-mix(in srgb, ${brand?.accentColor || "#2563eb"} 30%, transparent), transparent 58%), radial-gradient(520px 320px at 50% 112%, rgba(16,199,132,0.13), transparent 60%), var(--bg)` }} className="flex flex-col overflow-hidden text-[var(--text)]">
+      background: "radial-gradient(680px 420px at 50% -6%, rgba(22,199,154,0.08), transparent 60%), var(--bg)" }} className="flex flex-col overflow-hidden text-[var(--text)]">
       <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarRef} onChange={uploadAvatar} />
 
       {/* TOP HEADER — premium glass */}
       {(() => {
-        const hPrimary = brand?.primaryColor || "#7c3aed";
-        const hAccent = brand?.accentColor || "#2563eb";
+        const hPrimary = A1;
+        const hAccent = A2;
         const live = account?.type === "LIVE";
         return (
         <div className="sticky top-0 z-20 flex items-center justify-between px-3.5 py-2.5" style={{ background: "transparent" }}>
@@ -582,7 +586,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       const p = s.pct;
                       return (
                         <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] text-white" style={{ background: BUY }}><i className="fa-solid fa-arrow-up" /></span>
+                          <SymIcon symbol={s.symbol} size={26} />
                           <div className="w-24 shrink-0 text-left"><div className="truncate text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price != null ? gnum(s.price, dg(s.symbol)) : "…"}</div></div>
                           <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={true} /></div>
                           <span className="w-[52px] shrink-0 text-right text-[12px] font-semibold tabular-nums" style={{ color: BUY }}>{(p >= 0 ? "+" : "") + p.toFixed(2)}%</span>
@@ -596,7 +600,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       const p = s.pct;
                       return (
                         <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] text-white" style={{ background: SELL }}><i className="fa-solid fa-arrow-down" /></span>
+                          <SymIcon symbol={s.symbol} size={26} />
                           <div className="w-24 shrink-0 text-left"><div className="truncate text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price != null ? gnum(s.price, dg(s.symbol)) : "…"}</div></div>
                           <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={false} /></div>
                           <span className="w-[52px] shrink-0 text-right text-[12px] font-semibold tabular-nums" style={{ color: SELL }}>{p.toFixed(2)}%</span>
@@ -637,6 +641,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div className="mb-2 flex select-none items-center justify-between" onDoubleClick={() => { setSelSym(s.symbol); setTab("chart"); }}>
                       <div className="flex items-center gap-2">
                         <button onClick={() => toggleFav(s.symbol)} style={{ color: isFav ? GOLD : "var(--muted)" }}><i className={isFav ? "fa-solid fa-star" : "fa-regular fa-star"} /></button>
+                        <SymIcon symbol={s.symbol} size={20} />
                         <button onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="text-sm font-bold underline-offset-2 active:underline">{s.display || s.symbol}</button>
                         {dr !== 0 && <i className={"fa-solid " + (dr > 0 ? "fa-caret-up" : "fa-caret-down")} style={{ fontSize: 11, color: dr > 0 ? BUY : SELL }} />}
                       </div>
@@ -1191,8 +1196,8 @@ export default function ClientMobile({ t }: { t: any }) {
 
       {/* BOTTOM NAV — stylish rounded bar; active item = brand-gradient squircle */}
       {(() => {
-        const primary = brand?.primaryColor || "#2563eb";
-        const accent = brand?.accentColor || "#1d4ed8";
+        const primary = A1;
+        const accent = A2;
         const dark = theme === "dark";
         const barBg = dark ? "linear-gradient(180deg,#262a33,#1a1d24)" : "linear-gradient(180deg,#ffffff,#eef1f7)";
         const activeFill = `linear-gradient(140deg, ${primary}, ${accent})`; // gradient, not flat
