@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { effectiveSeatsForPlan } from "@/services/tenant.service";
+import { createClient, adjustBalance } from "@/services/account.service";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -78,6 +79,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           },
         });
       }
+    } else if (b.action === "seedDemo") {
+      // Populate a demo tenant with a few sample clients + balances so it isn't empty.
+      const samples = [
+        { name: "James Carter", type: "LIVE", dep: 25000 },
+        { name: "Aisha Khan", type: "LIVE", dep: 12000 },
+        { name: "Wei Chen", type: "DEMO", dep: 10000 },
+        { name: "Maria Lopez", type: "LIVE", dep: 5000 },
+      ];
+      let made = 0;
+      for (let i = 0; i < samples.length; i++) {
+        const sp = samples[i];
+        const email = `demo${i + 1}@${t.subdomain || "demo"}.sample`;
+        const exists = await prisma.user.findFirst({ where: { tenantId: t.id, email } });
+        if (exists) continue;
+        try {
+          const acc: any = await createClient(t.id, { name: sp.name, email, password: "Demo@1234", type: sp.type, leverage: 100, currency: "USD" }, "demo-seed");
+          if (sp.type === "LIVE" && sp.dep) await adjustBalance(t.id, acc.id, "DEPOSIT", sp.dep, "Demo seed deposit", "demo-seed").catch(() => {});
+          made++;
+        } catch {}
+      }
+      await audit(t.id, "sa.tenant.seedDemo", made + " clients", s.email).catch(() => {});
+      return NextResponse.json({ ok: true, seeded: made });
     } else if (b.action === "delete") {
       await prisma.tenant.delete({ where: { id: t.id } });
     } else {

@@ -647,6 +647,18 @@ function startStatementCron() {
   const msToNextHour = (60 - now.getMinutes()) * 60000 - now.getSeconds() * 1000 - now.getMilliseconds();
   setTimeout(() => { statementCronTick(); setInterval(statementCronTick, 60 * 60 * 1000); }, Math.max(1000, msToNextHour));
 }
+// Daily cleanup of expired demo trials (past the grace period).
+async function trialCleanupTick() {
+  try {
+    const res = await fetch("http://127.0.0.1:" + port + "/api/cron/trial-cleanup", { method: "POST", headers: CRON_SECRET ? { "x-cron-secret": CRON_SECRET } : {} });
+    const d = await res.json().catch(() => ({}));
+    if (d && d.deleted) console.log("[trials] cleaned up", d.deleted, "expired demo tenant(s)");
+  } catch (e) { /* transient — retried next day */ }
+}
+function startTrialCleanup() {
+  setTimeout(trialCleanupTick, 5 * 60 * 1000); // 5 min after boot
+  setInterval(trialCleanupTick, 24 * 60 * 60 * 1000); // then daily
+}
 
 app.prepare().then(async () => {
   try { await loadCatalog(); } catch (e) { console.error('[feed] catalog load failed:', e.message); }
@@ -686,6 +698,7 @@ app.prepare().then(async () => {
   setInterval(() => monitor(io), MONITOR_MS);
   setInterval(() => checkPending(io), 2000);
   startStatementCron();
+  startTrialCleanup();
   purgeOldNotifications();                                  // on boot
   setInterval(purgeOldNotifications, 6 * 60 * 60 * 1000);   // + every 6h
   server.listen(port, () => console.log("> Ready on http://localhost:" + port));
