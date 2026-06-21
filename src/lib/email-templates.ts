@@ -89,23 +89,27 @@ export function smtpTestEmail(brand: BrandInfo): string {
     <p style="font-size:12px;color:#9ca3af;margin:0 0 12px;text-align:center">No action needed — you can safely ignore this email.</p>`);
 }
 
-// Demo/trial welcome — sent to a prospect with their link, login and expiry.
-export function demoWelcomeEmail(brand: BrandInfo, o: { url: string; email: string; password: string; endsAt?: string | null }): string {
+// Demo/trial welcome — sent to a prospect with their link, admin + client login,
+// and expiry, so they can explore BOTH the back office and the trading app.
+export function demoWelcomeEmail(brand: BrandInfo, o: { url: string; email: string; password: string; endsAt?: string | null; client?: { email: string; password: string } | null }): string {
   const primary = esc(brand.primaryColor || "#2563eb");
   const row = (k: string, v: string) => `<tr><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;color:#6b7280;font-size:13px;white-space:nowrap">${esc(k)}</td><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;font-weight:700;font-size:13px;color:#111827;word-break:break-all">${v}</td></tr>`;
+  const head = (label: string) => `<div style="font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#9ca3af;margin:14px 0 4px">${esc(label)}</div>`;
   const ends = o.endsAt ? new Date(o.endsAt).toLocaleDateString() : null;
   return brandedEmail(brand, "Your demo is ready 🎉", `
-    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 16px">Welcome! Your <strong>${esc(brand.brandName)}</strong> trading platform demo is live. Sign in below to explore it${ends ? ` — your trial runs until <strong>${esc(ends)}</strong>` : ""}.</p>
-    <div style="text-align:center;margin:22px 0 18px">
-      <a href="${esc(o.url)}" style="display:inline-block;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:13px 30px;border-radius:9px;background:${primary}">Open your platform</a>
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 16px">Welcome! Your <strong>${esc(brand.brandName)}</strong> trading platform demo is live. Use the logins below to explore both sides${ends ? ` — your trial runs until <strong>${esc(ends)}</strong>` : ""}.</p>
+    <div style="text-align:center;margin:20px 0 6px">
+      <a href="${esc(o.url)}" style="display:inline-block;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:13px 30px;border-radius:9px;background:${primary}">Open the platform</a>
     </div>
-    <table style="width:100%;border-collapse:collapse;margin:6px 0 16px">
-      ${row("Platform URL", `<a href="${esc(o.url)}" style="color:${primary}">${esc(o.url.replace(/^https?:\/\//, ""))}</a>`)}
-      ${row("Login email", esc(o.email))}
+    ${head("Admin / Back office — manage clients, trades, payments")}
+    <table style="width:100%;border-collapse:collapse">
+      ${row("URL", `<a href="${esc(o.url)}" style="color:${primary}">${esc(o.url.replace(/^https?:\/\//, ""))}</a>`)}
+      ${row("Email", esc(o.email))}
       ${row("Password", esc(o.password))}
-      ${ends ? row("Trial ends", esc(ends)) : ""}
     </table>
-    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">Inside, you can brand the platform, create client accounts, place trades and try the mobile app. Reply to this email if you'd like to go live with your own domain.</p>`);
+    ${o.client ? head("Client / Trading app — the trader experience") + `<table style="width:100%;border-collapse:collapse">${row("Email", esc(o.client.email))}${row("Password", esc(o.client.password))}</table>` : ""}
+    ${ends ? `<p style="font-size:12px;color:#9ca3af;margin:14px 0 0">Trial ends ${esc(ends)}.</p>` : ""}
+    <p style="font-size:12px;color:#9ca3af;margin:10px 0 0">Reply to this email to go live with your own domain.</p>`);
 }
 
 export interface StatementSummary {
