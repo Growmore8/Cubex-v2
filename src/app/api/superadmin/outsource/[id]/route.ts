@@ -5,6 +5,8 @@ import { hashPassword } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { effectiveSeatsForPlan } from "@/services/tenant.service";
 import { createClient, adjustBalance } from "@/services/account.service";
+import { sendPlatformMail } from "@/lib/mailer";
+import { demoWelcomeEmail, type BrandInfo } from "@/lib/email-templates";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -101,6 +103,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
       await audit(t.id, "sa.tenant.seedDemo", made + " clients", s.email).catch(() => {});
       return NextResponse.json({ ok: true, seeded: made });
+    } else if (b.action === "sendWelcome") {
+      // Email the prospect their demo link + login + expiry (sets the admin
+      // password to the provided one so the credentials are guaranteed correct).
+      const to = String(b.to || "").trim();
+      const password = String(b.password || "").trim();
+      if (!to) throw new Error("Recipient email is required");
+      if (password.length < 6) throw new Error("Password must be at least 6 characters");
+      const admin = await prisma.user.findFirst({ where: { tenantId: t.id, role: "ADMIN" as any } });
+      if (!admin) throw new Error("This tenant has no admin user");
+      await prisma.user.update({ where: { id: admin.id }, data: { passwordHash: await hashPassword(password) } });
+      const base = process.env.PLATFORM_BASE_DOMAIN || "cubexenterprises.com";
+      const url = t.customDomain ? `https://${t.customDomain}` : `https://${t.subdomain}.${base}`;
+      const sub = await prisma.subscription.findUnique({ where: { tenantId: t.id }, select: { endsAt: true } });
+      const brand: BrandInfo = { brandName: t.brandName || t.name, primaryColor: t.primaryColor, accentColor: t.accentColor, logoUrl: t.logoUrl };
+      await sendPlatformMail({ to, subject: `Your ${brand.brandName} demo is ready`, fromName: brand.brandName, html: demoWelcomeEmail(brand, { url, email: admin.email, password, endsAt: sub?.endsAt ? String(sub.endsAt) : null }) });
+      await audit(t.id, "sa.tenant.sendWelcome", to, s.email).catch(() => {});
+      return NextResponse.json({ ok: true });
     } else if (b.action === "delete") {
       await prisma.tenant.delete({ where: { id: t.id } });
     } else {

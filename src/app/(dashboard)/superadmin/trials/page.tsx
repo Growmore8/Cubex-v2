@@ -25,6 +25,14 @@ export default function SATrials() {
   const extend = (t: Trial, days: number) => act(t.id, { action: "updateSub", status: "TRIALING", endsAt: new Date(Date.now() + days * 86400000).toISOString().slice(0, 10) }, `Extended ${t.name} by ${days} days`);
   const convert = (t: Trial) => act(t.id, { action: "updateSub", status: "ACTIVE", endsAt: null }, `${t.name} converted to paid`);
   const seed = (t: Trial) => act(t.id, { action: "seedDemo" }, `Seeded demo data for ${t.name}`);
+  async function welcome(t: Trial) {
+    const to = window.prompt(`Send the demo welcome email for ${t.name} to:`, "");
+    if (!to) return;
+    const pw = window.prompt("Admin password to include (sets/locks the login to this, min 6 chars):", "");
+    if (!pw) return;
+    if (pw.length < 6) { setErr("Password must be at least 6 characters"); return; }
+    await act(t.id, { action: "sendWelcome", to: to.trim(), password: pw }, `Welcome email sent to ${to.trim()}`);
+  }
 
   const urlFor = (t: Trial) => "https://" + (t.customDomain || `${t.subdomain}.${baseDomain}`);
 
@@ -49,6 +57,7 @@ export default function SATrials() {
                 {t.endsAt && <div className="mt-1 text-[10px] text-gray-400">ends {new Date(t.endsAt).toLocaleDateString()}</div>}
               </div>
               <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => welcome(t)} className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: "#2563eb", color: "#2563eb" }}><i className="fa-solid fa-envelope mr-1" />Welcome</button>
                 <button onClick={() => extend(t, 30)} className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: "#cbd5e1" }}>+30d</button>
                 <button onClick={() => seed(t)} className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: "#cbd5e1" }}>Seed data</button>
                 <button onClick={() => convert(t)} className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: "#16a34a", color: "#16a34a" }}>Convert</button>
