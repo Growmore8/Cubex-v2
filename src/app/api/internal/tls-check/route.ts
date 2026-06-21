@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { platformBaseDomains } from "@/lib/tenant";
 
 // Caddy on-demand TLS "ask" endpoint. Before issuing a Let's Encrypt cert for an
 // incoming hostname, Caddy calls GET /api/internal/tls-check?domain=<host>.
@@ -11,11 +12,10 @@ export async function GET(req: Request) {
   const domain = (new URL(req.url).searchParams.get("domain") || "").toLowerCase().trim();
   if (!domain) return new NextResponse("missing domain", { status: 400 });
 
-  // Allow the platform domain itself (apex landing page) and all its subdomains
-  // (trade., www., db., files., tenant subdomains).
-  const root = (process.env.ROOT_DOMAIN || process.env.DOMAIN || "").toLowerCase().trim();
-  if (root && (domain === root || domain.endsWith("." + root))) {
-    return new NextResponse("ok", { status: 200 });
+  // Allow every platform base domain (ROOT_DOMAIN / PLATFORM_BASE_DOMAIN / DOMAIN)
+  // and all of their subdomains (trade., www., db., files., and tenant subdomains).
+  for (const root of platformBaseDomains()) {
+    if (domain === root || domain.endsWith("." + root)) return new NextResponse("ok", { status: 200 });
   }
 
   try {
