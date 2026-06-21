@@ -57,11 +57,13 @@ export default function SATrials() {
                 {t.endsAt && <div className="mt-1 text-[10px] text-gray-400">ends {new Date(t.endsAt).toLocaleDateString()}</div>}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <button onClick={() => welcome(t)} className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: "#2563eb", color: "#2563eb" }}><i className="fa-solid fa-envelope mr-1" />Welcome</button>
-                <button onClick={() => extend(t, 30)} className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: "#cbd5e1" }}>+30d</button>
-                <button onClick={() => seed(t)} className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: "#cbd5e1" }}>Seed data</button>
-                <button onClick={() => convert(t)} className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: "#16a34a", color: "#16a34a" }}>Convert</button>
-                <button onClick={() => setConfirmDel(t)} className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: "#fca5a5", color: "#dc2626" }}>Delete</button>
+                {(() => { const sec = { background: "var(--bg2)", color: "var(--text)", border: "1px solid var(--border)" } as React.CSSProperties; return (<>
+                  <button onClick={() => welcome(t)} className="px-2.5 py-1.5 text-xs font-semibold" style={sec}><i className="fa-solid fa-envelope mr-1" />Welcome</button>
+                  <button onClick={() => extend(t, 30)} className="px-2.5 py-1.5 text-xs font-semibold" style={sec}>+30d</button>
+                  <button onClick={() => seed(t)} className="px-2.5 py-1.5 text-xs font-semibold" style={sec}>Seed data</button>
+                  <button onClick={() => convert(t)} className="px-2.5 py-1.5 text-xs font-semibold" style={{ background: "var(--accent)", color: "#04221c", border: "none" }}>Convert</button>
+                  <button onClick={() => setConfirmDel(t)} className="px-2.5 py-1.5 text-xs font-semibold" style={{ background: "color-mix(in srgb, var(--red) 14%, transparent)", color: "var(--red)", border: "1px solid color-mix(in srgb, var(--red) 35%, transparent)" }}>Delete</button>
+                </>); })()}
               </div>
             </div>
           ))}

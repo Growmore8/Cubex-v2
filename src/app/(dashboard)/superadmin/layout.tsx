@@ -38,7 +38,7 @@ const CSS = `
   --bg:#f3f5f9;--bg2:#eef2f6;--card:#ffffff;--border:#e6eaf0;--border-strong:#d4dbe6;--text:#0f172a;--text2:#64748b;--text3:#94a3b8;
   --shadow:0 2px 12px rgba(13,27,62,.10);--shadow-lg:0 8px 28px rgba(13,27,62,.16);--ring:rgba(22,199,154,.2);
   background:var(--bg);color:var(--text);}
-.sa-shell.dark{--bg:#0a0d12;--bg2:#11151d;--card:#11151d;--border:#1c2330;--border-strong:#2a3344;--text:#e7ecf3;--text2:#8a93a6;--text3:#5b6577;--shadow:0 2px 12px rgba(0,0,0,.4);--shadow-lg:0 10px 28px rgba(0,0,0,.55);--ring:rgba(22,199,154,.25);}
+.sa-shell.dark{--bg:#10151e;--bg2:#171d28;--card:#171d28;--border:#28303f;--border-strong:#3a455c;--text:#e9eef6;--text2:#9aa6bb;--text3:#6c7a92;--shadow:0 2px 12px rgba(0,0,0,.35);--shadow-lg:0 10px 28px rgba(0,0,0,.5);--ring:rgba(22,199,154,.25);}
 .sa-shell *{box-sizing:border-box;}
 .sa-shell .sidebar{width:220px;background:var(--navy);height:100vh;display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;}
 .sa-shell .sb-brand{padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08);}
@@ -121,6 +121,18 @@ const CSS = `
 .sa-shell.dark select{color-scheme:dark;}
 .sa-shell input::placeholder,.sa-shell textarea::placeholder{color:var(--text3);}
 .sa-shell table{color:var(--text);}
+/* ── consistent buttons, tags & badges (rounded-rect; only action icons keep distinct colours) ── */
+/* All text buttons: same rounded-rect shape. (Small icon-only action buttons in tables keep their colour.) */
+.sa-shell button{border-radius:9px !important;}
+/* Pills/tags -> rounded-rect, consistent padding/weight */
+.sa-shell span[class*="rounded-full"]{border-radius:8px !important;}
+.sa-shell .badge{border-radius:8px !important;padding:3px 9px !important;font-weight:700 !important;}
+/* status text-badges become consistent subtle chips */
+.sa-shell .sab{display:inline-block;border-radius:8px;padding:2px 8px;font-weight:700;background:color-mix(in srgb, currentColor 13%, transparent);}
+/* Primary button = accent; ghost/secondary = neutral surface — one consistent look */
+.sa-shell .ui-btn-primary,.sa-shell .btn-primary{background:var(--accent)!important;color:#04221c!important;border-color:transparent!important;}
+.sa-shell .btn-gold{background:var(--accent)!important;color:#04221c!important;}
+.sa-shell .ui-btn:not(.ui-btn-primary){background:var(--bg2)!important;color:var(--text)!important;border:1px solid var(--border)!important;}
 /* ── notification panel ── */
 .sa-shell .sa-notif-panel{position:fixed;top:0;right:-360px;width:340px;max-width:90vw;height:100vh;background:var(--card);border-left:1px solid var(--border);box-shadow:-12px 0 24px rgba(0,0,0,.18);z-index:9990;display:flex;flex-direction:column;transition:right .25s ease;}
 .sa-shell .sa-notif-panel.open{right:0;}
