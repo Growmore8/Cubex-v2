@@ -415,6 +415,19 @@ export default function SATenantsPage() {
                 <input type="date" className={inp} value={subForm.endsAt} onChange={(e) => setSubForm({ ...subForm, endsAt: e.target.value })} />
               </div>
             </div>
+            {/* Quick trial actions */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[7, 14, 30].map((d) => (
+                <button key={d} className="rounded-lg border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: "#cbd5e1" }}
+                  onClick={() => { const end = new Date(Date.now() + d * 86400000).toISOString().slice(0, 10); setSubForm({ ...subForm, status: "TRIALING", endsAt: end }); }}>
+                  Start {d}-day trial
+                </button>
+              ))}
+              <button className="rounded-lg border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: "#16a34a", color: "#16a34a" }}
+                onClick={() => setSubForm({ ...subForm, status: "ACTIVE", endsAt: "" })}>
+                Convert to paid (no expiry)
+              </button>
+            </div>
             <div className="mt-4 flex justify-end gap-2">
               <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setSubFor(null)}>Cancel</button>
               <button className="ui-btn ui-btn-primary px-3 py-1.5 text-sm" onClick={saveSub}>Save Subscription</button>

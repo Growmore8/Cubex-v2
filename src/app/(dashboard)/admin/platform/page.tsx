@@ -181,6 +181,7 @@ export default function AdminDeskPage() {
   const isManager = role === "MANAGER";
   const [perms, setPerms] = useState<Record<string, boolean>>({});
   const [brand, setBrand] = useState<{ name: string; logoUrl: string | null }>({ name: "", logoUrl: null });
+  const [trial, setTrial] = useState<{ active: boolean; daysLeft: number } | null>(null);
   const can = (k: string) => perms[k] !== false; // default allow until /me resolves
   const [fundPnlOnly, setFundPnlOnly] = useState(false);
   useEffect(() => { fetch("/api/admin/fund-settings").then((r) => r.json()).then((d) => { if (d.ok) setFundPnlOnly(!!d.pnlOnly); }).catch(() => {}); }, []);
@@ -282,7 +283,7 @@ export default function AdminDeskPage() {
   }
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((d) => {
-      if (d.ok && d.user) { roleRef.current = d.user.role; setRole(d.user.role); setPerms(d.perms || {}); if (d.brand) setBrand(d.brand); }
+      if (d.ok && d.user) { roleRef.current = d.user.role; setRole(d.user.role); setPerms(d.perms || {}); if (d.brand) setBrand(d.brand); setTrial(d.trial || null); }
     }).catch(() => {}).finally(() => loadAll());
   }, []);
   const notifSeen = useRef<Set<string>>(new Set());
@@ -680,6 +681,11 @@ export default function AdminDeskPage() {
     </div>); };
   return (
     <div style={{ ...(theme === "dark" ? ADSS_DARK : ADSS_LIGHT), fontFamily: ADSS_FONT }} className="relative flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+      {trial && (
+        <div className="flex items-center justify-center gap-2 py-1 text-[11px] font-semibold" style={{ background: trial.daysLeft <= 5 ? "rgba(246,70,93,0.16)" : "rgba(234,179,8,0.16)", color: trial.daysLeft <= 5 ? "#f6465d" : "#eab308" }}>
+          <i className="fa-solid fa-clock" /> Demo trial — {trial.daysLeft} day{trial.daysLeft === 1 ? "" : "s"} left. Contact sales to keep your platform.
+        </div>
+      )}
       <div className="flex items-stretch border-b border-[var(--border)] bg-[var(--panel)] text-[11px]">
         <div className="flex items-center gap-2 border-r border-[var(--border)] px-3 py-1.5" style={{ width: panels.nav ? navW + 1 : undefined }}>
           {brand.logoUrl ? <img src={brand.logoUrl} alt="" className="h-4 w-4 rounded object-contain" /> : <span className="inline-block h-4 w-4 rounded" style={{ background: "var(--accent)" }} />}<b className="font-medium">{brand.name || "Platform"}</b>

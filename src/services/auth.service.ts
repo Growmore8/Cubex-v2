@@ -48,6 +48,14 @@ export async function authenticate(host: string | null, email: string, password:
   // Tenant SUSPENDED = brokerage suspended → block sign-in. PENDING = not yet activated.
   if (tenant && tenant.status === "SUSPENDED") throw new Error("This brokerage has been suspended. Please contact support.");
   if (tenant && tenant.status === "PENDING") throw new Error("This workspace is not active yet");
+  // Trial expiry: a TRIALING subscription past its endsAt blocks sign-in (until
+  // converted to a paid plan). SuperAdmin can still extend or convert it.
+  if (tenant) {
+    const sub = await prisma.subscription.findUnique({ where: { tenantId: tenant.id }, select: { status: true, endsAt: true } });
+    if (sub && sub.status === "TRIALING" && sub.endsAt && new Date(sub.endsAt).getTime() < Date.now()) {
+      throw new Error("This demo has ended. Please contact sales to continue.");
+    }
+  }
 
   // Pending email verification: emailToken is set and is NOT a password-reset token.
   // Checked only after password is confirmed so we don't leak account existence.
@@ -291,7 +299,7 @@ export async function sendForgotPassword(host: string | null, email: string): Pr
   const hostBase = host ? host.replace(/^https?:\/\//, "").replace(/\/+$/, "") : "";
   const base = process.env.NEXT_PUBLIC_APP_URL
     || (hostBase ? `https://${hostBase}` : "")
-    || (tenant.customDomain ? `https://${tenant.customDomain}` : `https://${tenant.subdomain}.cubexenterprises.com`);
+    || (tenant.customDomain ? `https://${tenant.customDomain}` : `https://${tenant.subdomain}.${process.env.PLATFORM_BASE_DOMAIN || "cubexenterprises.com"}`);
   const resetLink = `${base}/reset-password?email=${encodeURIComponent(target)}&token=${token}`;
   const brand: BrandInfo = { brandName: tenant.brandName || tenant.name, primaryColor: tenant.primaryColor, accentColor: tenant.accentColor, logoUrl: tenant.logoUrl };
   try {
