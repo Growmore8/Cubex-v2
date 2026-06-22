@@ -121,17 +121,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await audit(t.id, "sa.tenant.seedDemo", made + " clients", s.email).catch(() => {});
       return NextResponse.json({ ok: true, seeded: made });
     } else if (b.action === "sendWelcome") {
-      // Email the prospect their demo link + login + expiry (sets the admin
-      // password to the provided one so the credentials are guaranteed correct).
       const to = String(b.to || "").trim();
+      const sendEmail = to && to !== "__skip__";
       const password = String(b.password || "").trim();
-      if (!to) throw new Error("Recipient email is required");
       if (password.length < 6) throw new Error("Password must be at least 6 characters");
       const admin = await prisma.user.findFirst({ where: { tenantId: t.id, role: "ADMIN" as any } });
       if (!admin) throw new Error("This tenant has no admin user");
       await prisma.user.update({ where: { id: admin.id }, data: { passwordHash: await hashPassword(password) } });
-      // Ensure a showcase CLIENT login (same password) so the prospect can also
-      // see the trader experience. DEMO account → auto-funded, no seat used.
+      // Ensure a showcase CLIENT login (same password) so the prospect can see the trader experience.
       const clientEmail = `client@${t.subdomain || "demo"}.demo`;
       let clientUser = await prisma.user.findFirst({ where: { tenantId: t.id, email: clientEmail } });
       if (!clientUser) {
@@ -140,12 +137,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       } else {
         await prisma.user.update({ where: { id: clientUser.id }, data: { passwordHash: await hashPassword(password) } });
       }
-      const base = process.env.PLATFORM_BASE_DOMAIN || "cubexenterprises.com";
-      const url = t.customDomain ? `https://${t.customDomain}` : `https://${t.subdomain}.${base}`;
-      const sub = await prisma.subscription.findUnique({ where: { tenantId: t.id }, select: { endsAt: true } });
-      const brand: BrandInfo = { brandName: t.brandName || t.name, primaryColor: t.primaryColor, accentColor: t.accentColor, logoUrl: t.logoUrl };
-      await sendPlatformMail({ to, subject: `Your ${brand.brandName} demo is ready`, fromName: brand.brandName, html: demoWelcomeEmail(brand, { url, email: admin.email, password, endsAt: sub?.endsAt ? String(sub.endsAt) : null, client: clientUser ? { email: clientEmail, password } : null }) });
-      await audit(t.id, "sa.tenant.sendWelcome", to, s.email).catch(() => {});
+      if (sendEmail) {
+        const base = process.env.PLATFORM_BASE_DOMAIN || "cubexenterprises.com";
+        const url = t.customDomain ? `https://${t.customDomain}` : `https://${t.subdomain}.${base}`;
+        const sub = await prisma.subscription.findUnique({ where: { tenantId: t.id }, select: { endsAt: true } });
+        const brand: BrandInfo = { brandName: t.brandName || t.name, primaryColor: t.primaryColor, accentColor: t.accentColor, logoUrl: t.logoUrl };
+        await sendPlatformMail({ to, subject: `Your ${brand.brandName} demo is ready`, fromName: brand.brandName, html: demoWelcomeEmail(brand, { url, email: admin.email, password, endsAt: sub?.endsAt ? String(sub.endsAt) : null, client: clientUser ? { email: clientEmail, password } : null }) });
+      }
+      await audit(t.id, "sa.tenant.sendWelcome", sendEmail ? to : "no-email", s.email).catch(() => {});
       return NextResponse.json({ ok: true });
     } else if (b.action === "delete") {
       await prisma.tenant.delete({ where: { id: t.id } });
