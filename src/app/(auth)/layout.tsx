@@ -1,7 +1,18 @@
 import { getBrand } from "@/lib/brand";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
   const brand = await getBrand();
+  // Security: on the PUBLIC base domain, only real tenant subdomains may show a
+  // login. Non-tenant public subdomains (e.g. trade./db./random.<public>) bounce
+  // to the marketing site, so the platform/SuperAdmin login is never exposed there.
+  // (Internal domains like cubexenterprises.com are unaffected.)
+  const host = ((await headers()).get("host") || "").split(":")[0].toLowerCase();
+  const pub = (process.env.PLATFORM_BASE_DOMAIN || "").toLowerCase();
+  if (!brand.tenantId && pub && host !== pub && host.endsWith("." + pub)) {
+    redirect(`https://${pub}`);
+  }
   const primary = brand.primaryColor;
   const accent = brand.accentColor;
 
