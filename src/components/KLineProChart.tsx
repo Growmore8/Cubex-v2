@@ -163,18 +163,35 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       proRef.current = new KLineChartPro({
         container: elRef.current,
         locale: "en-US",
-        timezone: "Etc/UTC", // chart times default to UTC
+        timezone: "Etc/UTC",
         theme,
-        drawingBarVisible: !bare, // preview hides the left drawing rail
-        // OHLC shown in a floating box that follows the mouse pointer
+        drawingBarVisible: !bare,
         styles: { candle: { tooltip: { showType: "rect", showRule: "follow_cross", rect: { position: "pointer" } } } } as any,
         symbol: { ticker: first.symbol, shortName: first.symbol, pricePrecision: digits, volumePrecision: 0, type: "forex" },
         period: tfToPeriod(tf),
         periods: PERIODS,
-        mainIndicators: [], // start clean — user adds indicators via the Indicator menu
+        mainIndicators: [],
         subIndicators: [],
         datafeed: datafeed as any,
       });
+      // Enable scroll + zoom immediately after Pro initialises (not lazily) so
+      // pinch-zoom, time-axis drag, and price-axis drag all work from first paint.
+      setTimeout(() => {
+        if (disposed) return;
+        loadKc().then((kc: any) => {
+          const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
+          if (!host) return;
+          if (!host.id) host.id = host.getAttribute("k-line-chart-id") || "";
+          try {
+            const core = kc.init(host);
+            coreRef.current = core;
+            core?.setScrollEnabled?.(true);
+            core?.setZoomEnabled?.(true);
+            core?.setBarSpace?.(9);
+            core?.setOffsetRightDistance?.(60);
+          } catch {}
+        });
+      }, 600); // give Pro 600ms to render its DOM before we reach into it
     });
 
     return () => {
@@ -283,5 +300,8 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   // Absolutely fill the (relative) parent so the widget always matches the
   // container box and shrinks/grows when panels are dragged — core klinecharts
   // has its own ResizeObserver, so it re-renders once the box changes.
-  return <div ref={elRef} className={bare ? "kline-bare" : undefined} style={{ position: "absolute", inset: 0, overflow: "hidden" }} />;
+  // touch-action: none → browser hands ALL touch events (pinch, swipe, scroll)
+  // directly to the chart JS. Without this, the browser intercepts two-finger
+  // pinch and single-finger drag before klinecharts sees them.
+  return <div ref={elRef} className={bare ? "kline-bare" : undefined} style={{ position: "absolute", inset: 0, overflow: "hidden", touchAction: "none" }} />;
 }
