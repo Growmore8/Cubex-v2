@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const invoices = await prisma.invoice.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    include: { tenant: { select: { name: true, brandName: true } } },
+    include: { tenant: { select: { name: true, brandName: true, supportEmail: true } } },
   });
   return NextResponse.json({ ok: true, invoices });
 }
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
         notes: notes || null,
         status: "PENDING",
       },
-      include: { tenant: { select: { name: true, brandName: true } } },
+      include: { tenant: { select: { name: true, brandName: true, supportEmail: true } } },
     });
     return NextResponse.json({ ok: true, invoice: inv });
   } catch (e: any) {

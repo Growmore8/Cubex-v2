@@ -6,7 +6,7 @@ import { audit } from "@/lib/audit";
 import { effectiveSeatsForPlan } from "@/services/tenant.service";
 import { createClient, adjustBalance } from "@/services/account.service";
 import { sendPlatformMail } from "@/lib/mailer";
-import { demoWelcomeEmail, type BrandInfo } from "@/lib/email-templates";
+import { demoWelcomeEmail, tenantActiveEmail, type BrandInfo } from "@/lib/email-templates";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -68,6 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         endsAt: b.endsAt !== undefined ? (b.endsAt ? new Date(b.endsAt) : null) : undefined,
       };
       Object.keys(subData).forEach((k) => subData[k] === undefined && delete subData[k]);
+      const wasTrial = existing?.status === "TRIALING";
       if (existing) {
         await prisma.subscription.update({ where: { tenantId: t.id }, data: subData });
       } else {
@@ -80,6 +81,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             endsAt: b.endsAt ? new Date(b.endsAt) : null,
           },
         });
+      }
+      // Starting a trial → disable client self-registration (no OTP page on a demo).
+      if (b.status === "TRIALING") {
+        await prisma.tenant.update({ where: { id: t.id }, data: { allowRegistration: false } as any }).catch(() => {});
+      }
+      // Converting a trial → paid: welcome the tenant at their contact email (platform SMTP).
+      if (wasTrial && b.status === "ACTIVE" && t.supportEmail) {
+        try {
+          const base = process.env.PLATFORM_BASE_DOMAIN || "cubexenterprises.com";
+          const url = t.customDomain ? `https://${t.customDomain}` : `https://${t.subdomain}.${base}`;
+          const brand: BrandInfo = { brandName: t.brandName || t.name, primaryColor: t.primaryColor, accentColor: t.accentColor, logoUrl: t.logoUrl };
+          await sendPlatformMail({ to: t.supportEmail, subject: `Welcome to ${brand.brandName} — your platform is live`, fromName: brand.brandName, html: tenantActiveEmail(brand, { url }) });
+        } catch (e) { /* email is best-effort; conversion still succeeds */ }
       }
     } else if (b.action === "seedDemo") {
       // Populate a demo tenant with a few sample clients + balances so it isn't empty.

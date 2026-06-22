@@ -112,6 +112,34 @@ export function demoWelcomeEmail(brand: BrandInfo, o: { url: string; email: stri
     <p style="font-size:12px;color:#9ca3af;margin:10px 0 0">Reply to this email to go live with your own domain.</p>`);
 }
 
+// Sent to the tenant's contact email when a trial is converted to a paid plan.
+export function tenantActiveEmail(brand: BrandInfo, o: { url: string }): string {
+  const primary = esc(brand.primaryColor || "#2563eb");
+  return brandedEmail(brand, "Your platform is now live 🚀", `
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 16px">Thank you for choosing <strong>${esc(brand.brandName)}</strong>. Your trading platform has been upgraded from trial to a full subscription and is now live.</p>
+    <div style="text-align:center;margin:22px 0 18px">
+      <a href="${esc(o.url)}" style="display:inline-block;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:13px 30px;border-radius:9px;background:${primary}">Open your platform</a>
+    </div>
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">You can now configure your own SMTP, connect a custom domain and onboard real clients. Your invoice will follow separately. Reply to this email anytime for support.</p>`);
+}
+
+// Invoice email to the tenant's contact email (platform → tenant billing).
+export function invoiceEmail(brand: BrandInfo, inv: { number: string; period: string; plan: string; amount: string; dueAt?: string | null; status?: string }): string {
+  const row = (k: string, v: string) => `<tr><td style="padding:9px 12px;border-bottom:1px solid #eef1f5;color:#6b7280;font-size:13px">${esc(k)}</td><td style="padding:9px 12px;border-bottom:1px solid #eef1f5;text-align:right;font-weight:700;font-size:13px;color:#111827">${esc(v)}</td></tr>`;
+  const due = inv.dueAt ? new Date(inv.dueAt).toLocaleDateString() : "—";
+  return brandedEmail(brand, `Invoice ${inv.number}`, `
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 14px">Please find your <strong>${esc(brand.brandName)}</strong> platform invoice below.</p>
+    <table style="width:100%;border-collapse:collapse;margin:6px 0 16px">
+      ${row("Invoice #", inv.number)}
+      ${row("Period", inv.period)}
+      ${row("Plan", inv.plan)}
+      ${row("Amount", "$" + inv.amount)}
+      ${row("Due date", due)}
+      ${inv.status ? row("Status", inv.status) : ""}
+    </table>
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">Reply to this email with any billing questions.</p>`);
+}
+
 export interface StatementSummary {
   holderName: string;
   periodLabel: string;

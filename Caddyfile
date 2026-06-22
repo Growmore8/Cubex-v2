@@ -35,6 +35,15 @@ trade.{$DOMAIN} {
 	reverse_proxy app:3000
 }
 
+# --- Neutral public marketing site (same landing page) ; automatic TLS ---
+# Demo tenant subdomains (*.orbitfxsolution.com) fall through to the :443
+# catch-all below and hit the app (on-demand TLS).
+orbitfxsolution.com, www.orbitfxsolution.com {
+	root * /srv/landing
+	file_server
+	encode gzip
+}
+
 # --- Admin tools ; on-demand (their DNS may not be set yet) ---
 db.{$DOMAIN} {
 	tls {

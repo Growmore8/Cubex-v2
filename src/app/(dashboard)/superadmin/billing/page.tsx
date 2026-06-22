@@ -66,6 +66,12 @@ export default function SABillingPage() {
     if (!d.ok) { setErr(d.error || "Failed"); return; }
     load();
   }
+  async function sendInvoice(inv: any) {
+    setErr("");
+    const r = await fetch("/api/superadmin/billing/" + inv.id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "send" }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+    if (!r.ok) { setErr(r.error || "Failed to send"); return; }
+    alert("Invoice " + inv.number + " emailed to " + r.sent);
+  }
 
   const inp = "ui-input rounded-md border px-2 py-1.5 text-sm w-full";
   const totalPending = invoices.filter((i) => i.status === "PENDING").reduce((s, i) => s + Number(i.amount), 0);
@@ -157,7 +163,7 @@ export default function SABillingPage() {
               {invoices.map((inv) => (
                 <tr key={inv.id}>
                   <td className="font-mono text-xs font-medium text-blue-600">{inv.number}</td>
-                  <td className="font-medium">{inv.tenant?.brandName || inv.tenant?.name || "—"}</td>
+                  <td className="font-medium">{inv.tenant?.brandName || inv.tenant?.name || "—"}{inv.tenant?.supportEmail && <div className="text-[10px] font-normal text-gray-400">{inv.tenant.supportEmail}</div>}</td>
                   <td className="text-gray-600">{inv.period}</td>
                   <td>
                     <span className="font-medium" style={{ color: PACKAGES[inv.plan as keyof typeof PACKAGES]?.color || "#666" }}>
@@ -184,6 +190,9 @@ export default function SABillingPage() {
                         Reset
                       </button>
                     )}
+                    <button onClick={() => sendInvoice(inv)} title="Email invoice to the tenant's contact email" className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#dbeafe", color: "#2563eb" }}>
+                      <i className="fa-solid fa-envelope text-xs" />
+                    </button>
                     <button onClick={() => setPrintInv(inv)} className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#f1f5f9", color: "#475569" }}>
                       <i className="fa-solid fa-print text-xs" />
                     </button>
