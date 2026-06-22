@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 
-type Trial = { id: string; name: string; subdomain: string; customDomain: string | null; plan: string; endsAt: string | null; clients: number; daysLeft: number | null; expired: boolean; adminEmail: string | null };
+type Trial = { id: string; name: string; subdomain: string; customDomain: string | null; plan: string; endsAt: string | null; clients: number; daysLeft: number | null; expired: boolean; adminEmail: string | null; supportEmail: string | null };
 
 function genPassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!";
@@ -46,7 +46,7 @@ export default function SATrials() {
   const urlFor = (t: Trial) => "https://" + (t.customDomain || `${t.subdomain}.${baseDomain}`);
 
   function openWelcome(t: Trial) {
-    setWelcome({ trial: t, pw: genPassword(), to: "", sending: false, sent: false });
+    setWelcome({ trial: t, pw: genPassword(), to: t.supportEmail || "", sending: false, sent: false });
   }
 
   async function applyWelcome(sendEmail: boolean) {
