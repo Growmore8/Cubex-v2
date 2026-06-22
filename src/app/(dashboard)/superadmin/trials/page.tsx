@@ -25,6 +25,8 @@ export default function SATrials() {
   const [err, setErr] = useState(""); const [msg, setMsg] = useState("");
   const [confirmDel, setConfirmDel] = useState<Trial | null>(null);
   const [welcome, setWelcome] = useState<{ trial: Trial; pw: string; to: string; sending: boolean; sent: boolean } | null>(null);
+  // Keep the last generated password per tenant so reopening shows the same one until Applied.
+  const [savedPw, setSavedPw] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try { const d = await fetch("/api/superadmin/trials").then((r) => r.json()); if (d.ok) { setTrials(d.trials || []); setBaseDomain(d.baseDomain || "cubexenterprises.com"); } } catch {}
@@ -46,7 +48,9 @@ export default function SATrials() {
   const urlFor = (t: Trial) => "https://" + (t.customDomain || `${t.subdomain}.${baseDomain}`);
 
   function openWelcome(t: Trial) {
-    setWelcome({ trial: t, pw: genPassword(), to: t.supportEmail || "", sending: false, sent: false });
+    const pw = savedPw[t.id] || genPassword();
+    if (!savedPw[t.id]) setSavedPw((p) => ({ ...p, [t.id]: pw }));
+    setWelcome({ trial: t, pw, to: t.supportEmail || "", sending: false, sent: false });
   }
 
   async function applyWelcome(sendEmail: boolean) {
@@ -61,6 +65,8 @@ export default function SATrials() {
     if (!r.ok) { setErr(r.error || "Failed"); setWelcome({ ...welcome, sending: false }); return; }
     setWelcome({ ...welcome, sending: false, sent: true });
     setMsg(sendEmail ? `Welcome email sent to ${to.trim()} for ${trial.name}` : `Password set for ${trial.name}`);
+    // Clear saved password after apply so next open generates a fresh one
+    setSavedPw((p) => { const n = { ...p }; delete n[trial.id]; return n; });
     load();
   }
 
@@ -123,7 +129,7 @@ export default function SATrials() {
               <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: "var(--bg2)", border: "1px solid var(--border)" }}>
                 <span className="font-mono text-sm font-bold flex-1" style={{ color: "var(--accent)" }}>{pw}</span>
                 <CopyBtn text={pw} />
-                <button onClick={() => setWelcome({ ...welcome, pw: genPassword(), sent: false })} className="text-xs text-gray-400 hover:text-gray-200 ml-1" title="Generate new">↻</button>
+                <button onClick={() => { const np = genPassword(); setSavedPw((p) => ({ ...p, [welcome.trial.id]: np })); setWelcome({ ...welcome, pw: np, sent: false }); }} className="text-xs text-gray-400 hover:text-gray-200 ml-1" title="Generate new">↻</button>
               </div>
             </div>
 
