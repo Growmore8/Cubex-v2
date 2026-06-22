@@ -174,13 +174,16 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         subIndicators: [],
         datafeed: datafeed as any,
       });
-      // Enable scroll + zoom immediately after Pro initialises (not lazily) so
-      // pinch-zoom, time-axis drag, and price-axis drag all work from first paint.
-      setTimeout(() => {
+      // Enable scroll + zoom after Pro renders. Retry until the core canvas
+      // element appears (Pro may take 300–1500ms depending on device speed).
+      const enableInteraction = (attempt = 0) => {
         if (disposed) return;
         loadKc().then((kc: any) => {
           const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
-          if (!host) return;
+          if (!host) {
+            if (attempt < 15) setTimeout(() => enableInteraction(attempt + 1), 200);
+            return;
+          }
           if (!host.id) host.id = host.getAttribute("k-line-chart-id") || "";
           try {
             const core = kc.init(host);
@@ -189,9 +192,12 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
             core?.setZoomEnabled?.(true);
             core?.setBarSpace?.(9);
             core?.setOffsetRightDistance?.(60);
+            // Apply touch-action:none directly on the canvas so no parent CSS can override
+            host.querySelectorAll("canvas").forEach((c) => { (c as HTMLElement).style.touchAction = "none"; });
           } catch {}
         });
-      }, 600); // give Pro 600ms to render its DOM before we reach into it
+      };
+      setTimeout(() => enableInteraction(), 400);
     });
 
     return () => {
@@ -300,8 +306,18 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   // Absolutely fill the (relative) parent so the widget always matches the
   // container box and shrinks/grows when panels are dragged — core klinecharts
   // has its own ResizeObserver, so it re-renders once the box changes.
-  // touch-action: none → browser hands ALL touch events (pinch, swipe, scroll)
-  // directly to the chart JS. Without this, the browser intercepts two-finger
-  // pinch and single-finger drag before klinecharts sees them.
-  return <div ref={elRef} className={bare ? "kline-bare" : undefined} style={{ position: "absolute", inset: 0, overflow: "hidden", touchAction: "none" }} />;
+  return (
+    <>
+      {/* Force touch-action:none on every element klinecharts-pro renders inside
+          our container (canvas, overlay divs, axis areas). Without this, the
+          browser intercepts pinch-zoom and single-finger swipe on the chart's
+          inner canvas before klinecharts sees the touch events. */}
+      <style>{`
+        .kline-chart-pro-wrap, .kline-chart-pro-wrap *,
+        .klinecharts-pro, .klinecharts-pro *,
+        [k-line-chart-id], [k-line-chart-id] * { touch-action: none !important; }
+      `}</style>
+      <div ref={elRef} className={`kline-chart-pro-wrap${bare ? " kline-bare" : ""}`} style={{ position: "absolute", inset: 0, overflow: "hidden", touchAction: "none" }} />
+    </>
+  );
 }
