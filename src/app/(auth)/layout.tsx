@@ -24,7 +24,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
       <div className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-extrabold text-white" style={{ background: `linear-gradient(135deg, ${primary}, ${accent})` }}>
         {(brand.name || "?").trim().charAt(0).toUpperCase()}
       </div>
-      <span className="text-[17px] font-bold tracking-tight" style={{ color: "var(--foreground)" }}>{brand.name}</span>
+      <span className="text-[17px] font-bold tracking-tight text-white">{brand.name}</span>
     </div>
   );
 
