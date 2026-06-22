@@ -94,7 +94,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [noForm, setNoForm] = useState<any>({ idx: 0, lots: 0.01, trigger: "", sl: "", tp: "" });
   const [balOpen, setBalOpen] = useState(false);
   const {
-    theme, brand, account, accts, accId, pnlOnly, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
+    theme, brand, account, accts, accId, pnlOnly, readOnly, isTrial, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
     selSym, vol, sl, tp, err,
     balance, equity, floating, free, used, level, price, bid, ask, tf, TFS,
     setSelSym, setVol, setSl, setTp, setTf,
@@ -1021,7 +1021,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   {a.id === accId && <i className="fa-solid fa-circle-check" style={{ color: BUY }} />}
                 </button>
               ))}
-              <button onClick={async () => { const r = await openAccount("LIVE"); if (r?.pending) { setMyReqsLoaded(false); loadMyReqs(); } }} className="mt-2 w-full rounded-lg py-2 text-[12px] font-semibold text-white" style={{ background: BUY }}><i className="fa-solid fa-plus mr-1" /> Create New Live Account</button>
+              {!isTrial && <button onClick={async () => { const r = await openAccount("LIVE"); if (r?.pending) { setMyReqsLoaded(false); loadMyReqs(); } }} className="mt-2 w-full rounded-lg py-2 text-[12px] font-semibold text-white" style={{ background: BUY }}><i className="fa-solid fa-plus mr-1" /> Create New Live Account</button>}
             </div>
 
             {/* demo accounts */}
@@ -1041,7 +1041,7 @@ export default function ClientMobile({ t }: { t: any }) {
               ))}
               {/* One demo per client: hide "Create" once a demo exists. Top-up lives on
                   the dashboard (demo account), not here. */}
-              {demoAccts.length === 0 && (
+              {!isTrial && demoAccts.length === 0 && (
                 <button onClick={() => openAccount("DEMO")} className="mt-2 w-full rounded-lg py-2 text-[12px] font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus mr-1" /> Create Demo Account</button>
               )}
             </div>

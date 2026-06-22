@@ -25,6 +25,9 @@ export async function POST(req: Request) {
     if (!user) throw new Error("User not found");
     // Block only if the user account itself is suspended/locked by staff
     if (user.status !== "ACTIVE") throw new Error("Your account is restricted. Please contact support.");
+    // Demo tenants: clients cannot open additional accounts — only the admin can create them.
+    const tenantSub = await prisma.subscription.findUnique({ where: { tenantId: s.tenantId! }, select: { status: true } });
+    if (tenantSub?.status === "TRIALING") throw new Error("Account creation is disabled on demo platforms. Please contact your broker.");
     if (type === "DEMO") {
       // a client may hold only one demo account
       const demoCount = await prisma.account.count({ where: { userId: s.sub, type: "DEMO" } });

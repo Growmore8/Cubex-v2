@@ -188,6 +188,8 @@ export default function ClientTerminal() {
   useEffect(() => { load(); }, []);
   // Fast brand fetch so the splash shows the logo/slogan immediately.
   useEffect(() => { fetch("/api/public/brand").then((r) => r.json()).then((b) => { if (b.ok) setSplashBrand(b); }).catch(() => {}); }, []);
+  // Check trial status to hide account-creation options on demo tenants.
+  useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((d) => { if (d.ok && d.trial) setIsTrial(true); }).catch(() => {}); }, []);
   // Keep the splash up for at least 3s (branding), regardless of how fast data loads.
   useEffect(() => { const t = setTimeout(() => setMinElapsed(true), 3000); return () => clearTimeout(t); }, []);
   // Once booted (data ready AND 3s elapsed), fade the splash out then unmount it.
@@ -394,6 +396,7 @@ export default function ClientTerminal() {
   const unread = notis.filter((n: any) => !n.read).length;
   const curAcct = accts.find((a) => a.id === accId);
   const readOnly = !!account?.locked;
+  const [isTrial, setIsTrial] = useState(false);
   // Live accounts require KYC; demo accounts never do. Drives the banner + trade gate.
   const needKyc = account?.type === "LIVE" && !kycVerified;
   // App-style order-kind grid for the desktop ticket
@@ -436,7 +439,7 @@ export default function ClientTerminal() {
   // and the 3s branding minimum has passed, then the app mounts.
   if (!splashGone) return <ClientSplash brand={splashBrand || brand} theme={theme} hiding={booted} />;
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {needKyc && (
@@ -488,8 +491,8 @@ export default function ClientTerminal() {
                   )}
                   {div}
                   {head("Accounts")}
-                  {!accts.some((a: any) => a.type === "DEMO") && mItem(() => openAccount("DEMO"), "fa-vial", "Open Demo Account", undefined, readOnly)}
-                  {mItem(async () => { const r = await openAccount("LIVE"); if (r?.pending) { setMyReqsLoaded(false); setBotTab("requests"); } }, "fa-bolt", "Open Live Account", BUY, readOnly)}
+                  {!isTrial && !accts.some((a: any) => a.type === "DEMO") && mItem(() => openAccount("DEMO"), "fa-vial", "Open Demo Account", undefined, readOnly)}
+                  {!isTrial && mItem(async () => { const r = await openAccount("LIVE"); if (r?.pending) { setMyReqsLoaded(false); setBotTab("requests"); } }, "fa-bolt", "Open Live Account", BUY, readOnly)}
                   {curAcct?.type === "LIVE" && mItem(() => { close(); setWalletModal("kyc"); }, "fa-id-card", "KYC Verification")}
                   {div}
                   {head("Reports")}
