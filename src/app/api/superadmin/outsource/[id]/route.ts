@@ -37,7 +37,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // current"); only overwrite when a new password is actually typed.
       if (b.smtpPassword) data.smtpPassword = b.smtpPassword;
       if (b.smtpHost !== undefined) data.smtpHost = b.smtpHost || null;
-      if (b.allowRegistration !== undefined) data.allowRegistration = !!b.allowRegistration;
+      // Demo tenants must never have self-registration on — ignore any attempt to enable it while TRIALING.
+      const currentSub = await prisma.subscription.findUnique({ where: { tenantId: t.id }, select: { status: true } });
+      if (b.allowRegistration !== undefined && currentSub?.status !== "TRIALING") data.allowRegistration = !!b.allowRegistration;
+      if (currentSub?.status === "TRIALING") data.allowRegistration = false;
       await prisma.tenant.update({ where: { id: t.id }, data });
       // Plan can also be changed here; seats follow the (live) package limit.
       if (b.plan) {
