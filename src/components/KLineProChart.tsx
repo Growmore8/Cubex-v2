@@ -113,9 +113,10 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
           try {
             const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}`, { cache: "no-store" }).then((x) => x.json());
             if (r?.ok && r.candles?.length) {
-              cached = r.candles.map(toBar);
-              lastBar[key] = cached[cached.length - 1];
-              try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), d: cached })); } catch {}
+              const fresh: any[] = r.candles.map(toBar);
+              cached = fresh;
+              lastBar[key] = fresh[fresh.length - 1];
+              try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), d: fresh })); } catch {}
             }
           } catch {}
         }
