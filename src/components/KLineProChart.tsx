@@ -242,7 +242,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
             }
             if (core) {
               coreRef.current = core;
-              try { core.setScrollEnabled(true); core.setZoomEnabled(true); core.setBarSpace(8); core.setOffsetRightDistance(50); } catch {}
+              try { core.setScrollEnabled(true); core.setZoomEnabled(true); core.setBarSpace(8); core.setOffsetRightDistance(50); core.resize(); } catch {}
               applyTouchAction();
             } else if (attempt < 20) {
               setTimeout(() => enableInteraction(attempt + 1), 200);
@@ -254,7 +254,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
           return;
         }
         coreRef.current = core;
-        try { core.setScrollEnabled(true); core.setZoomEnabled(true); core.setBarSpace(8); core.setOffsetRightDistance(50); } catch {}
+        try { core.setScrollEnabled(true); core.setZoomEnabled(true); core.setBarSpace(8); core.setOffsetRightDistance(50); core.resize(); } catch {}
         applyTouchAction();
       };
       setTimeout(() => enableInteraction(), 500);
@@ -374,6 +374,12 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
           browser intercepts pinch-zoom and single-finger swipe on the chart's
           inner canvas before klinecharts sees the touch events. */}
       <style>{`
+        /* klinecharts-pro hardcodes height:80vh — override so the chart fills our container */
+        .kline-chart-pro-wrap .klinecharts-pro { height: 100% !important; }
+        /* In bare mode hide the period bar and expand content area to full height */
+        .kline-bare .klinecharts-pro-period-bar { display: none !important; }
+        .kline-bare .klinecharts-pro-content { height: 100% !important; }
+        /* Prevent browser from claiming touch events before klinecharts handles them */
         .kline-chart-pro-wrap, .kline-chart-pro-wrap *,
         .klinecharts-pro, .klinecharts-pro *,
         [k-line-chart-id], [k-line-chart-id] * { touch-action: none !important; }
