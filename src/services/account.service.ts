@@ -79,8 +79,11 @@ export async function createClient(tenantId: string, input: any, actor = "admin"
         leverage: input.leverage || 100, currency: input.currency || "USD",
         managerId: input.managerId || null, phone: input.phone || null, country: input.country || null,
         isPool: !!input.isPool,
-        mcLevel: new Prisma.Decimal(50), // default margin-call level
+        mcLevel: new Prisma.Decimal(50),
         deposit: type === "DEMO" ? new Prisma.Decimal(input.deposit ?? 10000) : new Prisma.Decimal(input.deposit ?? 0),
+        // Demo accounts expire 30 days from creation (same as MT5). Hard-deleted by
+        // the daily cron; live accounts never expire (expiresAt stays null).
+        expiresAt: type === "DEMO" ? new Date(Date.now() + 30 * 86400000) : null,
       },
     });
   });

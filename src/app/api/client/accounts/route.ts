@@ -10,9 +10,9 @@ export async function GET() {
   const accounts = await prisma.account.findMany({
     where: { tenantId: s.tenantId!, userId: s.sub },
     orderBy: { createdAt: "asc" },
-    select: { id: true, login: true, type: true, currency: true, leverage: true, deposit: true, withdrawal: true, credit: true, bonus: true, pnl: true, locked: true, deactivated: true },
+    select: { id: true, login: true, type: true, currency: true, leverage: true, deposit: true, withdrawal: true, credit: true, bonus: true, pnl: true, locked: true, deactivated: true, expiresAt: true },
   });
-  return NextResponse.json({ ok: true, accounts: accounts.map((a) => ({ ...a, deposit: Number(a.deposit), withdrawal: Number(a.withdrawal), credit: Number(a.credit), bonus: Number(a.bonus), pnl: Number(a.pnl) })) });
+  return NextResponse.json({ ok: true, accounts: accounts.map((a) => ({ ...a, deposit: Number(a.deposit), withdrawal: Number(a.withdrawal), credit: Number(a.credit), bonus: Number(a.bonus), pnl: Number(a.pnl), expiresAt: a.expiresAt ?? null })) });
 }
 
 export async function POST(req: Request) {

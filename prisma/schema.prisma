@@ -28,8 +28,9 @@ model Tenant {
   smtpHost     String? // explicit SMTP server (e.g. mail.privateemail.com); blank = auto-detect from email domain
   permissions  Json          @default("{}")
   allowRegistration Boolean   @default(true) // show the client Register link on this tenant's login
-  subscription Subscription?
-  invoices     Invoice[]
+  subscription     Subscription?
+  invoices         Invoice[]
+  expiredAccounts  ExpiredAccount[]
   users        User[]
   accounts     Account[]
   symbols      Symbol[]
@@ -139,10 +140,12 @@ model Account {
   paymentRequests PaymentRequest[]
   pendingOrders   PendingOrder[]
   symbolOverrides AccountSymbolOverride[]
+  expiresAt       DateTime?          // DEMO only: set to createdAt+30d; null = never expires (LIVE)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   @@unique([tenantId, login])
   @@index([tenantId])
+  @@index([expiresAt])
 }
 model Counter {
   id       String @id @default(uuid())
@@ -406,6 +409,23 @@ model WebAuthnCredential {
   createdAt    DateTime @default(now())
   @@index([userId])
 }
+// Permanent history record written before a demo account is hard-deleted on expiry.
+model ExpiredAccount {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantName  String
+  clientName  String
+  clientEmail String?
+  login       String
+  type        String   @default("DEMO")
+  balance     Decimal  @default(0) @db.Decimal(18, 2)
+  expiredAt   DateTime
+  createdAt   DateTime @default(now())
+  @@index([tenantId])
+  @@index([expiredAt])
+}
+
 model GlobalSymbol {
   id        String   @id @default(uuid())
   symbol    String   @unique

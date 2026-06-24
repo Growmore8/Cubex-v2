@@ -656,8 +656,23 @@ async function trialCleanupTick() {
   } catch (e) { /* transient — retried next day */ }
 }
 function startTrialCleanup() {
-  setTimeout(trialCleanupTick, 5 * 60 * 1000); // 5 min after boot
-  setInterval(trialCleanupTick, 24 * 60 * 60 * 1000); // then daily
+  setTimeout(trialCleanupTick, 5 * 60 * 1000);
+  setInterval(trialCleanupTick, 24 * 60 * 60 * 1000);
+}
+
+// Daily cleanup of expired demo accounts (DEMO type, expiresAt < now).
+// Writes ExpiredAccount history, notifies the client, then hard-deletes.
+// Also sends 3-day and 1-day advance warnings.
+async function demoCleanupTick() {
+  try {
+    const res = await fetch("http://127.0.0.1:" + port + "/api/cron/demo-cleanup", { method: "POST", headers: CRON_SECRET ? { "x-cron-secret": CRON_SECRET } : {} });
+    const d = await res.json().catch(() => ({}));
+    if (d && (d.deleted || d.warned)) console.log("[demo-cleanup] deleted=" + (d.deleted || 0) + " warned=" + (d.warned || 0));
+  } catch (e) { /* transient — retried next day */ }
+}
+function startDemoCleanup() {
+  setTimeout(demoCleanupTick, 7 * 60 * 1000); // 7 min after boot (after trial cleanup)
+  setInterval(demoCleanupTick, 24 * 60 * 60 * 1000); // then daily
 }
 
 app.prepare().then(async () => {
@@ -699,6 +714,7 @@ app.prepare().then(async () => {
   setInterval(() => checkPending(io), 2000);
   startStatementCron();
   startTrialCleanup();
+  startDemoCleanup();
   purgeOldNotifications();                                  // on boot
   setInterval(purgeOldNotifications, 6 * 60 * 60 * 1000);   // + every 6h
   server.listen(port, () => console.log("> Ready on http://localhost:" + port));

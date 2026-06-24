@@ -19,6 +19,7 @@ const NAV: Item[] = [
   { href: "/superadmin/admins", label: "Admins", icon: "fa-user-shield", sub: true },
   { section: "Tenants", href: "/superadmin/tenants", label: "Tenants", icon: "fa-building", sub: true },
   { href: "/superadmin/trials", label: "Demo Trials", icon: "fa-hourglass-half", sub: true },
+  { href: "/superadmin/expired-accounts", label: "Expired Accounts", icon: "fa-clock-rotate-left", sub: true },
   { href: "/superadmin/analytics", label: "Analytics", icon: "fa-chart-column", sub: true },
   { section: "Finance", href: "/superadmin/billing", label: "Billing & Invoicing", icon: "fa-file-invoice-dollar", sub: true },
   { href: "/superadmin/packages", label: "Packages & Pricing", icon: "fa-box-open", sub: true },
