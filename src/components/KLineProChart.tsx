@@ -211,35 +211,48 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         datafeed: datafeed as any,
       });
       // Get the core klinecharts instance from Pro's getChart() — the proper API,
-      // not kc.init(host) which creates a second instance and steals events.
+      const applyTouchAction = () => {
+        try {
+          const container = elRef.current;
+          if (!container) return;
+          // Set touch-action:none on every element so the browser never intercepts
+          // single-finger scroll or pinch-zoom before klinecharts handles it.
+          container.querySelectorAll("*").forEach((el) => {
+            const h = el as HTMLElement;
+            if (h.style) h.style.touchAction = "none";
+          });
+        } catch {}
+      };
+
       const enableInteraction = (attempt = 0) => {
         if (disposed) return;
-        // Try Pro's own getChart() first (returns the real internal instance)
+        // Try Pro's getChart() (v0.2+) then fall back to kc.init(host) which is
+        // idempotent in klinecharts v9 — returns the existing instance, not a new one.
         let core: any = null;
-        try { core = proRef.current?.getChart?.(); } catch {}
+        try { core = proRef.current?.getChart?.() ?? proRef.current?.chart; } catch {}
         if (!core) {
-          if (attempt < 20) { setTimeout(() => enableInteraction(attempt + 1), 200); return; }
+          loadKc().then((kc: any) => {
+            const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
+            if (host) {
+              if (!host.id) host.id = host.getAttribute("k-line-chart-id") || "";
+              try { core = kc.init(host); } catch {}
+            }
+            if (core) {
+              coreRef.current = core;
+              try { core.setScrollEnabled(true); core.setZoomEnabled(true); core.setBarSpace(8); core.setOffsetRightDistance(50); } catch {}
+              applyTouchAction();
+            } else if (attempt < 20) {
+              setTimeout(() => enableInteraction(attempt + 1), 200);
+            } else {
+              // Even without core, at least force touch-action so canvas responds
+              applyTouchAction();
+            }
+          });
           return;
         }
         coreRef.current = core;
-        try {
-          // TradingView-style: horizontal time scroll + pinch/wheel zoom + price axis drag
-          core.setScrollEnabled(true);
-          core.setZoomEnabled(true);
-          core.setBarSpace(8);
-          core.setOffsetRightDistance(50);
-        } catch {}
-        // Apply touch-action:none to every inner element so the browser doesn't
-        // intercept single-finger scroll or pinch-zoom before klinecharts sees it.
-        try {
-          const container = elRef.current;
-          if (container) {
-            container.querySelectorAll("*").forEach((el) => {
-              const h = el as HTMLElement;
-              if (h.style) h.style.touchAction = "none";
-            });
-          }
-        } catch {}
+        try { core.setScrollEnabled(true); core.setZoomEnabled(true); core.setBarSpace(8); core.setOffsetRightDistance(50); } catch {}
+        applyTouchAction();
       };
       setTimeout(() => enableInteraction(), 500);
     });
@@ -258,15 +271,22 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   // the same instance (full API: createOverlay, resize, …).
   const getCore = useCallback(async () => {
     if (coreRef.current) return coreRef.current;
-    // Use Pro's getChart() — the safe way to reach the internal klinecharts instance.
-    // kc.init(host) on the same element creates a second chart that steals events.
-    let core: any = null;
-    try { core = proRef.current?.getChart?.(); } catch {}
-    if (core) { coreRef.current = core; return core; }
-    // Fallback: wait briefly and retry once (Pro may not be ready yet)
-    await new Promise((r) => setTimeout(r, 300));
-    try { core = proRef.current?.getChart?.(); } catch {}
-    if (core) coreRef.current = core;
+    // Try Pro's public API first (v0.2+), then fall back to kc.init(host).
+    // kc.init is idempotent in klinecharts v9: if the element is already
+    // initialised it returns the existing instance — it does NOT create a second chart.
+    try {
+      const c = proRef.current?.getChart?.() ?? proRef.current?.chart;
+      if (c) { coreRef.current = c; return c; }
+    } catch {}
+    const kc: any = await loadKc();
+    const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
+    if (host) {
+      if (!host.id) host.id = host.getAttribute("k-line-chart-id") || "";
+      try {
+        const core = kc.init(host);
+        if (core) { coreRef.current = core; return core; }
+      } catch {}
+    }
     return coreRef.current;
   }, []);
 

@@ -126,8 +126,8 @@ export default function ClientTerminal() {
   const [acctMenu, setAcctMenu] = useState(false);
   const [acctSwitchOpen, setAcctSwitchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [mwW, setMwW] = useState(220);
-  const [rtW, setRtW] = useState(262);
+  const [mwW, setMwW] = useState(240);
+  const [rtW, setRtW] = useState(280);
   const [tbH, setTbH] = useState(200);
   const [dragging, setDragging] = useState(false);
   const [favs, setFavs] = useState<string[]>([]);
