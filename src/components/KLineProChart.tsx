@@ -209,36 +209,38 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         subIndicators: [],
         datafeed: datafeed as any,
       });
-      // Enable scroll + zoom after Pro renders. Retry until the core canvas
-      // element appears (Pro may take 300–1500ms depending on device speed).
+      // Get the core klinecharts instance from Pro's getChart() — the proper API,
+      // not kc.init(host) which creates a second instance and steals events.
       const enableInteraction = (attempt = 0) => {
         if (disposed) return;
-        loadKc().then((kc: any) => {
-          const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
-          if (!host) {
-            if (attempt < 15) setTimeout(() => enableInteraction(attempt + 1), 200);
-            return;
+        // Try Pro's own getChart() first (returns the real internal instance)
+        let core: any = null;
+        try { core = proRef.current?.getChart?.(); } catch {}
+        if (!core) {
+          if (attempt < 20) { setTimeout(() => enableInteraction(attempt + 1), 200); return; }
+          return;
+        }
+        coreRef.current = core;
+        try {
+          // TradingView-style: horizontal time scroll + pinch/wheel zoom + price axis drag
+          core.setScrollEnabled(true);
+          core.setZoomEnabled(true);
+          core.setBarSpace(8);
+          core.setOffsetRightDistance(50);
+        } catch {}
+        // Apply touch-action:none to every inner element so the browser doesn't
+        // intercept single-finger scroll or pinch-zoom before klinecharts sees it.
+        try {
+          const container = elRef.current;
+          if (container) {
+            container.querySelectorAll("*").forEach((el) => {
+              const h = el as HTMLElement;
+              if (h.style) h.style.touchAction = "none";
+            });
           }
-          if (!host.id) host.id = host.getAttribute("k-line-chart-id") || "";
-          try {
-            const core = kc.init(host);
-            coreRef.current = core;
-            // TradingView-style: horizontal time scroll + pinch/wheel zoom + price axis drag
-            core?.setScrollEnabled?.(true);
-            core?.setZoomEnabled?.(true);
-            core?.setBarSpace?.(8);
-            core?.setOffsetRightDistance?.(50);
-            // Smooth scroll rate (lower = slower / more controlled, like TradingView)
-            core?.setOptions?.({ scrollRateLimitFactor: 0.98 });
-            // Apply touch-action:none on every canvas so browser doesn't intercept
-            host.querySelectorAll("canvas").forEach((c) => { (c as HTMLElement).style.touchAction = "none"; });
-            // Also set touch-action on the host itself and all children
-            (host as HTMLElement).style.touchAction = "none";
-            host.querySelectorAll("*").forEach((el) => { (el as HTMLElement).style && ((el as HTMLElement).style.touchAction = "none"); });
-          } catch {}
-        });
+        } catch {}
       };
-      setTimeout(() => enableInteraction(), 400);
+      setTimeout(() => enableInteraction(), 500);
     });
 
     return () => {
@@ -255,22 +257,15 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   // the same instance (full API: createOverlay, resize, …).
   const getCore = useCallback(async () => {
     if (coreRef.current) return coreRef.current;
-    const kc: any = await loadKc();
-    const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
-    if (host) {
-      if (!host.id) host.id = host.getAttribute("k-line-chart-id") || "";
-      try {
-        coreRef.current = kc.init(host);
-        // make sure dragging (scroll/zoom) + wheel zoom are on for mouse & touch,
-        // and give candles a roomier default width + right padding (TradingView-like)
-        try {
-          coreRef.current?.setScrollEnabled?.(true);
-          coreRef.current?.setZoomEnabled?.(true);
-          coreRef.current?.setBarSpace?.(9);
-          coreRef.current?.setOffsetRightDistance?.(60);
-        } catch {}
-      } catch {}
-    }
+    // Use Pro's getChart() — the safe way to reach the internal klinecharts instance.
+    // kc.init(host) on the same element creates a second chart that steals events.
+    let core: any = null;
+    try { core = proRef.current?.getChart?.(); } catch {}
+    if (core) { coreRef.current = core; return core; }
+    // Fallback: wait briefly and retry once (Pro may not be ready yet)
+    await new Promise((r) => setTimeout(r, 300));
+    try { core = proRef.current?.getChart?.(); } catch {}
+    if (core) coreRef.current = core;
     return coreRef.current;
   }, []);
 
