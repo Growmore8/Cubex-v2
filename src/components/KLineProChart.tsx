@@ -294,6 +294,21 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     return coreRef.current;
   }, []);
 
+  // iOS Safari: klinecharts registers touchstart as passive:true (can't call
+  // preventDefault), so iOS claims the touch for page scroll before the chart
+  // gets it. We add our own non-passive listeners to explicitly block that.
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return;
+    const prevent = (e: TouchEvent) => { if (e.cancelable) e.preventDefault(); };
+    el.addEventListener("touchstart", prevent, { passive: false });
+    el.addEventListener("touchmove", prevent, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", prevent);
+      el.removeEventListener("touchmove", prevent);
+    };
+  }, []);
+
   // Force the core chart to resize whenever our container box changes (panels /
   // toolbox dragged) — Pro's internal observer doesn't always fire.
   useEffect(() => {
