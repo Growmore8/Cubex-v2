@@ -482,7 +482,9 @@ export default function ClientMobile({ t }: { t: any }) {
       )}
 
       {/* CONTENT */}
-      <div className="min-h-0 flex-1 overflow-auto">
+      {/* overflow-hidden when chart is active — overflow-auto creates a scroll
+          context on iOS/Android that intercepts touch before klinecharts sees it */}
+      <div className="min-h-0 flex-1" style={{ overflowY: tab === "chart" ? "hidden" : "auto" }}>
 
         {/* ───────── DASHBOARD ───────── */}
         <KeepAlive active={tab === "dashboard"}>{(

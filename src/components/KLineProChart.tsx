@@ -234,7 +234,10 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
           loadKc().then((kc: any) => {
             const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
             if (host) {
-              if (!host.id) host.id = host.getAttribute("k-line-chart-id") || "";
+              // klinecharts stores instances by html id (not by element ref);
+              // it sets k-line-chart-id attr but never sets html id — so we must.
+              const klineId = host.getAttribute("k-line-chart-id");
+              if (klineId) host.id = klineId;
               try { core = kc.init(host); } catch {}
             }
             if (core) {
@@ -281,7 +284,8 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     const kc: any = await loadKc();
     const host = elRef.current?.querySelector("[k-line-chart-id]") as HTMLElement | null;
     if (host) {
-      if (!host.id) host.id = host.getAttribute("k-line-chart-id") || "";
+      const klineId = host.getAttribute("k-line-chart-id");
+      if (klineId) host.id = klineId;
       try {
         const core = kc.init(host);
         if (core) { coreRef.current = core; return core; }
