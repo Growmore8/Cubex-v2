@@ -61,6 +61,11 @@ export default function SATenantsPage() {
 
   async function create() {
     setErr("");
+    if (!form.name?.trim()) { setErr("Company name is required"); return; }
+    if (!form.subdomain?.trim()) { setErr("Subdomain is required"); return; }
+    if (!form.adminName?.trim()) { setErr("Admin name is required"); return; }
+    if (!form.adminEmail?.trim()) { setErr("Admin email is required"); return; }
+    if (!form.adminPassword?.trim()) { setErr("Admin password is required"); return; }
     const r = await fetch("/api/platform/tenants", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -170,7 +175,7 @@ export default function SATenantsPage() {
           <h1 className="text-2xl font-bold">Tenant Management</h1>
           <p className="text-sm text-gray-500">Manage tenants, subscription plans, and permissions</p>
         </div>
-        <button onClick={() => setCreateOpen(true)} className="ui-btn px-4 py-2 text-sm text-white" style={{ background: "#d97706", borderColor: "transparent" }}>
+        <button onClick={() => { setErr(""); setCreateOpen(true); }} className="ui-btn px-4 py-2 text-sm text-white" style={{ background: "#d97706", borderColor: "transparent" }}>
           + New Tenant
         </button>
       </div>

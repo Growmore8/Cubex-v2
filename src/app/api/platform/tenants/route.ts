@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { getSession } from "@/lib/auth";
 import { listTenants, createTenant } from "@/services/tenant.service";
 
@@ -44,6 +44,10 @@ export async function POST(req: Request) {
     const tenant = await createTenant(input);
     return NextResponse.json({ ok: true, tenant });
   } catch (e: any) {
+    if (e instanceof ZodError) {
+      const msg = e.errors.map((x) => x.message).join(", ");
+      return NextResponse.json({ ok: false, error: msg }, { status: 400 });
+    }
     return NextResponse.json({ ok: false, error: e.message || "Create failed" }, { status: 400 });
   }
 }
