@@ -6,6 +6,7 @@ import WorldMapBg from "@/components/ui/WorldMapBg";
 import { titleCaseName, gnum } from "@/lib/format";
 import { SymIcon } from "@/lib/symIcon";
 import { iconForNotification } from "@/lib/notif";
+import { COUNTRIES } from "@/config/countries";
 
 // Lazy-load the chart lib — it's ~350 kB and only needed on the Chart tab.
 // Loads on first tab open; subsequent visits are instant (module cached).
@@ -105,6 +106,27 @@ export default function ClientMobile({ t }: { t: any }) {
   } = t;
 
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "profile">("dashboard");
+  const [profileModal, setProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: "", phone: "", country: "" });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileErr, setProfileErr] = useState("");
+  const [profilePrompted, setProfilePrompted] = useState(false);
+  function openProfileEdit() { setProfileForm({ name: account?.ownerName || account?.name || "", phone: account?.phone || "", country: account?.country || "" }); setProfileErr(""); setProfileModal(true); }
+  async function saveProfile() {
+    setProfileSaving(true); setProfileErr("");
+    const r = await fetch("/api/client/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profileForm) }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
+    setProfileSaving(false);
+    if (!r.ok) { setProfileErr(r.error || "Update failed"); return; }
+    setProfileModal(false);
+  }
+  useEffect(() => {
+    if (account && !profilePrompted && (!account.phone || !account.country)) {
+      setProfilePrompted(true);
+      setProfileForm({ name: account?.ownerName || account?.name || "", phone: account?.phone || "", country: account?.country || "" });
+      setProfileErr("");
+      setProfileModal(true);
+    }
+  }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
   const [mInd, setMInd] = useState<string[]>([]);
   const [histTab, setHistTab] = useState<"trades" | "financial">("trades");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -930,11 +952,13 @@ export default function ClientMobile({ t }: { t: any }) {
                   <Avatar size={64} />
                   <button onClick={() => avatarRef.current?.click()} className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full text-white" style={{ background: BUY, border: "2px solid var(--card)" }}><i className="fa-solid fa-pencil text-[10px]" /></button>
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 text-base font-bold">{account?.ownerName || account?.name} <i className="fa-solid fa-circle-check text-[13px]" style={{ color: BLUE }} /></div>
                   <div className="mt-0.5 text-[11px] text-[var(--muted)]"><i className="fa-solid fa-envelope mr-1.5" />{account?.email || "—"}</div>
-                  <div className="text-[11px] text-[var(--muted)]"><i className="fa-solid fa-phone mr-1.5" />{account?.phone || "—"}</div>
+                  <div className="text-[11px] text-[var(--muted)]"><i className="fa-solid fa-phone mr-1.5" />{account?.phone || <span style={{ color: SELL }}>Not set</span>}</div>
+                  <div className="text-[11px] text-[var(--muted)]"><i className="fa-solid fa-globe mr-1.5" />{account?.country || <span style={{ color: SELL }}>Not set</span>}</div>
                 </div>
+                <button onClick={openProfileEdit} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-user-pen text-[13px]" /></button>
               </div>
             </div>
 
@@ -1326,6 +1350,39 @@ export default function ClientMobile({ t }: { t: any }) {
             <input type="password" inputMode="numeric" value={pin.pinForm.pin || ""} onChange={(e) => pin.setPinForm({ ...pin.pinForm, pin: e.target.value })} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-center text-[var(--text)]" />
             {pin.pinErr && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{pin.pinErr}</div>}
             <button onClick={pin.savePin} className="mt-3 w-full rounded-lg py-2 text-xs font-semibold text-white" style={{ background: BUY }}>Save PIN</button>
+          </div>
+        </div>
+      )}
+
+      {profileModal && (
+        <div className="fixed inset-0 z-[110] flex items-end justify-center p-0" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setProfileModal(false)}>
+          <div className="w-full rounded-t-3xl border-t p-5 pb-8" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 flex items-center justify-between">
+              <div className="text-base font-bold">Edit Profile</div>
+              <button onClick={() => setProfileModal(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)]" style={{ background: "var(--soft)" }}><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <p className="mb-4 text-[11px] text-[var(--muted)]">Keep your profile up to date for withdrawals and KYC.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Full Name</label>
+                <input value={profileForm.name} onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[14px] text-[var(--text)] outline-none" placeholder="Your full name" />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Phone Number</label>
+                <input value={profileForm.phone} onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[14px] text-[var(--text)] outline-none" placeholder="+1 234 567 8900" type="tel" />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Country</label>
+                <select value={profileForm.country} onChange={(e) => setProfileForm((f) => ({ ...f, country: e.target.value }))} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[14px] text-[var(--text)] outline-none">
+                  <option value="">Select country…</option>
+                  {COUNTRIES.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
+                </select>
+              </div>
+              {profileErr && <div className="text-[12px]" style={{ color: SELL }}>{profileErr}</div>}
+              <button onClick={saveProfile} disabled={profileSaving} className="w-full rounded-2xl py-3 text-[15px] font-semibold text-white disabled:opacity-60" style={{ background: BUY }}>
+                {profileSaving ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
           </div>
         </div>
       )}

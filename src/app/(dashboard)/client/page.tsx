@@ -9,6 +9,7 @@ import WalletPanel from "@/components/WalletPanel";
 import ClientSplash from "@/components/ClientSplash";
 import { SymIcon } from "@/lib/symIcon";
 import { titleCaseName, gnum, gmoney } from "@/lib/format";
+import { COUNTRIES } from "@/config/countries";
 import { iconForNotification } from "@/lib/notif";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
@@ -145,6 +146,28 @@ export default function ClientTerminal() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { fetch("/api/client/avatar").then((r) => r.json()).then((d) => { if (d.ok) setAvatarUrl(d.avatarUrl || ""); }).catch(() => {}); }, []);
   async function uploadAvatar(e: any) { const file = e.target.files && e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append("file", file); const r = await fetch("/api/client/avatar", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok && r.avatarUrl) setAvatarUrl(r.avatarUrl); else setErr(r.error || "Avatar upload failed"); }
+  const [profileModal, setProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: "", phone: "", country: "" });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileErr, setProfileErr] = useState("");
+  const [profilePrompted, setProfilePrompted] = useState(false);
+  function openProfileEdit() { setProfileForm({ name: account?.ownerName || account?.name || "", phone: account?.phone || "", country: account?.country || "" }); setProfileErr(""); setProfileModal(true); }
+  async function saveProfile() {
+    setProfileSaving(true); setProfileErr("");
+    const r = await fetch("/api/client/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profileForm) }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
+    setProfileSaving(false);
+    if (!r.ok) { setProfileErr(r.error || "Update failed"); return; }
+    setProfileModal(false);
+    load();
+  }
+  useEffect(() => {
+    if (account && !profilePrompted && (!account.phone || !account.country)) {
+      setProfilePrompted(true);
+      setProfileForm({ name: account?.ownerName || account?.name || "", phone: account?.phone || "", country: account?.country || "" });
+      setProfileErr("");
+      setProfileModal(true);
+    }
+  }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { setFavs(JSON.parse(localStorage.getItem("cubex-favs") || "[]")); } catch (e) {} }, []);
   function toggleFav(sym: string) { setFavs((f) => { const n = f.includes(sym) ? f.filter((x) => x !== sym) : [...f, sym]; localStorage.setItem("cubex-favs", JSON.stringify(n)); return n; }); }
   const [isMobile, setIsMobile] = useState(false);
@@ -498,6 +521,9 @@ export default function ClientTerminal() {
                   {head("Reports")}
                   {mItem(() => { close(); setRepPreset("all"); setRepFrom(""); setRepTo(""); setRepMsg(""); setStmtRep(true); }, "fa-file-invoice", "Statement / Report", BUY)}
                   {div}
+                  {head("Profile")}
+                  {mItem(() => { openProfileEdit(); }, "fa-user-pen", "Edit Profile")}
+                  {div}
                   {head("Security")}
                   {mItem(() => { setPinErr(""); setPinForm({}); setPinModal(true); }, "fa-shield-halved", pinHasPin ? "Change PIN" : "Set PIN")}
                   {pinHasPin && mItem(async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } }, "fa-shield-slash", "Disable PIN", SELL)}
@@ -571,6 +597,38 @@ export default function ClientTerminal() {
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setTopUpOpen(false)} className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs">Cancel</button>
               <button onClick={() => doTopUp(Number(topUpAmt))} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: GOLD, color: "#1a1300" }}>Top up</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {profileModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setProfileModal(false)}>
+          <div className="ui-pop w-full max-w-sm rounded-2xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="font-semibold">Edit Profile</div>
+              <button onClick={() => setProfileModal(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark text-[13px]" /></button>
+            </div>
+            <div className="space-y-3 text-[13px]">
+              <div>
+                <label className="mb-1 block text-[11px] text-[var(--muted)]">Full Name</label>
+                <input value={profileForm.name} onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" placeholder="Your full name" />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] text-[var(--muted)]">Phone Number</label>
+                <input value={profileForm.phone} onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" placeholder="+1 234 567 8900" type="tel" />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] text-[var(--muted)]">Country</label>
+                <select value={profileForm.country} onChange={(e) => setProfileForm((f) => ({ ...f, country: e.target.value }))} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]">
+                  <option value="">Select country…</option>
+                  {COUNTRIES.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
+                </select>
+              </div>
+              {profileErr && <div className="text-[12px]" style={{ color: SELL }}>{profileErr}</div>}
+              <button onClick={saveProfile} disabled={profileSaving} className="mt-1 w-full rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60" style={{ background: BUY }}>
+                {profileSaving ? "Saving…" : "Save Changes"}
+              </button>
             </div>
           </div>
         </div>
