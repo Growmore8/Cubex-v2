@@ -3,10 +3,26 @@ import { z } from "zod";
 import { requireAdmin, requireAdminOrManager } from "@/lib/guard";
 import { listClients, createClient } from "@/services/account.service";
 import { assertCan } from "@/lib/perms";
+import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: Request) {
   const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+
+  // ?check=email — returns existing client info if the email is already registered
+  const check = new URL(req.url).searchParams.get("check");
+  if (check) {
+    const user = await prisma.user.findFirst({
+      where: { tenantId: s.tenantId!, email: check.toLowerCase().trim(), role: "CLIENT" },
+      select: { name: true, id: true },
+    });
+    if (user) {
+      const accountCount = await prisma.account.count({ where: { userId: user.id } });
+      return NextResponse.json({ ok: true, exists: true, name: user.name, accounts: accountCount });
+    }
+    return NextResponse.json({ ok: true, exists: false });
+  }
+
   const clients = await listClients(s.tenantId!, s.role === "MANAGER" ? s.sub : null);
   return NextResponse.json({ ok: true, clients });
 }

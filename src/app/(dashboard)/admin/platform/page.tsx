@@ -94,6 +94,8 @@ export default function AdminDeskPage() {
   const [modalMin, setModalMin] = useState(false);
   useEffect(() => { if (modal === "notify") fetch("/api/admin/notify").then((r) => r.json()).then((d) => { if (d.ok) setNrecent(d.recent || []); }).catch(() => {}); }, [modal]);
   const [form, setForm] = useState<any>({ type: "LIVE", leverage: 100, currency: "USD" });
+  const [dupWarn, setDupWarn] = useState<{ name: string; accounts: number } | null>(null);
+  const dupTimerRef = useRef<any>(null);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [toasts, setToasts] = useState<any[]>([]);
@@ -492,9 +494,24 @@ export default function AdminDeskPage() {
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
     setPos(null); loadAll();
   }
-  function openModal(kind: any) { setTopMenu(""); setErr(""); setOk(""); setForm({ type: "LIVE", leverage: 100, currency: "USD" }); setModalMin(false); setModal(kind); }
+  function openModal(kind: any) { setTopMenu(""); setErr(""); setOk(""); setForm({ type: "LIVE", leverage: 100, currency: "USD" }); setDupWarn(null); setModalMin(false); setModal(kind); }
   async function submit(url: string, body: any, label: string) { setErr(""); setOk(""); const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; } setOk(label + " created"); setModal(""); loadAll(); }
-  const f = (k: string, v: any) => setForm((o: any) => ({ ...o, [k]: v }));
+  const f = (k: string, v: any) => {
+    setForm((o: any) => ({ ...o, [k]: v }));
+    if (k === "email") {
+      setDupWarn(null);
+      clearTimeout(dupTimerRef.current);
+      const email = String(v || "").trim();
+      if (email.includes("@")) {
+        dupTimerRef.current = setTimeout(() => {
+          fetch("/api/admin/clients?check=" + encodeURIComponent(email))
+            .then((r) => r.json())
+            .then((d) => { if (d.ok && d.exists) setDupWarn({ name: d.name, accounts: d.accounts }); })
+            .catch(() => {});
+        }, 600);
+      }
+    }
+  };
   // Preview the Live ID that a new pool account will get (peek, no consume).
   const [poolLogin, setPoolLogin] = useState("");
   async function fetchNextLogin(type: string) { try { const d = await fetch("/api/admin/next-login?type=" + (type || "LIVE")).then((r) => r.json()); if (d.ok) setPoolLogin(d.login); } catch {} }
@@ -1701,7 +1718,16 @@ export default function AdminDeskPage() {
               {form.isPool && (<><div className={lab + " mt-2"}>Live ID (auto-assigned)</div><input className={inp + " font-mono opacity-90 cursor-not-allowed"} value={poolLogin || "…"} readOnly /></>)}
               <div className={lab + " mt-2"}>Name <span className="font-normal normal-case text-[var(--muted)]">{form.isPool ? "(person who will use this pool account)" : ""}</span></div><input className={inp} value={form.name || ""} onChange={(e) => f("name", e.target.value)} />
               {!form.isPool && (<><div className={lab + " mt-2"}>Phone</div><input className={inp} value={form.phone || ""} onChange={(e) => f("phone", e.target.value)} /></>)}
-              {!form.isPool && (<><div className={lab + " mt-2"}>Email</div><input className={inp} value={form.email || ""} autoComplete="off" data-lpignore="true" onChange={(e) => f("email", e.target.value)} /></>)}
+              {!form.isPool && (<>
+                <div className={lab + " mt-2"}>Email</div>
+                <input className={inp} value={form.email || ""} autoComplete="off" data-lpignore="true" onChange={(e) => f("email", e.target.value)} />
+                {dupWarn && (
+                  <div className="mt-1.5 flex items-start gap-2 rounded-lg px-2.5 py-2 text-[11px]" style={{ background: "rgba(234,179,8,0.10)", border: "1px solid rgba(234,179,8,0.35)", color: "#b45309" }}>
+                    <i className="fa-solid fa-triangle-exclamation mt-0.5 shrink-0" />
+                    <span><b>{dupWarn.name}</b> already has {dupWarn.accounts} account{dupWarn.accounts !== 1 ? "s" : ""} with this email. The new account will be added as a <b>sub-account</b> under their profile.</span>
+                  </div>
+                )}
+              </>)}
               <div className={lab + " mt-2"}>Password</div><PasswordInput className={inp} value={form.password || ""} autoComplete="new-password" onChange={(e) => f("password", e.target.value)} />
               {!form.isPool && (<><div className={lab + " mt-2"}>Country</div><CountrySelect className={inp} value={form.country || ""} onChange={(v) => f("country", v)} /></>)}
               <div className="mt-2 grid grid-cols-2 gap-2">
