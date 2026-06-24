@@ -289,13 +289,22 @@ async function pollFinnhubQuotes() {
 }
 
 let tdWs = null;
+let tdWsFail200 = 0; // consecutive HTTP-200 handshake failures
 function connectTD() {
   if (!TD_KEY) { console.log("[TD] no key"); return; }
+  if (tdWsFail200 >= 3) return; // WS not available on this plan — REST poller handles prices
   tdWs = new WebSocket("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY);
-  tdWs.on("open", () => { try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
+  tdWs.on("open", () => { tdWsFail200 = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
   tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) applyPrice(s, parseFloat(m.price), "TD"); } } catch (e) {} });
-  tdWs.on("close", () => { setTimeout(connectTD, 5000); });
-  tdWs.on("error", (e) => console.error("[TD]", e.message));
+  tdWs.on("close", () => { if (tdWsFail200 < 3) setTimeout(connectTD, 5000); });
+  tdWs.on("error", (e) => {
+    if (e.message && e.message.includes("Unexpected server response: 200")) {
+      tdWsFail200++;
+      if (tdWsFail200 === 1) console.log("[TD] WS unavailable (HTTP 200) — using REST poller");
+    } else {
+      console.error("[TD]", e.message);
+    }
+  });
 }
 
 // Micro-tick simulation: between real feed updates, move each symbol's price by
