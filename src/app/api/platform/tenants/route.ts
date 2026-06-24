@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, tenant });
   } catch (e: any) {
     if (e instanceof ZodError) {
-      const msg = e.errors.map((x) => x.message).join(", ");
+      const msg = e.issues.map((x: any) => x.message).join(", ");
       return NextResponse.json({ ok: false, error: msg }, { status: 400 });
     }
     return NextResponse.json({ ok: false, error: e.message || "Create failed" }, { status: 400 });
