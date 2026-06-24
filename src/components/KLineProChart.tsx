@@ -99,20 +99,49 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       getHistoryKLineData: async (sym: any, period: any, from: number, to: number) => {
         const key = sym.ticker + "_" + period.text;
         const ck = "cubex-kl:" + key;
-        // Instant load: serve a fresh (<30s) localStorage cache without the network.
+        const toBar = (b: any) => ({ timestamp: b.time * 1000, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume ?? 0 });
+
+        // Read localStorage cache (5-minute TTL)
+        let cached: any[] | null = null;
         try {
           const c = JSON.parse(localStorage.getItem(ck) || "null");
-          if (c && c.d?.length && Date.now() - c.t < 30000) { lastBar[key] = c.d[c.d.length - 1]; return c.d.filter((d: any) => d.timestamp >= from && d.timestamp <= to); }
+          if (c && c.d?.length && Date.now() - c.t < 300000) cached = c.d;
         } catch {}
-        try {
-          const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}`, { cache: "no-store" }).then((x) => x.json());
-          if (!r?.ok || !r.candles?.length) return [];
-          const data = r.candles.map((b: any) => ({ timestamp: b.time * 1000, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume ?? 0 }));
-          lastBar[key] = data[data.length - 1];
-          try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), d: data.slice(-400) })); } catch {}
-          // honour the requested window so Pro's left-scroll paging terminates cleanly
-          return data.filter((d: any) => d.timestamp >= from && d.timestamp <= to);
-        } catch { return []; }
+
+        // Fetch fresh if no cache
+        if (!cached) {
+          try {
+            const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}`, { cache: "no-store" }).then((x) => x.json());
+            if (r?.ok && r.candles?.length) {
+              cached = r.candles.map(toBar);
+              lastBar[key] = cached[cached.length - 1];
+              try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), d: cached })); } catch {}
+            }
+          } catch {}
+        }
+        if (!cached) return [];
+
+        // Load more: user scrolled before our oldest candle — fetch an earlier batch
+        const oldest = cached[0]?.timestamp;
+        if (oldest && from < oldest) {
+          try {
+            const beforeSec = Math.floor(oldest / 1000);
+            const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}&before=${beforeSec}`, { cache: "no-store" }).then((x) => x.json());
+            if (r?.ok && r.candles?.length) {
+              const earlier = r.candles.map(toBar);
+              // Merge and deduplicate by timestamp
+              const seen = new Set<number>();
+              const merged = [...earlier, ...cached].filter((d) => !seen.has(d.timestamp) && seen.add(d.timestamp));
+              merged.sort((a, b) => a.timestamp - b.timestamp);
+              cached = merged;
+              lastBar[key] = cached[cached.length - 1];
+              try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), d: cached })); } catch {}
+            }
+          } catch {}
+        }
+
+        lastBar[key] = cached[cached.length - 1];
+        return cached.filter((d: any) => d.timestamp >= from && d.timestamp <= to);
       },
       subscribe: (sym: any, period: any, callback: (d: any) => void) => {
         try { onSymRef.current?.(sym.ticker); } catch {} // sync app when the user picks a symbol in the chart
@@ -166,7 +195,13 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         timezone: "Etc/UTC",
         theme,
         drawingBarVisible: !bare,
-        styles: { candle: { tooltip: { showType: "rect", showRule: "follow_cross", rect: { position: "pointer" } } } } as any,
+        styles: {
+          candle: { tooltip: { showType: "rect", showRule: "follow_cross", rect: { position: "pointer" } } },
+          // TradingView-style: right-side price axis is draggable for price zoom
+          yAxis: { type: "normal", inside: false, position: "right" },
+          crosshair: { show: true },
+          grid: { horizontal: { show: true, style: "dashed" }, vertical: { show: false } },
+        } as any,
         symbol: { ticker: first.symbol, shortName: first.symbol, pricePrecision: digits, volumePrecision: 0, type: "forex" },
         period: tfToPeriod(tf),
         periods: PERIODS,
@@ -188,12 +223,18 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
           try {
             const core = kc.init(host);
             coreRef.current = core;
+            // TradingView-style: horizontal time scroll + pinch/wheel zoom + price axis drag
             core?.setScrollEnabled?.(true);
             core?.setZoomEnabled?.(true);
-            core?.setBarSpace?.(9);
-            core?.setOffsetRightDistance?.(60);
-            // Apply touch-action:none directly on the canvas so no parent CSS can override
+            core?.setBarSpace?.(8);
+            core?.setOffsetRightDistance?.(50);
+            // Smooth scroll rate (lower = slower / more controlled, like TradingView)
+            core?.setOptions?.({ scrollRateLimitFactor: 0.98 });
+            // Apply touch-action:none on every canvas so browser doesn't intercept
             host.querySelectorAll("canvas").forEach((c) => { (c as HTMLElement).style.touchAction = "none"; });
+            // Also set touch-action on the host itself and all children
+            (host as HTMLElement).style.touchAction = "none";
+            host.querySelectorAll("*").forEach((el) => { (el as HTMLElement).style && ((el as HTMLElement).style.touchAction = "none"); });
           } catch {}
         });
       };

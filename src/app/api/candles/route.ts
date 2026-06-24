@@ -69,7 +69,11 @@ export async function GET(req: Request) {
   const tf = url.searchParams.get("tf") || "1M";
   if (!symbol) return NextResponse.json({ ok: false, error: "symbol required" }, { status: 400 });
 
-  const ckey = symbol + "|" + tf;
+  // Optional: fetch candles ending before a given unix timestamp (for "load more" scroll)
+  const beforeSec = url.searchParams.get("before");
+  const endDateParam = beforeSec ? `&end_date=${new Date(Number(beforeSec) * 1000).toISOString().replace("T", " ").slice(0, 19)}` : "";
+
+  const ckey = symbol + "|" + tf + (beforeSec ? "|b" + beforeSec : "");
   const hit = candleCache.get(ckey);
   if (hit && Date.now() - hit.t < CACHE_MS) return NextResponse.json({ ok: true, candles: hit.candles, source: hit.source, cached: true });
 
@@ -79,12 +83,12 @@ export async function GET(req: Request) {
 
   const dedupe = (arr: any[]) => { arr.sort((a, b) => a.time - b.time); const seen = new Set<number>(); return arr.filter((c) => isFinite(c.time) && isFinite(c.close) && !seen.has(c.time) && seen.add(c.time)); };
 
-  // Twelve Data time_series (the paid, reliable feed). ~1500 bars = fast paint.
+  // Twelve Data time_series. 5000 bars gives ~83h on 1M, ~17d on 5M, ~7mo on 1H.
   const getTD = async (): Promise<any[] | null> => {
     if (!TD_KEY) return null;
     const tdSym = tdSymbol(symbol, feed);
     const interval = INTERVAL[tf] || "1min";
-    const api = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(tdSym)}&interval=${interval}&outputsize=1500&order=ASC&timezone=UTC&format=JSON&apikey=${TD_KEY}`;
+    const api = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(tdSym)}&interval=${interval}&outputsize=5000&order=ASC&timezone=UTC&format=JSON${endDateParam}&apikey=${TD_KEY}`;
     try {
       const d = await (await fetch(api, { cache: "no-store" })).json();
       if (!d || d.status === "error" || !Array.isArray(d.values)) return null;
