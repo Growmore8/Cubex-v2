@@ -659,8 +659,9 @@ export default function AdminDeskPage() {
   const mi = "flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-[var(--soft)] transition-colors";
   const subi = "flex w-full items-center gap-2 px-3 py-1 text-left hover:bg-[var(--soft)] transition-colors";
   const mIco = (icon: string, color?: string) => <i className={"fa-solid " + icon} style={{ width: 13, fontSize: 11, textAlign: "center", color: color || "var(--muted)" }} />;
-  // Right-side flyout submenu (opens to the right of the trigger, not below).
-  const flyCls = "absolute left-full top-0 ml-1 min-w-[210px] overflow-hidden rounded-xl border py-1 z-[70]";
+  // Flyout submenu — opens right; if near right edge opens left instead
+  const flyRight = menu ? menu.x + 240 + 220 < (typeof window !== "undefined" ? window.innerWidth : 9999) : true;
+  const flyCls = "absolute top-0 ml-1 min-w-[210px] overflow-hidden rounded-xl border py-1 z-[70] " + (flyRight ? "left-full" : "right-full mr-1");
   const flySty: React.CSSProperties = { background: "color-mix(in srgb, var(--panel) 96%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", boxShadow: "0 20px 50px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.12s cubic-bezier(.16,1,.3,1)" };
   const tgl = (on: boolean) => "rounded border border-[var(--border)] px-2 py-1 " + (on ? "" : "opacity-50");
   function toggleCat(c: string) { setCollapsed((o) => ({ ...o, [c]: !o[c] })); }
@@ -1500,13 +1501,30 @@ export default function AdminDeskPage() {
               {sec("spread") && (
                 <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 text-[10px] space-y-2">
                   <div className="text-[9px] text-[var(--muted)]">Group markup added on top of symbol spread</div>
-                  <div><div className="mb-1 text-[9px] text-[var(--muted)]">Spread markup (pips)</div><input type="number" min="0" step="0.1" className={inp} value={grpForm.spread ?? 0} onChange={(e) => setGrpForm((f) => ({ ...f, spread: Number(e.target.value) }))} /></div>
-                  <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: grpForm.spread ?? 0, managerId: g.managerId }) }); const d = await r.json(); if (d.ok) { setOk("Group spread saved"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#22c55e" }}>Save group spread</button>
+                  {/* Fixed / Floating toggle */}
+                  <div className="flex gap-1">
+                    {["FIXED","FLOATING"].map((t) => { const active = (grpForm.spreadType ?? g.spreadType ?? "FIXED") === t; return (
+                      <button key={t} onClick={() => setGrpForm((f: any) => ({ ...f, spreadType: t }))} className="flex-1 rounded py-1 text-[10px] font-semibold border transition-colors" style={{ background: active ? "#22c55e" : "var(--bg)", color: active ? "#fff" : "var(--muted)", borderColor: active ? "#22c55e" : "var(--border)" }}>{t.charAt(0) + t.slice(1).toLowerCase()}</button>
+                    ); })}
+                  </div>
+                  <div><div className="mb-1 text-[9px] text-[var(--muted)]">{(grpForm.spreadType ?? g.spreadType ?? "FIXED") === "FLOATING" ? "Min spread markup (pips)" : "Spread markup (pips)"}</div>
+                    <input type="number" min="0" step="0.1" className={inp} value={grpForm.spread ?? Number(g.spread ?? 0)} onChange={(e) => setGrpForm((f: any) => ({ ...f, spread: Number(e.target.value) }))} />
+                  </div>
+                  {(grpForm.spreadType ?? g.spreadType ?? "FIXED") === "FLOATING" && (
+                    <div><div className="mb-1 text-[9px] text-[var(--muted)]">Max spread markup (pips, off-hours)</div>
+                      <input type="number" min="0" step="0.1" className={inp} value={grpForm.spreadMax ?? Number(g.spreadMax ?? 0)} onChange={(e) => setGrpForm((f: any) => ({ ...f, spreadMax: Number(e.target.value) }))} />
+                    </div>
+                  )}
+                  <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: grpForm.spread ?? Number(g.spread ?? 0), spreadType: grpForm.spreadType ?? g.spreadType ?? "FIXED", spreadMax: grpForm.spreadMax ?? Number(g.spreadMax ?? 0), managerId: g.managerId }) }); const d2 = await r.json(); if (d2.ok) { setOk("Group spread saved"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d2.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#22c55e" }}>Save group spread</button>
+                  <div className="border-t border-[var(--border)] pt-1.5">
+                    <div className="mb-1 text-[9px] font-semibold" style={{ color: "var(--muted)" }}>Set spread per symbol for all group members:</div>
+                    <button onClick={() => { setGrpCtx(null); setGrpSub(""); openSymPerm(); }} className="w-full rounded py-1 text-[9px] text-center" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)" }}>Open Symbol Spread Editor →</button>
+                  </div>
                 </div>
               )}
 
-              {/* Symbol disable/enable */}
-              <button onClick={() => { setGrpCtx(null); setGrpSub(""); }} className={row}><i className="fa-solid fa-eye-slash w-3.5 text-center text-[10px]" style={{ color: "var(--muted)" }} /><span className="flex-1">Symbol Access</span><span className="text-[9px]" style={{ color: "var(--muted)" }}>per account</span></button>
+              {/* Symbol Access — global toggle, applied tenant-wide */}
+              <button onClick={() => { setGrpCtx(null); setGrpSub(""); openSymPerm(); }} className={row}><i className="fa-solid fa-eye-slash w-3.5 text-center text-[10px]" style={{ color: "var(--accent)" }} /><span className="flex-1">Symbol Access</span><span className="text-[9px]" style={{ color: "var(--muted)" }}>enable/disable globally</span></button>
 
               <div className="my-1 border-t mx-1" style={{ borderColor: "var(--border)" }} />
 

@@ -257,6 +257,8 @@ model TradeGroup {
   tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name      String
   spread    Decimal   @default(0) @db.Decimal(10, 2)
+  spreadType String   @default("FIXED")
+  spreadMax Decimal   @default(0) @db.Decimal(10, 2)
   config    Json      @default("{}")
   // null = admin-level group; set = group belongs to this manager (3-level: manager > group > client)
   managerId String?

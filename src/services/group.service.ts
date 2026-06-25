@@ -13,6 +13,8 @@ export async function updateGroup(tenantId: string, id: string, input: any) {
   const data: any = {};
   if (input.name !== undefined) data.name = input.name;
   if (input.spread !== undefined) data.spread = new Prisma.Decimal(input.spread);
+  if (input.spreadType !== undefined) data.spreadType = input.spreadType === "FLOATING" ? "FLOATING" : "FIXED";
+  if (input.spreadMax !== undefined) data.spreadMax = new Prisma.Decimal(input.spreadMax);
   if (input.managerId !== undefined) data.managerId = input.managerId || null;
   return prisma.tradeGroup.update({ where: { id }, data });
 }
