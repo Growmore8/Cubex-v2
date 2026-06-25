@@ -105,6 +105,10 @@ export default function ClientMobile({ t }: { t: any }) {
     acctReqModal, setAcctReqModal,
   } = t;
 
+  const _mobSymSpreads = (): Record<string, number> => (t as any).symbolSpreads || {};
+  const _mobGrpSpread = (): number => (t as any).groupSpread || 0;
+  const _mobSpreadPips = (sym: string) => (_mobSymSpreads()[sym] ?? 0) + _mobGrpSpread();
+
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "profile">("dashboard");
   const [profileModal, setProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: "", phone: "", country: "" });
@@ -754,11 +758,15 @@ export default function ClientMobile({ t }: { t: any }) {
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]} />
             </div>
-            <div className="glass flex items-stretch gap-2 border-t border-[var(--border)] p-2.5" style={{ background: theme === "dark" ? "rgba(20,24,34,0.6)" : "rgba(255,255,255,0.6)" }}>
+            <div className="glass flex items-stretch gap-1.5 border-t border-[var(--border)] p-2.5" style={{ background: theme === "dark" ? "rgba(20,24,34,0.6)" : "rgba(255,255,255,0.6)" }}>
               <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, boxShadow: `0 8px 18px -8px ${SELLBTN}`, touchAction: "manipulation" }}>
                 <div className="text-[10px] font-semibold uppercase tracking-wide opacity-85">Sell</div><div className="text-base font-bold tabular-nums">{price != null ? gnum(bid, dg(selSym)) : "…"}</div>
               </button>
-              <div className="flex items-center"><LotStepper vol={vol} setVol={setVol} /></div>
+              <div className="flex flex-col items-center justify-center gap-0.5 shrink-0">
+                <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>sprd</span>
+                <span className="text-[10px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{_mobSpreadPips(selSym).toFixed(1)}</span>
+                <LotStepper vol={vol} setVol={setVol} small />
+              </div>
               <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, boxShadow: `0 8px 18px -8px ${BUYBTN}`, touchAction: "manipulation" }}>
                 <div className="text-[10px] font-semibold uppercase tracking-wide opacity-85">Buy</div><div className="text-base font-bold tabular-nums">{price != null ? gnum(ask, dg(selSym)) : "…"}</div>
               </button>

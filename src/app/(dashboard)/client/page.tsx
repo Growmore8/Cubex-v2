@@ -848,14 +848,20 @@ export default function ClientTerminal() {
               {/* Margin */}
               <div className="mb-2 flex items-center justify-between rounded-lg bg-[var(--soft)] px-3 py-1.5 text-[10px] text-[var(--muted)]">Required Margin<span className="font-semibold tabular-nums text-[var(--text)]">{margin ? "$" + fmt(margin) : "$0.00"}</span></div>
 
-              {/* Action buttons */}
+              {/* Action buttons — MT5 style: SELL | spread | BUY */}
               {entryTab === "trade" ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg, #ff6b78, #e0394a 70%, #b9293a)" }}>
-                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down text-[9px]" />Sell</span><span className="text-[15px] tabular-nums">{bid != null ? gnum(bid, d) : "…"}</span>
+                <div className="flex items-stretch gap-1.5">
+                  <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg, #ff6b78, #e0394a 70%, #b9293a)" }}>
+                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down text-[9px]" />Sell</span>
+                    <span className="text-[15px] tabular-nums">{bid != null ? gnum(bid, d) : "…"}</span>
                   </button>
-                  <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg, #5aa0ff, #2f81f7 70%, #1e63cc)" }}>
-                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up text-[9px]" />Buy</span><span className="text-[15px] tabular-nums">{ask != null ? gnum(ask, d) : "…"}</span>
+                  <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 px-1">
+                    <span className="text-[8px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>sprd</span>
+                    <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{_spreadPips(selSym).toFixed(1)}</span>
+                  </div>
+                  <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg, #5aa0ff, #2f81f7 70%, #1e63cc)" }}>
+                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up text-[9px]" />Buy</span>
+                    <span className="text-[15px] tabular-nums">{ask != null ? gnum(ask, d) : "…"}</span>
                   </button>
                 </div>
               ) : (
