@@ -17,30 +17,50 @@ export async function GET() {
     },
   });
 
-  const clients = accts.map((a: any) => ({
-    id: a.id,
-    tenantId: a.tenantId,
-    login: a.login,
-    name: a.name,
-    email: (a.user && a.user.email) || a.email || null,
-    hasUser: !!a.userId, // false = orphaned (login identity was deleted) → needs repair
-    phone: a.phone,
-    country: a.country,
-    company: a.tenant ? (a.tenant.brandName || a.tenant.name) : "—",
-    managerId: a.managerId,
-    manager: a.manager ? a.manager.name : null,
-    type: a.type,
-    balance: Number(a.deposit) - Number(a.withdrawal) + Number(a.credit) + Number(a.bonus) + Number(a.pnl),
-    locked: a.locked,
-    deactivated: a.deactivated,
-    isPool: a.isPool,
-    isOnline: a.user ? isOnline(a.user.lastSeenAt) : false,
-    lastPing: (a.user ? a.user.lastSeenAt : null) ?? a.lastPing,
-    device: a.user ? (a.user.lastDevice ?? null) : null,
-    lastLoginIp: a.user ? (a.user.lastLoginIp ?? null) : null,
-    kyc: a.kyc[0] ? a.kyc[0].status : null,
-    joined: a.createdAt,
-  }));
+  // Group by userId (one client object per user, with all their accounts)
+  const userMap = new Map<string, any>();
+  for (const a of accts) {
+    const uid = a.userId ?? `__anon__${a.id}`;
+    if (!userMap.has(uid)) {
+      const u: any = a.user;
+      userMap.set(uid, {
+        userId: a.userId,
+        name: u?.name || (a as any).name || "—",
+        email: u?.email || (a as any).email || null,
+        phone: u?.phone || (a as any).phone || null,
+        country: u?.country || (a as any).country || null,
+        isOnline: u ? isOnline(u.lastSeenAt) : false,
+        lastPing: u?.lastSeenAt ?? null,
+        device: u?.lastDevice ?? null,
+        lastLoginIp: u?.lastLoginIp ?? null,
+        joined: a.createdAt,
+        accounts: [] as any[],
+      });
+    }
+    const client = userMap.get(uid)!;
+    // Track earliest join date across accounts
+    if (new Date(a.createdAt) < new Date(client.joined)) client.joined = a.createdAt;
+    client.accounts.push({
+      id: a.id,
+      login: a.login,
+      name: (a as any).name,
+      email: (a.user as any)?.email || (a as any).email || null,
+      phone: (a as any).phone || null,
+      country: (a as any).country || null,
+      type: a.type,
+      balance: Number((a as any).deposit) - Number((a as any).withdrawal) + Number((a as any).credit) + Number((a as any).bonus) + Number((a as any).pnl),
+      locked: (a as any).locked,
+      deactivated: (a as any).deactivated,
+      isPool: (a as any).isPool,
+      tenantId: a.tenantId,
+      managerId: (a as any).managerId,
+      company: a.tenant ? (a.tenant.brandName || a.tenant.name) : "—",
+      manager: (a as any).manager?.name || null,
+      kyc: (a as any).kyc[0]?.status || null,
+      joined: a.createdAt,
+      hasUser: !!a.userId,
+    });
+  }
 
-  return NextResponse.json({ ok: true, clients });
+  return NextResponse.json({ ok: true, clients: Array.from(userMap.values()) });
 }
