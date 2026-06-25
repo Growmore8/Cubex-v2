@@ -36,7 +36,7 @@ async function finnhubCandles(feed: string, tf: string, fhKey: string): Promise<
     const r = await fetch(api, { cache: "no-store" });
     const d = await r.json();
     if (!d || d.s !== "ok" || !Array.isArray(d.t)) return null;
-    const out = d.t.map((t: number, i: number) => ({ time: t, open: Number(d.o[i]), high: Number(d.h[i]), low: Number(d.l[i]), close: Number(d.c[i]) }))
+    const out = d.t.map((t: number, i: number) => ({ time: t, open: Number(d.o[i]), high: Number(d.h[i]), low: Number(d.l[i]), close: Number(d.c[i]), volume: Number(d.v?.[i] ?? 0) }))
       .filter((c: any) => isFinite(c.time) && isFinite(c.close));
     return out.length ? out : null;
   } catch { return null; }
@@ -92,16 +92,27 @@ export async function GET(req: Request) {
     try {
       const d = await (await fetch(api, { cache: "no-store" })).json();
       if (!d || d.status === "error" || !Array.isArray(d.values)) return null;
-      const out = d.values.map((v: any) => { const dt = String(v.datetime); const iso = dt.includes(" ") ? dt.replace(" ", "T") + "Z" : dt + "T00:00:00Z"; return { time: Math.floor(new Date(iso).getTime() / 1000), open: Number(v.open), high: Number(v.high), low: Number(v.low), close: Number(v.close) }; });
+      const out = d.values.map((v: any) => { const dt = String(v.datetime); const iso = dt.includes(" ") ? dt.replace(" ", "T") + "Z" : dt + "T00:00:00Z"; return { time: Math.floor(new Date(iso).getTime() / 1000), open: Number(v.open), high: Number(v.high), low: Number(v.low), close: Number(v.close), volume: Number(v.volume ?? 0) }; });
       const clean = dedupe(out);
       return clean.length ? clean : null;
     } catch { return null; }
   };
   // Finnhub (OANDA) — only when the symbol has a Finnhub feed.
+  // Finnhub has no 4H resolution; fetch 1H and aggregate into 4H buckets.
   const getFH = async (): Promise<any[] | null> => {
     if (!feed || !feed.includes(":")) return null;
-    const fh = await finnhubCandles(feed, tf, FH_KEY);
-    return fh && fh.length ? dedupe(fh) : null;
+    const fh = await finnhubCandles(feed, tf === "4H" ? "1H" : tf, FH_KEY);
+    if (!fh || !fh.length) return null;
+    if (tf !== "4H") return dedupe(fh);
+    // Aggregate 1H → 4H: bucket by floor(time / 14400) * 14400
+    const buckets = new Map<number, any>();
+    for (const c of fh) {
+      const bucket = Math.floor(c.time / 14400) * 14400;
+      if (!buckets.has(bucket)) buckets.set(bucket, { time: bucket, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume ?? 0 });
+      else { const b = buckets.get(bucket)!; b.high = Math.max(b.high, c.high); b.low = Math.min(b.low, c.low); b.close = c.close; b.volume = (b.volume ?? 0) + (c.volume ?? 0); }
+    }
+    const out = Array.from(buckets.values()).sort((a, b) => a.time - b.time);
+    return out.length ? out : null;
   };
 
   // Try the configured PRIMARY feed first, the other as fallback.
