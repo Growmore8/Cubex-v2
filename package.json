@@ -10,6 +10,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@devexperts/dxcharts-lite": "^2.7.32",
     "@hookform/resolvers": "^5.4.0",
     "@klinecharts/pro": "^0.1.1",
     "@prisma/client": "^6.19.3",
