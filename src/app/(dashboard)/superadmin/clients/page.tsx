@@ -207,15 +207,30 @@ export default function SAClientsPage() {
     if (client.accounts.some((a: any) => a.kyc === "REJECTED")) return "REJECTED";
     return null;
   }
-  function kycBadge(kyc: string | null, sz = 9) {
-    if (!kyc) return null;
-    const cls = kyc === "APPROVED" ? "sab-green" : kyc === "PENDING" ? "sab-amber" : "sab-red";
-    return <span className={"sab " + cls} style={{ fontSize: sz }}>KYC</span>;
+  function kycText(client: any) {
+    const kyc = clientKyc(client);
+    const hasLive = client.accounts.some((a: any) => a.type === "LIVE");
+    if (kyc === "APPROVED") return <span className="text-xs font-semibold" style={{ color: GRN }}>KYC Verified</span>;
+    if (kyc === "PENDING") return <span className="text-xs font-semibold" style={{ color: AMB }}>KYC Pending</span>;
+    if (hasLive) return <span className="text-xs font-semibold" style={{ color: RED }}>KYC Required</span>;
+    return <span className="text-gray-300 text-xs">—</span>;
   }
-  function clientStatusBadge(client: any) {
-    if (client.accounts.some((a: any) => a.locked)) return <span className="sab sab-red">Locked</span>;
-    if (client.accounts.some((a: any) => a.deactivated)) return <span className="sab sab-amber">Inactive</span>;
-    return <span className="sab sab-green">Active</span>;
+  function clientStatusText(client: any) {
+    if (client.accounts.some((a: any) => a.locked)) return <span className="text-xs font-semibold" style={{ color: RED }}>Locked</span>;
+    if (client.accounts.some((a: any) => a.deactivated)) return <span className="text-xs font-semibold" style={{ color: AMB }}>Inactive</span>;
+    return <span className="text-xs font-semibold" style={{ color: GRN }}>Active</span>;
+  }
+
+  // Group actions — run for each account in a group sequentially
+  async function actAll(accounts: any[], action: string) {
+    for (const a of accounts) {
+      await fetch("/api/superadmin/clients/" + a.id, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+    }
+    load();
   }
 
   const demoAccts = (c: any) => c.accounts.filter((a: any) => a.type === "DEMO");
@@ -297,28 +312,21 @@ export default function SAClientsPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-sm text-gray-600">{client.country || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5 text-sm">
                       {tenantNames.length > 0
-                        ? tenantNames.map((t) => <span key={t} className="mr-1 rounded-full px-2 py-0.5 text-xs font-medium" style={{ background: "#dbeafe", color: BLU }}>{t}</span>)
-                        : <span className="text-xs text-gray-400">Own</span>}
+                        ? tenantNames.join(", ")
+                        : <span className="text-gray-400 text-xs">Own</span>}
                     </td>
                     <td className="px-3 py-2.5">
                       {demos.length === 0 ? <span className="text-gray-300 text-xs">—</span> : (
-                        <div className="inline-flex flex-col gap-0.5">
-                          <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "#eff6ff", color: BLU }}>
-                            {demos.length} account{demos.length > 1 ? "s" : ""}
-                          </span>
-                          <span className="pl-1 text-[11px] text-gray-500">${m(demos.reduce((s: number, a: any) => s + a.balance, 0))}</span>
-                        </div>
+                        <span className="text-sm text-gray-600">${m(demos.reduce((s: number, a: any) => s + a.balance, 0))}</span>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
                       {lives.length === 0 ? <span className="text-gray-300 text-xs">—</span> : (
-                        <div className="inline-flex flex-col gap-0.5">
-                          <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "#f0fdf4", color: GRN }}>
-                            {lives.length} account{lives.length > 1 ? "s" : ""}
-                          </span>
-                          <span className="pl-1 text-[11px] text-gray-500">${m(lives.reduce((s: number, a: any) => s + a.balance, 0))}</span>
+                        <div>
+                          <div className="text-sm font-medium" style={{ color: GRN }}>{lives.length} Live</div>
+                          <div className="text-xs text-gray-500">${m(lives.reduce((s: number, a: any) => s + a.balance, 0))}</div>
                         </div>
                       )}
                     </td>
@@ -329,8 +337,8 @@ export default function SAClientsPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{new Date(client.joined).toLocaleDateString()}</td>
-                    <td className="px-3 py-2.5">{kycBadge(kyc, 10)}</td>
-                    <td className="px-3 py-2.5">{clientStatusBadge(client)}</td>
+                    <td className="px-3 py-2.5">{kycText(client)}</td>
+                    <td className="px-3 py-2.5">{clientStatusText(client)}</td>
                     <td className="px-3 py-2.5">
                       <button className="rounded border px-2.5 py-1 text-[11px] font-medium hover:bg-blue-50" style={{ borderColor: "#bfdbfe", color: BLU }} onClick={(e) => { e.stopPropagation(); setDetailClient(client); }}>
                         View
@@ -372,7 +380,7 @@ export default function SAClientsPage() {
                 {(detailClient.name || "?")[0].toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5 font-semibold">{titleCaseName(detailClient.name)}{kycBadge(clientKyc(detailClient), 10)}</div>
+                <div className="flex flex-wrap items-center gap-1.5 font-semibold">{titleCaseName(detailClient.name)}{kycText(detailClient)}</div>
                 {detailClient.email && <div className="truncate text-xs text-gray-500">{detailClient.email}</div>}
               </div>
               <button onClick={() => setDetailClient(null)} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button>
@@ -415,9 +423,16 @@ export default function SAClientsPage() {
               {/* Demo accounts */}
               {demoAccts(detailClient).length > 0 && (
                 <div>
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="sab sab-blue">Demo</span>
-                    <span className="text-xs text-gray-500">{demoAccts(detailClient).length} account{demoAccts(detailClient).length > 1 ? "s" : ""}</span>
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold" style={{ color: BLU }}>Demo Accounts</span>
+                      <span className="text-xs text-gray-500">{demoAccts(detailClient).length}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => actAll(demoAccts(detailClient).filter((a: any) => !a.locked), "lock")} className="rounded px-2 py-1 text-[11px] font-medium" style={{ background: "#fff1f2", color: RED }}>Lock All</button>
+                      <button onClick={() => actAll(demoAccts(detailClient).filter((a: any) => a.locked), "unlock")} className="rounded px-2 py-1 text-[11px] font-medium" style={{ background: "#f0fdf4", color: GRN }}>Unlock All</button>
+                      <button onClick={() => actAll(demoAccts(detailClient).filter((a: any) => !a.deactivated), "deactivate")} className="rounded px-2 py-1 text-[11px] font-medium" style={{ background: "#fff7ed", color: AMB }}>Deactivate All</button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     {demoAccts(detailClient).map((a: any) => (
@@ -437,9 +452,17 @@ export default function SAClientsPage() {
               {/* Live accounts */}
               {liveAccts(detailClient).length > 0 && (
                 <div>
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="sab sab-green">Live</span>
-                    <span className="text-xs text-gray-500">{liveAccts(detailClient).length} account{liveAccts(detailClient).length > 1 ? "s" : ""}</span>
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold" style={{ color: GRN }}>Live Accounts</span>
+                      <span className="text-xs text-gray-500">{liveAccts(detailClient).length}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => actAll(liveAccts(detailClient).filter((a: any) => !a.locked), "lock")} className="rounded px-2 py-1 text-[11px] font-medium" style={{ background: "#fff1f2", color: RED }}>Lock All</button>
+                      <button onClick={() => actAll(liveAccts(detailClient).filter((a: any) => a.locked), "unlock")} className="rounded px-2 py-1 text-[11px] font-medium" style={{ background: "#f0fdf4", color: GRN }}>Unlock All</button>
+                      <button onClick={() => actAll(liveAccts(detailClient).filter((a: any) => !a.deactivated), "deactivate")} className="rounded px-2 py-1 text-[11px] font-medium" style={{ background: "#fff7ed", color: AMB }}>Deactivate All</button>
+                    </div>
+                  </div>
                   </div>
                   <div className="space-y-2">
                     {liveAccts(detailClient).map((a: any) => (
