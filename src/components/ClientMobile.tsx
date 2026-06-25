@@ -689,7 +689,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       </div>
                       <div className="flex items-center gap-2">
                         <Sparkline data={hist} up={upTrend} />
-                        <span className="text-[10px] text-[var(--muted)]">Sprd {spread}</span>
+                        <span className="text-[10px] text-[var(--muted)]">Sprd {Math.round(spread * 10)}</span>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 items-center gap-2">
@@ -772,7 +772,7 @@ export default function ClientMobile({ t }: { t: any }) {
               </button>
               <div className="flex flex-col items-center justify-center gap-0.5 shrink-0">
                 <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>sprd</span>
-                <span className="text-[10px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{_mobSpreadPips(selSym).toFixed(1)}</span>
+                <span className="text-[10px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_mobSpreadPips(selSym) * 10)}</span>
                 <LotStepper vol={vol} setVol={setVol} small />
               </div>
               <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, boxShadow: `0 8px 18px -8px ${BUYBTN}`, touchAction: "manipulation" }}>

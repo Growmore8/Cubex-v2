@@ -76,7 +76,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, onDisable, symbolSpreads, gr
                   <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} /><span className="truncate">{s.symbol}</span></span>
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
-                  <span className="flex items-center justify-end pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{spPips > 0 ? spPips.toFixed(1) : "—"}</span>
+                  <span className="flex items-center justify-end pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{spPips > 0 ? Math.round(spPips * 10) : "—"}</span>
                 </div>); })}
           </div>
         ))}
