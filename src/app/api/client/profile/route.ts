@@ -20,12 +20,13 @@ export async function PATCH(req: Request) {
     const name = typeof body.name === "string" ? body.name.trim() : undefined;
     const phone = typeof body.phone === "string" ? body.phone.trim() : undefined;
     const country = typeof body.country === "string" ? body.country.trim() : undefined;
-    if (name !== undefined && name.length < 2) throw new Error("Name must be at least 2 characters");
-    const data: any = {};
-    if (name !== undefined) data.name = name;
-    if (phone !== undefined) data.phone = phone || null;
-    if (country !== undefined) data.country = country || null;
-    if (!Object.keys(data).length) throw new Error("Nothing to update");
+    if (!name || name.length < 2) throw new Error("Full name is required (min 2 characters)");
+    if (!phone) throw new Error("Phone number is required");
+    if (!country) throw new Error("Country is required");
+    // Lock: if profile already complete, do not allow re-submission
+    const existing = await (prisma.user.findUnique as any)({ where: { id: s.sub }, select: { phone: true, country: true } });
+    if (existing?.phone && existing?.country) throw new Error("Profile already submitted and cannot be changed. Contact support if you need to update your details.");
+    const data: any = { name, phone, country };
     await (prisma.user.update as any)({ where: { id: s.sub }, data });
     return NextResponse.json({ ok: true });
   } catch (e: any) {

@@ -958,7 +958,9 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div className="text-[11px] text-[var(--muted)]"><i className="fa-solid fa-phone mr-1.5" />{account?.phone || <span style={{ color: SELL }}>Not set</span>}</div>
                   <div className="text-[11px] text-[var(--muted)]"><i className="fa-solid fa-globe mr-1.5" />{account?.country || <span style={{ color: SELL }}>Not set</span>}</div>
                 </div>
-                <button onClick={openProfileEdit} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-user-pen text-[13px]" /></button>
+                {(!account?.phone || !account?.country) && (
+                  <button onClick={openProfileEdit} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(239,83,80,0.15)", color: SELL }}><i className="fa-solid fa-circle-exclamation text-[13px]" /></button>
+                )}
               </div>
             </div>
 
@@ -1355,24 +1357,22 @@ export default function ClientMobile({ t }: { t: any }) {
       )}
 
       {profileModal && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center p-0" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setProfileModal(false)}>
-          <div className="w-full rounded-t-3xl border-t p-5 pb-8" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-1 flex items-center justify-between">
-              <div className="text-base font-bold">Edit Profile</div>
-              <button onClick={() => setProfileModal(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)]" style={{ background: "var(--soft)" }}><i className="fa-solid fa-xmark" /></button>
-            </div>
-            <p className="mb-4 text-[11px] text-[var(--muted)]">Keep your profile up to date for withdrawals and KYC.</p>
+        <div className="fixed inset-0 z-[110] flex items-end justify-center p-0" style={{ background: "rgba(0,0,0,0.6)" }}>
+          <div className="w-full rounded-t-3xl border-t p-5 pb-8" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+            <div className="mb-1 text-base font-bold">Complete Your Profile</div>
+            <p className="mb-4 text-[11px] text-[var(--muted)]">Required for withdrawals and KYC. This information cannot be changed after submission.</p>
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Full Name</label>
-                <input value={profileForm.name} onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[14px] text-[var(--text)] outline-none" placeholder="Your full name" />
+                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Full Name <span style={{ color: SELL }}>*</span></label>
+                <input value={profileForm.name} onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[14px] text-[var(--text)] outline-none" placeholder="As it appears on your ID" />
+                <p className="mt-1 text-[10px] text-[var(--muted)]">Must match your government-issued ID exactly.</p>
               </div>
               <div>
-                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Phone Number</label>
+                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Phone Number <span style={{ color: SELL }}>*</span></label>
                 <input value={profileForm.phone} onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[14px] text-[var(--text)] outline-none" placeholder="+1 234 567 8900" type="tel" />
               </div>
               <div>
-                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Country</label>
+                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Country <span style={{ color: SELL }}>*</span></label>
                 <select value={profileForm.country} onChange={(e) => setProfileForm((f) => ({ ...f, country: e.target.value }))} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[14px] text-[var(--text)] outline-none">
                   <option value="">Select country…</option>
                   {COUNTRIES.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
@@ -1380,7 +1380,7 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
               {profileErr && <div className="text-[12px]" style={{ color: SELL }}>{profileErr}</div>}
               <button onClick={saveProfile} disabled={profileSaving} className="w-full rounded-2xl py-3 text-[15px] font-semibold text-white disabled:opacity-60" style={{ background: BUY }}>
-                {profileSaving ? "Saving…" : "Save Changes"}
+                {profileSaving ? "Saving…" : "Submit & Continue"}
               </button>
             </div>
           </div>
