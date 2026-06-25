@@ -72,6 +72,8 @@ export default function AdminDeskPage() {
   const [adminSymIds, setAdminSymIds] = useState<Record<string, string>>({});
   const [symEdit, setSymEdit] = useState<{ sym: string; spread: number; spreadType: string; spreadMax: number; id: string } | null>(null);
   const [grpCtx, setGrpCtx] = useState<{ x: number; y: number; g: any } | null>(null);
+  const [grpSub, setGrpSub] = useState(""); // which inline section is open in grpCtx panel
+  const [grpForm, setGrpForm] = useState<Record<string, any>>({});
   const [grpEdit, setGrpEdit] = useState<any>(null);
   const [catEdit, setCatEdit] = useState<{ cat: string; syms: string[]; spread: number; spreadType: string; spreadMax: number } | null>(null);
   const [open, setOpen] = useState<any[]>([]);
@@ -203,6 +205,7 @@ export default function AdminDeskPage() {
     if (d.ok) { setFundPnlOnly(d.pnlOnly); setOk("Withdraw/Transfer policy: " + (d.pnlOnly ? "PNL only" : "Full balance")); }
   }
   const [symPerm, setSymPerm] = useState<any>(null); // { symbols, disabled[], scope, q }
+  const [symDisabledCount, setSymDisabledCount] = useState(0); // ticker only — does NOT open modal
   async function openSymPerm() {
     setTopMenu("");
     try {
@@ -215,6 +218,7 @@ export default function AdminDeskPage() {
     const d = await r.json();
     if (d.ok) {
       setSymPerm((p: any) => (p ? { ...p, disabled: d.disabled } : p));
+      setSymDisabledCount((d.disabled || []).length);
       setOk(`${symbol} turned ${disabled ? "OFF" : "ON"} for clients`);
       loadAll();
     } else setErr(d.error || "Failed to update symbol");
@@ -292,7 +296,7 @@ export default function AdminDeskPage() {
     if (a.ok) setAudit(a.logs);
     if (mg.ok) setManagers(mg.managers || []);
     if (gr.ok) setTradeGroups(gr.groups || []);
-    fetch("/api/admin/symbol-perms").then((r) => r.json()).then((d) => { if (d.ok) setSymPerm((p: any) => p ? p : { symbols: d.symbols, disabled: d.disabled || [], scope: d.scope, q: "" }); }).catch(() => {});
+    fetch("/api/admin/symbol-perms").then((r) => r.json()).then((d) => { if (d.ok) setSymDisabledCount((d.disabled || []).length); }).catch(() => {});
   }
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((d) => {
@@ -1001,9 +1005,7 @@ export default function AdminDeskPage() {
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
             <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
             <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile}
-              onToggleSym={(sym, disabled) => toggleSymPerm(sym, disabled)}
               disabledSyms={symPerm?.disabled || []}
-              onSymbolEdit={(sym) => { const id = adminSymIds[sym]; if (!id) return; setSymEdit({ sym, spread: adminSymSpreads[sym] ?? 0, spreadType: adminSymTypes[sym] ?? "FIXED", spreadMax: adminSymMax[sym] ?? 0, id }); }}
               onCategoryEdit={(cat, syms) => { const first = syms[0]; setCatEdit({ cat, syms, spread: adminSymSpreads[first] ?? 0, spreadType: adminSymTypes[first] ?? "FIXED", spreadMax: adminSymMax[first] ?? 0 }); }}
               symbolSpreads={adminSymSpreads} groupSpread={0} />
           </aside>
@@ -1020,7 +1022,7 @@ export default function AdminDeskPage() {
         {selAcc && <span>DNL: <span style={{ color: selAcc.doNotLiquidate ? GOLD : "var(--muted)" }}>{selAcc.doNotLiquidate ? "On" : "Off"}</span></span>}
         <span>{selAcc ? selAcc.login + " - " + titleCaseName(selAcc.name) : "No account selected"}</span>
         <span style={{ color: "var(--muted)" }}>|</span>
-        <span>Off: <span style={{ color: (symPerm?.disabled?.length || 0) > 0 ? SELL : "var(--muted)" }}>{symPerm?.disabled?.length || 0} sym</span></span>
+        <span>Off: <span style={{ color: symDisabledCount > 0 ? SELL : "var(--muted)" }}>{symDisabledCount} sym</span></span>
         <span>Spread set: <span style={{ color: "var(--text)" }}>{Object.values(adminSymSpreads).filter((v) => v > 0).length}/{symbols.length}</span></span>
       </div>
       {err && !act && !modal && !ticket && <div className="px-3 py-1 text-[11px]" style={{ color: SELL }}>{err}</div>}
@@ -1443,70 +1445,113 @@ export default function AdminDeskPage() {
         </div>
       )}
 
-      {/* Group right-click popup (rich, client-menu style) */}
+      {/* Group right-click — comprehensive panel */}
       {grpCtx && (() => {
         const g = grpCtx.g;
         const vw2 = typeof window !== "undefined" ? window.innerWidth : 1200;
         const vh2 = typeof window !== "undefined" ? window.innerHeight : 800;
-        const left2 = Math.max(6, Math.min(grpCtx.x, vw2 - 252));
+        const left2 = Math.max(6, Math.min(grpCtx.x, vw2 - 272));
         const openUp2 = grpCtx.y > vh2 * 0.55;
         const vpos2 = openUp2 ? { bottom: Math.max(6, vh2 - grpCtx.y) } : { top: grpCtx.y };
         const members = clients.filter((c: any) => c.groupId === g.id);
-        const mi2 = "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] hover:bg-[var(--soft)] transition-colors";
-        const mico2 = (icon: string, col?: string) => <i className={"fa-solid " + icon + " w-3.5 text-center text-[10px]"} style={{ color: col || "var(--muted)" }} />;
+        const row = "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] hover:bg-[var(--soft)] transition-colors rounded";
+        const sec = (k: string) => grpSub === k;
+        const tog = (k: string) => { setGrpSub(grpSub === k ? "" : k); setGrpForm(grpSub === k ? {} : k === "spread" ? { spread: Number(g.spread || 0), spreadType: g.spreadType || "FIXED", spreadMax: Number(g.spreadMax || 0) } : k === "leverage" ? { leverage: members[0]?.leverage || 100 } : k === "mclevel" ? { mcLevel: members[0] ? Number(members[0].mcLevel) : 50 } : k === "rename" ? { name: g.name } : k === "manager" ? { managerId: g.managerId || "" } : {}); };
+        const inp = "w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)]";
+        const applyAll = async (body: any) => { await Promise.all(members.map((c: any) => fetch("/api/admin/clients/" + c.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }))); setGrpCtx(null); setOk("Applied to all " + members.length + " members"); loadAll(); };
+        const LEVERAGE_OPTIONS = [25, 50, 100, 200, 400, 500, 1000];
         return (<>
-          <div className="fixed inset-0 z-40" onClick={() => setGrpCtx(null)} />
-          <div className="ui-pop fixed z-50 w-60 rounded-2xl border py-1 text-[11px]" style={{ left: left2, ...vpos2, background: "color-mix(in srgb, var(--panel) 92%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6)" }}>
+          <div className="fixed inset-0 z-40" onClick={() => { setGrpCtx(null); setGrpSub(""); }} />
+          <div className="ui-pop fixed z-50 w-[268px] overflow-hidden rounded-2xl border text-[11px]" style={{ left: left2, ...vpos2, maxHeight: Math.min(vh2 - 24, 620), overflowY: "auto", background: "color-mix(in srgb, var(--panel) 96%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.65)" }}>
             {/* Header */}
-            <div className="mx-1.5 mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 5%, transparent))" }}>
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm" style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))" }}><i className="fa-solid fa-folder text-[10px]" /></span>
+            <div className="flex items-center gap-2.5 px-3 py-2.5" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent) 6%, transparent))" }}>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold text-white shadow-sm" style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000))" }}><i className="fa-solid fa-layer-group text-[11px]" /></span>
               <div className="min-w-0 flex-1">
-                <div className="truncate font-bold" style={{ color: "var(--accent)" }}>{g.name}</div>
-                <div className="text-[9px]" style={{ color: "var(--muted)" }}>{members.length} members · Spread +{Number(g.spread || 0)} pips</div>
+                <div className="truncate text-[12px] font-bold" style={{ color: "var(--accent)" }}>{g.name}</div>
+                <div className="text-[9px]" style={{ color: "var(--muted)" }}>{members.length} members · Spread +{Number(g.spread || 0)} pips · {g.managerId ? (managers.find((m: any) => m.id === g.managerId)?.name || "Manager") : "Admin"}</div>
               </div>
             </div>
-            {/* Actions */}
-            <button onClick={() => { setGrpEdit({ ...g }); setGrpCtx(null); }} className={mi2}>{mico2("fa-sliders", "var(--accent)")} Group settings &amp; spread</button>
-            <button onClick={() => { setGrpCtx(null); setModal("group"); setForm({ editId: g.id, name: g.name, spread: g.spread, managerId: g.managerId }); }} className={mi2}>{mico2("fa-pen")} Rename group</button>
-            <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
-            <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Members ({members.length})</div>
-            {members.slice(0, 5).map((c: any) => (
-              <button key={c.id} onClick={() => { setSelAcc(c); setGrpCtx(null); }} className={mi2 + " text-[10px]"}>
-                {mico2("fa-user")} {c.login} — {titleCaseName(c.name)}
-              </button>
-            ))}
-            {members.length > 5 && <div className="px-3 py-1 text-[9px]" style={{ color: "var(--muted)" }}>+{members.length - 5} more…</div>}
-            <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
-            <button onClick={() => { const gg = g; setGrpCtx(null); askDelete(`Delete group "${gg.name}"? All members will be unassigned.`, async () => { const r = await fetch("/api/admin/groups/" + gg.id, { method: "DELETE" }); const d = await r.json(); if (d.ok) { setOk("Group deleted"); loadAll(); } else setErr(d.error || "Failed"); }); }} className={mi2} style={{ color: "#dc2626" }}>{mico2("fa-trash", "#dc2626")} Delete group</button>
+
+            <div className="py-1 px-1.5 space-y-0.5">
+              {/* Leverage */}
+              <button onClick={() => tog("leverage")} className={row + (sec("leverage") ? " bg-[var(--soft)]" : "")}><i className="fa-solid fa-gauge-high w-3.5 text-center text-[10px]" style={{ color: "var(--accent)" }} /><span className="flex-1">Group Leverage</span><i className={"fa-solid text-[8px] " + (sec("leverage") ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} /></button>
+              {sec("leverage") && (
+                <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 text-[10px] space-y-2">
+                  <div className="text-[9px] text-[var(--muted)]">Apply leverage to ALL {members.length} members in this group</div>
+                  <select className={inp} value={grpForm.leverage || 100} onChange={(e) => setGrpForm((f) => ({ ...f, leverage: Number(e.target.value) }))}>
+                    {LEVERAGE_OPTIONS.map((v) => <option key={v} value={v}>1:{v}</option>)}
+                  </select>
+                  <button onClick={() => applyAll({ action: "settings", leverage: grpForm.leverage || 100 })} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "var(--accent)" }}>Apply 1:{grpForm.leverage || 100} to all {members.length} members</button>
+                </div>
+              )}
+
+              {/* Margin Call */}
+              <button onClick={() => tog("mclevel")} className={row + (sec("mclevel") ? " bg-[var(--soft)]" : "")}><i className="fa-solid fa-triangle-exclamation w-3.5 text-center text-[10px]" style={{ color: "#f59e0b" }} /><span className="flex-1">Group Margin Call</span><i className={"fa-solid text-[8px] " + (sec("mclevel") ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} /></button>
+              {sec("mclevel") && (
+                <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 text-[10px] space-y-2">
+                  <div className="text-[9px] text-[var(--muted)]">Set margin call % for ALL {members.length} members</div>
+                  <input type="number" min="0" max="500" step="1" className={inp} value={grpForm.mcLevel ?? 50} onChange={(e) => setGrpForm((f) => ({ ...f, mcLevel: Number(e.target.value) }))} placeholder="e.g. 50 (0 = off)" />
+                  <button onClick={() => applyAll({ action: "settings", mcLevel: grpForm.mcLevel ?? 50 })} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#f59e0b" }}>Apply {grpForm.mcLevel ?? 50}% to all {members.length} members</button>
+                </div>
+              )}
+
+              {/* Spread */}
+              <button onClick={() => tog("spread")} className={row + (sec("spread") ? " bg-[var(--soft)]" : "")}><i className="fa-solid fa-arrows-left-right w-3.5 text-center text-[10px]" style={{ color: "#22c55e" }} /><span className="flex-1">Spread Settings</span><span className="text-[9px] tabular-nums" style={{ color: "var(--muted)" }}>+{Number(g.spread || 0)}p</span><i className={"fa-solid text-[8px] ml-1 " + (sec("spread") ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} /></button>
+              {sec("spread") && (
+                <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 text-[10px] space-y-2">
+                  <div className="text-[9px] text-[var(--muted)]">Group markup added on top of symbol spread</div>
+                  <div><div className="mb-1 text-[9px] text-[var(--muted)]">Spread markup (pips)</div><input type="number" min="0" step="0.1" className={inp} value={grpForm.spread ?? 0} onChange={(e) => setGrpForm((f) => ({ ...f, spread: Number(e.target.value) }))} /></div>
+                  <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: grpForm.spread ?? 0, managerId: g.managerId }) }); const d = await r.json(); if (d.ok) { setOk("Group spread saved"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#22c55e" }}>Save group spread</button>
+                </div>
+              )}
+
+              {/* Symbol disable/enable */}
+              <button onClick={() => { setGrpCtx(null); setGrpSub(""); }} className={row}><i className="fa-solid fa-eye-slash w-3.5 text-center text-[10px]" style={{ color: "var(--muted)" }} /><span className="flex-1">Symbol Access</span><span className="text-[9px]" style={{ color: "var(--muted)" }}>per account</span></button>
+
+              <div className="my-1 border-t mx-1" style={{ borderColor: "var(--border)" }} />
+
+              {/* Rename */}
+              <button onClick={() => tog("rename")} className={row + (sec("rename") ? " bg-[var(--soft)]" : "")}><i className="fa-solid fa-pen w-3.5 text-center text-[10px]" style={{ color: "var(--muted)" }} /><span className="flex-1">Rename Group</span><i className={"fa-solid text-[8px] " + (sec("rename") ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} /></button>
+              {sec("rename") && (
+                <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 space-y-2">
+                  <input className={inp} value={grpForm.name || ""} onChange={(e) => setGrpForm((f) => ({ ...f, name: e.target.value }))} placeholder="Group name" />
+                  <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpForm.name, spread: Number(g.spread || 0), managerId: g.managerId || null }) }); const d = await r.json(); if (d.ok) { setOk("Group renamed"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save name</button>
+                </div>
+              )}
+
+              {/* Manager */}
+              <button onClick={() => tog("manager")} className={row + (sec("manager") ? " bg-[var(--soft)]" : "")}><i className="fa-solid fa-user-tie w-3.5 text-center text-[10px]" style={{ color: "var(--muted)" }} /><span className="flex-1">Change Manager</span><i className={"fa-solid text-[8px] " + (sec("manager") ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} /></button>
+              {sec("manager") && (
+                <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 space-y-2">
+                  <select className={inp} value={grpForm.managerId || ""} onChange={(e) => setGrpForm((f) => ({ ...f, managerId: e.target.value || null }))}>
+                    <option value="">Admin-level (no manager)</option>
+                    {managers.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                  <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: g.name, spread: Number(g.spread || 0), managerId: grpForm.managerId || null }) }); const d = await r.json(); if (d.ok) { setOk("Manager updated"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save manager</button>
+                </div>
+              )}
+
+              <div className="my-1 border-t mx-1" style={{ borderColor: "var(--border)" }} />
+
+              {/* Members */}
+              <div className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Members ({members.length})</div>
+              <div className="max-h-32 overflow-y-auto">
+                {members.map((c: any) => (
+                  <button key={c.id} onClick={() => { setSelAcc(c); setGrpCtx(null); setGrpSub(""); }} className={row + " text-[10px]"}>
+                    <i className="fa-solid fa-user w-3.5 text-center text-[9px]" style={{ color: "var(--muted)" }} /> {c.login} — {titleCaseName(c.name)}
+                  </button>
+                ))}
+                {members.length === 0 && <div className="px-3 py-1.5 text-[9px]" style={{ color: "var(--muted)" }}>No members assigned</div>}
+              </div>
+
+              <div className="my-1 border-t mx-1" style={{ borderColor: "var(--border)" }} />
+
+              {/* Delete */}
+              <button onClick={() => { const gg = g; setGrpCtx(null); setGrpSub(""); askDelete(`Delete group "${gg.name}"? All ${members.length} members will be unassigned.`, async () => { const r = await fetch("/api/admin/groups/" + gg.id, { method: "DELETE" }); const d = await r.json(); if (d.ok) { setOk("Group deleted"); loadAll(); } else setErr(d.error || "Failed"); }); }} className={row} style={{ color: "#dc2626" }}><i className="fa-solid fa-trash w-3.5 text-center text-[10px]" style={{ color: "#dc2626" }} /> Delete Group</button>
+            </div>
           </div>
         </>);
       })()}
-
-      {/* Group manage modal */}
-      {grpEdit && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setGrpEdit(null)}>
-          <div className="w-[320px] rounded-xl border p-5 text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <div><div className="text-[14px] font-bold">{grpEdit.name}</div><div className="text-[10px] text-[var(--muted)]">Group settings · {clients.filter((c: any) => c.groupId === grpEdit.id).length} members</div></div>
-              <button onClick={() => setGrpEdit(null)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
-            </div>
-            <div className="space-y-3">
-              <div><div className="mb-1 text-[10px] text-[var(--muted)]">Group name</div><input className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} value={grpEdit.name || ""} onChange={(e) => setGrpEdit((g: any) => ({ ...g, name: e.target.value }))} /></div>
-              <div><div className="mb-1 text-[10px] text-[var(--muted)]">Spread markup (pips) — added on top of symbol spread</div><input type="number" min="0" step="0.1" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} value={grpEdit.spread ?? 0} onChange={(e) => setGrpEdit((g: any) => ({ ...g, spread: Number(e.target.value) }))} /></div>
-              <div><div className="mb-1 text-[10px] text-[var(--muted)]">Manager</div><select className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} value={grpEdit.managerId || ""} onChange={(e) => setGrpEdit((g: any) => ({ ...g, managerId: e.target.value || null }))}><option value="">Admin-level (no manager)</option>{managers.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
-              <div className="rounded-lg border border-[var(--border)] p-2.5 text-[10px]">
-                <div className="mb-1.5 font-semibold text-[var(--muted)]">Spread breakdown (this group)</div>
-                <div className="flex justify-between"><span className="text-[var(--muted)]">Group markup</span><span className="font-semibold tabular-nums">{grpEdit.spread ?? 0} pips ({Math.round((grpEdit.spread ?? 0) * 10)} pts)</span></div>
-                <div className="flex justify-between mt-1"><span className="text-[var(--muted)]">Members</span><span className="font-semibold">{clients.filter((c: any) => c.groupId === grpEdit.id).length}</span></div>
-              </div>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <button onClick={async () => { const r = await fetch("/api/admin/groups/" + grpEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpEdit.name, spread: Number(grpEdit.spread) || 0, managerId: grpEdit.managerId || null }) }); const d = await r.json(); if (d.ok) { setOk("Group saved"); setGrpEdit(null); loadAll(); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
-              <button onClick={() => setGrpEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {menu && (() => {
         const vh = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -1595,10 +1640,6 @@ export default function AdminDeskPage() {
             )}
           </>)}
 
-          {/* Symbol Access — direct item */}
-          <button onClick={() => openSymOv(menu.acc)} className={mi}>{mIco("fa-eye-slash", "var(--accent)")}Symbol Access</button>
-          {can("editSpread") && <button onClick={() => openAct("spreadmarkup", menu.acc)} className={mi}>{mIco("fa-arrows-left-right", "var(--accent)")}Spread Markup</button>}
-
           {/* Settings flyout */}
           <div className="relative">
             <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (menuSub === "settings" ? "bg-[var(--soft)]" : "")}>
@@ -1609,6 +1650,8 @@ export default function AdminDeskPage() {
               <div className={flyCls} style={flySty}>
                 <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
                 <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
+                <button onClick={() => { openSymOv(menu.acc); }} className={subi}>{mIco("fa-eye-slash", "var(--accent)")}Symbol Access</button>
+                {can("editSpread") && <button onClick={() => openAct("spreadmarkup", menu.acc)} className={subi}>{mIco("fa-arrows-left-right", "var(--accent)")}Spread Markup</button>}
                 <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
               </div>
             )}

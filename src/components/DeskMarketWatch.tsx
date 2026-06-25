@@ -11,13 +11,11 @@ const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "
 
 // Self-contained market watch with its OWN socket + price state, so it ticks
 // pip-by-pip independently of the (heavy) desk re-render — as smooth as the client.
-function DeskMarketWatch({ symbols, selSym, onPick, onToggleSym, disabledSyms, onSymbolEdit, onCategoryEdit, symbolSpreads, groupSpread }: {
+function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit, symbolSpreads, groupSpread }: {
   symbols: Sym[];
   selSym?: string;
   onPick: (sym: string) => void;
-  onToggleSym?: (sym: string, disabled: boolean) => void;
   disabledSyms?: string[];
-  onSymbolEdit?: (sym: string) => void;
   onCategoryEdit?: (cat: string, syms: string[]) => void;
   symbolSpreads?: Record<string, { min: number; max: number; type: string } | number>;
   groupSpread?: number;
@@ -26,7 +24,6 @@ function DeskMarketWatch({ symbols, selSym, onPick, onToggleSym, disabledSyms, o
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [ctx, setCtx] = useState<{ x: number; y: number; sym: string } | null>(null);
   const [catCtx, setCatCtx] = useState<{ x: number; y: number; cat: string; syms: string[] } | null>(null);
 
   useEffect(() => {
@@ -96,7 +93,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, onToggleSym, disabledSyms, o
               const isOff = !!(disabledSyms && disabledSyms.includes(s.symbol));
               return (
                 <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)}
-                  onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }}
+                  onContextMenu={(e) => e.preventDefault()}
                   className={"grid cursor-pointer grid-cols-[1fr_64px_64px_36px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}
                   style={{ borderRadius: 3, minHeight: 22, opacity: isOff ? 0.45 : 1 }}>
                   <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} /><span className="truncate">{s.symbol}</span>{isOff && <span className="text-[8px] rounded px-1" style={{ background: "rgba(224,82,96,0.18)", color: "#ef5350" }}>OFF</span>}</span>
@@ -109,27 +106,6 @@ function DeskMarketWatch({ symbols, selSym, onPick, onToggleSym, disabledSyms, o
         ))}
         {ordered.length === 0 && <div className="px-2 py-3 text-center text-[var(--muted)]">No symbols match &ldquo;{search}&rdquo;.</div>}
       </div>
-
-      {/* Symbol right-click context menu */}
-      {ctx && (<>
-        <div className="fixed inset-0 z-[120]" onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
-        <div className="fixed z-[121] min-w-[180px] overflow-hidden rounded-lg border py-1 text-[11px] shadow-2xl" style={{ left: Math.min(ctx.x, vw - 200), top: ctx.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
-          <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{ctx.sym}</div>
-          {onSymbolEdit && (
-            <button onClick={() => { onSymbolEdit(ctx.sym); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]">
-              <i className="fa-solid fa-sliders text-[10px]" style={{ color: "var(--accent)" }} /> Spread settings
-            </button>
-          )}
-          {onToggleSym && (() => {
-            const isOff = !!(disabledSyms && disabledSyms.includes(ctx.sym));
-            return (
-              <button onClick={() => { onToggleSym(ctx.sym, !isOff); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]" style={{ color: isOff ? "#22c55e" : "#ef5350" }}>
-                <i className={"fa-solid text-[10px] " + (isOff ? "fa-eye" : "fa-eye-slash")} /> {isOff ? "Enable symbol (global)" : "Disable symbol (global)"}
-              </button>
-            );
-          })()}
-        </div>
-      </>)}
 
       {/* Category right-click context menu */}
       {catCtx && onCategoryEdit && (<>
