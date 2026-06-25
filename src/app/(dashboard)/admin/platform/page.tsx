@@ -73,6 +73,7 @@ export default function AdminDeskPage() {
   const [symEdit, setSymEdit] = useState<{ sym: string; spread: number; spreadType: string; spreadMax: number; id: string } | null>(null);
   const [grpCtx, setGrpCtx] = useState<{ x: number; y: number; g: any } | null>(null);
   const [grpEdit, setGrpEdit] = useState<any>(null);
+  const [catEdit, setCatEdit] = useState<{ cat: string; syms: string[]; spread: number; spreadType: string; spreadMax: number } | null>(null);
   const [open, setOpen] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
@@ -291,6 +292,7 @@ export default function AdminDeskPage() {
     if (a.ok) setAudit(a.logs);
     if (mg.ok) setManagers(mg.managers || []);
     if (gr.ok) setTradeGroups(gr.groups || []);
+    fetch("/api/admin/symbol-perms").then((r) => r.json()).then((d) => { if (d.ok) setSymPerm((p: any) => p ? p : { symbols: d.symbols, disabled: d.disabled || [], scope: d.scope, q: "" }); }).catch(() => {});
   }
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((d) => {
@@ -926,10 +928,13 @@ export default function AdminDeskPage() {
                   const g = tradeGroups.find((x: any) => x.id === gid);
                   return (
                     <div key={"grp-" + gid} className={nested ? "" : "mt-0.5"}>
-                      <div className="relative flex items-center">
-                        {header("grp-" + gid, grpName(gid), "fa-folder", "var(--accent)", grpRows[gid].length)}
-                        {g && <button onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setGrpCtx({ x: e.clientX, y: e.clientY, g }); }} onClick={(e) => { e.stopPropagation(); setGrpCtx({ x: e.currentTarget.getBoundingClientRect().right, y: e.currentTarget.getBoundingClientRect().top, g }); }} className="shrink-0 px-1 text-[var(--muted)] hover:text-[var(--accent)]" title="Manage group"><i className="fa-solid fa-ellipsis-vertical text-[10px]" /></button>}
-                      </div>
+                      <button onClick={() => toggleCat("grp-" + gid)} onContextMenu={(e) => { e.preventDefault(); if (g) setGrpCtx({ x: e.clientX, y: e.clientY, g }); }}
+                        className={"flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-[10px] font-semibold"} style={{ color: "var(--accent)" }}>
+                        <i className={"fa-solid " + (collapsed["grp-" + gid] ? "fa-chevron-right" : "fa-chevron-down")} style={{ fontSize: 8 }} />
+                        <i className="fa-solid fa-folder" style={{ fontSize: 10 }} />
+                        <span className="flex-1 truncate text-left">{grpName(gid)}</span>
+                        <span className="rounded px-1.5" style={{ background: "var(--accent)22" }}>{grpRows[gid].length}</span>
+                      </button>
                       {!collapsed["grp-" + gid] && <div className="flex flex-col gap-0.5 pl-2">{grpRows[gid].filter(isRoot).map(acctBlock)}</div>}
                     </div>
                   );
@@ -995,7 +1000,12 @@ export default function AdminDeskPage() {
           <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
             <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
-            <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile} onDisable={(sym) => toggleSymPerm(sym, true)} onSymbolEdit={(sym) => { const id = adminSymIds[sym]; if (!id) return; setSymEdit({ sym, spread: adminSymSpreads[sym] ?? 0, spreadType: adminSymTypes[sym] ?? "FIXED", spreadMax: adminSymMax[sym] ?? 0, id }); }} symbolSpreads={adminSymSpreads} groupSpread={0} />
+            <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile}
+              onToggleSym={(sym, disabled) => toggleSymPerm(sym, disabled)}
+              disabledSyms={symPerm?.disabled || []}
+              onSymbolEdit={(sym) => { const id = adminSymIds[sym]; if (!id) return; setSymEdit({ sym, spread: adminSymSpreads[sym] ?? 0, spreadType: adminSymTypes[sym] ?? "FIXED", spreadMax: adminSymMax[sym] ?? 0, id }); }}
+              onCategoryEdit={(cat, syms) => { const first = syms[0]; setCatEdit({ cat, syms, spread: adminSymSpreads[first] ?? 0, spreadType: adminSymTypes[first] ?? "FIXED", spreadMax: adminSymMax[first] ?? 0 }); }}
+              symbolSpreads={adminSymSpreads} groupSpread={0} />
           </aside>
         </>)}
       </div>
@@ -1009,6 +1019,9 @@ export default function AdminDeskPage() {
         {selAcc && <span>MC: <span style={{ color: Number(selAcc.mcLevel) > 0 ? SELL : "var(--muted)" }}>{Number(selAcc.mcLevel) > 0 ? selAcc.mcLevel + "%" : "Off"}</span></span>}
         {selAcc && <span>DNL: <span style={{ color: selAcc.doNotLiquidate ? GOLD : "var(--muted)" }}>{selAcc.doNotLiquidate ? "On" : "Off"}</span></span>}
         <span>{selAcc ? selAcc.login + " - " + titleCaseName(selAcc.name) : "No account selected"}</span>
+        <span style={{ color: "var(--muted)" }}>|</span>
+        <span>Off: <span style={{ color: (symPerm?.disabled?.length || 0) > 0 ? SELL : "var(--muted)" }}>{symPerm?.disabled?.length || 0} sym</span></span>
+        <span>Spread set: <span style={{ color: "var(--text)" }}>{Object.values(adminSymSpreads).filter((v) => v > 0).length}/{symbols.length}</span></span>
       </div>
       {err && !act && !modal && !ticket && <div className="px-3 py-1 text-[11px]" style={{ color: SELL }}>{err}</div>}
 
@@ -1389,16 +1402,85 @@ export default function AdminDeskPage() {
         </div>
       )}
 
-      {/* Group context menu + manage popup */}
-      {grpCtx && (<>
-        <div className="fixed inset-0 z-[140]" onClick={() => setGrpCtx(null)} />
-        <div className="fixed z-[141] min-w-[180px] overflow-hidden rounded-lg border py-1 text-[11px] shadow-2xl" style={{ left: Math.min(grpCtx.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 200), top: grpCtx.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
-          <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{grpCtx.g.name}</div>
-          <button onClick={() => { setGrpEdit({ ...grpCtx.g }); setGrpCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]"><i className="fa-solid fa-sliders text-[10px]" style={{ color: "var(--accent)" }} /> Manage group</button>
-          <button onClick={() => { setGrpCtx(null); openAct("assigngroup", { id: "", name: "New", groupId: grpCtx.g.id } as any); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]"><i className="fa-solid fa-user-plus text-[10px]" /> Assign client</button>
-          <button onClick={() => { const g = grpCtx.g; setGrpCtx(null); askDelete(`Delete group "${g.name}"? All members will be unassigned.`, async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "DELETE" }); const d = await r.json(); if (d.ok) { setOk("Group deleted"); loadAll(); } else setErr(d.error || "Failed"); }); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]" style={{ color: "#dc2626" }}><i className="fa-solid fa-trash text-[10px]" /> Delete group</button>
+      {/* Category bulk spread popup */}
+      {catEdit && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setCatEdit(null)}>
+          <div className="w-[320px] rounded-xl border p-5 text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <div><div className="text-[14px] font-bold capitalize">{catEdit.cat}</div><div className="text-[10px] text-[var(--muted)]">Set spread for all {catEdit.syms.length} symbols in this category</div></div>
+              <button onClick={() => setCatEdit(null)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <div className="space-y-3">
+              <div><div className="mb-1 text-[10px] text-[var(--muted)]">Spread type</div>
+                <select value={catEdit.spreadType} onChange={(e) => setCatEdit((s) => s ? { ...s, spreadType: e.target.value } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }}>
+                  <option value="FIXED">Fixed</option><option value="FLOATING">Floating (widens off-hours)</option>
+                </select>
+              </div>
+              <div><div className="mb-1 text-[10px] text-[var(--muted)]">{catEdit.spreadType === "FLOATING" ? "Min spread (pips)" : "Spread (pips)"}</div>
+                <input type="number" min="0" step="0.1" value={catEdit.spread} onChange={(e) => setCatEdit((s) => s ? { ...s, spread: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+              </div>
+              {catEdit.spreadType === "FLOATING" && (
+                <div><div className="mb-1 text-[10px] text-[var(--muted)]">Max spread (pips, off-hours)</div>
+                  <input type="number" min="0" step="0.1" value={catEdit.spreadMax} onChange={(e) => setCatEdit((s) => s ? { ...s, spreadMax: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button onClick={async () => {
+                const { syms, spread, spreadType, spreadMax } = catEdit!;
+                await Promise.all(syms.map(async (sym) => {
+                  const sid = adminSymIds[sym]; if (!sid) return;
+                  await fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread, spreadType, spreadMax }) }).catch(() => {});
+                  setAdminSymSpreads((m) => ({ ...m, [sym]: spread }));
+                  setAdminSymTypes((m) => ({ ...m, [sym]: spreadType }));
+                  setAdminSymMax((m) => ({ ...m, [sym]: spreadMax }));
+                }));
+                setOk(`Spread set for all ${catEdit!.cat} symbols`); setCatEdit(null);
+              }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Apply to all {catEdit.syms.length} symbols</button>
+              <button onClick={() => setCatEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
+            </div>
+          </div>
         </div>
-      </>)}
+      )}
+
+      {/* Group right-click popup (rich, client-menu style) */}
+      {grpCtx && (() => {
+        const g = grpCtx.g;
+        const vw2 = typeof window !== "undefined" ? window.innerWidth : 1200;
+        const vh2 = typeof window !== "undefined" ? window.innerHeight : 800;
+        const left2 = Math.max(6, Math.min(grpCtx.x, vw2 - 252));
+        const openUp2 = grpCtx.y > vh2 * 0.55;
+        const vpos2 = openUp2 ? { bottom: Math.max(6, vh2 - grpCtx.y) } : { top: grpCtx.y };
+        const members = clients.filter((c: any) => c.groupId === g.id);
+        const mi2 = "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] hover:bg-[var(--soft)] transition-colors";
+        const mico2 = (icon: string, col?: string) => <i className={"fa-solid " + icon + " w-3.5 text-center text-[10px]"} style={{ color: col || "var(--muted)" }} />;
+        return (<>
+          <div className="fixed inset-0 z-40" onClick={() => setGrpCtx(null)} />
+          <div className="ui-pop fixed z-50 w-60 rounded-2xl border py-1 text-[11px]" style={{ left: left2, ...vpos2, background: "color-mix(in srgb, var(--panel) 92%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6)" }}>
+            {/* Header */}
+            <div className="mx-1.5 mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 5%, transparent))" }}>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm" style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))" }}><i className="fa-solid fa-folder text-[10px]" /></span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-bold" style={{ color: "var(--accent)" }}>{g.name}</div>
+                <div className="text-[9px]" style={{ color: "var(--muted)" }}>{members.length} members · Spread +{Number(g.spread || 0)} pips</div>
+              </div>
+            </div>
+            {/* Actions */}
+            <button onClick={() => { setGrpEdit({ ...g }); setGrpCtx(null); }} className={mi2}>{mico2("fa-sliders", "var(--accent)")} Group settings &amp; spread</button>
+            <button onClick={() => { setGrpCtx(null); setModal("group"); setForm({ editId: g.id, name: g.name, spread: g.spread, managerId: g.managerId }); }} className={mi2}>{mico2("fa-pen")} Rename group</button>
+            <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
+            <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Members ({members.length})</div>
+            {members.slice(0, 5).map((c: any) => (
+              <button key={c.id} onClick={() => { setSelAcc(c); setGrpCtx(null); }} className={mi2 + " text-[10px]"}>
+                {mico2("fa-user")} {c.login} — {titleCaseName(c.name)}
+              </button>
+            ))}
+            {members.length > 5 && <div className="px-3 py-1 text-[9px]" style={{ color: "var(--muted)" }}>+{members.length - 5} more…</div>}
+            <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
+            <button onClick={() => { const gg = g; setGrpCtx(null); askDelete(`Delete group "${gg.name}"? All members will be unassigned.`, async () => { const r = await fetch("/api/admin/groups/" + gg.id, { method: "DELETE" }); const d = await r.json(); if (d.ok) { setOk("Group deleted"); loadAll(); } else setErr(d.error || "Failed"); }); }} className={mi2} style={{ color: "#dc2626" }}>{mico2("fa-trash", "#dc2626")} Delete group</button>
+          </div>
+        </>);
+      })()}
 
       {/* Group manage modal */}
       {grpEdit && (
@@ -1513,6 +1595,10 @@ export default function AdminDeskPage() {
             )}
           </>)}
 
+          {/* Symbol Access — direct item */}
+          <button onClick={() => openSymOv(menu.acc)} className={mi}>{mIco("fa-eye-slash", "var(--accent)")}Symbol Access</button>
+          {can("editSpread") && <button onClick={() => openAct("spreadmarkup", menu.acc)} className={mi}>{mIco("fa-arrows-left-right", "var(--accent)")}Spread Markup</button>}
+
           {/* Settings flyout */}
           <div className="relative">
             <button onClick={() => setMenuSub(menuSub === "settings" ? "" : "settings")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (menuSub === "settings" ? "bg-[var(--soft)]" : "")}>
@@ -1523,8 +1609,6 @@ export default function AdminDeskPage() {
               <div className={flyCls} style={flySty}>
                 <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
                 <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
-                {can("editSpread") && <button onClick={() => openAct("spreadmarkup", menu.acc)} className={subi}>{mIco("fa-arrows-left-right", "var(--accent)")}Spread Markup</button>}
-                <button onClick={() => openSymOv(menu.acc)} className={subi}>{mIco("fa-eye-slash")}Disable Symbols</button>
                 <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
               </div>
             )}
@@ -2064,6 +2148,26 @@ export default function AdminDeskPage() {
                 : "Switching a symbol OFF hides it across the ENTIRE tenant (all clients, managers, desk). Other tenants are unaffected."}
             </div>
             <input value={symPerm.q || ""} onChange={(e) => setSymPerm((p: any) => ({ ...p, q: e.target.value }))} placeholder="Search symbol" className="mb-2 rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--text)]" />
+            {/* Category-level bulk spread rows */}
+            {!symPerm.q && (() => {
+              const cats: Record<string, string[]> = {};
+              symPerm.symbols.forEach((s: any) => { const c = s.category || "other"; (cats[c] || (cats[c] = [])).push(s.symbol); });
+              return (
+                <div className="mb-3 rounded-lg border border-[var(--border)] p-2">
+                  <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Set spread by category</div>
+                  {Object.entries(cats).map(([cat, syms]) => (
+                    <div key={cat} className="flex items-center gap-2 py-1 border-b border-[var(--border)] last:border-0">
+                      <span className="capitalize text-[10px] font-semibold w-20 shrink-0">{cat}</span>
+                      <span className="text-[9px] shrink-0" style={{ color: "var(--muted)" }}>{syms.length} sym</span>
+                      <button onClick={() => setCatEdit({ cat, syms, spread: adminSymSpreads[syms[0]] ?? 0, spreadType: adminSymTypes[syms[0]] ?? "FIXED", spreadMax: adminSymMax[syms[0]] ?? 0 })}
+                        className="ml-auto rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)" }}>
+                        Set spread
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             <div className="flex-1 overflow-auto">
               {symPerm.symbols.filter((s: any) => s.symbol.toLowerCase().includes((symPerm.q || "").toLowerCase())).map((s: any) => {
                 const off = symPerm.disabled.includes(s.symbol);

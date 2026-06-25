@@ -11,20 +11,27 @@ const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "
 
 // Self-contained market watch with its OWN socket + price state, so it ticks
 // pip-by-pip independently of the (heavy) desk re-render — as smooth as the client.
-function DeskMarketWatch({ symbols, selSym, onPick, onDisable, onSymbolEdit, symbolSpreads, groupSpread }: { symbols: Sym[]; selSym?: string; onPick: (sym: string) => void; onDisable?: (sym: string) => void; onSymbolEdit?: (sym: string) => void; symbolSpreads?: Record<string, { min: number; max: number; type: string } | number>; groupSpread?: number }) {
+function DeskMarketWatch({ symbols, selSym, onPick, onToggleSym, disabledSyms, onSymbolEdit, onCategoryEdit, symbolSpreads, groupSpread }: {
+  symbols: Sym[];
+  selSym?: string;
+  onPick: (sym: string) => void;
+  onToggleSym?: (sym: string, disabled: boolean) => void;
+  disabledSyms?: string[];
+  onSymbolEdit?: (sym: string) => void;
+  onCategoryEdit?: (cat: string, syms: string[]) => void;
+  symbolSpreads?: Record<string, { min: number; max: number; type: string } | number>;
+  groupSpread?: number;
+}) {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [ctx, setCtx] = useState<{ x: number; y: number; sym: string } | null>(null);
-  const [symInfo, setSymInfo] = useState<{ sym: Sym; ask: number | null } | null>(null);
+  const [catCtx, setCatCtx] = useState<{ x: number; y: number; cat: string; syms: string[] } | null>(null);
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
     const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const prev: Record<string, number> = {};
-    // Steady interval flush + startTransition (mirrors the client) — rAF can be
-    // throttled by the browser, which made the desk watch lag. This keeps it
-    // ticking pip-by-pip for every symbol.
     const flush = () => {
       const pk = Object.keys(pP), dk = Object.keys(pD);
       if (!pk.length && !dk.length) return;
@@ -55,6 +62,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, onDisable, onSymbolEdit, sym
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
   const dgFor = (s: Sym) => (s.digits != null ? s.digits : 2);
+  const vw = typeof window !== "undefined" ? window.innerWidth : 9999;
 
   return (
     <>
@@ -66,76 +74,73 @@ function DeskMarketWatch({ symbols, selSym, onPick, onDisable, onSymbolEdit, sym
         </div>
       </div>
       <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]">
-        <div className="sticky top-0 z-10 grid grid-cols-[1fr_64px_64px_36px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" style={{ color: "var(--muted)" }}>Sprd</span></div>
+        <div className="sticky top-0 z-10 grid grid-cols-[1fr_64px_64px_36px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]">
+          <span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" style={{ color: "var(--muted)" }}>Sprd</span>
+        </div>
         {ordered.map(([cat, list]) => (
           <div key={cat}>
-            <div onClick={() => setCollapsed((o) => ({ ...o, [cat]: !o[cat] }))} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[cat] ? "▸" : "▾"} {cat.toUpperCase()}</div>
-            {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dgFor(s); const rawSp = symbolSpreads && symbolSpreads[s.symbol]; const spPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0); const spPx = spPips * Math.pow(10, -(d - 1)); const ask = p != null ? gnum(p, d) : "—"; const bid = p != null ? gnum(p - spPx, d) : "—"; const dir = dirs[s.symbol] || 0;
+            <div
+              onClick={() => setCollapsed((o) => ({ ...o, [cat]: !o[cat] }))}
+              onContextMenu={(e) => { if (!onCategoryEdit) return; e.preventDefault(); setCatCtx({ x: e.clientX, y: e.clientY, cat, syms: list.map((s) => s.symbol) }); }}
+              className={"mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)] flex items-center justify-between " + (onCategoryEdit ? "cursor-context-menu" : "cursor-pointer")}
+            >
+              <span>{collapsed[cat] ? "▸" : "▾"} {cat.toUpperCase()}</span>
+              {onCategoryEdit && <i className="fa-solid fa-sliders text-[8px] opacity-40 hover:opacity-100" title="Right-click to set category spread" />}
+            </div>
+            {!collapsed[cat] && list.map((s) => {
+              const p = prices[s.symbol]; const d = dgFor(s);
+              const rawSp = symbolSpreads && symbolSpreads[s.symbol];
+              const spPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
+              const spPx = spPips * Math.pow(10, -(d - 1));
+              const ask = p != null ? gnum(p, d) : "—"; const bid = p != null ? gnum(p - spPx, d) : "—"; const dir = dirs[s.symbol] || 0;
+              const isOff = !!(disabledSyms && disabledSyms.includes(s.symbol));
               return (
-                <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid cursor-pointer grid-cols-[1fr_64px_64px_36px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")} style={{ borderRadius: 3, minHeight: 22 }}>
-                  <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} /><span className="truncate">{s.symbol}</span></span>
+                <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)}
+                  onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }}
+                  className={"grid cursor-pointer grid-cols-[1fr_64px_64px_36px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}
+                  style={{ borderRadius: 3, minHeight: 22, opacity: isOff ? 0.45 : 1 }}>
+                  <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} /><span className="truncate">{s.symbol}</span>{isOff && <span className="text-[8px] rounded px-1" style={{ background: "rgba(224,82,96,0.18)", color: "#ef5350" }}>OFF</span>}</span>
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
                   <span className="flex items-center justify-end pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{spPips > 0 ? Math.round(spPips * 10) : "—"}</span>
-                </div>); })}
+                </div>);
+            })}
           </div>
         ))}
         {ordered.length === 0 && <div className="px-2 py-3 text-center text-[var(--muted)]">No symbols match &ldquo;{search}&rdquo;.</div>}
       </div>
+
+      {/* Symbol right-click context menu */}
       {ctx && (<>
         <div className="fixed inset-0 z-[120]" onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
-        <div className="fixed z-[121] min-w-[180px] overflow-hidden rounded-lg border py-1 text-[11px] shadow-2xl" style={{ left: Math.min(ctx.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 200), top: ctx.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+        <div className="fixed z-[121] min-w-[180px] overflow-hidden rounded-lg border py-1 text-[11px] shadow-2xl" style={{ left: Math.min(ctx.x, vw - 200), top: ctx.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
           <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{ctx.sym}</div>
-          <button onClick={() => { const s = symbols.find((x) => x.symbol === ctx.sym); setSymInfo({ sym: s || { symbol: ctx.sym }, ask: prices[ctx.sym] ?? null }); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]">
-            <i className="fa-solid fa-circle-info text-[10px]" /> Symbol properties
-          </button>
-          {onSymbolEdit && <button onClick={() => { onSymbolEdit(ctx.sym); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]">
-            <i className="fa-solid fa-sliders text-[10px]" style={{ color: "var(--accent)" }} /> Symbol settings
-          </button>}
-          {onDisable && <button onClick={() => { onDisable(ctx.sym); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]" style={{ color: "#dc2626" }}>
-            <i className="fa-solid fa-eye-slash text-[10px]" /> Disable symbol
-          </button>}
+          {onSymbolEdit && (
+            <button onClick={() => { onSymbolEdit(ctx.sym); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]">
+              <i className="fa-solid fa-sliders text-[10px]" style={{ color: "var(--accent)" }} /> Spread settings
+            </button>
+          )}
+          {onToggleSym && (() => {
+            const isOff = !!(disabledSyms && disabledSyms.includes(ctx.sym));
+            return (
+              <button onClick={() => { onToggleSym(ctx.sym, !isOff); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]" style={{ color: isOff ? "#22c55e" : "#ef5350" }}>
+                <i className={"fa-solid text-[10px] " + (isOff ? "fa-eye" : "fa-eye-slash")} /> {isOff ? "Enable symbol (global)" : "Disable symbol (global)"}
+              </button>
+            );
+          })()}
         </div>
       </>)}
 
-      {/* Symbol Properties popup (MT5 style) */}
-      {symInfo && (() => {
-        const s = symInfo.sym; const d = s.digits ?? 2;
-        const rawSp = symbolSpreads && symbolSpreads[s.symbol];
-        const spObj = typeof rawSp === "object" && rawSp !== null ? rawSp as any : null;
-        const spPips = (spObj ? spObj.min : (rawSp as number) || 0) + (groupSpread || 0);
-        const spPx = spPips * Math.pow(10, -(d - 1));
-        const ask = symInfo.ask ?? prices[s.symbol] ?? null;
-        const bid = ask != null ? ask - spPx : null;
-        return (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setSymInfo(null)}>
-            <div className="w-[300px] rounded-xl border p-5 text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-              <div className="mb-3 flex items-center justify-between">
-                <div><div className="text-[15px] font-bold">{s.symbol}</div><div className="text-[10px] text-[var(--muted)]">{s.display || ""} · {s.category || "forex"}</div></div>
-                <button onClick={() => setSymInfo(null)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
-              </div>
-              <div className="mb-3 space-y-1.5 rounded-lg border border-[var(--border)] p-3 text-[11px]">
-                <div className="flex justify-between"><span className="text-[var(--muted)]">Digits</span><span className="font-semibold">{d}</span></div>
-                <div className="flex justify-between"><span className="text-[var(--muted)]">Pip size</span><span className="font-semibold tabular-nums">{Math.pow(10, -(d - 1)).toFixed(d - 1 > 0 ? d - 1 : 0)}</span></div>
-                <div className="flex justify-between"><span className="text-[var(--muted)]">Spread (pips)</span><span className="font-semibold tabular-nums">{spPips.toFixed(1)}</span></div>
-                {spObj && <div className="flex justify-between"><span className="text-[var(--muted)]">Spread type</span><span className="font-semibold">{spObj.type || "FIXED"}</span></div>}
-                {spObj?.type === "FLOATING" && <div className="flex justify-between"><span className="text-[var(--muted)]">Spread range</span><span className="font-semibold tabular-nums">{spObj.min} – {spObj.max} pips</span></div>}
-              </div>
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.3)" }}>
-                  <div className="text-[9px] uppercase tracking-widest text-[var(--muted)]">Bid</div>
-                  <div className="text-[14px] font-bold tabular-nums" style={{ color: "#ef5350" }}>{bid != null ? bid.toFixed(d) : "—"}</div>
-                </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(38,166,154,0.12)", border: "1px solid rgba(38,166,154,0.3)" }}>
-                  <div className="text-[9px] uppercase tracking-widest text-[var(--muted)]">Ask</div>
-                  <div className="text-[14px] font-bold tabular-nums" style={{ color: "#26a69a" }}>{ask != null ? ask.toFixed(d) : "—"}</div>
-                </div>
-              </div>
-              <button onClick={() => setSymInfo(null)} className="w-full rounded-lg border border-[var(--border)] py-1.5 text-[11px] text-[var(--muted)] hover:text-[var(--text)]">Close</button>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Category right-click context menu */}
+      {catCtx && onCategoryEdit && (<>
+        <div className="fixed inset-0 z-[120]" onClick={() => setCatCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCatCtx(null); }} />
+        <div className="fixed z-[121] min-w-[180px] overflow-hidden rounded-lg border py-1 text-[11px] shadow-2xl" style={{ left: Math.min(catCtx.x, vw - 220), top: catCtx.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+          <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{catCtx.cat.toUpperCase()} · {catCtx.syms.length} symbols</div>
+          <button onClick={() => { onCategoryEdit(catCtx.cat, catCtx.syms); setCatCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]">
+            <i className="fa-solid fa-sliders text-[10px]" style={{ color: "var(--accent)" }} /> Set spread for all {catCtx.cat}
+          </button>
+        </div>
+      </>)}
     </>
   );
 }
