@@ -146,6 +146,7 @@ export default function ClientTerminal() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { fetch("/api/client/avatar").then((r) => r.json()).then((d) => { if (d.ok) setAvatarUrl(d.avatarUrl || ""); }).catch(() => {}); }, []);
   async function uploadAvatar(e: any) { const file = e.target.files && e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append("file", file); const r = await fetch("/api/client/avatar", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok && r.avatarUrl) setAvatarUrl(r.avatarUrl); else setErr(r.error || "Avatar upload failed"); }
+  const [profileOpen, setProfileOpen] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: "", phone: "", country: "" });
   const [profileSaving, setProfileSaving] = useState(false);
@@ -536,6 +537,10 @@ export default function ClientTerminal() {
             <button onClick={() => { const w = !notiOpen; setNotiOpen(w); if (w && unread > 0) { fetch("/api/client/notifications", { method: "POST" }).then(() => setNotis((ns) => ns.map((n) => ({ ...n, read: true })))); } }} title="Notifications" className="relative rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-bell" />{unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 text-[8px] font-bold" style={{ background: SELL, color: "#fff" }}>{unread}</span>}</button>
             {notiOpen && (<><div className="fixed inset-0 z-[80]" onClick={() => setNotiOpen(false)} /><div className="ui-pop absolute right-0 z-[90] mt-1 max-h-80 w-72 overflow-hidden rounded-xl border text-left text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)" }}><div className="sticky top-0 flex items-center justify-between border-b px-3 py-2" style={{ background: "var(--panel)", borderColor: "var(--border)" }}><span className="font-semibold">Notifications</span>{notis.length > 0 && <button onClick={() => { markAllNotifsRead(); }} className="text-[10px]" style={{ color: GOLD }}>Mark all read</button>}</div><div className="overflow-auto" style={{ maxHeight: "calc(20rem - 36px)" }}>{notis.length === 0 ? <div className="px-2 py-3 text-center text-[var(--muted)]">No notifications</div> : notis.map((n, i) => { const ic = iconForNotification(n); return (<div key={i} className="flex items-start gap-2 border-b px-2 py-2 last:border-0" style={{ borderColor: "var(--border)", background: !n.read ? "color-mix(in srgb, var(--soft) 60%, transparent)" : undefined }}><span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: ic.color + "22", color: ic.color }}><i className={"fa-solid " + ic.icon + " text-[10px]"} /></span><div className="min-w-0 flex-1"><div className="font-medium text-[var(--text)]">{n.title}</div>{n.body && <div className="mt-0.5 whitespace-pre-line text-[var(--muted)]">{n.body}</div>}{n.image && <img src={n.image} alt="" className="mt-1 max-h-28 w-full rounded object-cover" />}<div className="mt-1 text-[9px] text-[var(--muted)]">{new Date(n.createdAt).toLocaleString()}</div></div></div>); })}</div></div></>)}
           </div>
+          <button onClick={() => setProfileOpen((o) => !o)} title="Profile" className="relative flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] hover:border-[var(--accent)]">
+            {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <i className="fa-solid fa-user text-[11px] text-[var(--muted)]" />}
+            {(!account?.phone || !account?.country) && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--panel)]" style={{ background: SELL }} />}
+          </button>
           <button onClick={async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} title="Logout" className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-right-from-bracket" /></button>
         </div>
       </div>
@@ -599,6 +604,71 @@ export default function ClientTerminal() {
             </div>
           </div>
         </div>
+      )}
+
+      {profileOpen && (
+        <>
+          <div className="fixed inset-0 z-[150]" onClick={() => setProfileOpen(false)} />
+          <div className="fixed right-0 top-0 z-[160] flex h-full w-72 flex-col border-l overflow-y-auto" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
+            {/* header */}
+            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
+              <span className="text-[12px] font-semibold tracking-wide">PROFILE</span>
+              <button onClick={() => setProfileOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark text-[12px]" /></button>
+            </div>
+            {/* avatar + name */}
+            <div className="flex flex-col items-center gap-2 border-b px-4 py-5" style={{ borderColor: "var(--border)" }}>
+              <div className="relative">
+                <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarInputRef} onChange={uploadAvatar} />
+                <button onClick={() => avatarInputRef.current?.click()} className="relative h-16 w-16 overflow-hidden rounded-full border-2" style={{ borderColor: "var(--accent)" }}>
+                  {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-xl font-bold" style={{ background: "var(--soft)", color: "var(--accent)" }}>{(account?.ownerName || account?.name || "?")[0].toUpperCase()}</span>}
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"><i className="fa-solid fa-camera text-white text-xs" /></span>
+                </button>
+              </div>
+              <div className="text-center">
+                <div className="font-semibold">{account?.ownerName || account?.name}</div>
+                <div className="text-[11px] text-[var(--muted)]">{account?.email}</div>
+              </div>
+            </div>
+            {/* info rows */}
+            <div className="border-b px-4 py-3 space-y-2" style={{ borderColor: "var(--border)" }}>
+              <div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Personal Info</div>
+              <div className="flex items-center gap-2 text-[12px]"><i className="fa-solid fa-phone w-4 text-center text-[var(--muted)]" /><span>{account?.phone || <span style={{ color: SELL }}>Not set</span>}</span></div>
+              <div className="flex items-center gap-2 text-[12px]"><i className="fa-solid fa-globe w-4 text-center text-[var(--muted)]" /><span>{account?.country || <span style={{ color: SELL }}>Not set</span>}</span></div>
+              {(!account?.phone || !account?.country) && (
+                <button onClick={() => { setProfileOpen(false); openProfileEdit(); }} className="mt-1 w-full rounded-lg py-1.5 text-[11px] font-semibold text-white" style={{ background: SELL }}>Complete Profile</button>
+              )}
+            </div>
+            {/* account summary */}
+            <div className="border-b px-4 py-3 space-y-1.5" style={{ borderColor: "var(--border)" }}>
+              <div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Account</div>
+              <div className="flex justify-between text-[12px]"><span className="text-[var(--muted)]">Login</span><span className="font-medium">{curAcct?.login} · {curAcct?.type}</span></div>
+              <div className="flex justify-between text-[12px]"><span className="text-[var(--muted)]">Balance</span><span className="font-medium" style={{ color: BUY }}>${fmt(balance)}</span></div>
+              <div className="flex justify-between text-[12px]"><span className="text-[var(--muted)]">Equity</span><span>${fmt(equity)}</span></div>
+              <div className="flex justify-between text-[12px]"><span className="text-[var(--muted)]">Leverage</span><span>1:{account?.leverage || 100}</span></div>
+              <div className="flex justify-between text-[12px]"><span className="text-[var(--muted)]">Currency</span><span>{account?.currency || "USD"}</span></div>
+            </div>
+            {/* security */}
+            <div className="border-b px-4 py-3 space-y-1" style={{ borderColor: "var(--border)" }}>
+              <div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Security & Settings</div>
+              {[
+                { icon: "fa-shield-halved", label: pinHasPin ? "Change PIN" : "Set PIN", onClick: () => { setProfileOpen(false); setPinErr(""); setPinForm({}); setPinModal(true); } },
+                { icon: "fa-fingerprint", label: "Biometrics / Face ID", onClick: () => { setProfileOpen(false); addPasskey(); } },
+                { icon: "fa-bell-concierge", label: "Push Notifications", onClick: () => { setProfileOpen(false); enablePush(); } },
+                { icon: "fa-id-card", label: "KYC Verification", onClick: () => { setProfileOpen(false); setWalletModal("kyc"); }, hide: curAcct?.type !== "LIVE" },
+              ].filter((x) => !x.hide).map((item) => (
+                <button key={item.label} onClick={item.onClick} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[12px] hover:bg-[var(--soft)]">
+                  <i className={"fa-solid " + item.icon} style={{ width: 14, textAlign: "center", color: "var(--muted)" }} />{item.label}
+                </button>
+              ))}
+            </div>
+            {/* logout */}
+            <div className="px-4 py-3 mt-auto">
+              <button onClick={async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-[12px] hover:bg-[var(--soft)]" style={{ color: SELL }}>
+                <i className="fa-solid fa-right-from-bracket" style={{ width: 14, textAlign: "center" }} />Logout
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {profileModal && (
