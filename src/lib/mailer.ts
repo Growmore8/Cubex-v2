@@ -102,5 +102,6 @@ export async function sendPlatformMail(opts: MailOptions) {
   const smtpEmail = process.env.SMTP_EMAIL;
   const smtpPassword = process.env.SMTP_PASSWORD;
   if (!smtpEmail || !smtpPassword) throw new Error("Platform SMTP not configured");
-  return sendTenantMail(smtpEmail, smtpPassword, opts);
+  const smtpHost = process.env.SMTP_HOST || null; // explicit host for custom domains
+  return sendTenantMail(smtpEmail, smtpPassword, opts, smtpHost);
 }
