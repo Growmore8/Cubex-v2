@@ -478,7 +478,7 @@ export default function AdminDeskPage() {
     else if (act.kind === "assign") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assign", managerId: (aform.managerId ?? act.acc.managerId) || null, groupId: (aform.groupId ?? act.acc.groupId) || null }; }
     else if (act.kind === "leverage") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", leverage: Number(aform.leverage ?? act.acc.leverage) }; }
     else if (act.kind === "mclevel") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", mcLevel: Number(aform.mcLevel ?? act.acc.mcLevel), doNotLiquidate: aform.doNotLiquidate ?? act.acc.doNotLiquidate }; }
-    else if (act.kind === "spreadmarkup") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", spreadMarkup: Number(aform.spreadMarkup ?? act.acc.spreadMarkup ?? 0) }; }
+    else if (act.kind === "spreadmarkup") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", spreadMarkup: Number(aform.spreadMarkup ?? act.acc.spreadMarkup ?? 0), spreadMarkupType: aform.spreadMarkupType ?? act.acc.spreadMarkupType ?? "FIXED", spreadMarkupMax: Number(aform.spreadMarkupMax ?? act.acc.spreadMarkupMax ?? 0) }; }
     else return;
     const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
@@ -1885,9 +1885,24 @@ export default function AdminDeskPage() {
               <label className="flex items-center gap-2 text-[11px]"><span className="text-[var(--muted)]">Do Not Liquidate:</span><input type="checkbox" checked={!!(aform.doNotLiquidate ?? act.acc.doNotLiquidate)} onChange={(e) => af("doNotLiquidate", e.target.checked)} /> Enable (account will NOT be liquidated)</label>
             </>)}
             {act.kind === "spreadmarkup" && (<>
-              <div className="mb-1 text-[10px] text-[var(--muted)]">Extra pips added on top of the symbol + group spread for this account only.</div>
-              <div><div className={flab}>Spread Markup (pips)</div><input type="number" min="0" step="0.1" className={inp} value={aform.spreadMarkup ?? Number(act.acc.spreadMarkup ?? 0)} onChange={(e) => af("spreadMarkup", e.target.value)} autoFocus /></div>
-              <div className="mt-1 text-[10px] text-[var(--muted)]">Current: <b>{Number(act.acc.spreadMarkup ?? 0)} pips</b> ({Math.round(Number(act.acc.spreadMarkup ?? 0) * 10)} pts)</div>
+              <div className="mb-2 text-[10px] text-[var(--muted)]">Extra pips added on top of symbol + group spread for this account only.</div>
+              {/* Type toggle */}
+              <div className="mb-3"><div className={flab}>Spread Type</div>
+                <div className="flex gap-1 mt-1">
+                  {["FIXED","FLOATING"].map((t) => { const active = (aform.spreadMarkupType ?? act.acc.spreadMarkupType ?? "FIXED") === t; return (
+                    <button key={t} onClick={() => af("spreadMarkupType", t)} className="flex-1 rounded-lg py-1.5 text-[11px] font-semibold border transition-colors" style={{ background: active ? "var(--accent)" : "var(--bg)", color: active ? "#fff" : "var(--muted)", borderColor: active ? "var(--accent)" : "var(--border)" }}>{t.charAt(0) + t.slice(1).toLowerCase()}</button>
+                  ); })}
+                </div>
+              </div>
+              <div><div className={flab}>{(aform.spreadMarkupType ?? act.acc.spreadMarkupType ?? "FIXED") === "FLOATING" ? "Min Spread Markup (pips)" : "Spread Markup (pips)"}</div>
+                <input type="number" min="0" step="0.1" className={inp} value={aform.spreadMarkup ?? Number(act.acc.spreadMarkup ?? 0)} onChange={(e) => af("spreadMarkup", e.target.value)} autoFocus />
+              </div>
+              {(aform.spreadMarkupType ?? act.acc.spreadMarkupType ?? "FIXED") === "FLOATING" && (
+                <div className="mt-2"><div className={flab}>Max Spread Markup (pips, off-hours)</div>
+                  <input type="number" min="0" step="0.1" className={inp} value={aform.spreadMarkupMax ?? Number(act.acc.spreadMarkupMax ?? 0)} onChange={(e) => af("spreadMarkupMax", e.target.value)} />
+                </div>
+              )}
+              <div className="mt-1 text-[10px] text-[var(--muted)]">Current: <b>{Number(act.acc.spreadMarkup ?? 0)} pips</b> ({Math.round(Number(act.acc.spreadMarkup ?? 0) * 10)} pts) · {act.acc.spreadMarkupType || "FIXED"}</div>
             </>)}
             {act.kind === "settings" && (<>
               <div className="grid grid-cols-2 gap-2">

@@ -37,6 +37,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         if (b.doNotLiquidate !== undefined) data.doNotLiquidate = !!b.doNotLiquidate;
         if (b.currency !== undefined) data.currency = b.currency;
         if (b.spreadMarkup !== undefined) data.spreadMarkup = new Prisma.Decimal(Math.max(0, Number(b.spreadMarkup) || 0));
+        if (b.spreadMarkupType !== undefined) data.spreadMarkupType = b.spreadMarkupType === "FLOATING" ? "FLOATING" : "FIXED";
+        if (b.spreadMarkupMax !== undefined) data.spreadMarkupMax = new Prisma.Decimal(Math.max(0, Number(b.spreadMarkupMax) || 0));
         await prisma.account.update({ where: { id: acc.id }, data });
         await audit(tenantId, "client.settings", acc.login + " " + JSON.stringify(data), actor);
         break;

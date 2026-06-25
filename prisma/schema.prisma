@@ -129,6 +129,8 @@ model Account {
   insurance       Decimal            @default(0) @db.Decimal(18, 2)
   pnl             Decimal            @default(0) @db.Decimal(18, 2)
   spreadMarkup    Decimal            @default(0) @db.Decimal(10, 2)
+  spreadMarkupType String            @default("FIXED")
+  spreadMarkupMax Decimal            @default(0) @db.Decimal(10, 2)
   managerId       String?
   manager         User?              @relation("ManagerAccounts", fields: [managerId], references: [id], onDelete: SetNull)
   parentId        String?
