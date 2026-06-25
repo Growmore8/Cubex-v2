@@ -8,7 +8,7 @@ export async function GET() {
   const s = await requireClient();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   const accounts = await prisma.account.findMany({
-    where: { tenantId: s.tenantId!, userId: s.sub },
+    where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false },
     orderBy: { createdAt: "asc" },
     select: { id: true, login: true, type: true, currency: true, leverage: true, deposit: true, withdrawal: true, credit: true, bonus: true, pnl: true, locked: true, deactivated: true, expiresAt: true },
   });
