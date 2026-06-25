@@ -1451,7 +1451,7 @@ export default function AdminDeskPage() {
         const vw2 = typeof window !== "undefined" ? window.innerWidth : 1200;
         const vh2 = typeof window !== "undefined" ? window.innerHeight : 800;
         const left2 = Math.max(6, Math.min(grpCtx.x, vw2 - 272));
-        const openUp2 = grpCtx.y > vh2 * 0.55;
+        const openUp2 = grpCtx.y + 520 > vh2 - 20;
         const vpos2 = openUp2 ? { bottom: Math.max(6, vh2 - grpCtx.y) } : { top: grpCtx.y };
         const members = clients.filter((c: any) => c.groupId === g.id);
         const row = "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] hover:bg-[var(--soft)] transition-colors rounded";
@@ -1557,11 +1557,12 @@ export default function AdminDeskPage() {
         const vh = typeof window !== "undefined" ? window.innerHeight : 800;
         const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
         const left = Math.max(6, Math.min(menu.x, vw - 246));
-        const openUp = menu.y > vh * 0.55; // flip upward when near the bottom so nothing is cut off
+        const MENU_H = 420; // approx max menu height
+        const openUp = menu.y + MENU_H > vh - 20;
         const vpos = openUp ? { bottom: Math.max(6, vh - menu.y) } : { top: menu.y };
         return (<>
         <div className="fixed inset-0 z-40" onClick={() => { setMenu(null); setMenuSub(""); }} />
-        <div className="ui-pop fixed z-50 w-60 rounded-2xl border py-1 text-[11px]" style={{ left, ...vpos, background: "color-mix(in srgb, var(--panel) 92%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.14s cubic-bezier(.16,1,.3,1)" }}>
+        <div className="ui-pop fixed z-50 w-60 rounded-2xl border py-1 text-[11px] overflow-y-auto" style={{ left, ...vpos, maxHeight: Math.min(vh - 24, 480), background: "color-mix(in srgb, var(--panel) 92%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.14s cubic-bezier(.16,1,.3,1)" }}>
           {/* Header */}
           <div className="mx-1.5 mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 5%, transparent))" }}>
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm" style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))" }}>{(menu.acc.name || "?").charAt(0).toUpperCase()}</span>
