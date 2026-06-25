@@ -463,7 +463,6 @@ export default function SAClientsPage() {
                       <button onClick={() => actAll(liveAccts(detailClient).filter((a: any) => !a.deactivated), "deactivate")} className="rounded px-2 py-1 text-[11px] font-medium" style={{ background: "#fff7ed", color: AMB }}>Deactivate All</button>
                     </div>
                   </div>
-                  </div>
                   <div className="space-y-2">
                     {liveAccts(detailClient).map((a: any) => (
                       <AccountCard key={a.id} a={a} tenants={tenants} m={m} act={act} openEdit={openEdit} openMgr={openMgr}
