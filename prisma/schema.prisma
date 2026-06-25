@@ -78,6 +78,8 @@ model User {
   webauthnChallenge String?
   avatarUrl       String?
   name            String
+  phone           String?
+  country         String?
   role            Role       @default(CLIENT)
   status          UserStatus @default(ACTIVE)
   perms           Json       @default("{}")
