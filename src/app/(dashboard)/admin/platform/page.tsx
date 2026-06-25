@@ -74,6 +74,7 @@ export default function AdminDeskPage() {
   const [grpCtx, setGrpCtx] = useState<{ x: number; y: number; g: any } | null>(null);
   const [grpSub, setGrpSub] = useState(""); // which inline section is open in grpCtx panel
   const [grpForm, setGrpForm] = useState<Record<string, any>>({});
+  const [grpSymOv, setGrpSymOv] = useState<{ g: any; disabled: string[]; q: string } | null>(null);
   const [grpEdit, setGrpEdit] = useState<any>(null);
   const [catEdit, setCatEdit] = useState<{ cat: string; syms: string[]; spread: number; spreadType: string; spreadMax: number } | null>(null);
   const [open, setOpen] = useState<any[]>([]);
@@ -1446,6 +1447,55 @@ export default function AdminDeskPage() {
         </div>
       )}
 
+      {/* Group Symbol Access modal */}
+      {grpSymOv && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setGrpSymOv(null)}>
+          <div className="flex w-[400px] max-h-[80vh] flex-col rounded-xl border text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[14px] font-bold">Symbol Access — {grpSymOv.g.name}</div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--muted)" }}>Symbols disabled here are hidden for ALL clients in this group only.</div>
+                </div>
+                <button onClick={() => setGrpSymOv(null)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+              </div>
+              <input value={grpSymOv.q} onChange={(e) => setGrpSymOv((s) => s ? { ...s, q: e.target.value } : s)} placeholder="Search symbol…" className="mt-2 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+              {grpSymOv.disabled.length > 0 && (
+                <div className="mt-1.5 text-[9px] font-semibold" style={{ color: SELL }}>{grpSymOv.disabled.length} symbol{grpSymOv.disabled.length !== 1 ? "s" : ""} disabled for this group</div>
+              )}
+            </div>
+            {/* Symbol list */}
+            <div className="flex-1 overflow-y-auto px-3 py-2">
+              {symbols.filter((s: any) => !grpSymOv.q || s.symbol.toLowerCase().includes(grpSymOv.q.toLowerCase())).map((s: any) => {
+                const off = grpSymOv.disabled.includes(s.symbol);
+                return (
+                  <div key={s.symbol} className="flex items-center justify-between border-b py-1.5" style={{ borderColor: "var(--border)" }}>
+                    <div><span className="font-semibold">{s.symbol}</span> <span className="text-[10px]" style={{ color: "var(--muted)" }}>{s.display || ""}</span></div>
+                    <button onClick={() => {
+                      const next = off ? grpSymOv.disabled.filter((x) => x !== s.symbol) : [...grpSymOv.disabled, s.symbol];
+                      setGrpSymOv((p) => p ? { ...p, disabled: next } : p);
+                    }} className="rounded px-2.5 py-0.5 text-[10px] font-semibold shrink-0" style={off ? { background: "rgba(224,82,96,0.16)", color: SELL } : { background: "rgba(38,166,154,0.16)", color: BUY }}>
+                      {off ? "OFF" : "ON"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Footer */}
+            <div className="shrink-0 border-t px-4 py-3 flex gap-2" style={{ borderColor: "var(--border)" }}>
+              <button onClick={async () => {
+                const cfg = { ...((grpSymOv.g.config as any) || {}), disabledSymbols: grpSymOv.disabled };
+                const r = await fetch("/api/admin/groups/" + grpSymOv.g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config: cfg }) });
+                const d = await r.json();
+                if (d.ok) { setOk("Symbol access saved for " + grpSymOv.g.name); setGrpSymOv(null); loadAll(); } else setErr(d.error || "Failed");
+              }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save for group</button>
+              <button onClick={() => setGrpSymOv(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px]" style={{ color: "var(--muted)" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Group right-click — comprehensive panel */}
       {grpCtx && (() => {
         const g = grpCtx.g;
@@ -1523,8 +1573,8 @@ export default function AdminDeskPage() {
                 </div>
               )}
 
-              {/* Symbol Access — global toggle, applied tenant-wide */}
-              <button onClick={() => { setGrpCtx(null); setGrpSub(""); openSymPerm(); }} className={row}><i className="fa-solid fa-eye-slash w-3.5 text-center text-[10px]" style={{ color: "var(--accent)" }} /><span className="flex-1">Symbol Access</span><span className="text-[9px]" style={{ color: "var(--muted)" }}>enable/disable globally</span></button>
+              {/* Symbol Access — per-group disabled list (stored in group config) */}
+              <button onClick={() => { const dis: string[] = (g.config as any)?.disabledSymbols || []; setGrpSymOv({ g, disabled: dis, q: "" }); setGrpCtx(null); setGrpSub(""); }} className={row}><i className="fa-solid fa-eye-slash w-3.5 text-center text-[10px]" style={{ color: "var(--accent)" }} /><span className="flex-1">Symbol Access</span><span className="text-[9px] rounded px-1" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)" }}>group only</span></button>
 
               <div className="my-1 border-t mx-1" style={{ borderColor: "var(--border)" }} />
 
