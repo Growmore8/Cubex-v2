@@ -768,29 +768,28 @@ export default function ClientTerminal() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[1fr_64px_64px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-2">Bid</span><span className="text-right pr-2">Ask</span></div>
+          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[1fr_56px_56px_34px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" style={{ color: "var(--muted)" }}>Sprd</span></div>
             {favs.length > 0 && (
               <div>
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
-                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const a = p ?? null; const b = p != null ? p - _spreadPx(s.symbol) : null; const dir = dirs[s.symbol] || 0; return (
-                  <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
+                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const a = p ?? null; const b = p != null ? p - _spreadPx(s.symbol) : null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); return (
+                  <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_56px_56px_34px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
+                    <span className="text-right pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{sp > 0 ? sp.toFixed(1) : "\u2014"}</span>
                   </div>); })}
               </div>
             )}
             {orderedGroups.map(([c, list]) => (
               <div key={c}>
                 <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
-                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const a = p ?? null; const b = p != null ? p - _spreadPx(s.symbol) : null; const dir = dirs[s.symbol] || 0; const fc = dir > 0 ? BUY : dir < 0 ? SELL : "var(--text)"; const bg = dir > 0 ? "rgba(22,199,132,0.32)" : dir < 0 ? "rgba(224,82,96,0.32)" : "transparent"; return (
-                  <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
+                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const a = p ?? null; const b = p != null ? p - _spreadPx(s.symbol) : null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); return (
+                  <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_56px_56px_34px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
-                    <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} /><span style={{ display: "none" }}>
-                      
-                      
-                    </span>
+                    <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
+                    <span className="text-right pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{sp > 0 ? sp.toFixed(1) : "\u2014"}</span>
                   </div>); })}
               </div>
             ))}

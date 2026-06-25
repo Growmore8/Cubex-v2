@@ -66,16 +66,17 @@ function DeskMarketWatch({ symbols, selSym, onPick, onDisable, symbolSpreads, gr
         </div>
       </div>
       <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]">
-        <div className="sticky top-0 z-10 grid grid-cols-[1fr_72px_72px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span></div>
+        <div className="sticky top-0 z-10 grid grid-cols-[1fr_64px_64px_36px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" style={{ color: "var(--muted)" }}>Sprd</span></div>
         {ordered.map(([cat, list]) => (
           <div key={cat}>
             <div onClick={() => setCollapsed((o) => ({ ...o, [cat]: !o[cat] }))} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[cat] ? "▸" : "▾"} {cat.toUpperCase()}</div>
             {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dgFor(s); const rawSp = symbolSpreads && symbolSpreads[s.symbol]; const spPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0); const spPx = spPips * Math.pow(10, -(d - 1)); const ask = p != null ? gnum(p, d) : "—"; const bid = p != null ? gnum(p - spPx, d) : "—"; const dir = dirs[s.symbol] || 0;
               return (
-                <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid cursor-pointer grid-cols-[1fr_72px_72px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")} style={{ borderRadius: 3, minHeight: 22 }}>
+                <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid cursor-pointer grid-cols-[1fr_64px_64px_36px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")} style={{ borderRadius: 3, minHeight: 22 }}>
                   <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} /><span className="truncate">{s.symbol}</span></span>
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
+                  <span className="flex items-center justify-end pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{spPips > 0 ? spPips.toFixed(1) : "—"}</span>
                 </div>); })}
           </div>
         ))}
