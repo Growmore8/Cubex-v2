@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/guard";
 import { updateSymbol, deleteSymbol } from "@/services/symbol.service";
 
-const schema = z.object({ display: z.string().optional(), category: z.string().optional(), digits: z.number().int().optional(), spread: z.number().min(0).optional(), enabled: z.boolean().optional() });
+const schema = z.object({ display: z.string().optional(), category: z.string().optional(), digits: z.number().int().optional(), spread: z.number().min(0).optional(), spreadType: z.enum(["FIXED", "FLOATING"]).optional(), spreadMax: z.number().min(0).optional(), enabled: z.boolean().optional() });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

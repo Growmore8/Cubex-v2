@@ -57,7 +57,7 @@ function ensureLevelOverlay() {
   return _ovReg;
 }
 
-export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, positions, bare, onSymbolChange }: {
+export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, positions, bare, onSymbolChange, spreadPips }: {
   symbol: string;
   tf: string;
   theme: "dark" | "light";
@@ -66,6 +66,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   positions?: ChartPosition[];
   bare?: boolean; // hide the period-bar + drawing-rail (preview); chart only
   onSymbolChange?: (sym: string) => void; // user picked a symbol in the chart dropdown
+  spreadPips?: number; // total spread in pips for bid/ask overlay lines
 }) {
   const onSymRef = useRef(onSymbolChange); onSymRef.current = onSymbolChange;
   const symbolsRef = useRef(symbols); symbolsRef.current = symbols; // always the current full list
@@ -74,6 +75,8 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   const dfRef = useRef<any>(null);
   const overlayIds = useRef<string[]>([]);
   const coreRef = useRef<any>(null); // the REAL core klinecharts chart (reached via re-init)
+  const bidAskIds = useRef<{ bid: string | null; ask: string | null }>({ bid: null, ask: null });
+  const spreadPipsRef = useRef(spreadPips ?? 0); spreadPipsRef.current = spreadPips ?? 0;
 
   // build once
   useEffect(() => {
@@ -378,6 +381,30 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     ensureLevelOverlay().then(draw);
     return () => { cancelled = true; };
   }, [positions, symbol, getCore]);
+
+  // Bid/Ask price lines — live socket listener updates them on every tick.
+  useEffect(() => {
+    const sock: any = io({ path: "/socket.io" });
+    const symRef = { current: symbol };
+    const updateLines = async (ask: number) => {
+      const core = await getCore();
+      if (!core || typeof core.createOverlay !== "function") return;
+      const spPips = spreadPipsRef.current;
+      const spPx = spPips * Math.pow(10, -(digits - 1));
+      const bid = ask - spPx;
+      let ts: number | undefined;
+      try { const dl = core.getDataList?.() || []; if (dl.length) ts = dl[dl.length - 1].timestamp; } catch {}
+      const upsert = (ref: "bid" | "ask", price: number, color: string, label: string) => {
+        const id = bidAskIds.current[ref];
+        if (id) { try { core.overrideOverlay({ id, points: [{ timestamp: ts, value: price }] }); return; } catch {} }
+        try { const newId = core.createOverlay({ name: "cubexLevel", points: [{ timestamp: ts, value: price }], lock: true, extendData: { color, text: label } }); if (typeof newId === "string") bidAskIds.current[ref] = newId; } catch {}
+      };
+      upsert("ask", ask, "#26a69a", `Ask ${ask.toFixed(digits)}`);
+      upsert("bid", bid, "#ef5350", `Bid ${bid.toFixed(digits)}`);
+    };
+    sock.on("tick", ({ symbol: sym, price }: any) => { if (sym === symRef.current && price != null) updateLines(price); });
+    return () => { sock.disconnect(); };
+  }, [symbol, digits, getCore]);
 
   // Absolutely fill the (relative) parent so the widget always matches the
   // container box and shrinks/grows when panels are dragged — core klinecharts

@@ -167,7 +167,7 @@ export type ChartPosition = {
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
 function LWChart({
-  symbol, tf, theme, positions, digits = 2, showTools = true, ind, cfg, calcPnl, tool: toolProp, onTool, clearKey,
+  symbol, tf, theme, positions, digits = 2, showTools = true, ind, cfg, calcPnl, tool: toolProp, onTool, clearKey, spreadPips,
 }: {
   symbol: string;
   tf: string;
@@ -176,6 +176,7 @@ function LWChart({
   digits?: number;
   onClose?: (id: string) => void;
   showTools?: boolean;
+  spreadPips?: number;
   /** Pure P&L formula from the parent so the chart can update position labels
       live on its own internal tick (without re-rendering). */
   calcPnl?: (p: ChartPosition, price: number) => number;
@@ -194,6 +195,10 @@ function LWChart({
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
   const barsRef = useRef<any[]>([]);
+  const askLineRef = useRef<any>(null);
+  const bidLineRef = useRef<any>(null);
+  const spreadPipsRef = useRef(spreadPips ?? 0);
+  spreadPipsRef.current = spreadPips ?? 0;
   // TradingView-style OHLC legend (updated via ref, no re-render) + right-click menu
   const legendRef = useRef<HTMLDivElement | null>(null);
   const cfgRef = useRef(cfg); cfgRef.current = cfg;
@@ -294,6 +299,9 @@ function LWChart({
     });
     chartRef.current = chart;
     seriesRef.current = series;
+    // Bid / Ask price lines (MT5 style) — created once, updated on each tick via ref
+    askLineRef.current = series.createPriceLine({ price: 0, color: "#26a69a", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "Ask" });
+    bidLineRef.current = series.createPriceLine({ price: 0, color: "#ef5350", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "Bid" });
     // a recreated chart loses prior drawings/indicators — drop the stale refs
     hlineRefs.current = []; trendRefs.current = []; smaRef.current = null; emaRef.current = null; psarRef.current = null; markersRef.current = null; sigMarkersRef.current = null; ribbonRefs.current = []; trendStart.current = null;
     // Click handler for H-Line / Trend drawing tools
@@ -656,6 +664,9 @@ function LWChart({
           bars.push(bar);
           seriesRef.current.update(bar);
         }
+        // Update bid/ask lines on each tick
+        const spPx = spreadPipsRef.current * Math.pow(10, -(digits - 1));
+        try { askLineRef.current?.applyOptions({ price: close }); bidLineRef.current?.applyOptions({ price: close - spPx }); } catch {}
         if (!hoveringRef.current) fmtLegRef.current(barsRef.current[barsRef.current.length - 1]);
       } catch { /* out-of-order tick during a reseed — ignore */ }
     };
@@ -862,7 +873,7 @@ function areEqual(a: any, b: any) {
   return a.symbol === b.symbol && a.tf === b.tf && a.theme === b.theme && a.digits === b.digits
     && a.showTools === b.showTools && JSON.stringify(a.ind) === JSON.stringify(b.ind)
     && JSON.stringify(a.cfg) === JSON.stringify(b.cfg)
-    && a.tool === b.tool && a.clearKey === b.clearKey
+    && a.tool === b.tool && a.clearKey === b.clearKey && a.spreadPips === b.spreadPips
     && posSig(a.positions) === posSig(b.positions);
 }
 export default memo(LWChart, areEqual);

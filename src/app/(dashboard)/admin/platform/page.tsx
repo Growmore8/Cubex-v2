@@ -67,6 +67,8 @@ export default function AdminDeskPage() {
   
   const [symbols, setSymbols] = useState<any[]>([]);
   const [adminSymSpreads, setAdminSymSpreads] = useState<Record<string, number>>({});
+  const [adminSymTypes, setAdminSymTypes] = useState<Record<string, string>>({});
+  const [adminSymMax, setAdminSymMax] = useState<Record<string, number>>({});
   const [adminSymIds, setAdminSymIds] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
@@ -280,7 +282,7 @@ export default function AdminDeskPage() {
     if (c.ok) setClients(c.clients);
     if (sy.ok) { const seen = new Set<string>(); const uniq = (sy.symbols || []).filter((s: any) => { if (seen.has(s.symbol)) return false; seen.add(s.symbol); return true; }); setSymbols(uniq); if (!selSymRef.current && uniq.length) setSelSym((uniq.find((s: any) => s.symbol === "BTCUSD") || uniq[0]).symbol); }
     // Load per-symbol spreads for market watch bid/ask display
-    fetch("/api/admin/symbols").then((r) => r.json()).then((asr) => { if (asr.ok) { const m: Record<string, number> = {}; const ids: Record<string, string> = {}; (asr.symbols || []).forEach((s: any) => { m[s.symbol] = Number(s.spread ?? 0); ids[s.symbol] = s.id; }); setAdminSymSpreads(m); setAdminSymIds(ids); } }).catch(() => {});
+    fetch("/api/admin/symbols").then((r) => r.json()).then((asr) => { if (asr.ok) { const m: Record<string, number> = {}; const types: Record<string, string> = {}; const maxes: Record<string, number> = {}; const ids: Record<string, string> = {}; (asr.symbols || []).forEach((s: any) => { m[s.symbol] = Number(s.spread ?? 0); types[s.symbol] = s.spreadType || "FIXED"; maxes[s.symbol] = Number(s.spreadMax ?? 0); ids[s.symbol] = s.id; }); setAdminSymSpreads(m); setAdminSymTypes(types); setAdminSymMax(maxes); setAdminSymIds(ids); } }).catch(() => {});
     if (o.ok) setOpen(o.trades);
     if (h.ok) setHistory(h.history);
     if (a.ok) setAudit(a.logs);
@@ -1978,17 +1980,28 @@ export default function AdminDeskPage() {
               {symPerm.symbols.filter((s: any) => s.symbol.toLowerCase().includes((symPerm.q || "").toLowerCase())).map((s: any) => {
                 const off = symPerm.disabled.includes(s.symbol);
                 return (
-                  <div key={s.symbol} className="flex items-center justify-between border-b border-[var(--border)] py-1.5 text-[11px] gap-2">
-                    <div className="min-w-0 flex-1"><span className="font-medium">{s.symbol}</span> <span style={{ color: "var(--muted)" }}>{s.display}</span></div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span style={{ color: "var(--muted)", fontSize: 9 }}>Spread</span>
+                  <div key={s.symbol} className="flex flex-col gap-1 border-b border-[var(--border)] py-1.5 text-[11px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1"><span className="font-medium">{s.symbol}</span> <span style={{ color: "var(--muted)" }}>{s.display}</span></div>
+                      <button onClick={() => toggleSymPerm(s.symbol, !off)} className="rounded px-2 py-0.5 text-[10px] font-semibold shrink-0" style={off ? { background: "rgba(224,82,96,0.16)", color: SELL } : { background: "rgba(38,166,154,0.16)", color: BUY }}>
+                        {off ? "OFF" : "ON"}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select value={adminSymTypes[s.symbol] || "FIXED"} onChange={(e) => { const v = e.target.value; setAdminSymTypes((m) => ({ ...m, [s.symbol]: v })); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spreadType: v }) }).catch(() => {}); }} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[9px]" style={{ color: "var(--text)" }}>
+                        <option value="FIXED">Fixed</option><option value="FLOATING">Float</option>
+                      </select>
+                      <span style={{ color: "var(--muted)", fontSize: 9 }}>Min</span>
                       <input type="number" min="0" step="0.1" value={adminSymSpreads[s.symbol] ?? 0} onChange={(e) => setAdminSymSpreads((m) => ({ ...m, [s.symbol]: Number(e.target.value) }))}
                         onBlur={(e) => { const v = Math.max(0, Number(e.target.value)); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: v }) }).catch(() => {}); setAdminSymSpreads((m) => ({ ...m, [s.symbol]: v })); }}
-                        className="w-14 rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-center text-[10px]" style={{ color: "var(--text)" }} />
+                        className="w-12 rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-center text-[10px]" style={{ color: "var(--text)" }} />
+                      {(adminSymTypes[s.symbol] || "FIXED") === "FLOATING" && <>
+                        <span style={{ color: "var(--muted)", fontSize: 9 }}>Max</span>
+                        <input type="number" min="0" step="0.1" value={adminSymMax[s.symbol] ?? 0} onChange={(e) => setAdminSymMax((m) => ({ ...m, [s.symbol]: Number(e.target.value) }))}
+                          onBlur={(e) => { const v = Math.max(0, Number(e.target.value)); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spreadMax: v }) }).catch(() => {}); setAdminSymMax((m) => ({ ...m, [s.symbol]: v })); }}
+                          className="w-12 rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-center text-[10px]" style={{ color: "var(--text)" }} />
+                      </>}
                     </div>
-                    <button onClick={() => toggleSymPerm(s.symbol, !off)} className="rounded px-2 py-0.5 text-[10px] font-semibold shrink-0" style={off ? { background: "rgba(224,82,96,0.16)", color: SELL } : { background: "rgba(38,166,154,0.16)", color: BUY }}>
-                      {off ? "OFF" : "ON"}
-                    </button>
                   </div>
                 );
               })}

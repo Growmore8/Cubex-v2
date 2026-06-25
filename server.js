@@ -418,27 +418,39 @@ function microTick() {
   }
 }
 
-// Per-symbol and per-group spread cache (refreshed every 60s).
-// symSpreads: "tenantId:symbol" → pips (Decimal from DB → Number)
+// Spread cache: symbol (with floating support), group, and per-account markups.
+// symSpreads: "tenantId:symbol" → { min, max, type }
 // grpSpreads: groupId → pips
+// accMarkups: accountId → pips
 const symSpreads = {};
 const grpSpreads = {};
+const accMarkups = {};
 async function loadSpreads() {
   try {
-    const syms = await prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true } });
-    for (const s of syms) symSpreads[s.tenantId + ":" + s.symbol] = Number(s.spread || 0);
+    const syms = await prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true, spreadType: true, spreadMax: true } });
+    for (const s of syms) symSpreads[s.tenantId + ":" + s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FIXED" };
     const grps = await prisma.tradeGroup.findMany({ select: { id: true, spread: true } });
     for (const g of grps) grpSpreads[g.id] = Number(g.spread || 0);
+    const accs = await prisma.account.findMany({ select: { id: true, spreadMarkup: true } });
+    for (const a of accs) accMarkups[a.id] = Number(a.spreadMarkup || 0);
   } catch (e) { console.error("[spreads] load failed", e); }
 }
-// Bid = ask − spread. Ask = raw feed price (market-maker model).
-function getSpreadPrice(tenantId, symbol, groupId) {
-  const pips = (symSpreads[tenantId + ":" + symbol] || 0) + (grpSpreads[groupId] || 0);
+// Compute floating or fixed symbol spread in pips.
+function getSymSpreadPips(tenantId, symbol) {
+  const s = symSpreads[tenantId + ":" + symbol];
+  if (!s) return 0;
+  if (s.type !== "FLOATING" || s.max <= s.min) return s.min;
+  const h = new Date().getUTCHours(), d = new Date().getUTCDay();
+  const isPeak = d >= 1 && d <= 5 && h >= 8 && h < 17;
+  return isPeak ? s.min : s.min + (s.max - s.min);
+}
+function getSpreadPrice(tenantId, symbol, groupId, accountId) {
+  const pips = getSymSpreadPips(tenantId, symbol) + (grpSpreads[groupId] || 0) + (accMarkups[accountId] || 0);
   const digits = (meta[symbol] && meta[symbol].digits) || 5;
   return pips * Math.pow(10, -(digits - 1));
 }
-function getBid(tenantId, symbol, groupId, ask) {
-  return ask - getSpreadPrice(tenantId, symbol, groupId);
+function getBid(tenantId, symbol, groupId, accountId, ask) {
+  return ask - getSpreadPrice(tenantId, symbol, groupId, accountId);
 }
 
 // Shared P&L: $1/pip/lot for forex (USD quote); USD-base converted via rate;
@@ -532,7 +544,7 @@ async function liquidate(acc, list, io) {
     let total = 0;
     for (const t of list) {
       const ask = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
-      const price = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, ask) : ask;
+      const price = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, acc.id, ask) : ask;
       const pnl = calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
       total += pnl;
       await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnl, closeReason: "MC", openedAt: t.openedAt } });
@@ -564,7 +576,7 @@ async function monitor(io) {
         const m = meta[t.symbol]; if (!m) continue;
         const ask = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
         // BUY P/L uses bid (ask − spread); SELL P/L uses ask
-        const closePrice = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, ask) : ask;
+        const closePrice = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, acc.id, ask) : ask;
         floating += calcPnl(t.symbol, t.type, Number(t.openPrice), closePrice, Number(t.lots));
         net[t.symbol] = (net[t.symbol] || 0) + (t.type === "BUY" ? 1 : -1) * Number(t.lots);
       }
@@ -584,7 +596,7 @@ async function monitor(io) {
       const st = state[t.symbol];
       if (!st || st.price == null) continue;
       const ask = st.price;
-      const bid = getBid(t.account.tenantId, t.symbol, t.account.groupId, ask);
+      const bid = getBid(t.account.tenantId, t.symbol, t.account.groupId, t.account.id, ask);
       const sl = Number(t.sl), tp = Number(t.tp);
       let reason = null;
       if (t.type === "BUY") {
@@ -607,7 +619,7 @@ async function checkPending(io) {
       const st = state[o.symbol];
       if (!st || st.price == null) continue;
       const ask = st.price;
-      const bid = getBid(o.account.tenantId, o.symbol, o.account.groupId, ask);
+      const bid = getBid(o.account.tenantId, o.symbol, o.account.groupId, o.account.id, ask);
       const trig = Number(o.price);
       if (!trig) continue;
       // BUY orders trigger on ask; SELL orders trigger on bid (MT5 style)

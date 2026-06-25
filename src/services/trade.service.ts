@@ -66,7 +66,7 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   // Compute spread-adjusted open price: BUY opens at ask, SELL opens at bid
   const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol: input.symbol }, select: { digits: true } }).catch(() => null);
   const digits = symRow?.digits ?? 5;
-  const pips = await getSpreadPips(tenantId, input.symbol, (account as any).groupId);
+  const pips = await getSpreadPips(tenantId, input.symbol, (account as any).groupId, account.id);
   const sp = spreadPrice(pips, digits);
   const openPrice = input.side === "BUY" ? ask : ask - sp;
 
@@ -103,7 +103,7 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
   // BUY closes at bid (ask − spread), SELL closes at ask
   const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol: trade.symbol }, select: { digits: true } }).catch(() => null);
   const digits = symRow?.digits ?? 5;
-  const pips = await getSpreadPips(tenantId, trade.symbol, (trade.account as any).groupId);
+  const pips = await getSpreadPips(tenantId, trade.symbol, (trade.account as any).groupId, trade.accountId.toString());
   const price = trade.type === "BUY" ? ask - spreadPrice(pips, digits) : ask;
   const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
 

@@ -62,8 +62,9 @@ export default function ClientTerminal() {
   const [history, setHistory] = useState<any[]>([]);
   const [financials, setFinancials] = useState<any[]>([]);
   const [symbols, setSymbols] = useState<any[]>([]);
-  const [symbolSpreads, setSymbolSpreads] = useState<Record<string, number>>({});
+  const [symbolSpreads, setSymbolSpreads] = useState<Record<string, { min: number; max: number; type: string }>>({});
   const [groupSpread, setGroupSpread] = useState(0);
+  const [accountSpreadMarkup, setAccountSpreadMarkup] = useState(0);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const notifSeen = useRef<Set<string>>(new Set());
@@ -196,7 +197,7 @@ export default function ClientTerminal() {
       if (d.code === "TENANT_SUSPENDED") { setTenantSuspended(true); setDataReady(true); return; }
       setErr(d.error || "Failed"); return;
     }
-    setAccount(d.account); setKycVerified(!!d.kycVerified); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); setPnlOnly(!!d.pnlOnly); if (d.brand) setBrand(d.brand); if (d.symbolSpreads) setSymbolSpreads(d.symbolSpreads); if (d.groupSpread != null) setGroupSpread(Number(d.groupSpread));
+    setAccount(d.account); setKycVerified(!!d.kycVerified); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); setPnlOnly(!!d.pnlOnly); if (d.brand) setBrand(d.brand); if (d.symbolSpreads) setSymbolSpreads(d.symbolSpreads); if (d.groupSpread != null) setGroupSpread(Number(d.groupSpread)); if (d.accountSpreadMarkup != null) setAccountSpreadMarkup(Number(d.accountSpreadMarkup));
     (d.symbols || []).forEach((s: any) => { DIGITS[s.symbol] = s.digits; });
     if (!selSymRef.current && d.symbols.length) setSelSym((d.symbols.find((s: any) => s.symbol === "BTCUSD") || d.symbols[0]).symbol);
     fetch("/api/client/accounts").then((r) => r.json()).then((ad) => { if (ad.ok) { setAccts(ad.accounts || []); if (!accIdRef.current && ad.accounts && ad.accounts.length) { accIdRef.current = ad.accounts[0].id; setAccId(ad.accounts[0].id); } } }).catch((e) => console.warn("[client] accounts fetch failed", e));
@@ -453,7 +454,17 @@ export default function ClientTerminal() {
   const price = prices[selSym];
   const d = dg(selSym);
   // Real spread: symbol pips + group markup → bid = ask − spread
-  const _spreadPips = (sym: string) => (symbolSpreads[sym] ?? 0) + groupSpread;
+  const _spreadPips = (sym: string) => {
+    const s = symbolSpreads[sym];
+    if (!s) return groupSpread + accountSpreadMarkup;
+    let base = s.min;
+    if (s.type === "FLOATING" && s.max > s.min) {
+      const h = new Date().getUTCHours(), d = new Date().getUTCDay();
+      const isPeak = d >= 1 && d <= 5 && h >= 8 && h < 17;
+      if (!isPeak) base = s.max;
+    }
+    return base + groupSpread + accountSpreadMarkup;
+  };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
   const ask = price ?? 0;
   const bid = price != null ? price - _spreadPx(selSym) : 0;
@@ -471,7 +482,7 @@ export default function ClientTerminal() {
   // and the 3s branding minimum has passed, then the app mounts.
   if (!splashGone) return <ClientSplash brand={splashBrand || brand} theme={theme} hiding={booted} />;
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, accountSpreadMarkup, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
   if (tenantSuspended) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 text-center px-6" style={{ background: "#0f172a", color: "#94a3b8" }}>
@@ -791,7 +802,7 @@ export default function ClientTerminal() {
           <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">{(() => { const pos = [
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-          ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} onSymbolChange={(sm) => setSelSym(sm)} />; })()}</div>
+          ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} spreadPips={_spreadPips(selSym)} onSymbolChange={(sm) => setSelSym(sm)} />; })()}</div>
         </div>
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 

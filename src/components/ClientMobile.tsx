@@ -105,9 +105,19 @@ export default function ClientMobile({ t }: { t: any }) {
     acctReqModal, setAcctReqModal,
   } = t;
 
-  const _mobSymSpreads = (): Record<string, number> => (t as any).symbolSpreads || {};
+  const _mobSymSpreads = (): Record<string, { min: number; max: number; type: string }> => (t as any).symbolSpreads || {};
   const _mobGrpSpread = (): number => (t as any).groupSpread || 0;
-  const _mobSpreadPips = (sym: string) => (_mobSymSpreads()[sym] ?? 0) + _mobGrpSpread();
+  const _mobAccMarkup = (): number => (t as any).accountSpreadMarkup || 0;
+  const _mobSpreadPips = (sym: string) => {
+    const s = _mobSymSpreads()[sym];
+    if (!s) return _mobGrpSpread() + _mobAccMarkup();
+    let base = s.min;
+    if (s.type === "FLOATING" && s.max > s.min) {
+      const h = new Date().getUTCHours(), d = new Date().getUTCDay();
+      if (!(d >= 1 && d <= 5 && h >= 8 && h < 17)) base = s.max;
+    }
+    return base + _mobGrpSpread() + _mobAccMarkup();
+  };
 
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "profile">("dashboard");
   const [profileModal, setProfileModal] = useState(false);
@@ -660,9 +670,7 @@ export default function ClientMobile({ t }: { t: any }) {
             <div className="space-y-2.5">
               {quoteList.length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No symbols.</div> : quoteList.map((s: any) => {
                 const dd = dg(s.symbol); const p = prices[s.symbol]; const isFav = (favs || []).includes(s.symbol);
-                const symSpreads: Record<string, number> = (t as any).symbolSpreads || {};
-                const grpSpread: number = (t as any).groupSpread || 0;
-                const spPips = (symSpreads[s.symbol] ?? 0) + grpSpread;
+                const spPips = _mobSpreadPips(s.symbol);
                 const spPx = spPips * Math.pow(10, -(dd - 1));
                 const sAsk = p; const sBid = p != null ? p - spPx : null;
                 const spread = spPips;
@@ -752,7 +760,7 @@ export default function ClientMobile({ t }: { t: any }) {
             )}
             {/* Preview chart — bare KLine (no toolbar/rail); full features in full-screen */}
             <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
-              <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} symbols={symbols} bare
+              <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} symbols={symbols} bare spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
@@ -785,7 +793,7 @@ export default function ClientMobile({ t }: { t: any }) {
               </button>
             </div>
             <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
-              <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} symbols={symbols} onSymbolChange={(sm: string) => setSelSym(sm)}
+              <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} symbols={symbols} spreadPips={_mobSpreadPips(selSym)} onSymbolChange={(sm: string) => setSelSym(sm)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
