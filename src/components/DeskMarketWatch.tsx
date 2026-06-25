@@ -79,10 +79,9 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
             <div
               onClick={() => setCollapsed((o) => ({ ...o, [cat]: !o[cat] }))}
               onContextMenu={(e) => { if (!onCategoryEdit) return; e.preventDefault(); setCatCtx({ x: e.clientX, y: e.clientY, cat, syms: list.map((s) => s.symbol) }); }}
-              className={"mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)] flex items-center justify-between " + (onCategoryEdit ? "cursor-context-menu" : "cursor-pointer")}
+              className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)] flex items-center justify-between cursor-pointer"
             >
               <span>{collapsed[cat] ? "▸" : "▾"} {cat.toUpperCase()}</span>
-              {onCategoryEdit && <i className="fa-solid fa-sliders text-[8px] opacity-40 hover:opacity-100" title="Right-click to set category spread" />}
             </div>
             {!collapsed[cat] && list.map((s) => {
               const p = prices[s.symbol]; const d = dgFor(s);
