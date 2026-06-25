@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PACKAGES, PLAN_KEYS } from "@/config/packages";
 import { useDialog } from "@/components/ui/ConfirmDialog";
 
@@ -23,6 +23,15 @@ export default function SABillingPage() {
   const [filterTenant, setFilterTenant] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [printInv, setPrintInv] = useState<any>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  // Email dialog state
+  const [emailInv, setEmailInv] = useState<any>(null);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailErr, setEmailErr] = useState("");
+
   const { confirm, node } = useDialog();
 
   const now = new Date();
@@ -48,6 +57,14 @@ export default function SABillingPage() {
   }
   useEffect(() => { load(); }, [filterTenant, filterStatus]);
 
+  // When tenant changes in generate form, auto-fill plan + amount from their subscription
+  function onTenantChange(tenantId: string) {
+    const t = tenants.find((x: any) => x.id === tenantId);
+    const plan = t?.subscription?.plan || "STARTER";
+    const amount = PACKAGES[plan as keyof typeof PACKAGES]?.price || PACKAGES.STARTER.price;
+    setGf((f: any) => ({ ...f, tenantId, plan, amount }));
+  }
+
   async function generate() {
     setErr("");
     if (!gf.tenantId) { setErr("Select a tenant"); return; }
@@ -72,11 +89,48 @@ export default function SABillingPage() {
     if (!d.ok) { setErr(d.error || "Failed"); return; }
     load();
   }
-  async function sendInvoice(inv: any) {
-    setErr("");
-    const r = await fetch("/api/superadmin/billing/" + inv.id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "send" }) }).then((x) => x.json()).catch(() => ({ ok: false }));
-    if (!r.ok) { setErr(r.error || "Failed to send"); return; }
-    alert("Invoice " + inv.number + " emailed to " + r.sent);
+
+  function openEmailDialog(inv: any) {
+    setEmailInv(inv);
+    setEmailTo(inv.tenant?.supportEmail || "");
+    setEmailSent(false);
+    setEmailErr("");
+    setEmailSending(false);
+  }
+
+  async function sendEmail() {
+    if (!emailTo.trim()) { setEmailErr("Enter an email address"); return; }
+    setEmailSending(true);
+    setEmailErr("");
+    const r = await fetch("/api/superadmin/billing/" + emailInv.id, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "send", overrideTo: emailTo.trim() }),
+    }).then((x) => x.json()).catch(() => ({ ok: false }));
+    setEmailSending(false);
+    if (!r.ok) { setEmailErr(r.error || "Failed to send"); return; }
+    setEmailSent(true);
+  }
+
+  function printInvoice() {
+    const el = printRef.current;
+    if (!el) return;
+    const w = window.open("", "_blank", "width=794,height=1123");
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Invoice ${printInv?.number}</title><style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:system-ui,-apple-system,sans-serif;background:#fff;color:#111827;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      @page{size:A4;margin:0}
+      .page{width:794px;min-height:1123px;padding:60px 72px;background:#fff}
+      table{width:100%;border-collapse:collapse}
+      th{text-align:left;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #e5e7eb;padding:8px 10px}
+      td{padding:10px;border-bottom:1px solid #f3f4f6;font-size:13px}
+      .total-row td{border-top:2px solid #e5e7eb;border-bottom:none;padding-top:14px}
+      .stamp{display:inline-block;border:3px solid #16a34a;color:#16a34a;font-size:22px;font-weight:800;letter-spacing:.1em;padding:6px 20px;border-radius:6px;transform:rotate(-12deg);opacity:.85}
+    </style></head><body><div class="page">${el.innerHTML}</div></body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); }, 400);
   }
 
   const inp = "ui-input rounded-md border px-2 py-1.5 text-sm w-full";
@@ -161,18 +215,13 @@ export default function SABillingPage() {
                   <td className="text-xs" style={{ color: inv.status === "OVERDUE" ? "#b91c1c" : "#6b7280", fontWeight: inv.status === "OVERDUE" ? 600 : 400 }}>{new Date(inv.dueAt).toLocaleDateString()}</td>
                   <td className="text-xs text-green-600 font-medium">{inv.paidAt ? new Date(inv.paidAt).toLocaleDateString() : "—"}</td>
                   <td className="whitespace-nowrap">
-                    {inv.status === "PENDING" && (
-                      <button onClick={() => act(inv.id, "markPaid")} title="Mark as Paid — tenant will be unsuspended" className="mr-1 rounded px-2 py-1 text-xs font-semibold" style={{ background: "#dcfce7", color: "#15803d" }}>
-                        <i className="fa-solid fa-check mr-1" />Mark Paid
-                      </button>
-                    )}
-                    {inv.status === "OVERDUE" && (
-                      <button onClick={() => act(inv.id, "markPaid")} title="Mark as Paid — tenant will be unsuspended" className="mr-1 rounded px-2 py-1 text-xs font-semibold" style={{ background: "#dcfce7", color: "#15803d" }}>
-                        <i className="fa-solid fa-check mr-1" />Mark Paid
+                    {(inv.status === "PENDING" || inv.status === "OVERDUE") && (
+                      <button onClick={() => act(inv.id, "markPaid")} title="Mark as Paid" className="mr-1 rounded px-2 py-1 text-xs font-semibold" style={{ background: "#dcfce7", color: "#15803d" }}>
+                        <i className="fa-solid fa-check mr-1" />Paid
                       </button>
                     )}
                     {(inv.status === "PENDING" || inv.status === "OVERDUE") && (
-                      <button onClick={() => act(inv.id, "markOverdue")} title="Mark as Overdue — tenant will be suspended" className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#fee2e2", color: "#dc2626" }}>
+                      <button onClick={() => act(inv.id, "markOverdue")} title="Suspend tenant" className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#fee2e2", color: "#dc2626" }}>
                         Suspend
                       </button>
                     )}
@@ -181,7 +230,7 @@ export default function SABillingPage() {
                         Reset
                       </button>
                     )}
-                    <button onClick={() => sendInvoice(inv)} title="Send invoice by email to tenant's contact email" className="mr-1 rounded px-2 py-1 text-xs gap-1 inline-flex items-center" style={{ background: "#dbeafe", color: "#2563eb" }}>
+                    <button onClick={() => openEmailDialog(inv)} title="Send invoice by email" className="mr-1 rounded px-2 py-1 text-xs gap-1 inline-flex items-center" style={{ background: "#dbeafe", color: "#2563eb" }}>
                       <i className="fa-solid fa-envelope text-xs" /><span>Email</span>
                     </button>
                     <button onClick={() => setPrintInv(inv)} title="Download / Print PDF" className="mr-1 rounded px-2 py-1 text-xs gap-1 inline-flex items-center" style={{ background: "#f1f5f9", color: "#475569" }}>
@@ -208,7 +257,7 @@ export default function SABillingPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">TENANT</label>
-                <select className={inp} value={gf.tenantId} onChange={(e) => setGf({ ...gf, tenantId: e.target.value })}>
+                <select className={inp} value={gf.tenantId} onChange={(e) => onTenantChange(e.target.value)}>
                   <option value="">Select tenant…</option>
                   {tenants.map((t: any) => <option key={t.id} value={t.id}>{t.brandName || t.name}</option>)}
                 </select>
@@ -216,11 +265,11 @@ export default function SABillingPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-500 block mb-1">PERIOD (YYYY-MM)</label>
-                  <input className={inp} type="month" value={gf.period} onChange={(e) => setGf({ ...gf, period: e.target.value })} />
+                  <input className={inp} type="month" value={gf.period} onChange={(e) => setGf((f: any) => ({ ...f, period: e.target.value }))} />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 block mb-1">PLAN</label>
-                  <select className={inp} value={gf.plan} onChange={(e) => setGf({ ...gf, plan: e.target.value, amount: PACKAGES[e.target.value as keyof typeof PACKAGES]?.price || gf.amount })}>
+                  <select className={inp} value={gf.plan} onChange={(e) => setGf((f: any) => ({ ...f, plan: e.target.value, amount: PACKAGES[e.target.value as keyof typeof PACKAGES]?.price || f.amount }))}>
                     {PLAN_KEYS.map((k) => <option key={k} value={k}>{PACKAGES[k].name} — ${PACKAGES[k].price}/mo</option>)}
                   </select>
                 </div>
@@ -228,16 +277,16 @@ export default function SABillingPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-500 block mb-1">AMOUNT ($)</label>
-                  <input className={inp} type="number" value={gf.amount} onChange={(e) => setGf({ ...gf, amount: e.target.value })} />
+                  <input className={inp} type="number" value={gf.amount} onChange={(e) => setGf((f: any) => ({ ...f, amount: e.target.value }))} />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 block mb-1">DUE DATE</label>
-                  <input className={inp} type="date" value={gf.dueAt} onChange={(e) => setGf({ ...gf, dueAt: e.target.value })} />
+                  <input className={inp} type="date" value={gf.dueAt} onChange={(e) => setGf((f: any) => ({ ...f, dueAt: e.target.value }))} />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">NOTES (optional)</label>
-                <textarea className={inp} rows={2} value={gf.notes} onChange={(e) => setGf({ ...gf, notes: e.target.value })} />
+                <textarea className={inp} rows={2} value={gf.notes} onChange={(e) => setGf((f: any) => ({ ...f, notes: e.target.value }))} />
               </div>
             </div>
             {err && <div className="mt-2 text-sm text-red-600">{err}</div>}
@@ -249,65 +298,159 @@ export default function SABillingPage() {
         </div>
       )}
 
-      {/* Print Invoice */}
+      {/* Email Dialog */}
+      {emailInv && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
+          <div className="ui-card ui-pop w-[440px] bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            {emailSent ? (
+              <div className="text-center py-4">
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full" style={{ background: "#dcfce7" }}>
+                  <i className="fa-solid fa-circle-check text-2xl" style={{ color: "#16a34a" }} />
+                </div>
+                <div className="text-lg font-semibold text-gray-800 mb-1">Email Sent Successfully</div>
+                <div className="text-sm text-gray-500 mb-4">Invoice <span className="font-mono font-medium">{emailInv.number}</span> was emailed to <span className="font-medium">{emailTo}</span></div>
+                <button onClick={() => setEmailInv(null)} className="ui-btn px-6 py-2 text-sm text-white" style={{ background: "#16a34a", borderColor: "transparent" }}>Done</button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="font-semibold text-gray-800">Send Invoice by Email</div>
+                  <button onClick={() => setEmailInv(null)} className="text-gray-400 hover:text-gray-600"><i className="fa-solid fa-xmark" /></button>
+                </div>
+                <div className="mb-3 rounded-lg p-3 text-sm" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                  <div className="text-xs text-gray-400 mb-0.5">Invoice</div>
+                  <div className="font-mono font-medium text-gray-700">{emailInv.number}</div>
+                  <div className="text-xs text-gray-500 mt-1">{emailInv.tenant?.brandName || emailInv.tenant?.name} · {emailInv.period} · {fmt(Number(emailInv.amount))}</div>
+                </div>
+                <div className="mb-1">
+                  <label className="text-xs font-medium text-gray-500 block mb-1">SEND TO</label>
+                  <input
+                    className={inp}
+                    type="email"
+                    value={emailTo}
+                    onChange={(e) => setEmailTo(e.target.value)}
+                    placeholder="email@example.com"
+                    autoFocus
+                  />
+                  {emailInv.tenant?.supportEmail && emailTo !== emailInv.tenant.supportEmail && (
+                    <button onClick={() => setEmailTo(emailInv.tenant.supportEmail)} className="mt-1 text-xs" style={{ color: "#2563eb" }}>
+                      Use contact email: {emailInv.tenant.supportEmail}
+                    </button>
+                  )}
+                </div>
+                {emailErr && <div className="mt-2 text-sm text-red-600">{emailErr}</div>}
+                <div className="mt-4 flex justify-end gap-2">
+                  <button onClick={() => setEmailInv(null)} className="ui-btn px-4 py-2 text-sm">Cancel</button>
+                  <button onClick={sendEmail} disabled={emailSending} className="ui-btn px-5 py-2 text-sm text-white inline-flex items-center gap-2 disabled:opacity-60" style={{ background: "#2563eb", borderColor: "transparent" }}>
+                    {emailSending ? <><i className="fa-solid fa-spinner fa-spin text-xs" />Sending…</> : <><i className="fa-solid fa-paper-plane text-xs" />Send Email</>}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* PDF Invoice Preview */}
       {printInv && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
-          <div className="ui-card ui-pop w-[600px] bg-white print:shadow-none" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b px-6 py-4 print:hidden" style={{ borderColor: "#e2e8f0" }}>
-              <div className="font-semibold">Invoice Preview</div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4" onClick={() => setPrintInv(null)}>
+          <div className="flex flex-col" style={{ maxHeight: "95vh" }} onClick={(e) => e.stopPropagation()}>
+            {/* Toolbar */}
+            <div className="flex items-center justify-between rounded-t-xl px-4 py-2.5" style={{ background: "#1e293b" }}>
+              <span className="text-sm font-medium text-white">{printInv.number}</span>
               <div className="flex gap-2">
-                <button onClick={() => window.print()} className="ui-btn ui-btn-primary px-4 py-1.5 text-sm"><i className="fa-solid fa-print mr-1" />Print / Save PDF</button>
-                <button onClick={() => setPrintInv(null)} className="ui-btn px-4 py-1.5 text-sm">Close</button>
+                <button onClick={printInvoice} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: "#2563eb" }}>
+                  <i className="fa-solid fa-download text-xs" />Download PDF
+                </button>
+                <button onClick={() => setPrintInv(null)} className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:text-white" style={{ background: "#334155" }}>
+                  <i className="fa-solid fa-xmark text-xs" />
+                </button>
               </div>
             </div>
-            <div className="p-8">
-              <div className="flex items-start justify-between mb-8">
-                <div>
-                  <div className="text-2xl font-bold text-gray-800">INVOICE</div>
-                  <div className="text-gray-500 text-sm mt-1">{printInv.number}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-gray-800">{PLATFORM_NAME}</div>
-                  <div className="text-sm text-gray-500">Finance Department</div>
+
+            {/* A4 white invoice */}
+            <div className="overflow-auto rounded-b-xl" style={{ background: "#94a3b8" }}>
+              <div className="p-6">
+                {/* This div is what gets printed */}
+                <div ref={printRef} style={{ width: 595, minHeight: 842, background: "#fff", color: "#111827", fontFamily: "system-ui,-apple-system,sans-serif", padding: "56px 60px" }}>
+                  {/* Header */}
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 40 }}>
+                    <div>
+                      <div style={{ fontSize: 32, fontWeight: 800, color: "#111827", letterSpacing: "-0.02em" }}>INVOICE</div>
+                      <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4, fontFamily: "monospace" }}>{printInv.number}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: "#111827" }}>{PLATFORM_NAME}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>Finance Department</div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{ height: 2, background: "#e5e7eb", marginBottom: 32 }} />
+
+                  {/* Billed To + Invoice Details */}
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 40 }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Billed To</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{printInv.tenant?.brandName || printInv.tenant?.name}</div>
+                      {printInv.tenant?.supportEmail && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{printInv.tenant.supportEmail}</div>}
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Invoice Details</div>
+                      <div style={{ fontSize: 13, color: "#374151" }}>Period: <strong>{printInv.period}</strong></div>
+                      <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>Due Date: <strong>{new Date(printInv.dueAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</strong></div>
+                      <div style={{ fontSize: 13, marginTop: 2 }}>
+                        Status: <strong style={{ color: STATUS_STYLE[printInv.status]?.color }}>{STATUS_LABEL[printInv.status] || printInv.status}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Line items table */}
+                  <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 8 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
+                        <th style={{ textAlign: "left", fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", padding: "8px 10px" }}>Description</th>
+                        <th style={{ textAlign: "right", fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", padding: "8px 10px" }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: "14px 10px", borderBottom: "1px solid #f3f4f6" }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{PACKAGES[printInv.plan as keyof typeof PACKAGES]?.name || printInv.plan} Plan — Monthly Subscription</div>
+                          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>Billing period: {printInv.period}</div>
+                          {printInv.notes && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 3 }}>{printInv.notes}</div>}
+                        </td>
+                        <td style={{ padding: "14px 10px", textAlign: "right", fontSize: 14, fontWeight: 600, color: "#111827", borderBottom: "1px solid #f3f4f6" }}>{fmt(Number(printInv.amount))}</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td style={{ padding: "16px 10px 0", textAlign: "right", fontSize: 13, fontWeight: 600, color: "#374151", borderTop: "2px solid #e5e7eb" }}>Total Due</td>
+                        <td style={{ padding: "16px 10px 0", textAlign: "right", fontSize: 22, fontWeight: 800, color: "#111827", borderTop: "2px solid #e5e7eb" }}>{fmt(Number(printInv.amount))}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+
+                  {/* PAID stamp */}
+                  {printInv.status === "PAID" && (
+                    <div style={{ textAlign: "center", margin: "24px 0" }}>
+                      <span style={{ display: "inline-block", border: "3px solid #16a34a", color: "#16a34a", fontSize: 22, fontWeight: 800, letterSpacing: "0.12em", padding: "6px 24px", borderRadius: 6, transform: "rotate(-12deg)", opacity: 0.85 }}>PAID</span>
+                      {printInv.paidAt && <div style={{ fontSize: 12, color: "#16a34a", marginTop: 8 }}>Payment received on {new Date(printInv.paidAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>}
+                    </div>
+                  )}
+
+                  {/* Footer */}
+                  <div style={{ marginTop: 60, paddingTop: 20, borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                    <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                      <div style={{ fontWeight: 600, color: "#6b7280" }}>{PLATFORM_NAME}</div>
+                      <div>Finance Department</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#9ca3af", textAlign: "right" }}>
+                      <div>Generated {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-6 mb-8">
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-1">BILLED TO</div>
-                  <div className="font-semibold">{printInv.tenant?.brandName || printInv.tenant?.name}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs font-semibold text-gray-400 mb-1">INVOICE DETAILS</div>
-                  <div className="text-sm text-gray-600">Period: <span className="font-medium">{printInv.period}</span></div>
-                  <div className="text-sm text-gray-600">Due: <span className="font-medium">{new Date(printInv.dueAt).toLocaleDateString()}</span></div>
-                  <div className="text-sm text-gray-600">Status: <span className="font-semibold" style={{ color: STATUS_STYLE[printInv.status]?.color }}>{STATUS_LABEL[printInv.status] || printInv.status}</span></div>
-                </div>
-              </div>
-              <table className="sa-table mb-6">
-                <thead>
-                  <tr>
-                    <th className="text-left">Description</th>
-                    <th className="text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>
-                      <div className="font-medium">{PACKAGES[printInv.plan as keyof typeof PACKAGES]?.name || printInv.plan} Plan — Monthly Subscription</div>
-                      <div className="text-xs text-gray-500">Billing period: {printInv.period}</div>
-                      {printInv.notes && <div className="text-xs text-gray-400 mt-0.5">{printInv.notes}</div>}
-                    </td>
-                    <td className="text-right font-semibold">{fmt(Number(printInv.amount))}</td>
-                  </tr>
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td className="text-right font-bold text-gray-700">Total Due:</td>
-                    <td className="text-right text-xl font-bold">{fmt(Number(printInv.amount))}</td>
-                  </tr>
-                </tfoot>
-              </table>
-              {printInv.paidAt && <div className="text-center text-sm font-semibold text-green-600 border border-green-200 rounded-lg py-2 bg-green-50">PAID on {new Date(printInv.paidAt).toLocaleDateString()}</div>}
             </div>
           </div>
         </div>

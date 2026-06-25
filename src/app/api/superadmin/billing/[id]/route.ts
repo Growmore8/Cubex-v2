@@ -37,8 +37,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await prisma.invoice.update({ where: { id }, data });
     } else if (b.action === "send") {
       const tenant: any = inv.tenant;
-      const to = tenant?.supportEmail;
-      if (!to) throw new Error("This tenant has no contact email — set it in Tenant → Edit first.");
+      const to = b.overrideTo || tenant?.supportEmail;
+      if (!to) throw new Error("No email address provided. Enter an email or set one in Tenant → Edit.");
       const tenantName = tenant.brandName || tenant.name || "Tenant";
       await sendPlatformMail({
         to,
