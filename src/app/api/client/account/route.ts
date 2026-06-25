@@ -86,6 +86,18 @@ export async function GET(req: Request) {
     if (hidden.size) symbols = symbols.filter((x: any) => !hidden.has(x.symbol));
   } catch { symbols = []; }
 
+  // Spread data: per-symbol pips + group markup so client can derive real bid/ask
+  let symbolSpreads: Record<string, number> = {};
+  let groupSpread = 0;
+  try {
+    const tenantSyms = await prisma.symbol.findMany({ where: { tenantId: s.tenantId! }, select: { symbol: true, spread: true } });
+    for (const ts of tenantSyms) symbolSpreads[ts.symbol] = Number(ts.spread ?? 0);
+    if (account && (account as any).groupId) {
+      const grp = await prisma.tradeGroup.findUnique({ where: { id: (account as any).groupId }, select: { spread: true } });
+      groupSpread = Number(grp?.spread ?? 0);
+    }
+  } catch {}
+
   // tenant branding for the app header (never "CubeX")
   let brand: { name: string; logoUrl: string | null; primaryColor: string | null; accentColor: string | null } = { name: "", logoUrl: null, primaryColor: null, accentColor: null };
   try {
@@ -126,5 +138,7 @@ export async function GET(req: Request) {
       closeReason: h.closeReason, openedAt: h.openedAt, closedAt: h.closedAt,
     })) : [],
     symbols,
+    symbolSpreads,
+    groupSpread,
   });
 }

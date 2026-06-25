@@ -215,6 +215,7 @@ model Symbol {
   category String  @default("forex")
   digits   Int     @default(5)
   feed     String?
+  spread   Decimal @default(0) @db.Decimal(10, 2)
   enabled  Boolean @default(true)
   @@unique([tenantId, symbol])
 }

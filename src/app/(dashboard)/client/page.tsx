@@ -62,6 +62,8 @@ export default function ClientTerminal() {
   const [history, setHistory] = useState<any[]>([]);
   const [financials, setFinancials] = useState<any[]>([]);
   const [symbols, setSymbols] = useState<any[]>([]);
+  const [symbolSpreads, setSymbolSpreads] = useState<Record<string, number>>({});
+  const [groupSpread, setGroupSpread] = useState(0);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const notifSeen = useRef<Set<string>>(new Set());
@@ -194,7 +196,7 @@ export default function ClientTerminal() {
       if (d.code === "TENANT_SUSPENDED") { setTenantSuspended(true); setDataReady(true); return; }
       setErr(d.error || "Failed"); return;
     }
-    setAccount(d.account); setKycVerified(!!d.kycVerified); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); setPnlOnly(!!d.pnlOnly); if (d.brand) setBrand(d.brand);
+    setAccount(d.account); setKycVerified(!!d.kycVerified); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); setPnlOnly(!!d.pnlOnly); if (d.brand) setBrand(d.brand); if (d.symbolSpreads) setSymbolSpreads(d.symbolSpreads); if (d.groupSpread != null) setGroupSpread(Number(d.groupSpread));
     (d.symbols || []).forEach((s: any) => { DIGITS[s.symbol] = s.digits; });
     if (!selSymRef.current && d.symbols.length) setSelSym((d.symbols.find((s: any) => s.symbol === "BTCUSD") || d.symbols[0]).symbol);
     fetch("/api/client/accounts").then((r) => r.json()).then((ad) => { if (ad.ok) { setAccts(ad.accounts || []); if (!accIdRef.current && ad.accounts && ad.accounts.length) { accIdRef.current = ad.accounts[0].id; setAccId(ad.accounts[0].id); } } }).catch((e) => console.warn("[client] accounts fetch failed", e));
@@ -450,7 +452,11 @@ export default function ClientTerminal() {
   const level = used > 0 ? (equity / used) * 100 : 0;
   const price = prices[selSym];
   const d = dg(selSym);
-  const bid = price ?? 0, ask = price != null ? price + Math.pow(10, -d) * 2 : 0;
+  // Real spread: symbol pips + group markup → bid = ask − spread
+  const _spreadPips = (sym: string) => (symbolSpreads[sym] ?? 0) + groupSpread;
+  const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
+  const ask = price ?? 0;
+  const bid = price != null ? price - _spreadPx(selSym) : 0;
   const margin = price != null ? ((vol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0;
   const fmt = (v: number) => gmoney(v);
   const groups: Record<string, any[]> = {};
@@ -465,7 +471,7 @@ export default function ClientTerminal() {
   // and the 3s branding minimum has passed, then the app mounts.
   if (!splashGone) return <ClientSplash brand={splashBrand || brand} theme={theme} hiding={booted} />;
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
   if (tenantSuspended) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 text-center px-6" style={{ background: "#0f172a", color: "#94a3b8" }}>
@@ -755,7 +761,7 @@ export default function ClientTerminal() {
             {favs.length > 0 && (
               <div>
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
-                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const b = p != null ? p * 0.9999 : null; const a = p != null ? p * 1.0001 : null; const dir = dirs[s.symbol] || 0; return (
+                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const a = p ?? null; const b = p != null ? p - _spreadPx(s.symbol) : null; const dir = dirs[s.symbol] || 0; return (
                   <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
@@ -766,7 +772,7 @@ export default function ClientTerminal() {
             {orderedGroups.map(([c, list]) => (
               <div key={c}>
                 <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
-                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const b = p != null ? p * 0.9999 : null; const a = p != null ? p * 1.0001 : null; const dir = dirs[s.symbol] || 0; const fc = dir > 0 ? BUY : dir < 0 ? SELL : "var(--text)"; const bg = dir > 0 ? "rgba(22,199,132,0.32)" : dir < 0 ? "rgba(224,82,96,0.32)" : "transparent"; return (
+                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const a = p ?? null; const b = p != null ? p - _spreadPx(s.symbol) : null; const dir = dirs[s.symbol] || 0; const fc = dir > 0 ? BUY : dir < 0 ? SELL : "var(--text)"; const bg = dir > 0 ? "rgba(22,199,132,0.32)" : dir < 0 ? "rgba(224,82,96,0.32)" : "transparent"; return (
                   <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_64px_64px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />

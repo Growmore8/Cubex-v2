@@ -66,6 +66,8 @@ export default function AdminDeskPage() {
   const NOTI_TEMPLATES: any = { Maintenance: { title: "Scheduled Maintenance", body: "Our platform will undergo scheduled maintenance. Trading may be briefly unavailable. We apologize for any inconvenience." }, Promotion: { title: "Special Promotion", body: "A new promotion is now available. Contact your account manager to learn more." }, News: { title: "Market News", body: "Stay informed with the latest market updates and analysis." }, Notice: { title: "Important Notice", body: "Please review this important notice regarding your trading account." }, Custom: { title: "", body: "" } };
   
   const [symbols, setSymbols] = useState<any[]>([]);
+  const [adminSymSpreads, setAdminSymSpreads] = useState<Record<string, number>>({});
+  const [adminSymIds, setAdminSymIds] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
@@ -277,6 +279,8 @@ export default function AdminDeskPage() {
     ]);
     if (c.ok) setClients(c.clients);
     if (sy.ok) { const seen = new Set<string>(); const uniq = (sy.symbols || []).filter((s: any) => { if (seen.has(s.symbol)) return false; seen.add(s.symbol); return true; }); setSymbols(uniq); if (!selSymRef.current && uniq.length) setSelSym((uniq.find((s: any) => s.symbol === "BTCUSD") || uniq[0]).symbol); }
+    // Load per-symbol spreads for market watch bid/ask display
+    fetch("/api/admin/symbols").then((r) => r.json()).then((asr) => { if (asr.ok) { const m: Record<string, number> = {}; const ids: Record<string, string> = {}; (asr.symbols || []).forEach((s: any) => { m[s.symbol] = Number(s.spread ?? 0); ids[s.symbol] = s.id; }); setAdminSymSpreads(m); setAdminSymIds(ids); } }).catch(() => {});
     if (o.ok) setOpen(o.trades);
     if (h.ok) setHistory(h.history);
     if (a.ok) setAudit(a.logs);
@@ -674,7 +678,7 @@ export default function AdminDeskPage() {
   );
 
   const shown: { sym: string; i: number }[] = layout === 1 ? (openCharts[activeChart] ? [{ sym: openCharts[activeChart], i: activeChart }] : []) : openCharts.slice(0, layout).map((sym, i) => ({ sym, i }));
-  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const bid = p != null ? gnum(p * 0.9999, d) : "..."; const ask = p != null ? gnum(p * 1.0001, d) : "...";
+  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const spPips = adminSymSpreads[sym] || 0; const spPx = spPips * Math.pow(10, -(d - 1)); const ask = p != null ? gnum(p, d) : "..."; const bid = p != null ? gnum(p - spPx, d) : "...";
     if (!showOC) return (
       <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-16 top-12 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
         <i className="fa-solid fa-bolt" /> Trade
@@ -978,7 +982,7 @@ export default function AdminDeskPage() {
           <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
             <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
-            <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile} onDisable={(sym) => toggleSymPerm(sym, true)} />
+            <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile} onDisable={(sym) => toggleSymPerm(sym, true)} symbolSpreads={adminSymSpreads} groupSpread={0} />
           </aside>
         </>)}
       </div>
@@ -1974,9 +1978,15 @@ export default function AdminDeskPage() {
               {symPerm.symbols.filter((s: any) => s.symbol.toLowerCase().includes((symPerm.q || "").toLowerCase())).map((s: any) => {
                 const off = symPerm.disabled.includes(s.symbol);
                 return (
-                  <div key={s.symbol} className="flex items-center justify-between border-b border-[var(--border)] py-1.5 text-[11px]">
-                    <div><span className="font-medium">{s.symbol}</span> <span style={{ color: "var(--muted)" }}>{s.display}</span></div>
-                    <button onClick={() => toggleSymPerm(s.symbol, !off)} className="rounded px-2 py-0.5 text-[10px] font-semibold" style={off ? { background: "rgba(224,82,96,0.16)", color: SELL } : { background: "rgba(38,166,154,0.16)", color: BUY }}>
+                  <div key={s.symbol} className="flex items-center justify-between border-b border-[var(--border)] py-1.5 text-[11px] gap-2">
+                    <div className="min-w-0 flex-1"><span className="font-medium">{s.symbol}</span> <span style={{ color: "var(--muted)" }}>{s.display}</span></div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span style={{ color: "var(--muted)", fontSize: 9 }}>Spread</span>
+                      <input type="number" min="0" step="0.1" value={adminSymSpreads[s.symbol] ?? 0} onChange={(e) => setAdminSymSpreads((m) => ({ ...m, [s.symbol]: Number(e.target.value) }))}
+                        onBlur={(e) => { const v = Math.max(0, Number(e.target.value)); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: v }) }).catch(() => {}); setAdminSymSpreads((m) => ({ ...m, [s.symbol]: v })); }}
+                        className="w-14 rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-center text-[10px]" style={{ color: "var(--text)" }} />
+                    </div>
+                    <button onClick={() => toggleSymPerm(s.symbol, !off)} className="rounded px-2 py-0.5 text-[10px] font-semibold shrink-0" style={off ? { background: "rgba(224,82,96,0.16)", color: SELL } : { background: "rgba(38,166,154,0.16)", color: BUY }}>
                       {off ? "OFF" : "ON"}
                     </button>
                   </div>

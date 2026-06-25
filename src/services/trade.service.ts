@@ -7,6 +7,7 @@ import { pnlFor, validateSlTp, usedMargin } from "@/lib/trademath";
 import { notifyStaff } from "@/services/notification.service";
 import { audit } from "@/lib/audit";
 import { gnum, gprice } from "@/lib/format";
+import { getSpreadPips, spreadPrice, pipForDigits } from "@/lib/spread";
 import { isMarketOpen } from "@/lib/market";
 
 // Throws if the symbol's market is closed (weekend forex/metals, etc.). Used to
@@ -58,29 +59,33 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   if (account.deactivated) throw new Error("Account is deactivated");
   if (account.locked) throw new Error("Account is locked (read-only)");
   await assertTradingOpen();
-  await assertMarketOpen(input.symbol);     // block when the market is closed
-  const price = await getPrice(input.symbol);
-  if (price == null) throw new Error("No price for " + input.symbol);
+  await assertMarketOpen(input.symbol);
+  const ask = await getPrice(input.symbol);
+  if (ask == null) throw new Error("No price for " + input.symbol);
 
-  // TP/SL placement validation
-  const slErr = validateSlTp(input.side, price, input.sl, input.tp);
+  // Compute spread-adjusted open price: BUY opens at ask, SELL opens at bid
+  const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol: input.symbol }, select: { digits: true } }).catch(() => null);
+  const digits = symRow?.digits ?? 5;
+  const pips = await getSpreadPips(tenantId, input.symbol, (account as any).groupId);
+  const sp = spreadPrice(pips, digits);
+  const openPrice = input.side === "BUY" ? ask : ask - sp;
+
+  const slErr = validateSlTp(input.side, openPrice, input.sl, input.tp);
   if (slErr) throw new Error(slErr);
 
-  // Free-margin check (shared rule) — free margin must be positive and cover
-  // this trade's required margin, else "Not enough money".
-  await assertMargin(account, { symbol: input.symbol, type: input.side, lots: Number(input.lots) }, price);
+  await assertMargin(account, { symbol: input.symbol, type: input.side, lots: Number(input.lots) }, ask);
 
   const ticket = await nextTicket(tenantId);
   const trade = await prisma.trade.create({
     data: {
       ticket, accountId: account.id, symbol: input.symbol, type: input.side,
-      lots: new Prisma.Decimal(input.lots), openPrice: new Prisma.Decimal(price),
+      lots: new Prisma.Decimal(input.lots), openPrice: new Prisma.Decimal(openPrice),
       sl: new Prisma.Decimal(input.sl || 0), tp: new Prisma.Decimal(input.tp || 0),
     },
   });
-  const label = `${account.login} ${input.side} ${input.symbol} ${input.lots}L @ ${price}`;
+  const label = `${account.login} ${input.side} ${input.symbol} ${input.lots}L @ ${openPrice}`;
   audit(tenantId, "trade.open", label, account.login, "CLIENT" as any);
-  notifyStaff(tenantId, { type: "TRADE", title: "Trade opened", body: label }, account.managerId).catch(() => {});
+  notifyStaff(tenantId, { type: "TRADE", title: "Trade opened", body: label }, (account as any).managerId).catch(() => {});
   return {
     id: trade.id.toString(), ticket: trade.ticket.toString(), symbol: trade.symbol, type: trade.type,
     lots: Number(trade.lots), openPrice: Number(trade.openPrice), sl: Number(trade.sl), tp: Number(trade.tp),
@@ -93,8 +98,13 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
   if (!trade) throw new Error("Position not found");
   if (trade.account.deactivated) throw new Error("Account is deactivated");
   if (trade.account.locked) throw new Error("Account is locked (read-only)");
-  const price = await getPrice(trade.symbol);
-  if (price == null) throw new Error("No price");
+  const ask = await getPrice(trade.symbol);
+  if (ask == null) throw new Error("No price");
+  // BUY closes at bid (ask − spread), SELL closes at ask
+  const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol: trade.symbol }, select: { digits: true } }).catch(() => null);
+  const digits = symRow?.digits ?? 5;
+  const pips = await getSpreadPips(tenantId, trade.symbol, (trade.account as any).groupId);
+  const price = trade.type === "BUY" ? ask - spreadPrice(pips, digits) : ask;
   const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
 
   await prisma.$transaction(async (tx) => {
@@ -108,7 +118,7 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
     await tx.account.update({ where: { id: trade.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnl) } } });
     await tx.trade.delete({ where: { id: trade.id } });
   });
-  const label = `${trade.account.login} ${trade.symbol} closed @ ${gprice(price)} | PnL ${gnum(pnl, 2)}`;
+  const label = `${(trade.account as any).login} ${trade.symbol} closed @ ${gprice(price)} | PnL ${gnum(pnl, 2)}`;
   audit(tenantId, "trade.close", label, trade.account.login, "CLIENT" as any);
   notifyStaff(tenantId, { type: "TRADE", title: "Trade closed", body: label }, trade.account.managerId).catch(() => {});
   return { pnl };

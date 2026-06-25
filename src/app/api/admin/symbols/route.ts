@@ -12,7 +12,7 @@ export async function GET() {
 
 const schema = z.object({
   symbol: z.string().min(1), display: z.string().optional(), category: z.string().optional(),
-  digits: z.number().int().optional(), enabled: z.boolean().optional(), feed: z.string().optional(),
+  digits: z.number().int().optional(), spread: z.number().min(0).optional(), enabled: z.boolean().optional(), feed: z.string().optional(),
 });
 
 export async function POST(req: Request) {

@@ -418,6 +418,29 @@ function microTick() {
   }
 }
 
+// Per-symbol and per-group spread cache (refreshed every 60s).
+// symSpreads: "tenantId:symbol" → pips (Decimal from DB → Number)
+// grpSpreads: groupId → pips
+const symSpreads = {};
+const grpSpreads = {};
+async function loadSpreads() {
+  try {
+    const syms = await prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true } });
+    for (const s of syms) symSpreads[s.tenantId + ":" + s.symbol] = Number(s.spread || 0);
+    const grps = await prisma.tradeGroup.findMany({ select: { id: true, spread: true } });
+    for (const g of grps) grpSpreads[g.id] = Number(g.spread || 0);
+  } catch (e) { console.error("[spreads] load failed", e); }
+}
+// Bid = ask − spread. Ask = raw feed price (market-maker model).
+function getSpreadPrice(tenantId, symbol, groupId) {
+  const pips = (symSpreads[tenantId + ":" + symbol] || 0) + (grpSpreads[groupId] || 0);
+  const digits = (meta[symbol] && meta[symbol].digits) || 5;
+  return pips * Math.pow(10, -(digits - 1));
+}
+function getBid(tenantId, symbol, groupId, ask) {
+  return ask - getSpreadPrice(tenantId, symbol, groupId);
+}
+
 // Shared P&L: $1/pip/lot for forex (USD quote); USD-base converted via rate;
 // metals/crypto/indices keep contract model. Mirrors src/lib/trademath.ts.
 function calcPnl(symbol, type, openPrice, price, lots) {
@@ -426,9 +449,8 @@ function calcPnl(symbol, type, openPrice, price, lots) {
   const diff = (price - openPrice) * dir;
   const isFx = !/^(XAU|XAG|XPT|XPD)/.test(sym) && !sym.endsWith("USDT") && /^[A-Z]{6}$/.test(sym);
   const m = meta[sym] || { contract: 100000 };
-  // Standard contract-size model (1.0 lot = contract size; forex = 100,000).
   let pf = diff * lots * m.contract;
-  if (isFx && /^USD/i.test(sym)) pf = pf / (price || 1); // USD as base -> convert to USD
+  if (isFx && /^USD/i.test(sym)) pf = pf / (price || 1);
   return pf;
 }
 const liquidating = new Set(); // guard: prevent double-liquidation of same account
@@ -509,7 +531,8 @@ async function liquidate(acc, list, io) {
   try {
     let total = 0;
     for (const t of list) {
-      const price = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
+      const ask = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
+      const price = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, ask) : ask;
       const pnl = calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
       total += pnl;
       await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnl, closeReason: "MC", openedAt: t.openedAt } });
@@ -539,37 +562,40 @@ async function monitor(io) {
       const net = {};
       for (const t of list) {
         const m = meta[t.symbol]; if (!m) continue;
-        const price = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
-        floating += calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
-        net[t.symbol] = (net[t.symbol] || 0) + (t.type === "BUY" ? 1 : -1) * Number(t.lots); // hedged net lots
+        const ask = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
+        // BUY P/L uses bid (ask − spread); SELL P/L uses ask
+        const closePrice = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, ask) : ask;
+        floating += calcPnl(t.symbol, t.type, Number(t.openPrice), closePrice, Number(t.lots));
+        net[t.symbol] = (net[t.symbol] || 0) + (t.type === "BUY" ? 1 : -1) * Number(t.lots);
       }
-      // used margin charged on |net| volume per symbol (full hedge => 0)
       let used = 0;
       for (const sym in net) {
         const nl = Math.abs(net[sym]); if (nl < 1e-9) continue;
         const m = meta[sym]; if (!m) continue;
-        const price = state[sym] && state[sym].price ? state[sym].price : Number((list.find((t) => t.symbol === sym) || {}).openPrice || 0);
-        let mg = (nl * m.contract * price) / acc.leverage; if (/JPY$/i.test(sym)) mg = mg / 100; used += mg;
+        const ask = state[sym] && state[sym].price ? state[sym].price : Number((list.find((t) => t.symbol === sym) || {}).openPrice || 0);
+        let mg = (nl * m.contract * ask) / acc.leverage; if (/JPY$/i.test(sym)) mg = mg / 100; used += mg;
       }
       if (used <= 0) continue;
       if (((balance + floating) / used) * 100 <= mc) await liquidate(acc, list, io);
     }
-    // TP / SL auto-close — check every open trade against current price
+    // TP/SL: BUY triggered on bid, SELL triggered on ask (MT5 style)
     for (const t of trades) {
       if (closing.has(t.id.toString())) continue;
       const st = state[t.symbol];
       if (!st || st.price == null) continue;
-      const price = st.price;
+      const ask = st.price;
+      const bid = getBid(t.account.tenantId, t.symbol, t.account.groupId, ask);
       const sl = Number(t.sl), tp = Number(t.tp);
       let reason = null;
       if (t.type === "BUY") {
-        if (tp > 0 && price >= tp) reason = "TP";
-        else if (sl > 0 && price <= sl) reason = "SL";
+        if (tp > 0 && bid >= tp) reason = "TP";
+        else if (sl > 0 && bid <= sl) reason = "SL";
       } else {
-        if (tp > 0 && price <= tp) reason = "TP";
-        else if (sl > 0 && price >= sl) reason = "SL";
+        if (tp > 0 && ask <= tp) reason = "TP";
+        else if (sl > 0 && ask >= sl) reason = "SL";
       }
-      if (reason) closeTpSl(t, reason, price, io); // fire-and-forget; closing Set prevents re-entry
+      // Close at bid (BUY) or ask (SELL)
+      if (reason) closeTpSl(t, reason, t.type === "BUY" ? bid : ask, io);
     }
   } catch (e) { console.error("[monitor]", e); }
 }
@@ -580,16 +606,21 @@ async function checkPending(io) {
     for (const o of pend) {
       const st = state[o.symbol];
       if (!st || st.price == null) continue;
-      const px = st.price, trig = Number(o.price);
+      const ask = st.price;
+      const bid = getBid(o.account.tenantId, o.symbol, o.account.groupId, ask);
+      const trig = Number(o.price);
       if (!trig) continue;
+      // BUY orders trigger on ask; SELL orders trigger on bid (MT5 style)
       let fill = false;
-      if (o.side === "BUY" && o.kind === "LIMIT") fill = px <= trig;
-      else if (o.side === "BUY" && o.kind === "STOP") fill = px >= trig;
-      else if (o.side === "SELL" && o.kind === "LIMIT") fill = px >= trig;
-      else if (o.side === "SELL" && o.kind === "STOP") fill = px <= trig;
+      if (o.side === "BUY" && o.kind === "LIMIT") fill = ask <= trig;
+      else if (o.side === "BUY" && o.kind === "STOP") fill = ask >= trig;
+      else if (o.side === "SELL" && o.kind === "LIMIT") fill = bid >= trig;
+      else if (o.side === "SELL" && o.kind === "STOP") fill = bid <= trig;
       if (!fill) continue;
+      // BUY opens at ask, SELL opens at bid
+      const openPx = o.side === "BUY" ? ask : bid;
       const ticket = await nextTicket(o.account.tenantId);
-      await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: px, sl: o.sl, tp: o.tp } });
+      await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: openPx, sl: o.sl, tp: o.tp } });
       await prisma.pendingOrder.delete({ where: { id: o.id } });
       const pbody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + px;
       if (o.account && o.account.userId) { await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: pbody, type: "TRADE" } }).catch(() => {}); pushToUser(o.account.userId, { title: "Pending order filled", body: pbody }); }
@@ -700,6 +731,7 @@ function startDemoCleanup() {
 
 app.prepare().then(async () => {
   try { await loadCatalog(); } catch (e) { console.error('[feed] catalog load failed:', e.message); }
+  try { await loadSpreads(); setInterval(loadSpreads, 60000); } catch (e) { console.error('[spreads] initial load failed:', e.message); }
   const server = createServer((req, res) => handle(req, res));
   const io = new Server(server, { path: "/socket.io" });
   global.__io = io;

@@ -11,7 +11,7 @@ const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "
 
 // Self-contained market watch with its OWN socket + price state, so it ticks
 // pip-by-pip independently of the (heavy) desk re-render — as smooth as the client.
-function DeskMarketWatch({ symbols, selSym, onPick, onDisable }: { symbols: Sym[]; selSym?: string; onPick: (sym: string) => void; onDisable?: (sym: string) => void }) {
+function DeskMarketWatch({ symbols, selSym, onPick, onDisable, symbolSpreads, groupSpread }: { symbols: Sym[]; selSym?: string; onPick: (sym: string) => void; onDisable?: (sym: string) => void; symbolSpreads?: Record<string, number>; groupSpread?: number }) {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
@@ -69,7 +69,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, onDisable }: { symbols: Sym[
         {ordered.map(([cat, list]) => (
           <div key={cat}>
             <div onClick={() => setCollapsed((o) => ({ ...o, [cat]: !o[cat] }))} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[cat] ? "▸" : "▾"} {cat.toUpperCase()}</div>
-            {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dgFor(s); const bid = p != null ? gnum(p * 0.9999, d) : "—"; const ask = p != null ? gnum(p * 1.0001, d) : "—"; const dir = dirs[s.symbol] || 0;
+            {!collapsed[cat] && list.map((s) => { const p = prices[s.symbol]; const d = dgFor(s); const spPips = ((symbolSpreads && symbolSpreads[s.symbol]) || 0) + (groupSpread || 0); const spPx = spPips * Math.pow(10, -(d - 1)); const ask = p != null ? gnum(p, d) : "—"; const bid = p != null ? gnum(p - spPx, d) : "—"; const dir = dirs[s.symbol] || 0;
               return (
                 <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)} onContextMenu={onDisable ? (e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); } : undefined} className={"grid cursor-pointer grid-cols-[1fr_72px_72px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")} style={{ borderRadius: 3, minHeight: 22 }}>
                   <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} /><span className="truncate">{s.symbol}</span></span>

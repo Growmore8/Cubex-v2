@@ -656,8 +656,12 @@ export default function ClientMobile({ t }: { t: any }) {
             <div className="space-y-2.5">
               {quoteList.length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No symbols.</div> : quoteList.map((s: any) => {
                 const dd = dg(s.symbol); const p = prices[s.symbol]; const isFav = (favs || []).includes(s.symbol);
-                const sBid = p != null ? p * 0.9999 : null; const sAsk = p;
-                const spread = p != null ? Math.max(1, Math.round((p - sBid!) / Math.pow(10, -dd))) : 0;
+                const symSpreads: Record<string, number> = (t as any).symbolSpreads || {};
+                const grpSpread: number = (t as any).groupSpread || 0;
+                const spPips = (symSpreads[s.symbol] ?? 0) + grpSpread;
+                const spPx = spPips * Math.pow(10, -(dd - 1));
+                const sAsk = p; const sBid = p != null ? p - spPx : null;
+                const spread = spPips;
                 const dr = dirs?.[s.symbol] || 0;
                 const hist = sparkRef.current[s.symbol];
                 const upTrend = hist && hist.length >= 2 ? hist[hist.length - 1] >= hist[0] : dr >= 0;
