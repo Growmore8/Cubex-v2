@@ -304,23 +304,21 @@ export default function SAClientsPage() {
                     </td>
                     <td className="px-3 py-2.5">
                       {demos.length === 0 ? <span className="text-gray-300 text-xs">—</span> : (
-                        <div className="flex flex-wrap gap-1">
-                          {demos.map((a: any) => (
-                            <span key={a.id} className="rounded border px-1.5 py-0.5 font-mono text-[11px] font-medium" style={{ borderColor: "#bfdbfe", color: BLU, background: "#eff6ff" }}>
-                              {a.login} <span className="font-normal text-gray-500 text-[10px]">${m(a.balance)}</span>
-                            </span>
-                          ))}
+                        <div className="inline-flex flex-col gap-0.5">
+                          <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "#eff6ff", color: BLU }}>
+                            {demos.length} account{demos.length > 1 ? "s" : ""}
+                          </span>
+                          <span className="pl-1 text-[11px] text-gray-500">${m(demos.reduce((s: number, a: any) => s + a.balance, 0))}</span>
                         </div>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
                       {lives.length === 0 ? <span className="text-gray-300 text-xs">—</span> : (
-                        <div className="flex flex-wrap gap-1">
-                          {lives.map((a: any) => (
-                            <span key={a.id} className="rounded border px-1.5 py-0.5 font-mono text-[11px] font-medium" style={{ borderColor: "#bbf7d0", color: GRN, background: "#f0fdf4" }}>
-                              {a.login} <span className="font-normal text-gray-500 text-[10px]">${m(a.balance)}</span>
-                            </span>
-                          ))}
+                        <div className="inline-flex flex-col gap-0.5">
+                          <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "#f0fdf4", color: GRN }}>
+                            {lives.length} account{lives.length > 1 ? "s" : ""}
+                          </span>
+                          <span className="pl-1 text-[11px] text-gray-500">${m(lives.reduce((s: number, a: any) => s + a.balance, 0))}</span>
                         </div>
                       )}
                     </td>
