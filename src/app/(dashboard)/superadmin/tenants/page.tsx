@@ -10,6 +10,7 @@ const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
   { sec: "Trades", items: [["manualTrade", "Manual Trade Entry"], ["closeTrades", "Close Trades"], ["editTrades", "Edit Trade Records"], ["deleteTrades", "Delete Trades"]] },
   { sec: "Reports", items: [["viewAudit", "View Audit Log"], ["exportPdf", "Export PDF Reports"]] },
   { sec: "Communication", items: [["sendNotifications", "Send Notifications"]] },
+  { sec: "Spread", items: [["editSpread", "Edit Spread Settings (symbol / group / account markup)"]] },
 ];
 
 const PLAN_LABELS: Record<string, string> = { STARTER: "Starter", PRO: "Pro", ENTERPRISE: "Enterprise" };

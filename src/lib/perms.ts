@@ -47,6 +47,7 @@ export const PERM_KEYS = [
   "processDeposits", "processWithdrawals", "creditBonus", "transferFunds", "editFinancial", "deleteFinancial",
   "manualTrade", "closeTrades", "editTrades", "deleteTrades",
   "viewAudit", "exportPdf", "sendNotifications",
+  "editSpread",
 ] as const;
 
 // Resolve every permission key to a final boolean for this session, applying the

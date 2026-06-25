@@ -26,6 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     const actor = s.email || "admin";
     const permMap: Record<string, string> = { manualPnl: "editFinancial", transfer: "transferFunds", subAccount: "createClients", reconcile: "editFinancial" };
+    if (b.action === "settings" && b.spreadMarkup !== undefined) await assertCan(s, "editSpread");
     if (permMap[b.action]) await assertCan(s, permMap[b.action]);
 
     switch (b.action) {

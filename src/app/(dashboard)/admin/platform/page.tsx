@@ -1523,7 +1523,7 @@ export default function AdminDeskPage() {
               <div className={flyCls} style={flySty}>
                 <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
                 <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
-                <button onClick={() => openAct("spreadmarkup", menu.acc)} className={subi}>{mIco("fa-arrows-left-right", "var(--accent)")}Spread Markup</button>
+                {can("editSpread") && <button onClick={() => openAct("spreadmarkup", menu.acc)} className={subi}>{mIco("fa-arrows-left-right", "var(--accent)")}Spread Markup</button>}
                 <button onClick={() => openSymOv(menu.acc)} className={subi}>{mIco("fa-eye-slash")}Disable Symbols</button>
                 <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
               </div>
