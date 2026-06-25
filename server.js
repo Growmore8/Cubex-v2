@@ -669,6 +669,20 @@ function startTrialCleanup() {
   setInterval(trialCleanupTick, 24 * 60 * 60 * 1000);
 }
 
+// Daily billing cron: auto-generate invoices 2 days before subscription expiry
+// and suspend tenants with overdue unpaid invoices.
+async function billingCronTick() {
+  try {
+    const res = await fetch("http://127.0.0.1:" + port + "/api/cron/billing", { method: "POST", headers: CRON_SECRET ? { "x-cron-secret": CRON_SECRET } : {} });
+    const d = await res.json().catch(() => ({}));
+    if (d && (d.generated || d.suspended)) console.log("[billing] invoices-generated=" + (d.generated || 0) + " tenants-suspended=" + (d.suspended || 0));
+  } catch (e) { /* transient — retried next day */ }
+}
+function startBillingCron() {
+  setTimeout(billingCronTick, 3 * 60 * 1000); // 3 min after boot
+  setInterval(billingCronTick, 24 * 60 * 60 * 1000); // then daily
+}
+
 // Daily cleanup of expired demo accounts (DEMO type, expiresAt < now).
 // Writes ExpiredAccount history, notifies the client, then hard-deletes.
 // Also sends 3-day and 1-day advance warnings.
@@ -724,6 +738,7 @@ app.prepare().then(async () => {
   startStatementCron();
   startTrialCleanup();
   startDemoCleanup();
+  startBillingCron();
   purgeOldNotifications();                                  // on boot
   setInterval(purgeOldNotifications, 6 * 60 * 60 * 1000);   // + every 6h
   server.listen(port, () => console.log("> Ready on http://localhost:" + port));

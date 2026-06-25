@@ -65,6 +65,29 @@ export default function TenantBillingPage() {
         </div>
       )}
 
+      {/* Subscription due-soon warning — shown to admin only, not to clients */}
+      {subscription?.endsAt && (() => {
+        const daysLeft = Math.ceil((new Date(subscription.endsAt).getTime() - Date.now()) / 86400000);
+        const hasUnpaid = pending.length > 0;
+        if (daysLeft > 7 && !hasUnpaid) return null;
+        const isOverdue = daysLeft < 0 || subscription.status === "PAST_DUE";
+        return (
+          <div className="rounded-xl border px-4 py-3 flex items-start gap-3" style={{ background: isOverdue ? "#fff1f2" : "#fffbeb", borderColor: isOverdue ? "#fecaca" : "#fde68a" }}>
+            <i className={"fa-solid mt-0.5 " + (isOverdue ? "fa-circle-exclamation text-red-600" : "fa-triangle-exclamation text-amber-500")} />
+            <div>
+              <div className="font-semibold text-sm" style={{ color: isOverdue ? "#b91c1c" : "#92400e" }}>
+                {isOverdue ? "Subscription overdue — platform access at risk" : `Subscription renewing in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}`}
+              </div>
+              <div className="text-xs mt-0.5" style={{ color: isOverdue ? "#dc2626" : "#b45309" }}>
+                {hasUnpaid
+                  ? `You have ${pending.length} unpaid invoice${pending.length !== 1 ? "s" : ""}. Please arrange payment to avoid suspension.`
+                  : `Your subscription expires on ${new Date(subscription.endsAt).toLocaleDateString()}. An invoice will be sent shortly.`}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4 ui-fade-up-stagger">
         {[

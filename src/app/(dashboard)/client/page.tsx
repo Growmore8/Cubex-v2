@@ -49,6 +49,7 @@ export default function ClientTerminal() {
   const [dataReady, setDataReady] = useState(false); // first account/prices loaded
   const [minElapsed, setMinElapsed] = useState(false); // 3s branding minimum
   const [splashGone, setSplashGone] = useState(false);
+  const [tenantSuspended, setTenantSuspended] = useState(false);
   const booted = dataReady && minElapsed; // start fade only when both are true
   const [kycVerified, setKycVerified] = useState(true); // assume ok until /account resolves
   const [accts, setAccts] = useState<any[]>([]);
@@ -190,6 +191,7 @@ export default function ClientTerminal() {
     const d = await fetch("/api/client/account" + (id ? "?accountId=" + id : "")).then((r) => r.json());
     if (!d.ok) {
       if (d.code === "DEACTIVATED") { await fetch("/api/auth/logout", { method: "POST" }).catch(() => {}); window.location.href = "/login?reason=deactivated"; return; }
+      if (d.code === "TENANT_SUSPENDED") { setTenantSuspended(true); setDataReady(true); return; }
       setErr(d.error || "Failed"); return;
     }
     setAccount(d.account); setKycVerified(!!d.kycVerified); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); setPnlOnly(!!d.pnlOnly); if (d.brand) setBrand(d.brand);
@@ -464,6 +466,21 @@ export default function ClientTerminal() {
   if (!splashGone) return <ClientSplash brand={splashBrand || brand} theme={theme} hiding={booted} />;
 
   if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, prices, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  if (tenantSuspended) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4 text-center px-6" style={{ background: "#0f172a", color: "#94a3b8" }}>
+        <div className="rounded-full w-16 h-16 flex items-center justify-center mb-2" style={{ background: "#1e293b" }}>
+          <i className="fa-solid fa-lock text-2xl" style={{ color: "#f59e0b" }} />
+        </div>
+        <div className="text-lg font-semibold" style={{ color: "#f1f5f9" }}>Platform Temporarily Unavailable</div>
+        <div className="text-sm max-w-xs" style={{ color: "#64748b" }}>This platform is currently undergoing maintenance. Please contact your broker for assistance.</div>
+        <button onClick={() => fetch("/api/auth/logout", { method: "POST" }).then(() => { window.location.href = "/login"; })} className="mt-2 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: "#1e293b", color: "#94a3b8" }}>
+          Sign Out
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }} className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {needKyc && (

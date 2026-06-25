@@ -140,6 +140,33 @@ export function invoiceEmail(brand: BrandInfo, inv: { number: string; period: st
     <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">Reply to this email with any billing questions.</p>`);
 }
 
+// Invoice sent FROM the platform (OrbitFxSolution) TO the tenant admin.
+// platformName = process.env.APP_NAME, tenantName = tenant's brand.
+export function platformInvoiceEmail(
+  platformName: string,
+  tenantName: string,
+  inv: { number: string; period: string; plan: string; amount: string; dueAt?: string | null; status?: string; notes?: string | null },
+): string {
+  const platform = esc(platformName);
+  const row = (k: string, v: string) => `<tr><td style="padding:9px 12px;border-bottom:1px solid #eef1f5;color:#6b7280;font-size:13px">${esc(k)}</td><td style="padding:9px 12px;border-bottom:1px solid #eef1f5;text-align:right;font-weight:700;font-size:13px;color:#111827">${esc(v)}</td></tr>`;
+  const due = inv.dueAt ? new Date(inv.dueAt).toLocaleDateString() : "—";
+  const statusColor = inv.status === "PAID" ? "#16a34a" : inv.status === "OVERDUE" ? "#dc2626" : "#b45309";
+  const platformBrand: BrandInfo = { brandName: platformName, primaryColor: "#1a56db", accentColor: "#22c55e", logoUrl: null };
+  return brandedEmail(platformBrand, `Invoice ${inv.number}`, `
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 14px">Dear <strong>${esc(tenantName)}</strong>, please find your subscription invoice from <strong>${platform}</strong> below.</p>
+    <table style="width:100%;border-collapse:collapse;margin:6px 0 16px">
+      ${row("Invoice #", inv.number)}
+      ${row("Billed To", tenantName)}
+      ${row("Period", inv.period)}
+      ${row("Plan", inv.plan)}
+      ${row("Amount Due", "$" + inv.amount)}
+      ${row("Due Date", due)}
+      ${inv.status ? `<tr><td style="padding:9px 12px;border-bottom:1px solid #eef1f5;color:#6b7280;font-size:13px">Status</td><td style="padding:9px 12px;border-bottom:1px solid #eef1f5;text-align:right;font-weight:700;font-size:13px;color:${statusColor}">${esc(inv.status === "PENDING" ? "UNPAID" : inv.status)}</td></tr>` : ""}
+      ${inv.notes ? row("Notes", inv.notes) : ""}
+    </table>
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">To pay or query this invoice, reply to this email or contact ${platform} support.</p>`);
+}
+
 export interface StatementSummary {
   holderName: string;
   periodLabel: string;

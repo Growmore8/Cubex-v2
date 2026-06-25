@@ -28,6 +28,15 @@ async function tenantSuspended(tenantId: string | null): Promise<boolean> {
   } catch { return false; }
 }
 
+// Returns "SUSPENDED" when the tenant is suspended (distinct from unauthenticated).
+// Use in client-facing APIs that need to show a friendly suspension message.
+export async function getClientSession() {
+  const s = await getSession();
+  if (!s || s.role !== "CLIENT" || !s.tenantId) return { session: null, suspended: false };
+  if (await tenantSuspended(s.tenantId)) return { session: null, suspended: true };
+  return { session: s, suspended: false };
+}
+
 export async function requireAdmin() {
   const s = await getSession();
   if (!s || s.role !== "ADMIN" || !s.tenantId) return null;

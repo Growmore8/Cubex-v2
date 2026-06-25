@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireClient } from "@/lib/guard";
+import { getClientSession } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { getDisabledSetFor } from "@/services/symbolPerms.service";
 import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
 
 export async function GET(req: Request) {
-  const s = await requireClient();
+  const { session: s, suspended } = await getClientSession();
+  if (suspended) return NextResponse.json({ ok: false, code: "TENANT_SUSPENDED" }, { status: 403 });
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
 
   const url = new URL(req.url);

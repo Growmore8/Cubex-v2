@@ -3,8 +3,14 @@ import { useEffect, useState } from "react";
 import { PACKAGES, PLAN_KEYS } from "@/config/packages";
 import { useDialog } from "@/components/ui/ConfirmDialog";
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDING: "sab-amber", PAID: "sab-green", OVERDUE: "sab-red", CANCELLED: "sab-red",
+const PLATFORM_NAME = process.env.NEXT_PUBLIC_APP_NAME || "OrbitFxSolution";
+
+const STATUS_LABEL: Record<string, string> = { PENDING: "UNPAID", PAID: "PAID", OVERDUE: "OVERDUE", CANCELLED: "CANCELLED" };
+const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+  PENDING: { bg: "#fef3c7", color: "#92400e" },
+  PAID: { bg: "#dcfce7", color: "#15803d" },
+  OVERDUE: { bg: "#fee2e2", color: "#b91c1c" },
+  CANCELLED: { bg: "#f1f5f9", color: "#64748b" },
 };
 
 function fmt(n: number) { return "$" + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -106,33 +112,6 @@ export default function SABillingPage() {
         ))}
       </div>
 
-      {/* Package info */}
-      <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
-        <div className="mb-3 text-sm font-semibold text-gray-700">Package Plans</div>
-        <div className="grid grid-cols-3 gap-3">
-          {PLAN_KEYS.map((key) => {
-            const pkg = PACKAGES[key];
-            return (
-              <div key={key} className="ui-card p-3" style={{ borderColor: "#e2e8f0" }}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold" style={{ color: pkg.color }}>{pkg.name}</span>
-                  <span className="text-lg font-bold">${pkg.price}<span className="text-xs text-gray-400">/mo</span></span>
-                </div>
-                <div className="text-xs text-gray-500 mb-2">{pkg.description}</div>
-                <ul className="space-y-0.5">
-                  {pkg.features.slice(0, 3).map((f) => (
-                    <li key={f} className="text-xs text-gray-600 flex items-center gap-1">
-                      <i className="fa-solid fa-check text-[9px]" style={{ color: pkg.color }} />{f}
-                    </li>
-                  ))}
-                  {pkg.features.length > 3 && <li className="text-xs text-gray-400">+{pkg.features.length - 3} more</li>}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {err && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
 
       {/* Invoice table */}
@@ -160,8 +139,11 @@ export default function SABillingPage() {
               </tr>
             </thead>
             <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv.id}>
+              {invoices.map((inv) => {
+                const ss = STATUS_STYLE[inv.status] || STATUS_STYLE.PENDING;
+                const isPaid = inv.status === "PAID";
+                return (
+                <tr key={inv.id} style={isPaid ? { opacity: 0.75 } : undefined}>
                   <td className="font-mono text-xs font-medium text-blue-600">{inv.number}</td>
                   <td className="font-medium">{inv.tenant?.brandName || inv.tenant?.name || "—"}{inv.tenant?.supportEmail && <div className="text-[10px] font-normal text-gray-400">{inv.tenant.supportEmail}</div>}</td>
                   <td className="text-gray-600">{inv.period}</td>
@@ -171,18 +153,27 @@ export default function SABillingPage() {
                     </span>
                   </td>
                   <td className="font-semibold">{fmt(Number(inv.amount))}</td>
-                  <td><span className={"sab " + (STATUS_COLORS[inv.status] || "sab-amber")}>{inv.status}</span></td>
-                  <td className="text-xs text-gray-500">{new Date(inv.dueAt).toLocaleDateString()}</td>
-                  <td className="text-xs text-gray-500">{inv.paidAt ? new Date(inv.paidAt).toLocaleDateString() : "—"}</td>
+                  <td>
+                    <span className="rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: ss.bg, color: ss.color }}>
+                      {STATUS_LABEL[inv.status] || inv.status}
+                    </span>
+                  </td>
+                  <td className="text-xs" style={{ color: inv.status === "OVERDUE" ? "#b91c1c" : "#6b7280", fontWeight: inv.status === "OVERDUE" ? 600 : 400 }}>{new Date(inv.dueAt).toLocaleDateString()}</td>
+                  <td className="text-xs text-green-600 font-medium">{inv.paidAt ? new Date(inv.paidAt).toLocaleDateString() : "—"}</td>
                   <td className="whitespace-nowrap">
                     {inv.status === "PENDING" && (
-                      <button onClick={() => act(inv.id, "markPaid")} className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#dcfce7", color: "#15803d" }}>
-                        <i className="fa-solid fa-check mr-1" />Paid
+                      <button onClick={() => act(inv.id, "markPaid")} title="Mark as Paid — tenant will be unsuspended" className="mr-1 rounded px-2 py-1 text-xs font-semibold" style={{ background: "#dcfce7", color: "#15803d" }}>
+                        <i className="fa-solid fa-check mr-1" />Mark Paid
                       </button>
                     )}
-                    {inv.status === "PENDING" && (
-                      <button onClick={() => act(inv.id, "markOverdue")} className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#fee2e2", color: "#dc2626" }}>
-                        Overdue
+                    {inv.status === "OVERDUE" && (
+                      <button onClick={() => act(inv.id, "markPaid")} title="Mark as Paid — tenant will be unsuspended" className="mr-1 rounded px-2 py-1 text-xs font-semibold" style={{ background: "#dcfce7", color: "#15803d" }}>
+                        <i className="fa-solid fa-check mr-1" />Mark Paid
+                      </button>
+                    )}
+                    {(inv.status === "PENDING" || inv.status === "OVERDUE") && (
+                      <button onClick={() => act(inv.id, "markOverdue")} title="Mark as Overdue — tenant will be suspended" className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#fee2e2", color: "#dc2626" }}>
+                        Suspend
                       </button>
                     )}
                     {(inv.status === "PAID" || inv.status === "OVERDUE") && (
@@ -190,18 +181,19 @@ export default function SABillingPage() {
                         Reset
                       </button>
                     )}
-                    <button onClick={() => sendInvoice(inv)} title="Email invoice to the tenant's contact email" className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#dbeafe", color: "#2563eb" }}>
-                      <i className="fa-solid fa-envelope text-xs" />
+                    <button onClick={() => sendInvoice(inv)} title="Send invoice by email to tenant's contact email" className="mr-1 rounded px-2 py-1 text-xs gap-1 inline-flex items-center" style={{ background: "#dbeafe", color: "#2563eb" }}>
+                      <i className="fa-solid fa-envelope text-xs" /><span>Email</span>
                     </button>
-                    <button onClick={() => setPrintInv(inv)} className="mr-1 rounded px-2 py-1 text-xs" style={{ background: "#f1f5f9", color: "#475569" }}>
-                      <i className="fa-solid fa-print text-xs" />
+                    <button onClick={() => setPrintInv(inv)} title="Download / Print PDF" className="mr-1 rounded px-2 py-1 text-xs gap-1 inline-flex items-center" style={{ background: "#f1f5f9", color: "#475569" }}>
+                      <i className="fa-solid fa-download text-xs" /><span>PDF</span>
                     </button>
                     <button onClick={async () => { if (await confirm({ title: "Delete invoice", message: "Delete invoice " + inv.number + "?", danger: true })) act(inv.id, "delete"); }} className="rounded px-2 py-1 text-xs" style={{ background: "#fff1f2", color: "#dc2626" }}>
                       <i className="fa-solid fa-trash text-xs" />
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {invoices.length === 0 && <tr><td className="text-center text-gray-400 py-8" colSpan={9}>No invoices found.</td></tr>}
             </tbody>
           </table>
@@ -275,8 +267,8 @@ export default function SABillingPage() {
                   <div className="text-gray-500 text-sm mt-1">{printInv.number}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-gray-800">CubeX Platform</div>
-                  <div className="text-sm text-gray-500">Billing Department</div>
+                  <div className="text-lg font-bold text-gray-800">{PLATFORM_NAME}</div>
+                  <div className="text-sm text-gray-500">Finance Department</div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-6 mb-8">
@@ -288,7 +280,7 @@ export default function SABillingPage() {
                   <div className="text-xs font-semibold text-gray-400 mb-1">INVOICE DETAILS</div>
                   <div className="text-sm text-gray-600">Period: <span className="font-medium">{printInv.period}</span></div>
                   <div className="text-sm text-gray-600">Due: <span className="font-medium">{new Date(printInv.dueAt).toLocaleDateString()}</span></div>
-                  <div className="text-sm text-gray-600">Status: <span className="font-medium">{printInv.status}</span></div>
+                  <div className="text-sm text-gray-600">Status: <span className="font-semibold" style={{ color: STATUS_STYLE[printInv.status]?.color }}>{STATUS_LABEL[printInv.status] || printInv.status}</span></div>
                 </div>
               </div>
               <table className="sa-table mb-6">
