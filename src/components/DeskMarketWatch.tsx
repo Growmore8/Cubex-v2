@@ -11,7 +11,7 @@ const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "
 
 // Self-contained market watch with its OWN socket + price state, so it ticks
 // pip-by-pip independently of the (heavy) desk re-render — as smooth as the client.
-function DeskMarketWatch({ symbols, selSym, onPick, onDisable, symbolSpreads, groupSpread }: { symbols: Sym[]; selSym?: string; onPick: (sym: string) => void; onDisable?: (sym: string) => void; symbolSpreads?: Record<string, { min: number; max: number; type: string } | number>; groupSpread?: number }) {
+function DeskMarketWatch({ symbols, selSym, onPick, onDisable, onSymbolEdit, symbolSpreads, groupSpread }: { symbols: Sym[]; selSym?: string; onPick: (sym: string) => void; onDisable?: (sym: string) => void; onSymbolEdit?: (sym: string) => void; symbolSpreads?: Record<string, { min: number; max: number; type: string } | number>; groupSpread?: number }) {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
@@ -89,6 +89,9 @@ function DeskMarketWatch({ symbols, selSym, onPick, onDisable, symbolSpreads, gr
           <button onClick={() => { const s = symbols.find((x) => x.symbol === ctx.sym); setSymInfo({ sym: s || { symbol: ctx.sym }, ask: prices[ctx.sym] ?? null }); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]">
             <i className="fa-solid fa-circle-info text-[10px]" /> Symbol properties
           </button>
+          {onSymbolEdit && <button onClick={() => { onSymbolEdit(ctx.sym); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]">
+            <i className="fa-solid fa-sliders text-[10px]" style={{ color: "var(--accent)" }} /> Symbol settings
+          </button>}
           {onDisable && <button onClick={() => { onDisable(ctx.sym); setCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]" style={{ color: "#dc2626" }}>
             <i className="fa-solid fa-eye-slash text-[10px]" /> Disable symbol
           </button>}

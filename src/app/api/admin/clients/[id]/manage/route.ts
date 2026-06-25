@@ -35,6 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         if (b.mcLevel !== undefined) data.mcLevel = new Prisma.Decimal(Number(b.mcLevel) || 0);
         if (b.doNotLiquidate !== undefined) data.doNotLiquidate = !!b.doNotLiquidate;
         if (b.currency !== undefined) data.currency = b.currency;
+        if (b.spreadMarkup !== undefined) data.spreadMarkup = new Prisma.Decimal(Math.max(0, Number(b.spreadMarkup) || 0));
         await prisma.account.update({ where: { id: acc.id }, data });
         await audit(tenantId, "client.settings", acc.login + " " + JSON.stringify(data), actor);
         break;

@@ -70,6 +70,9 @@ export default function AdminDeskPage() {
   const [adminSymTypes, setAdminSymTypes] = useState<Record<string, string>>({});
   const [adminSymMax, setAdminSymMax] = useState<Record<string, number>>({});
   const [adminSymIds, setAdminSymIds] = useState<Record<string, string>>({});
+  const [symEdit, setSymEdit] = useState<{ sym: string; spread: number; spreadType: string; spreadMax: number; id: string } | null>(null);
+  const [grpCtx, setGrpCtx] = useState<{ x: number; y: number; g: any } | null>(null);
+  const [grpEdit, setGrpEdit] = useState<any>(null);
   const [open, setOpen] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
@@ -422,14 +425,15 @@ export default function AdminDeskPage() {
   function reconcileAcc(acc: any) { setMenu(null); askConfirm(`Recalculate balance for ${acc.login} - ${acc.name}? This rebuilds realized P/L from the surviving closed trades and manual P/L entries (fixes balances left wrong after a deleted manual P/L). Deposits, withdrawals and credit are not touched.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reconcile" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else { setOk(`Balance recalculated (P/L ${d.before?.toFixed?.(2)} → ${d.after?.toFixed?.(2)})`); loadAll(); } }, false); }
 
   function openAct(kind: string, acc: any, finType?: string, label?: string) { setMenu(null); setMenuSub(""); setErr(""); setAform({}); setActMin(false); setAct({ kind, acc, finType, label }); }
-  function actTitle() { if (!act) return ""; const m: any = { money: act.label, manualpnl: "Manual P/L", transfer: "Transfer Between Accounts", rename: "Client Details", accountid: "Change Account ID", password: "Change Password", assignmgr: "Assign Manager", assign: "Assign Manager & Group", settings: "Account Settings", subaccount: "Create Sub-Account", assigngroup: "Assign Group", leverage: "Change Leverage", mclevel: "Margin Call Level" }; return m[act.kind] || "Action"; }
-  function actIcon() { if (!act) return "fa-circle"; const m: any = { money: "fa-dollar-sign", manualpnl: "fa-chart-line", transfer: "fa-right-left", rename: "fa-user-pen", accountid: "fa-id-card", password: "fa-key", assignmgr: "fa-user-tie", assign: "fa-user-tie", settings: "fa-sliders", subaccount: "fa-sitemap", assigngroup: "fa-layer-group", leverage: "fa-gauge-high", mclevel: "fa-triangle-exclamation" }; return m[act.kind] || "fa-circle"; }
+  function actTitle() { if (!act) return ""; const m: any = { money: act.label, manualpnl: "Manual P/L", transfer: "Transfer Between Accounts", rename: "Client Details", accountid: "Change Account ID", password: "Change Password", assignmgr: "Assign Manager", assign: "Assign Manager & Group", settings: "Account Settings", subaccount: "Create Sub-Account", assigngroup: "Assign Group", leverage: "Change Leverage", mclevel: "Margin Call Level", spreadmarkup: "Spread Markup" }; return m[act.kind] || "Action"; }
+  function actIcon() { if (!act) return "fa-circle"; const m: any = { money: "fa-dollar-sign", manualpnl: "fa-chart-line", transfer: "fa-right-left", rename: "fa-user-pen", accountid: "fa-id-card", password: "fa-key", assignmgr: "fa-user-tie", assign: "fa-user-tie", settings: "fa-sliders", subaccount: "fa-sitemap", assigngroup: "fa-layer-group", leverage: "fa-gauge-high", mclevel: "fa-triangle-exclamation", spreadmarkup: "fa-arrows-left-right" }; return m[act.kind] || "fa-circle"; }
   function actPrimary() {
     if (!act) return { label: "Confirm", color: BUY, fg: "#04140e" };
     const m: any = {
       money: { label: "Apply", color: "#2563eb", fg: "#fff" }, transfer: { label: "Confirm Transfer", color: "#2563eb", fg: "#fff" },
       rename: { label: "Save Changes", color: "#2563eb", fg: "#fff" }, accountid: { label: "Change", color: "#2563eb", fg: "#fff" },
       subaccount: { label: "Create", color: "#2563eb", fg: "#fff" }, mclevel: { label: "Save", color: SELL, fg: "#fff" },
+      spreadmarkup: { label: "Save", color: "#2563eb", fg: "#fff" },
     };
     return m[act.kind] || { label: "Confirm", color: BUY, fg: "#04140e" };
   }
@@ -468,6 +472,7 @@ export default function AdminDeskPage() {
     else if (act.kind === "assign") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assign", managerId: (aform.managerId ?? act.acc.managerId) || null, groupId: (aform.groupId ?? act.acc.groupId) || null }; }
     else if (act.kind === "leverage") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", leverage: Number(aform.leverage ?? act.acc.leverage) }; }
     else if (act.kind === "mclevel") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", mcLevel: Number(aform.mcLevel ?? act.acc.mcLevel), doNotLiquidate: aform.doNotLiquidate ?? act.acc.doNotLiquidate }; }
+    else if (act.kind === "spreadmarkup") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", spreadMarkup: Number(aform.spreadMarkup ?? act.acc.spreadMarkup ?? 0) }; }
     else return;
     const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
@@ -917,12 +922,18 @@ export default function AdminDeskPage() {
                 );
                 // Count roots only for header badge (sub-accounts counted under parent)
                 const rootCount = (arr: any[]) => arr.filter(isRoot).length;
-                const groupSection = (gid: string, nested = false) => (
-                  <div key={"grp-" + gid} className={nested ? "" : "mt-0.5"}>
-                    {header("grp-" + gid, grpName(gid), "fa-folder", "var(--accent)", grpRows[gid].length)}
-                    {!collapsed["grp-" + gid] && <div className="flex flex-col gap-0.5 pl-2">{grpRows[gid].filter(isRoot).map(acctBlock)}</div>}
-                  </div>
-                );
+                const groupSection = (gid: string, nested = false) => {
+                  const g = tradeGroups.find((x: any) => x.id === gid);
+                  return (
+                    <div key={"grp-" + gid} className={nested ? "" : "mt-0.5"}>
+                      <div className="relative flex items-center">
+                        {header("grp-" + gid, grpName(gid), "fa-folder", "var(--accent)", grpRows[gid].length)}
+                        {g && <button onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setGrpCtx({ x: e.clientX, y: e.clientY, g }); }} onClick={(e) => { e.stopPropagation(); setGrpCtx({ x: e.currentTarget.getBoundingClientRect().right, y: e.currentTarget.getBoundingClientRect().top, g }); }} className="shrink-0 px-1 text-[var(--muted)] hover:text-[var(--accent)]" title="Manage group"><i className="fa-solid fa-ellipsis-vertical text-[10px]" /></button>}
+                      </div>
+                      {!collapsed["grp-" + gid] && <div className="flex flex-col gap-0.5 pl-2">{grpRows[gid].filter(isRoot).map(acctBlock)}</div>}
+                    </div>
+                  );
+                };
                 return (
                   <div className="flex flex-col gap-0.5">
                     {direct.length > 0 && (<>
@@ -984,7 +995,7 @@ export default function AdminDeskPage() {
           <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
             <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
-            <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile} onDisable={(sym) => toggleSymPerm(sym, true)} symbolSpreads={adminSymSpreads} groupSpread={0} />
+            <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile} onDisable={(sym) => toggleSymPerm(sym, true)} onSymbolEdit={(sym) => { const id = adminSymIds[sym]; if (!id) return; setSymEdit({ sym, spread: adminSymSpreads[sym] ?? 0, spreadType: adminSymTypes[sym] ?? "FIXED", spreadMax: adminSymMax[sym] ?? 0, id }); }} symbolSpreads={adminSymSpreads} groupSpread={0} />
           </aside>
         </>)}
       </div>
@@ -1344,6 +1355,77 @@ export default function AdminDeskPage() {
       {mgrModal && <ManagersModal onClose={() => { setMgrModal(false); loadAll(); }} />}
       {pmModal && <PaymentMethodsModal onClose={() => setPmModal(false)} />}
 
+      {/* Symbol settings popup (from market watch right-click) */}
+      {symEdit && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setSymEdit(null)}>
+          <div className="w-[300px] rounded-xl border p-5 text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <div><div className="text-[14px] font-bold">{symEdit.sym}</div><div className="text-[10px] text-[var(--muted)]">Symbol spread settings</div></div>
+              <button onClick={() => setSymEdit(null)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 text-[10px] text-[var(--muted)]">Spread type</div>
+                <select value={symEdit.spreadType} onChange={(e) => setSymEdit((s) => s ? { ...s, spreadType: e.target.value } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }}>
+                  <option value="FIXED">Fixed</option><option value="FLOATING">Floating (widens off-hours)</option>
+                </select>
+              </div>
+              <div>
+                <div className="mb-1 text-[10px] text-[var(--muted)]">{symEdit.spreadType === "FLOATING" ? "Min spread (pips)" : "Spread (pips)"}</div>
+                <input type="number" min="0" step="0.1" value={symEdit.spread} onChange={(e) => setSymEdit((s) => s ? { ...s, spread: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+              </div>
+              {symEdit.spreadType === "FLOATING" && (
+                <div>
+                  <div className="mb-1 text-[10px] text-[var(--muted)]">Max spread (pips, off-hours)</div>
+                  <input type="number" min="0" step="0.1" value={symEdit.spreadMax} onChange={(e) => setSymEdit((s) => s ? { ...s, spreadMax: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button onClick={async () => { const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: symEdit.spread, spreadType: symEdit.spreadType, spreadMax: symEdit.spreadMax }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: symEdit.spread })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: symEdit.spreadMax })); setOk(symEdit.sym + " spread saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
+              <button onClick={() => setSymEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Group context menu + manage popup */}
+      {grpCtx && (<>
+        <div className="fixed inset-0 z-[140]" onClick={() => setGrpCtx(null)} />
+        <div className="fixed z-[141] min-w-[180px] overflow-hidden rounded-lg border py-1 text-[11px] shadow-2xl" style={{ left: Math.min(grpCtx.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 200), top: grpCtx.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+          <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{grpCtx.g.name}</div>
+          <button onClick={() => { setGrpEdit({ ...grpCtx.g }); setGrpCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]"><i className="fa-solid fa-sliders text-[10px]" style={{ color: "var(--accent)" }} /> Manage group</button>
+          <button onClick={() => { setGrpCtx(null); openAct("assigngroup", { id: "", name: "New", groupId: grpCtx.g.id } as any); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]"><i className="fa-solid fa-user-plus text-[10px]" /> Assign client</button>
+          <button onClick={() => { const g = grpCtx.g; setGrpCtx(null); askDelete(`Delete group "${g.name}"? All members will be unassigned.`, async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "DELETE" }); const d = await r.json(); if (d.ok) { setOk("Group deleted"); loadAll(); } else setErr(d.error || "Failed"); }); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]" style={{ color: "#dc2626" }}><i className="fa-solid fa-trash text-[10px]" /> Delete group</button>
+        </div>
+      </>)}
+
+      {/* Group manage modal */}
+      {grpEdit && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setGrpEdit(null)}>
+          <div className="w-[320px] rounded-xl border p-5 text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <div><div className="text-[14px] font-bold">{grpEdit.name}</div><div className="text-[10px] text-[var(--muted)]">Group settings · {clients.filter((c: any) => c.groupId === grpEdit.id).length} members</div></div>
+              <button onClick={() => setGrpEdit(null)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <div className="space-y-3">
+              <div><div className="mb-1 text-[10px] text-[var(--muted)]">Group name</div><input className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} value={grpEdit.name || ""} onChange={(e) => setGrpEdit((g: any) => ({ ...g, name: e.target.value }))} /></div>
+              <div><div className="mb-1 text-[10px] text-[var(--muted)]">Spread markup (pips) — added on top of symbol spread</div><input type="number" min="0" step="0.1" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} value={grpEdit.spread ?? 0} onChange={(e) => setGrpEdit((g: any) => ({ ...g, spread: Number(e.target.value) }))} /></div>
+              <div><div className="mb-1 text-[10px] text-[var(--muted)]">Manager</div><select className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} value={grpEdit.managerId || ""} onChange={(e) => setGrpEdit((g: any) => ({ ...g, managerId: e.target.value || null }))}><option value="">Admin-level (no manager)</option>{managers.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
+              <div className="rounded-lg border border-[var(--border)] p-2.5 text-[10px]">
+                <div className="mb-1.5 font-semibold text-[var(--muted)]">Spread breakdown (this group)</div>
+                <div className="flex justify-between"><span className="text-[var(--muted)]">Group markup</span><span className="font-semibold tabular-nums">{grpEdit.spread ?? 0} pips ({Math.round((grpEdit.spread ?? 0) * 10)} pts)</span></div>
+                <div className="flex justify-between mt-1"><span className="text-[var(--muted)]">Members</span><span className="font-semibold">{clients.filter((c: any) => c.groupId === grpEdit.id).length}</span></div>
+              </div>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button onClick={async () => { const r = await fetch("/api/admin/groups/" + grpEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpEdit.name, spread: Number(grpEdit.spread) || 0, managerId: grpEdit.managerId || null }) }); const d = await r.json(); if (d.ok) { setOk("Group saved"); setGrpEdit(null); loadAll(); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
+              <button onClick={() => setGrpEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {menu && (() => {
         const vh = typeof window !== "undefined" ? window.innerHeight : 800;
         const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
@@ -1441,6 +1523,7 @@ export default function AdminDeskPage() {
               <div className={flyCls} style={flySty}>
                 <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
                 <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
+                <button onClick={() => openAct("spreadmarkup", menu.acc)} className={subi}>{mIco("fa-arrows-left-right", "var(--accent)")}Spread Markup</button>
                 <button onClick={() => openSymOv(menu.acc)} className={subi}>{mIco("fa-eye-slash")}Disable Symbols</button>
                 <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
               </div>
@@ -1672,6 +1755,11 @@ export default function AdminDeskPage() {
             {act.kind === "mclevel" && (<>
               <div><div className={flab}>MC Level % (0 = OFF)</div><input type="number" className={inp} value={aform.mcLevel ?? act.acc.mcLevel} onChange={(e) => af("mcLevel", e.target.value)} autoFocus /></div>
               <label className="flex items-center gap-2 text-[11px]"><span className="text-[var(--muted)]">Do Not Liquidate:</span><input type="checkbox" checked={!!(aform.doNotLiquidate ?? act.acc.doNotLiquidate)} onChange={(e) => af("doNotLiquidate", e.target.checked)} /> Enable (account will NOT be liquidated)</label>
+            </>)}
+            {act.kind === "spreadmarkup" && (<>
+              <div className="mb-1 text-[10px] text-[var(--muted)]">Extra pips added on top of the symbol + group spread for this account only.</div>
+              <div><div className={flab}>Spread Markup (pips)</div><input type="number" min="0" step="0.1" className={inp} value={aform.spreadMarkup ?? Number(act.acc.spreadMarkup ?? 0)} onChange={(e) => af("spreadMarkup", e.target.value)} autoFocus /></div>
+              <div className="mt-1 text-[10px] text-[var(--muted)]">Current: <b>{Number(act.acc.spreadMarkup ?? 0)} pips</b> ({Math.round(Number(act.acc.spreadMarkup ?? 0) * 10)} pts)</div>
             </>)}
             {act.kind === "settings" && (<>
               <div className="grid grid-cols-2 gap-2">
