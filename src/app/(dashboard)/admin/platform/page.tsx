@@ -1006,15 +1006,7 @@ export default function AdminDeskPage() {
         {panels.mw && (<>
           <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">
-              MARKET WATCH
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => setAllSymEdit({ type: "FIXED", pips: 1.5 })} title="Set spread for all symbols" className="rounded px-1.5 py-0.5 text-[9px] font-semibold border transition-colors hover:bg-[var(--soft)]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
-                  <i className="fa-solid fa-sliders mr-1" />All Spreads
-                </button>
-                <button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button>
-              </div>
-            </div>
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
             <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile}
               disabledSyms={symPerm?.disabled || []}
               onCategoryEdit={(cat, syms) => { const first = syms[0]; setCatEdit({ cat, syms, spread: adminSymSpreads[first] ?? 0, spreadType: adminSymTypes[first] ?? "FIXED", spreadMax: adminSymMax[first] ?? 0 }); }}
@@ -1476,8 +1468,8 @@ export default function AdminDeskPage() {
             </div>
             <div className="mt-4 flex gap-2">
               <button onClick={async () => {
-                const allSyms = Object.keys(adminSymIds);
-                await Promise.all(allSyms.map(async (sym) => {
+                const allSyms = symPerm ? symPerm.symbols.map((s: any) => s.symbol) : Object.keys(adminSymIds);
+                await Promise.all(allSyms.map(async (sym: string) => {
                   const sid = adminSymIds[sym]; if (!sid) return;
                   await fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: allSymEdit!.pips, spreadType: allSymEdit!.type, spreadMax: 0 }) }).catch(() => {});
                   setAdminSymSpreads((m) => ({ ...m, [sym]: allSymEdit!.pips }));
@@ -1485,7 +1477,7 @@ export default function AdminDeskPage() {
                   setAdminSymMax((m) => ({ ...m, [sym]: 0 }));
                 }));
                 setOk(`Spread applied to all ${allSyms.length} symbols`); setAllSymEdit(null);
-              }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Apply to all {Object.keys(adminSymIds).length} symbols</button>
+              }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Apply to all {symPerm ? symPerm.symbols.length : Object.keys(adminSymIds).length} symbols</button>
               <button onClick={() => setAllSymEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
             </div>
           </div>
@@ -2387,13 +2379,22 @@ export default function AdminDeskPage() {
                 : "Switching a symbol OFF hides it across the ENTIRE tenant (all clients, managers, desk). Other tenants are unaffected."}
             </div>
             <input value={symPerm.q || ""} onChange={(e) => setSymPerm((p: any) => ({ ...p, q: e.target.value }))} placeholder="Search symbol" className="mb-2 rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--text)]" />
-            {/* Category-level bulk spread rows */}
+            {/* Category-level bulk spread rows + All Symbols */}
             {!symPerm.q && (() => {
               const cats: Record<string, string[]> = {};
               symPerm.symbols.forEach((s: any) => { const c = s.category || "other"; (cats[c] || (cats[c] = [])).push(s.symbol); });
               return (
                 <div className="mb-3 rounded-lg border border-[var(--border)] p-2">
                   <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Set spread by category</div>
+                  {/* All Symbols row */}
+                  <div className="flex items-center gap-2 py-1 border-b border-[var(--border)]">
+                    <span className="capitalize text-[10px] font-semibold w-20 shrink-0">All Symbols</span>
+                    <span className="text-[9px] shrink-0" style={{ color: "var(--muted)" }}>{symPerm.symbols.length} sym</span>
+                    <button onClick={() => setAllSymEdit({ type: "FIXED", pips: 1.5 })}
+                      className="ml-auto rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)" }}>
+                      Set spread
+                    </button>
+                  </div>
                   {Object.entries(cats).map(([cat, syms]) => (
                     <div key={cat} className="flex items-center gap-2 py-1 border-b border-[var(--border)] last:border-0">
                       <span className="capitalize text-[10px] font-semibold w-20 shrink-0">{cat}</span>
@@ -2422,16 +2423,11 @@ export default function AdminDeskPage() {
                       <select value={adminSymTypes[s.symbol] || "FIXED"} onChange={(e) => { const v = e.target.value; setAdminSymTypes((m) => ({ ...m, [s.symbol]: v })); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spreadType: v }) }).catch(() => {}); }} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[9px]" style={{ color: "var(--text)" }}>
                         <option value="FIXED">Fixed</option><option value="FLOATING">Float</option>
                       </select>
-                      <span style={{ color: "var(--muted)", fontSize: 9 }}>Min</span>
+                      <span style={{ color: "var(--muted)", fontSize: 9 }}>Pips</span>
                       <input type="number" min="0" step="0.1" value={adminSymSpreads[s.symbol] ?? 0} onChange={(e) => setAdminSymSpreads((m) => ({ ...m, [s.symbol]: Number(e.target.value) }))}
-                        onBlur={(e) => { const v = Math.max(0, Number(e.target.value)); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: v }) }).catch(() => {}); setAdminSymSpreads((m) => ({ ...m, [s.symbol]: v })); }}
+                        onBlur={(e) => { const v = Math.max(0, Number(e.target.value)); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: v, spreadMax: 0 }) }).catch(() => {}); setAdminSymSpreads((m) => ({ ...m, [s.symbol]: v })); }}
                         className="w-12 rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-center text-[10px]" style={{ color: "var(--text)" }} />
-                      {(adminSymTypes[s.symbol] || "FIXED") === "FLOATING" && <>
-                        <span style={{ color: "var(--muted)", fontSize: 9 }}>Max</span>
-                        <input type="number" min="0" step="0.1" value={adminSymMax[s.symbol] ?? 0} onChange={(e) => setAdminSymMax((m) => ({ ...m, [s.symbol]: Number(e.target.value) }))}
-                          onBlur={(e) => { const v = Math.max(0, Number(e.target.value)); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spreadMax: v }) }).catch(() => {}); setAdminSymMax((m) => ({ ...m, [s.symbol]: v })); }}
-                          className="w-12 rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-center text-[10px]" style={{ color: "var(--text)" }} />
-                      </>}
+                      {(adminSymTypes[s.symbol] || "FIXED") === "FLOATING" && <span className="text-[9px]" style={{ color: "#22c55e" }}>~variable</span>}
                     </div>
                   </div>
                 );
