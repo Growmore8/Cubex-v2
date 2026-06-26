@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
+import { Redis } from "ioredis";
 
 // Category-based default spreads (pips) used when type=FLOATING and no pip value is specified
 const CAT_DEFAULTS: Record<string, number> = {
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
       });
     }));
 
+    try { const pub = new Redis(process.env.REDIS_URL || "redis://localhost:6379"); await pub.publish("cubex:spreads", "1"); pub.disconnect(); } catch (_) {}
     return NextResponse.json({ ok: true, count: globals.length });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 500 });

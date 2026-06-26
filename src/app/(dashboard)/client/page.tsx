@@ -263,6 +263,10 @@ export default function ClientTerminal() {
     const flushIv = setInterval(flush, 200);
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
     socket.on("refresh", (p: any) => { if (p && p.kind === "notification") loadNotifs(); else load(); });
+    // Real-time spread updates: admin changes spread → server pushes to tenant room → update instantly
+    socket.on("sym-spreads", (spreads: Record<string, { min: number; max: number; type: string }>) => {
+      startTransition(() => setSymbolSpreads((prev) => ({ ...prev, ...spreads })));
+    });
     return () => { socket.disconnect(); clearInterval(clr); clearInterval(flushIv); };
   }, []);
 

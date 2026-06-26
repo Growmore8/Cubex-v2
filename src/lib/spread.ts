@@ -5,14 +5,15 @@ export function pipForDigits(digits: number): number {
   return Math.pow(10, -(digits - 1));
 }
 
-// FLOATING = pass raw live market spread (zero extra markup).
-// FIXED = add the configured pip markup.
+// Symbol layer FLOATING = stored pip value IS the base spread (off-hours widening is separate).
+// Group/Account layer FLOATING = 0 extra markup (client sees raw symbol spread, no markup added).
 function resolveMarkup(pips: number, type: string): number {
   return type === "FLOATING" ? 0 : pips;
 }
 
-// Total spread in pips: symbol + group markup + account markup.
-// Any layer set to FLOATING contributes 0 — raw feed spread passes through for that layer.
+// Total spread in pips: symbol base + group markup + account markup.
+// Symbol layer always uses its stored spread regardless of FLOATING/FIXED.
+// Group and account FLOATING layers contribute 0 (no extra markup).
 export async function getSpreadPips(
   tenantId: string,
   symbol: string,
@@ -24,7 +25,7 @@ export async function getSpreadPips(
     groupId ? prisma.tradeGroup.findUnique({ where: { id: groupId }, select: { spread: true, spreadType: true } }).catch(() => null) : null,
     accountId ? prisma.account.findUnique({ where: { id: accountId }, select: { spreadMarkup: true, spreadMarkupType: true } }).catch(() => null) : null,
   ]);
-  const symPips = resolveMarkup(Number(sym?.spread ?? 0), sym?.spreadType ?? "FIXED");
+  const symPips = Number(sym?.spread ?? 0); // symbol base always applies
   const grpPips = resolveMarkup(Number(grp?.spread ?? 0), grp?.spreadType ?? "FIXED");
   const accPips = resolveMarkup(Number(acc?.spreadMarkup ?? 0), acc?.spreadMarkupType ?? "FIXED");
   return symPips + grpPips + accPips;

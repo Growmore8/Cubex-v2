@@ -430,11 +430,22 @@ const accMarkups = {};
 async function loadSpreads() {
   try {
     const syms = await prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true, spreadType: true, spreadMax: true } });
-    for (const s of syms) symSpreads[s.tenantId + ":" + s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FIXED" };
-    const grps = await prisma.tradeGroup.findMany({ select: { id: true, spread: true } });
+    const tenantSpreadMap = {}; // tenantId → { symbol → {min,max,type} }
+    for (const s of syms) {
+      symSpreads[s.tenantId + ":" + s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FIXED" };
+      if (!tenantSpreadMap[s.tenantId]) tenantSpreadMap[s.tenantId] = {};
+      tenantSpreadMap[s.tenantId][s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FIXED" };
+    }
+    const grps = await prisma.tradeGroup.findMany({ select: { id: true, spread: true, spreadType: true } });
     for (const g of grps) grpSpreads[g.id] = Number(g.spread || 0);
     const accs = await prisma.account.findMany({ select: { id: true, spreadMarkup: true } });
     for (const a of accs) accMarkups[a.id] = Number(a.spreadMarkup || 0);
+    // Push spread updates to all connected clients — each tenant gets its own data
+    if (global.__io) {
+      for (const [tenantId, spreads] of Object.entries(tenantSpreadMap)) {
+        global.__io.to("t:" + tenantId).emit("sym-spreads", spreads);
+      }
+    }
   } catch (e) { console.error("[spreads] load failed", e); }
 }
 // Compute floating or fixed symbol spread in pips.
@@ -754,19 +765,29 @@ app.prepare().then(async () => {
   sub.on("message", (ch, msg) => {
     if (ch === "cubex:refresh" && global.__io) { try { global.__io.emit("refresh", JSON.parse(msg)); } catch (e) { global.__io.emit("refresh", {}); } }
     else if (ch === "cubex:feeds") { (async () => { await loadFeedConfig(); reconnectFeeds(); console.log("[feed] reloaded from SuperAdmin"); })().catch((e) => console.error("[feed] reload failed:", e.message)); }
+    else if (ch === "cubex:spreads") { loadSpreads().catch(() => {}); } // admin changed a spread → reload + push
   });
+  sub.subscribe("cubex:spreads").catch(() => {});
   io.on("connection", (socket) => {
     const h = {}; for (const s of symbols) h[s] = state[s].candles; socket.emit("history", h);
     // Snapshot of current prices so clients (incl. for FROZEN/closed markets) know the
     // latest price immediately — open positions then show their real last P&L, not 0.
     const px = {}; for (const s of symbols) { const st = state[s]; if (st && st.price != null) px[s] = st.price; }
     socket.emit("prices", px);
-    // Presence tracking — CLIENT and MANAGER sessions count toward online/offline
-    // (so closing the app / terminal notifies staff even when the beacon fails).
+    // Presence tracking + tenant room — CLIENT and MANAGER sessions count toward online/offline
     const sess = sessionFromSocket(socket);
-    if (sess && (sess.role === "CLIENT" || sess.role === "MANAGER") && sess.sub && sess.tenantId) {
-      presenceConnect(socket, sess);
-      socket.on("disconnect", () => presenceDisconnect(socket));
+    if (sess && sess.tenantId) {
+      socket.join("t:" + sess.tenantId); // tenant room for spread + refresh broadcasts
+      // Send current spread data immediately on connect so client has fresh spreads
+      const tenantSpreads = {};
+      for (const [k, v] of Object.entries(symSpreads)) {
+        if (k.startsWith(sess.tenantId + ":")) tenantSpreads[k.slice(sess.tenantId.length + 1)] = v;
+      }
+      if (Object.keys(tenantSpreads).length) socket.emit("sym-spreads", tenantSpreads);
+      if (sess.role === "CLIENT" || sess.role === "MANAGER") {
+        presenceConnect(socket, sess);
+        socket.on("disconnect", () => presenceDisconnect(socket));
+      }
     }
   });
   await seedFromRedis();        // resume last-known prices (survives restarts)
