@@ -27,18 +27,19 @@ const CAT_FEEDS: Record<string, { key: string; name: string; free: boolean; hasB
   ],
 };
 
-const CATEGORIES = [
-  { key: "cryptoFeed",  label: "Crypto",      icon: "fa-brands fa-bitcoin",   color: "#f59e0b" },
-  { key: "forexFeed",   label: "Forex",        icon: "fa-solid fa-coins",       color: "#3b82f6" },
-  { key: "commFeed",    label: "Commodities",  icon: "fa-solid fa-oil-well",    color: "#8b5cf6" },
-  { key: "idxFeed",     label: "Indices",      icon: "fa-solid fa-chart-line",  color: "#22c55e" },
+const CATEGORIES: { key: string; catName: string; label: string; icon: string; color: string }[] = [
+  { key: "cryptoFeed", catName: "crypto",       label: "Crypto",      icon: "fa-brands fa-bitcoin",   color: "#f59e0b" },
+  { key: "forexFeed",  catName: "forex",        label: "Forex",        icon: "fa-solid fa-coins",       color: "#3b82f6" },
+  { key: "commFeed",   catName: "commodities",  label: "Commodities",  icon: "fa-solid fa-oil-well",    color: "#8b5cf6" },
+  { key: "idxFeed",    catName: "indices",      label: "Indices",      icon: "fa-solid fa-chart-line",  color: "#22c55e" },
 ];
 
 type TestStatus = { status: "idle" | "checking" | "ok" | "error"; latency?: number; error?: string };
 
 // ── Needs API key? ──────────────────────────────────────────────────────────
+const CAT_KEY_MAP: Record<string, string> = { cryptoFeed: "crypto", forexFeed: "forex", commFeed: "commodities", idxFeed: "indices" };
 function needsKey(catKey: string, feedKey: string, keys: Record<string, string>) {
-  const opt = CAT_FEEDS[catKey.replace("Feed", "")]?.find((f) => f.key === feedKey);
+  const opt = CAT_FEEDS[CAT_KEY_MAP[catKey] || catKey]?.find((f) => f.key === feedKey);
   if (!opt || opt.free) return false;
   if (feedKey === "TD") return !keys.tdKey;
   if (feedKey === "FH") return !keys.finnhubKey;
@@ -156,8 +157,7 @@ export default function SAFeeds() {
               WebSocket Provider per Asset Class
             </div>
             {CATEGORIES.map((cat) => {
-              const catName = cat.key.replace("Feed", "");
-              const options = CAT_FEEDS[catName] || [];
+              const options = CAT_FEEDS[cat.catName] || [];
               const selected = (feeds as any)[cat.key] as string;
               const opt = options.find((o) => o.key === selected);
               const ts = testStatus[cat.key] || { status: "idle" };

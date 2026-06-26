@@ -107,7 +107,16 @@ function recordFeedFailure(feed) {
   if (feed !== PRIMARY) return;
   primaryFailCount++;
   if (primaryFailCount >= PRIMARY_FAIL_THRESHOLD) {
-    const next = PRIMARY === "TD" ? (MASSIVE_KEY ? "MV" : "FH") : (TD_KEY ? "TD" : "FH");
+    // Pick next: prefer FH (free, stable) over MV (paid, may have bad key)
+    // Never bounce back to MV if it already failed — use FH as stable fallback
+    let next = "FH";
+    if (PRIMARY === "TD" && FINNHUB_KEY) next = "FH";
+    else if (PRIMARY === "TD" && !FINNHUB_KEY && MASSIVE_KEY) next = "MV";
+    else if (PRIMARY === "MV" && TD_KEY) next = "TD";
+    else if (PRIMARY === "MV" && !TD_KEY && FINNHUB_KEY) next = "FH";
+    else if (PRIMARY === "FH" && TD_KEY) next = "TD";
+    else next = FINNHUB_KEY ? "FH" : (TD_KEY ? "TD" : PRIMARY); // stay if nothing better
+    if (next === PRIMARY) { primaryFailCount = 0; return; } // nothing to switch to
     const prev = PRIMARY;
     console.warn(`[feed] AUTO-FAILOVER: ${prev} failed ${primaryFailCount}x → switching to ${next}`);
     PRIMARY = next; primaryFailCount = 0;
