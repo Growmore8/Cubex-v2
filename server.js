@@ -338,6 +338,7 @@ function commitPrice(sym, p) {
   } else { candle.high = Math.max(candle.high, p); candle.low = Math.min(candle.low, p); candle.close = p; }
   st.price = p;
   redis.set("price:" + sym, String(p));
+  if (st.bid != null) redis.set("bid:" + sym, String(st.bid)); // real bid for trade execution
   // `price` is the smooth DISPLAY value (lively market watch); `real` is the true
   // feed price (the chart builds its candles from this so they match the market,
   // while the ticker stays smooth). Falls back to the display when no live feed.

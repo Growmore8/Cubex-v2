@@ -1,13 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen } from "@/lib/perms";
-import { getPrice } from "@/lib/prices";
+import { getPrice, getBid } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
 import { pnlFor, validateSlTp, usedMargin } from "@/lib/trademath";
 import { notifyStaff } from "@/services/notification.service";
 import { audit } from "@/lib/audit";
 import { gnum, gprice } from "@/lib/format";
-import { getSpreadPips, spreadPrice, pipForDigits } from "@/lib/spread";
+import { getSpreadPips, pipForDigits } from "@/lib/spread";
 import { isMarketOpen } from "@/lib/market";
 
 // Throws if the symbol's market is closed (weekend forex/metals, etc.). Used to
@@ -63,12 +63,19 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   const ask = await getPrice(input.symbol);
   if (ask == null) throw new Error("No price for " + input.symbol);
 
-  // Compute spread-adjusted open price: BUY opens at ask, SELL opens at bid
+  // Compute spread-adjusted open price: BUY opens at ask, SELL opens at bid (MT5 standard)
   const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol: input.symbol }, select: { digits: true } }).catch(() => null);
   const digits = symRow?.digits ?? 5;
-  const pips = await getSpreadPips(tenantId, input.symbol, (account as any).groupId, account.id);
-  const sp = spreadPrice(pips, digits);
-  const openPrice = input.side === "BUY" ? ask : ask - sp;
+  const pip = pipForDigits(digits);
+  const adminPips = await getSpreadPips(tenantId, input.symbol, (account as any).groupId, account.id);
+  // Use real bid from Binance/Kraken if available + admin markup on top
+  // Fall back to ask − admin spread when no real bid (TwelveData/Finnhub feeds)
+  const realBid = await getBid(input.symbol);
+  const validRealBid = realBid != null && realBid > 0 && realBid < ask;
+  const bid = validRealBid
+    ? Math.max(0, realBid - adminPips * pip)   // live spread + admin markup
+    : Math.max(0, ask - adminPips * pip);       // admin spread only
+  const openPrice = input.side === "BUY" ? ask : bid;
 
   const slErr = validateSlTp(input.side, openPrice, input.sl, input.tp);
   if (slErr) throw new Error(slErr);
@@ -100,11 +107,17 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
   if (trade.account.locked) throw new Error("Account is locked (read-only)");
   const ask = await getPrice(trade.symbol);
   if (ask == null) throw new Error("No price");
-  // BUY closes at bid (ask − spread), SELL closes at ask
+  // BUY closes at bid (ask − spread), SELL closes at ask (MT5 standard)
   const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol: trade.symbol }, select: { digits: true } }).catch(() => null);
   const digits = symRow?.digits ?? 5;
-  const pips = await getSpreadPips(tenantId, trade.symbol, (trade.account as any).groupId, trade.accountId.toString());
-  const price = trade.type === "BUY" ? ask - spreadPrice(pips, digits) : ask;
+  const pip = pipForDigits(digits);
+  const adminPips = await getSpreadPips(tenantId, trade.symbol, (trade.account as any).groupId, trade.accountId.toString());
+  const realBid = await getBid(trade.symbol);
+  const validRealBid = realBid != null && realBid > 0 && realBid < ask;
+  const closeBid = validRealBid
+    ? Math.max(0, realBid - adminPips * pip)
+    : Math.max(0, ask - adminPips * pip);
+  const price = trade.type === "BUY" ? closeBid : ask;
   const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
 
   await prisma.$transaction(async (tx) => {
