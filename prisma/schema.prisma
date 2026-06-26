@@ -454,6 +454,15 @@ model FeedFailoverLog {
   reason    String?
   ts        DateTime @default(now())
 }
+
+model FeedErrorLog {
+  id        Int      @id @default(autoincrement())
+  category  String   // crypto | forex | commodities | indices | system
+  provider  String   // TD | FH | BN | KR | MV
+  errorType String   // API_KEY | WS_CONNECT | WS_ERROR | WS_TIMEOUT
+  message   String
+  ts        DateTime @default(now())
+}
 enum Role {
   SUPERADMIN
   ADMIN

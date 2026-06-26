@@ -84,12 +84,25 @@ function presenceDisconnect(socket) {
   p.offTimer = setTimeout(() => { presence.delete(uid); presenceMarkOffline(p.info); }, PRESENCE_GRACE_MS);
 }
 let TD_KEY = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
-let MASSIVE_KEY = process.env.MASSIVE_KEY || ""; // Massive.com (ex-Polygon.io) API key
-// Primary feed ("TD", "FH", or "MV"). Fallback kicks in when primary goes quiet.
+let MASSIVE_KEY = process.env.MASSIVE_KEY || "";
+// ── Per-category feed selection ──
+// Each asset class can use a different WebSocket provider independently.
+let CRYPTO_FEED = "BN";   // BN | KR | TD | FH
+let FOREX_FEED  = "TD";   // KR | TD | MV | FH
+let COMM_FEED   = "TD";   // KR | TD  (commodities = metals + energy)
+let IDX_FEED    = "TD";   // TD | FH  (indices)
+// Legacy PRIMARY kept for auto-failover fallback logic
 let PRIMARY = "TD";
-// Auto-failover: track consecutive primary feed failures
 let primaryFailCount = 0;
-const PRIMARY_FAIL_THRESHOLD = 5; // auto-switch after 5 consecutive WS failures
+const PRIMARY_FAIL_THRESHOLD = 5;
+
+// Persist an error event to DB and emit via socket
+function logFeedError(category, provider, errorType, message) {
+  console.error(`[${provider}][${category}] ${errorType}: ${message}`);
+  prisma.feedErrorLog.create({ data: { category, provider, errorType, message } }).catch(() => {});
+  if (global.__io) global.__io.emit("feed-error", { category, provider, errorType, message, ts: Date.now() });
+}
+
 function recordFeedFailure(feed) {
   if (feed !== PRIMARY) return;
   primaryFailCount++;
@@ -97,13 +110,28 @@ function recordFeedFailure(feed) {
     const next = PRIMARY === "TD" ? (MASSIVE_KEY ? "MV" : "FH") : (TD_KEY ? "TD" : "FH");
     const prev = PRIMARY;
     console.warn(`[feed] AUTO-FAILOVER: ${prev} failed ${primaryFailCount}x → switching to ${next}`);
-    PRIMARY = next;
-    primaryFailCount = 0;
-    const ts = Date.now();
-    // persist to DB
+    PRIMARY = next; primaryFailCount = 0;
     prisma.feedFailoverLog.create({ data: { fromFeed: prev, toFeed: next, reason: `${prev} failed ${PRIMARY_FAIL_THRESHOLD}x consecutively` } }).catch(() => {});
-    if (global.__io) global.__io.emit("feed-failover", { from: prev, to: next, ts });
+    if (global.__io) global.__io.emit("feed-failover", { from: prev, to: next, ts: Date.now() });
   }
+}
+
+// Determine which category a symbol belongs to (for per-category feed routing)
+const CRYPTO_SYM_SET = new Set(["BTCUSD","ETHUSD","BNBUSD","SOLUSD","DOGEUSD","XRPUSD","ADAUSD","AVAXUSD","LINKUSD","LTCUSD","DOTUSD"]);
+const INDEX_SYM_SET  = new Set(["US500","US30","US100","GER40","UK100","JP225","HK50","FRA40"]);
+const ENERGY_SYM_SET = new Set(["USOIL","UKOIL","NATGAS"]);
+function getSymCategory(sym) {
+  if (CRYPTO_SYM_SET.has(sym)) return "crypto";
+  if (INDEX_SYM_SET.has(sym))  return "indices";
+  if (ENERGY_SYM_SET.has(sym)) return "commodities";
+  if (/^(XAU|XAG|XPT|XPD|GAU|XAGG)/.test(sym)) return "commodities";
+  return "forex";
+}
+function getCatFeed(cat) {
+  if (cat === "crypto")      return CRYPTO_FEED;
+  if (cat === "indices")     return IDX_FEED;
+  if (cat === "commodities") return COMM_FEED;
+  return FOREX_FEED;
 }
 // Price display mode:
 //   DEFAULT (smoothed)  — the real feed sets each symbol's TARGET; the display
@@ -123,21 +151,26 @@ async function loadFeedConfig() {
     if (typeof v.tdKey === "string" && v.tdKey.trim()) TD_KEY = v.tdKey.trim();
     if (typeof v.finnhubKey === "string" && v.finnhubKey.trim()) FINNHUB_KEY = v.finnhubKey.trim();
     if (typeof v.massiveKey === "string" && v.massiveKey.trim()) MASSIVE_KEY = v.massiveKey.trim();
-    if (["TD", "FH", "MV"].includes(v.primary)) PRIMARY = v.primary;
+    if (["BN","KR","TD","FH"].includes(v.cryptoFeed))  CRYPTO_FEED = v.cryptoFeed;
+    if (["KR","TD","MV","FH"].includes(v.forexFeed))   FOREX_FEED  = v.forexFeed;
+    if (["KR","TD"].includes(v.commFeed))               COMM_FEED   = v.commFeed;
+    if (["TD","FH"].includes(v.idxFeed))                IDX_FEED    = v.idxFeed;
+    // Legacy PRIMARY for auto-failover
+    PRIMARY = TD_KEY ? "TD" : (FINNHUB_KEY ? "FH" : PRIMARY);
   } catch (e) { console.error("[feed] config load failed:", e.message); }
   recomputeExact();
-  console.log("[feed] config:", { td: TD_KEY ? "set" : "none", fh: FINNHUB_KEY ? "set" : "none", primary: PRIMARY, exact: REAL_EXACT });
+  console.log("[feed] config:", { td: !!TD_KEY, fh: !!FINNHUB_KEY, mv: !!MASSIVE_KEY, crypto: CRYPTO_FEED, forex: FOREX_FEED, comm: COMM_FEED, idx: IDX_FEED });
 }
 // Tear down and re-open all feed sockets with current keys (after a config change).
 function reconnectFeeds() {
-  try { if (tdWs) { tdWs.removeAllListeners(); tdWs.close(); } } catch (e) {}
-  tdWs = null;
-  try { if (fhWs) { fhWs.removeAllListeners(); fhWs.close(); } } catch (e) {}
-  fhWs = null;
-  try { if (mvWs) { mvWs.removeAllListeners(); mvWs.close(); } } catch (e) {}
-  mvWs = null;
+  for (const [ws, name] of [[tdWs,"TD"],[fhWs,"FH"],[mvWs,"MV"],[bnWs,"BN"],[krWs,"KR"]]) {
+    try { if (ws) { ws.removeAllListeners(); ws.close(); } } catch (e) {}
+  }
+  tdWs = null; fhWs = null; mvWs = null; bnWs = null; krWs = null;
   connectFinnhub();
   connectTD();
+  connectBinance();
+  connectKraken();
   if (MASSIVE_KEY) connectMassive();
 }
 
@@ -258,18 +291,23 @@ async function loadCatalog() {
 // it one point at a time, so every symbol's last decimal crawls smoothly.
 function applyPrice(sym, price, source) {
   if (!state[sym] || !price || isNaN(price) || price <= 0) return;
-  if (DERIVED_SET.has(sym)) return; // derived symbols are computed, never fed externally
-  // Primary feed wins; the other feed is used only when the primary is quiet.
-  const grp = source === "TD" ? "TD" : "FH";          // FH-Q counts as FH
-  const secondary = PRIMARY === "TD" ? "FH" : "TD";
+  if (DERIVED_SET.has(sym)) return;
+  // Per-category feed routing: preferred feed for this symbol's category wins.
+  // Any other source is accepted only when the preferred feed has been silent >12s.
+  const cat = getSymCategory(sym);
+  const preferred = getCatFeed(cat);
+  const src = source === "FH-Q" ? "FH" : source; // normalize
   const pk = "__prim_" + sym;
-  if (grp === secondary && fhLast[pk] && Date.now() - fhLast[pk] < 12000) return;
-  if (grp === PRIMARY) fhLast[pk] = Date.now();
+  if (src !== preferred) {
+    if (fhLast[pk] && Date.now() - fhLast[pk] < 12000) return; // preferred feed still active
+  } else {
+    fhLast[pk] = Date.now();
+  }
   const d = meta[sym].digits, p = r(price, d), st = state[sym];
   st.target = p;
-  st.realAt = Date.now();                 // a real feed price just arrived
-  if (REAL_EXACT) commitPrice(sym, p);     // exact mode: show the real tick right now
-  else if (st.price == null) commitPrice(sym, p); // smoothed mode: only seed the first price
+  st.realAt = Date.now();
+  if (REAL_EXACT) commitPrice(sym, p);
+  else if (st.price == null) commitPrice(sym, p);
 }
 
 // Commit an actual DISPLAY price: update the forming candle, cache it, broadcast
@@ -299,7 +337,7 @@ function connectFinnhub() {
   fhWs.on("open", () => { let n = 0; for (const s of symbols) { const f = meta[s].feed; if (!f) continue; try { fhWs.send(JSON.stringify({ type: "subscribe", symbol: f })); n++; } catch (e) {} } console.log("[FH] connected, subscribed", n); });
   fhWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.type === "trade" && m.data) for (const tk of m.data) { const s = feedToSym[tk.s]; if (s) applyPrice(s, parseFloat(tk.p), "FH"); } } catch (e) {} });
   fhWs.on("close", () => { setTimeout(connectFinnhub, 5000); });
-  fhWs.on("error", (e) => console.error("[FH]", e.message));
+  fhWs.on("error", (e) => { logFeedError("system", "FH", "WS_ERROR", e.message); });
 }
 // Finnhub Quote endpoint — real current price (c) for each Finnhub-fed symbol.
 // Seeds the live price on boot and acts as a fallback between WebSocket trades.
@@ -346,6 +384,70 @@ function connectBinance() {
   });
   bnWs.on("close", () => setTimeout(connectBinance, 5000));
   bnWs.on("error", (e) => console.error("[BN]", e.message));
+}
+
+// ── Kraken WebSocket — free real bid/ask for forex + metals + crypto ──
+// Docs: https://docs.kraken.com/websockets/
+// Endpoint: wss://ws.kraken.com  (no auth required)
+// Spread message: [channelID, [bid, ask, ts, bidSize, askSize], "spread", "EUR/USD"]
+const KR_PAIR_TO_SYM = {
+  "EUR/USD":"EURUSD","GBP/USD":"GBPUSD","AUD/USD":"AUDUSD","NZD/USD":"NZDUSD",
+  "USD/CAD":"USDCAD","USD/CHF":"USDCHF","USD/JPY":"USDJPY","EUR/GBP":"EURGBP",
+  "EUR/JPY":"EURJPY","EUR/CAD":"EURCAD","EUR/CHF":"EURCHF","GBP/JPY":"GBPJPY",
+  "GBP/CHF":"GBPCHF","AUD/JPY":"AUDJPY","AUD/NZD":"AUDNZD","AUD/CAD":"AUDCAD",
+  "NZD/JPY":"NZDJPY","USD/HKD":"USDHKD","USD/SGD":"USDSGD","USD/TRY":"USDTRY",
+  "USD/MXN":"USDMXN","GBP/AUD":"GBPAUD","GBP/CAD":"GBPCAD","GBP/NZD":"GBPNZD",
+  "EUR/NZD":"EURNZD","EUR/AUD":"EURAUD","CAD/CHF":"CADCHF","CAD/JPY":"CADJPY",
+  "CHF/JPY":"CHFJPY","NZD/CAD":"NZDCAD","NZD/CHF":"NZDCHF",
+  // Metals
+  "XAU/USD":"XAUUSD","XAG/USD":"XAGUSD",
+  // Crypto (Kraken uses XBT for Bitcoin)
+  "XBT/USD":"BTCUSD","ETH/USD":"ETHUSD","SOL/USD":"SOLUSD","XRP/USD":"XRPUSD",
+  "ADA/USD":"ADAUSD","DOT/USD":"DOTUSD","LINK/USD":"LINKUSD","AVAX/USD":"AVAXUSD",
+  "LTC/USD":"LTCUSD","DOGE/USD":"DOGEUSD",
+};
+const KR_FOREX_PAIRS  = ["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/CAD","USD/CHF","USD/JPY","EUR/GBP","EUR/JPY","EUR/CAD","EUR/CHF","GBP/JPY","GBP/CHF","AUD/JPY","AUD/NZD","AUD/CAD","NZD/JPY","USD/HKD","USD/SGD","USD/TRY","USD/MXN","GBP/AUD","GBP/CAD","GBP/NZD","EUR/NZD","EUR/AUD","CAD/CHF","CAD/JPY","CHF/JPY","NZD/CAD","NZD/CHF"];
+const KR_METAL_PAIRS  = ["XAU/USD","XAG/USD"];
+const KR_CRYPTO_PAIRS = ["XBT/USD","ETH/USD","SOL/USD","XRP/USD","ADA/USD","DOT/USD","LINK/USD","AVAX/USD","LTC/USD","DOGE/USD"];
+let krWs = null;
+function connectKraken() {
+  // Only connect if at least one category uses Kraken
+  if (!["KR"].some(k => [CRYPTO_FEED, FOREX_FEED, COMM_FEED].includes(k))) return;
+  if (krWs) { try { krWs.removeAllListeners(); krWs.terminate(); } catch (_) {} krWs = null; }
+  krWs = new WebSocket("wss://ws.kraken.com");
+  krWs.on("open", () => {
+    const pairs = [
+      ...(FOREX_FEED === "KR" ? KR_FOREX_PAIRS : []),
+      ...(COMM_FEED  === "KR" ? KR_METAL_PAIRS : []),
+      ...(CRYPTO_FEED=== "KR" ? KR_CRYPTO_PAIRS : []),
+    ];
+    if (!pairs.length) return;
+    krWs.send(JSON.stringify({ event: "subscribe", pair: pairs, subscription: { name: "spread" } }));
+    console.log("[KR] connected, subscribed spread for", pairs.length, "pairs");
+  });
+  krWs.on("message", (data) => {
+    try {
+      const m = JSON.parse(data);
+      // Spread message: [channelID, [bid, ask, ts, bidSize, askSize], "spread", "EUR/USD"]
+      if (Array.isArray(m) && m[2] === "spread") {
+        const pair = m[3];
+        const sym = KR_PAIR_TO_SYM[pair];
+        if (!sym || !state[sym]) return;
+        const bid = parseFloat(m[1][0]), ask = parseFloat(m[1][1]);
+        if (bid > 0 && ask > 0) {
+          state[sym].bid = r(bid, meta[sym] ? meta[sym].digits : 5);
+          applyPrice(sym, ask, "KR");
+        }
+      }
+    } catch (e) {}
+  });
+  krWs.on("close", () => {
+    logFeedError("system", "KR", "WS_CONNECT", "Kraken WebSocket closed, reconnecting in 5s");
+    setTimeout(connectKraken, 5000);
+  });
+  krWs.on("error", (e) => {
+    logFeedError("system", "KR", "WS_ERROR", e.message);
+  });
 }
 
 // ── Massive.com WebSocket — forex real bid/ask ──
@@ -411,7 +513,7 @@ function connectTD() {
   });
   tdWs.on("error", (e) => {
     tdWsFail200++;
-    console.error("[TD] WS error #" + tdWsFail200 + ":", e.message);
+    logFeedError("system", "TD", "WS_ERROR", e.message);
     recordFeedFailure("TD");
   });
 }
@@ -900,10 +1002,11 @@ app.prepare().then(async () => {
   });
   await seedFromRedis();        // resume last-known prices (survives restarts)
   await loadFeedConfig();       // keys + primary from SuperAdmin (DB overrides env)
-  connectBinance(); // free real bid/ask for crypto — no API key needed
+  connectBinance();    // crypto real bid/ask — free, no key
+  connectKraken();     // forex + metals real bid/ask — free, no key
   connectFinnhub();
   connectTD();
-  if (MASSIVE_KEY) connectMassive(); // Massive.com (ex-Polygon.io) — forex real bid/ask
+  if (MASSIVE_KEY) connectMassive();
   // Delay initial REST poll so WS can connect and subscribe first (avoids rate-limit spike on boot)
   setTimeout(pollPrices, 15000);
   setTimeout(pollFinnhubQuotes, 10000);
