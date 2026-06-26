@@ -293,8 +293,8 @@ let tdWsFail200 = 0; // consecutive WS handshake failures
 function connectTD() {
   if (!TD_KEY) { console.log("[TD] no key"); return; }
   if (tdWsFail200 >= 5) return; // give up after 5 failed attempts — REST poller covers prices
-  tdWs = new WebSocket("wss://ws.twelvedata.com/v1/quotes/price");
-  tdWs.on("open", () => { tdWsFail200 = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(","), apikey: TD_KEY } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
+  tdWs = new WebSocket("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY, { headers: { "Origin": "https://twelvedata.com" } });
+  tdWs.on("open", () => { tdWsFail200 = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
   tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits); else state[s].bid = null; applyPrice(s, ask, "TD"); } } } catch (e) {} });
   tdWs.on("close", () => { if (tdWsFail200 < 3) setTimeout(connectTD, 5000); });
   tdWs.on("error", (e) => {
