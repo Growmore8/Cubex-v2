@@ -15,12 +15,33 @@ const SPREADS: Record<string, number> = {
   AUDNZD: 1.5, AUDCAD: 1.5, NZDJPY: 1.5,
   // Exotic forex
   USDHKD: 3.0, USDSGD: 2.5, USDTRY: 8.0, USDIDR: 15.0,
+  USDMXN: 80.0, USDZAR: 120.0,
+  // More forex crosses
+  GBPAUD: 2.0, GBPCAD: 2.5, GBPNZD: 3.0, EURNZD: 2.5, EURAUD: 1.5,
+  CADCHF: 2.5, CADJPY: 1.8, CHFJPY: 2.0, NZDCAD: 2.5, NZDCHF: 3.0,
+  // Indices (digits=2, pip=$0.10 — spread in index points × 10)
+  US500: 5.0,   // $0.50 = 0.5 S&P points
+  US30:  20.0,  // $2.00 = 2.0 Dow points
+  US100: 10.0,  // $1.00 = 1.0 NASDAQ points
+  GER40: 10.0,  // $1.00 = 1.0 DAX points
+  UK100: 10.0,  // $1.00 = 1.0 FTSE points
+  JP225: 50.0,  // $5.00 = 5.0 Nikkei points
+  // Energy (digits=2 for oil, digits=3 for natgas)
+  USOIL:  3.0,  // $0.03 WTI spread
+  UKOIL:  3.0,  // $0.03 Brent spread
+  NATGAS: 5.0,  // $0.005 natural gas spread
   // Crypto (digits=2, pip=$0.10)
   BTCUSD: 20.0,  // $2.00 spread
   ETHUSD: 5.0,   // $0.50 spread
   BNBUSD: 2.0,   // $0.20 spread
   SOLUSD: 1.5,   // $0.15 spread
   DOGEUSD: 1.5,  // digits fixed to 5, pip=$0.0001 → $0.00015 spread
+  XRPUSD:  2.0,  // digits=4, pip=$0.0001 → $0.0002 spread
+  ADAUSD:  2.0,  // digits=4, pip=$0.0001 → $0.0002 spread
+  AVAXUSD: 2.0,  // digits=2, pip=$0.01 → $0.02 spread
+  LINKUSD: 2.0,  // digits=3, pip=$0.001 → $0.002 spread
+  LTCUSD:  2.0,  // digits=2, pip=$0.01 → $0.02 spread
+  DOTUSD:  2.0,  // digits=3, pip=$0.001 → $0.002 spread
   // Metals (digits=2, pip=$0.10)
   XAUUSD: 3.0,   // $0.30 spread (gold)
   XAGUSD: 0.5,   // $0.05 spread (silver)
@@ -38,9 +59,13 @@ const SPREADS: Record<string, number> = {
   XAGGUSD: 0.5, XAGGEUR: 0.6, XAGGTRY: 2.0,
 };
 
-// Digits overrides — fix assets where default digits make pip > price
+// Digits overrides — fix assets where default digits make pip > price or lose precision
 const DIGITS_FIX: Record<string, number> = {
-  DOGEUSD: 5, // price ~$0.09; digits=2 gives pip=$0.10 > price — fix to 5
+  DOGEUSD: 5, // price ~$0.09; digits=2 gives pip=$0.10 > price
+  XRPUSD: 4,  // price ~$2.4; need 4 decimal places
+  ADAUSD: 4,  // price ~$0.7; need 4 decimal places
+  DOTUSD: 3,  // price ~$5; need 3 decimal places
+  LINKUSD: 3, // price ~$15; need 3 decimal places
 };
 
 export async function POST(req: Request) {

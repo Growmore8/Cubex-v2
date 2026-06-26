@@ -193,10 +193,15 @@ function contractFor(cat, sym) {
   if (cat === "metals") return 100;
   if (cat === "crypto") return 1;
   if (cat === "stocks" || cat === "indices") return 1;
+  if (cat === "energy") return 100;
   return 100000;
 }
+const TD_INDEX_MAP = { US500: "SPX", US30: "DJI", US100: "IXIC", GER40: "DAX", UK100: "FTSE", JP225: "NI225", HK50: "HSI", FRA40: "CAC" };
+const TD_ENERGY_MAP = { USOIL: "WTI/USD", UKOIL: "BCO/USD", NATGAS: "NATGAS/USD" };
 function toTD(sym, cat) {
   if (cat === "crypto" || sym.endsWith("USDT")) return sym.replace(/USDT?$/, "") + "/USD";
+  if (cat === "indices" && TD_INDEX_MAP[sym]) return TD_INDEX_MAP[sym];
+  if (cat === "energy" && TD_ENERGY_MAP[sym]) return TD_ENERGY_MAP[sym];
   if (sym.length === 6 || /^(XAU|XAG|XPT|XPD)/.test(sym)) return sym.slice(0, 3) + "/" + sym.slice(3);
   return sym;
 }
@@ -289,10 +294,13 @@ async function pollFinnhubQuotes() {
 }
 
 // ── Binance WebSocket — free real bid/ask for crypto (no API key needed) ──
-const BN_SYM = { BTCUSD: "btcusdt", ETHUSD: "ethusdt", BNBUSD: "bnbusdt", SOLUSD: "solusdt", DOGEUSD: "dogeusdt" };
+const BN_SYM = {
+  BTCUSD: "btcusdt", ETHUSD: "ethusdt", BNBUSD: "bnbusdt", SOLUSD: "solusdt", DOGEUSD: "dogeusdt",
+  XRPUSD: "xrpusdt", ADAUSD: "adausdt", AVAXUSD: "avaxusdt", LINKUSD: "linkusdt", LTCUSD: "ltcusdt", DOTUSD: "dotusdt",
+};
 const BN_TO_SYM = Object.fromEntries(Object.entries(BN_SYM).map(([k, v]) => [v.toUpperCase(), k]));
-// Digit overrides for low-price crypto where default digits cause pip > price
-const BN_DIGITS = { DOGEUSD: 5, SOLUSD: 3 };
+// Digit overrides for assets where default digits cause pip > price or loss of precision
+const BN_DIGITS = { DOGEUSD: 5, SOLUSD: 3, XRPUSD: 4, ADAUSD: 4, DOTUSD: 3, LINKUSD: 3, AVAXUSD: 2, LTCUSD: 2 };
 let bnWs = null;
 function connectBinance() {
   const streams = Object.values(BN_SYM).map((s) => s + "@bookTicker").join("/");
