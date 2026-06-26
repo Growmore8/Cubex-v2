@@ -94,15 +94,18 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const spPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
               const spPx = spPips * Math.pow(10, -(d - 1));
               const ask = p != null ? gnum(p, d) : "—";
-              const lpBid = realBids[s.symbol]; // real bid from TwelveData Pro feed
+              const lpBid = realBids[s.symbol];
               const pip = Math.pow(10, -(d - 1));
               // Cap admin spread at 2% of price to prevent negative bid on low-price assets (e.g. DOGE)
               const safeSpPx = p != null ? Math.min(spPx, p * 0.02) : spPx;
+              // Use real bid only when strictly less than ask (bid >= ask = stale/inverted → fall back)
+              const validRealBid = p != null && lpBid != null && lpBid > 0 && lpBid < p;
               const bid = p != null
-                ? (lpBid != null && lpBid > 0 ? gnum(lpBid, d) : gnum(Math.max(0, p - safeSpPx), d))
+                ? (validRealBid ? gnum(lpBid!, d) : gnum(Math.max(0, p - safeSpPx), d))
                 : "—";
-              const realSpPips = p != null && lpBid != null && lpBid > 0
-                ? (p - lpBid) / pip
+              // Live spread pips: from real bid/ask when valid, else from admin spread setting
+              const realSpPips = validRealBid
+                ? (p! - lpBid!) / pip
                 : safeSpPx / pip;
               const dir = dirs[s.symbol] || 0;
               const isOff = !!(disabledSyms && disabledSyms.includes(s.symbol));

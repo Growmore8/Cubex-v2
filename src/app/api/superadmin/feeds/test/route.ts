@@ -4,7 +4,7 @@ import WebSocket from "ws";
 
 const TIMEOUT_MS = 6000;
 
-function testWS(url: string, onOpen?: (ws: WebSocket) => void, validate?: (data: string) => boolean): Promise<{ ok: boolean; latency?: number; error?: string }> {
+function testWS(url: string, onOpen?: (ws: WebSocket) => void, validate?: (data: string) => boolean, wsOptions?: object): Promise<{ ok: boolean; latency?: number; error?: string }> {
   return new Promise((resolve) => {
     const start = Date.now();
     let done = false;
@@ -15,7 +15,7 @@ function testWS(url: string, onOpen?: (ws: WebSocket) => void, validate?: (data:
       resolve(result);
     };
     const timer = setTimeout(() => finish({ ok: false, error: "Timeout — no data received in 6s" }), TIMEOUT_MS);
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(url, wsOptions as any);
     ws.on("open", () => { if (onOpen) onOpen(ws); });
     ws.on("message", (data: Buffer) => {
       const str = data.toString();
@@ -52,8 +52,8 @@ export async function POST(req: Request) {
       const result = await testWS(
         `wss://ws.twelvedata.com/v1/quotes/price?apikey=${apiKey}`,
         (ws) => ws.send(JSON.stringify({ action: "subscribe", params: { symbols: "EUR/USD" } })),
-        // Accept connection ack OR heartbeat OR price — any response proves key is valid & WS works
-        (data) => { try { const m = JSON.parse(data); return m.status === "ok" || m.event === "heartbeat" || m.event === "price"; } catch { return false; } }
+        (data) => { try { const m = JSON.parse(data); return m.status === "ok" || m.event === "heartbeat" || m.event === "price"; } catch { return false; } },
+        { headers: { Origin: "https://twelvedata.com" } }
       );
       return NextResponse.json(result);
     }

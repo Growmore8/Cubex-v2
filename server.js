@@ -393,7 +393,7 @@ function connectBinance() {
       if (bid > 0 && ask > 0 && ask >= bid) {
         const digits = BN_DIGITS[sym] || (meta[sym] ? meta[sym].digits : 2);
         if (meta[sym]) meta[sym].digits = digits; // fix digits runtime for low-price assets
-        state[sym].bid = r(bid, digits);
+        if (bid > 0 && bid < ask) state[sym].bid = r(bid, digits);
         applyPrice(sym, ask, "BN");
       }
     } catch (e) {}
@@ -450,7 +450,7 @@ function connectKraken() {
         const sym = KR_PAIR_TO_SYM[pair];
         if (!sym || !state[sym]) return;
         const bid = parseFloat(m[1][0]), ask = parseFloat(m[1][1]);
-        if (bid > 0 && ask > 0) {
+        if (bid > 0 && ask > 0 && bid < ask) {
           state[sym].bid = r(bid, meta[sym] ? meta[sym].digits : 5);
           applyPrice(sym, ask, "KR");
         }
