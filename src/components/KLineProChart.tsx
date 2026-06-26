@@ -297,48 +297,28 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     return coreRef.current;
   }, []);
 
-  // iOS Safari / Android Chrome: block browser scroll/zoom on the chart container.
-  // Strategy: (1) non-passive capture listeners on the document so we intercept
-  // BEFORE the browser evaluates touch-action on any ancestor, (2) MutationObserver
-  // to add non-passive listeners directly on every canvas klinecharts creates —
-  // klinecharts v9 registers its own listeners as passive (can't be overridden from
-  // outside), so this is the only reliable way to prevent iOS from stealing the swipe.
+  // Mobile chart panning: the ONLY correct fix for Chrome PWA + iOS Safari is
+  // touch-action:none via CSS — applied to every element klinecharts creates.
+  // Do NOT call preventDefault() on touchstart: Chrome derives Pointer Events from
+  // Touch Events, so preventing touchstart default suppresses pointerdown/pointermove
+  // which klinecharts uses for drag/pan. CSS touch-action is evaluated before any
+  // JS fires and tells the browser to hand ALL touch gestures to JS instead of
+  // scrolling the page.
   useEffect(() => {
     const el = elRef.current;
     if (!el) return;
-
-    const prevent = (e: TouchEvent) => {
-      if (el.contains(e.target as Node) && e.cancelable) e.preventDefault();
+    // Set touch-action:none as inline style on every element including canvases
+    // created dynamically by klinecharts after init.
+    const patch = (node: Element) => {
+      if ((node as HTMLElement).style) (node as HTMLElement).style.touchAction = "none";
+      node.querySelectorAll<HTMLElement>("*").forEach((h) => { if (h.style) h.style.touchAction = "none"; });
     };
-    document.addEventListener("touchstart", prevent, { passive: false, capture: true });
-    document.addEventListener("touchmove", prevent, { passive: false, capture: true });
-
-    // Attach non-passive listeners directly to canvas elements as they're created.
-    const patchCanvas = (node: Element) => {
-      if (node.nodeName === "CANVAS") {
-        const c = node as HTMLCanvasElement;
-        if (!(c as any).__cubexTouchPatched) {
-          (c as any).__cubexTouchPatched = true;
-          (c as HTMLElement).style.touchAction = "none";
-          c.addEventListener("touchstart", prevent, { passive: false });
-          c.addEventListener("touchmove", prevent, { passive: false });
-        }
-      }
-      node.querySelectorAll("canvas").forEach(patchCanvas);
-    };
-    // Patch canvases already in DOM (if klinecharts rendered synchronously).
-    el.querySelectorAll("canvas").forEach(patchCanvas);
-    // Watch for canvases added later (klinecharts init is async).
+    patch(el);
     const mo = new MutationObserver((mutations) => {
-      for (const m of mutations) m.addedNodes.forEach((n) => { if (n.nodeType === 1) patchCanvas(n as Element); });
+      for (const m of mutations) m.addedNodes.forEach((n) => { if (n.nodeType === 1) patch(n as Element); });
     });
     mo.observe(el, { childList: true, subtree: true });
-
-    return () => {
-      document.removeEventListener("touchstart", prevent, { capture: true } as any);
-      document.removeEventListener("touchmove", prevent, { capture: true } as any);
-      mo.disconnect();
-    };
+    return () => mo.disconnect();
   }, []);
 
   // Force the core chart to resize whenever our container box changes (panels /
