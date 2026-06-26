@@ -52,7 +52,8 @@ export async function POST(req: Request) {
       const result = await testWS(
         `wss://ws.twelvedata.com/v1/quotes/price?apikey=${apiKey}`,
         (ws) => ws.send(JSON.stringify({ action: "subscribe", params: { symbols: "EUR/USD" } })),
-        (data) => { try { const m = JSON.parse(data); return m.event === "price"; } catch { return false; } }
+        // Accept connection ack OR heartbeat OR price — any response proves key is valid & WS works
+        (data) => { try { const m = JSON.parse(data); return m.status === "ok" || m.event === "heartbeat" || m.event === "price"; } catch { return false; } }
       );
       return NextResponse.json(result);
     }
@@ -62,7 +63,8 @@ export async function POST(req: Request) {
       const result = await testWS(
         `wss://ws.finnhub.io?token=${apiKey}`,
         (ws) => ws.send(JSON.stringify({ type: "subscribe", symbol: "OANDA:EUR_USD" })),
-        (data) => { try { const m = JSON.parse(data); return m.type === "trade" || m.type === "ping"; } catch { return false; } }
+        // Accept trade data OR ping (heartbeat) — ping alone proves connection + valid key
+        (data) => { try { const m = JSON.parse(data); return m.type === "trade" || m.type === "ping" || m.type === "connected"; } catch { return false; } }
       );
       return NextResponse.json(result);
     }
