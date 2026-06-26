@@ -19,7 +19,7 @@ export default function SAFeeds() {
   const [err,        setErr]        = useState("");
   const [msg,        setMsg]        = useState("");
   const [loading,    setLoading]    = useState(true);
-  const [failoverLog, setFailoverLog] = useState<{ from: string; to: string; ts: number }[]>([]);
+  const [failoverLog, setFailoverLog] = useState<{ from: string; to: string; ts: number; reason?: string }[]>([]);
 
   useEffect(() => {
     fetch("/api/superadmin/feeds").then((r) => r.json()).then((d) => {
@@ -32,11 +32,16 @@ export default function SAFeeds() {
       setLoading(false);
     }).catch(() => setLoading(false));
 
-    // Listen for auto-failover events from server
+    // Load failover log from DB
+    fetch("/api/superadmin/feeds/log").then((r) => r.json()).then((d) => {
+      if (d.ok && d.logs) setFailoverLog(d.logs.map((l: any) => ({ from: l.fromFeed, to: l.toFeed, ts: new Date(l.ts).getTime(), reason: l.reason })));
+    }).catch(() => {});
+
+    // Listen for real-time failover events
     const sock = io({ path: "/socket.io" });
     sock.on("feed-failover", (data: any) => {
       setPrimary(data.to as Primary);
-      setFailoverLog((prev) => [data, ...prev].slice(0, 20));
+      setFailoverLog((prev) => [data, ...prev].slice(0, 50));
     });
     return () => { sock.disconnect(); };
   }, []);
@@ -73,8 +78,8 @@ export default function SAFeeds() {
             <span className="text-sm font-semibold flex items-center gap-2" style={{ color: "#f97316" }}>
               <i className="fa-solid fa-triangle-exclamation" /> Auto-failover log
             </span>
-            <button onClick={() => setFailoverLog([])} className="text-xs opacity-60 hover:opacity-100" style={{ color: "#f97316" }}>
-              Clear
+            <button onClick={() => { fetch("/api/superadmin/feeds/log", { method: "DELETE" }); setFailoverLog([]); }} className="text-xs opacity-60 hover:opacity-100" style={{ color: "#f97316" }}>
+              Clear log
             </button>
           </div>
           <div className="divide-y" style={{ borderColor: "rgba(249,115,22,0.15)" }}>
@@ -86,7 +91,7 @@ export default function SAFeeds() {
                 <span style={{ color: "#f97316" }}>{ev.from}</span>
                 <i className="fa-solid fa-arrow-right text-[10px]" style={{ color: "#94a3b8" }} />
                 <span className="font-semibold" style={{ color: "#22c55e" }}>{ev.to}</span>
-                <span className="text-[11px] ml-auto" style={{ color: "#94a3b8" }}>switched to {ev.to}</span>
+                <span className="text-[11px] ml-auto" style={{ color: "#94a3b8" }}>{ev.reason || `switched to ${ev.to}`}</span>
               </div>
             ))}
           </div>

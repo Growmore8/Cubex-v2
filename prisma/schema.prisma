@@ -446,6 +446,14 @@ model GlobalSymbol {
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
 }
+
+model FeedFailoverLog {
+  id        Int      @id @default(autoincrement())
+  fromFeed  String
+  toFeed    String
+  reason    String?
+  ts        DateTime @default(now())
+}
 enum Role {
   SUPERADMIN
   ADMIN

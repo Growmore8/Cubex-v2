@@ -95,10 +95,14 @@ function recordFeedFailure(feed) {
   primaryFailCount++;
   if (primaryFailCount >= PRIMARY_FAIL_THRESHOLD) {
     const next = PRIMARY === "TD" ? (MASSIVE_KEY ? "MV" : "FH") : (TD_KEY ? "TD" : "FH");
-    console.warn(`[feed] AUTO-FAILOVER: ${PRIMARY} failed ${primaryFailCount}x → switching to ${next}`);
+    const prev = PRIMARY;
+    console.warn(`[feed] AUTO-FAILOVER: ${prev} failed ${primaryFailCount}x → switching to ${next}`);
     PRIMARY = next;
     primaryFailCount = 0;
-    if (global.__io) global.__io.emit("feed-failover", { from: feed, to: next, ts: Date.now() });
+    const ts = Date.now();
+    // persist to DB
+    prisma.feedFailoverLog.create({ data: { fromFeed: prev, toFeed: next, reason: `${prev} failed ${PRIMARY_FAIL_THRESHOLD}x consecutively` } }).catch(() => {});
+    if (global.__io) global.__io.emit("feed-failover", { from: prev, to: next, ts });
   }
 }
 // Price display mode:
