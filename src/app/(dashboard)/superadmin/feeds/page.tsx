@@ -52,14 +52,6 @@ export default function SAFeeds() {
   }
 
   const keyOf = (k: Primary) => k === "TD" ? tdKey : k === "FH" ? finnhubKey : massiveKey;
-  const primFeed = FEEDS.find((f) => f.key === primary)!;
-  const secFeeds = FEEDS.filter((f) => f.key !== primary);
-
-  const roleStyle = (role: "PRIMARY" | "FALLBACK") =>
-    role === "PRIMARY"
-      ? { background: "rgba(34,197,94,0.15)", color: "#22c55e" }
-      : { background: "rgba(249,115,22,0.15)", color: "#f97316" };
-
   const inp = "w-full rounded-lg border px-3 py-2 text-sm font-mono bg-[var(--bg)] border-[var(--border)] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
 
   return (
@@ -83,48 +75,44 @@ export default function SAFeeds() {
       {err && <div className="rounded-lg px-4 py-2 text-sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>{err}</div>}
       {msg && <div className="rounded-lg px-4 py-2 text-sm" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>{msg}</div>}
 
-      {/* Priority cards */}
+      {/* Priority cards — click any card to set as primary */}
       <div className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>Priority</span>
-          <button
-            onClick={() => setPrimary((p) => {
-              const idx = FEEDS.findIndex((f) => f.key === p);
-              return FEEDS[(idx + 1) % FEEDS.length].key;
-            })}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-[var(--soft)]"
-            style={{ borderColor: "var(--border)", color: "var(--text)" }}
-          >
-            <i className="fa-solid fa-right-left" />Swap primary / fallback
-          </button>
+          <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>Priority <span className="font-normal text-xs ml-1" style={{ color: "var(--muted)" }}>— click a card to set as primary</span></span>
         </div>
-        <div className="flex items-stretch gap-3">
-          {/* Primary */}
-          <div className="flex-1 rounded-lg border p-3" style={{ borderColor: "#22c55e", background: "rgba(34,197,94,0.06)" }}>
-            <div className="mb-1 flex items-center justify-between">
-              <span className="font-semibold text-sm" style={{ color: "var(--text)" }}>{primFeed.name}</span>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={roleStyle("PRIMARY")}>PRIMARY</span>
-            </div>
-            <div className="text-[11px]" style={{ color: "var(--muted)" }}>{primFeed.info}</div>
-            <div className="mt-1 text-[11px]" style={{ color: keyOf(primFeed.key) ? "#22c55e" : "var(--muted)" }}>
-              {keyOf(primFeed.key) ? "✓ key set" : "⚠ no key"}
-            </div>
-          </div>
-          {/* Fallbacks */}
-          <div className="flex flex-1 flex-col gap-2">
-            {secFeeds.map((f) => (
-              <div key={f.key} className="flex-1 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
-                <div className="mb-1 flex items-center justify-between">
+        <div className="grid grid-cols-3 gap-3">
+          {FEEDS.map((f) => {
+            const isPrimary = f.key === primary;
+            const hasKey = !!keyOf(f.key);
+            return (
+              <button
+                key={f.key}
+                onClick={() => setPrimary(f.key)}
+                className="rounded-xl border p-3 text-left transition-all"
+                style={{
+                  borderColor: isPrimary ? "#22c55e" : "var(--border)",
+                  background: isPrimary ? "rgba(34,197,94,0.08)" : "var(--bg)",
+                  boxShadow: isPrimary ? "0 0 0 1px #22c55e" : "none",
+                  cursor: "pointer",
+                }}
+              >
+                <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-sm" style={{ color: "var(--text)" }}>{f.name}</span>
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={roleStyle("FALLBACK")}>FALLBACK</span>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                    style={isPrimary
+                      ? { background: "rgba(34,197,94,0.2)", color: "#22c55e" }
+                      : { background: "rgba(100,116,139,0.15)", color: "var(--muted)" }}>
+                    {isPrimary ? "PRIMARY" : "FALLBACK"}
+                  </span>
                 </div>
-                <div className="text-[11px]" style={{ color: "var(--muted)" }}>{f.info}</div>
-                <div className="mt-1 text-[11px]" style={{ color: keyOf(f.key) ? "#22c55e" : "var(--muted)" }}>
-                  {keyOf(f.key) ? "✓ key set" : "no key"}
+                <div className="text-[11px] mb-2" style={{ color: "var(--muted)" }}>{f.info}</div>
+                <div className="flex items-center gap-1 text-[11px]" style={{ color: hasKey ? "#22c55e" : "#ef4444" }}>
+                  <i className={hasKey ? "fa-solid fa-circle-check" : "fa-solid fa-circle-xmark"} />
+                  {hasKey ? "key set" : "no key"}
                 </div>
-              </div>
-            ))}
-          </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
