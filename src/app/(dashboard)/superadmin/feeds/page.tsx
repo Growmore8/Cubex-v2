@@ -71,24 +71,25 @@ export default function SAFeeds() {
         </p>
       </div>
 
-      {/* Auto-failover log */}
-      {failoverLog.length > 0 && (
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "#f97316", background: "rgba(249,115,22,0.06)" }}>
+      {/* Auto-failover log — always visible */}
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor: failoverLog.length > 0 ? "#f97316" : "var(--border)", background: failoverLog.length > 0 ? "rgba(249,115,22,0.06)" : "var(--card)" }}>
           <div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: "rgba(249,115,22,0.3)" }}>
-            <span className="text-sm font-semibold flex items-center gap-2" style={{ color: "#f97316" }}>
-              <i className="fa-solid fa-triangle-exclamation" /> Auto-failover log
+            <span className="text-sm font-semibold flex items-center gap-2" style={{ color: failoverLog.length > 0 ? "#f97316" : "var(--text)" }}>
+              <i className={failoverLog.length > 0 ? "fa-solid fa-triangle-exclamation" : "fa-solid fa-clock-rotate-left"} /> Failover log
             </span>
             <button onClick={() => { fetch("/api/superadmin/feeds/log", { method: "DELETE" }); setFailoverLog([]); }} className="text-xs opacity-60 hover:opacity-100" style={{ color: "#f97316" }}>
               Clear log
             </button>
           </div>
-          <div className="divide-y" style={{ borderColor: "rgba(249,115,22,0.15)" }}>
-            {failoverLog.map((ev, i) => (
+          <div className="divide-y" style={{ borderColor: "rgba(100,116,139,0.15)" }}>
+            {failoverLog.length === 0 ? (
+              <div className="px-4 py-3 text-[12px]" style={{ color: "#94a3b8" }}>No failover events yet. Events are recorded here automatically when a feed goes down.</div>
+            ) : failoverLog.map((ev, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-2 text-sm">
-                <span className="font-mono text-[11px] w-24 shrink-0" style={{ color: "#94a3b8" }}>
-                  {new Date(ev.ts).toLocaleTimeString()}
+                <span className="font-mono text-[11px] w-40 shrink-0" style={{ color: "#94a3b8" }}>
+                  {new Date(ev.ts).toLocaleString()}
                 </span>
-                <span style={{ color: "#f97316" }}>{ev.from}</span>
+                <span className="font-semibold" style={{ color: "#f97316" }}>{ev.from}</span>
                 <i className="fa-solid fa-arrow-right text-[10px]" style={{ color: "#94a3b8" }} />
                 <span className="font-semibold" style={{ color: "#22c55e" }}>{ev.to}</span>
                 <span className="text-[11px] ml-auto" style={{ color: "#94a3b8" }}>{ev.reason || `switched to ${ev.to}`}</span>
@@ -96,7 +97,6 @@ export default function SAFeeds() {
             ))}
           </div>
         </div>
-      )}
 
       {err && <div className="rounded-lg px-4 py-2 text-sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>{err}</div>}
       {msg && <div className="rounded-lg px-4 py-2 text-sm" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>{msg}</div>}
