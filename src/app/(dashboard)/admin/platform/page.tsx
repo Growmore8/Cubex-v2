@@ -1496,127 +1496,175 @@ export default function AdminDeskPage() {
         </div>
       )}
 
-      {/* Group right-click — comprehensive panel */}
+      {/* Group right-click — flyout style matching client context menu */}
       {grpCtx && (() => {
         const g = grpCtx.g;
         const vw2 = typeof window !== "undefined" ? window.innerWidth : 1200;
         const vh2 = typeof window !== "undefined" ? window.innerHeight : 800;
-        const left2 = Math.max(6, Math.min(grpCtx.x, vw2 - 272));
-        const top2 = Math.max(8, Math.min(grpCtx.y, vh2 - 560));
-        const vpos2 = { top: top2 };
+        const left2 = Math.max(6, Math.min(grpCtx.x, vw2 - 246));
+        const GMENU_H = 320;
+        const top2 = Math.max(8, Math.min(grpCtx.y, vh2 - GMENU_H - 8));
         const members = clients.filter((c: any) => c.groupId === g.id);
-        const row = "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] hover:bg-[var(--soft)] transition-colors rounded";
-        const sec = (k: string) => grpSub === k;
+        const gmi = "flex w-full items-center gap-2 px-3 py-1 text-left text-[11px] transition-colors hover:bg-[var(--soft)]";
+        const gsubi = "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] transition-colors hover:bg-[var(--soft)]";
+        const ginp = "w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)]";
+        const gFlyRight = grpCtx.x + 246 + 220 < vw2;
+        const gFlyCls = "absolute top-0 ml-1 min-w-[210px] overflow-hidden rounded-xl border py-1 z-[70] " + (gFlyRight ? "left-full" : "right-full mr-1");
+        const gFlySty: React.CSSProperties = { background: "color-mix(in srgb, var(--panel) 96%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", boxShadow: "0 20px 50px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.12s cubic-bezier(.16,1,.3,1)" };
         const tog = (k: string) => { setGrpSub(grpSub === k ? "" : k); setGrpForm(grpSub === k ? {} : k === "spread" ? { spread: Number(g.spread || 0), spreadType: g.spreadType || "FIXED", spreadMax: Number(g.spreadMax || 0) } : k === "leverage" ? { leverage: members[0]?.leverage || 100 } : k === "mclevel" ? { mcLevel: members[0] ? Number(members[0].mcLevel) : 50 } : k === "rename" ? { name: g.name } : k === "manager" ? { managerId: g.managerId || "" } : {}); };
-        const inp = "w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)]";
         const applyAll = async (body: any) => { await Promise.all(members.map((c: any) => fetch("/api/admin/clients/" + c.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }))); setGrpCtx(null); setOk("Applied to all " + members.length + " members"); loadAll(); };
         const LEVERAGE_OPTIONS = [25, 50, 100, 200, 400, 500, 1000];
         return (<>
           <div className="fixed inset-0 z-40" onClick={() => { setGrpCtx(null); setGrpSub(""); }} />
-          <div className="ui-pop fixed z-50 w-[268px] overflow-hidden rounded-2xl border text-[11px]" style={{ left: left2, ...vpos2, maxHeight: Math.min(vh2 - 24, 620), overflowY: "auto", background: "color-mix(in srgb, var(--panel) 96%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.65)" }}>
+          <div className="ui-pop fixed z-50 w-60 rounded-2xl border py-1 text-[11px]" style={{ left: left2, top: top2, background: "color-mix(in srgb, var(--panel) 92%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderColor: "color-mix(in srgb, var(--border) 70%, transparent)", color: "var(--text)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)", animation: "menuPop 0.14s cubic-bezier(.16,1,.3,1)" }}>
             {/* Header */}
-            <div className="flex items-center gap-2.5 px-3 py-2.5" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent) 6%, transparent))" }}>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold text-white shadow-sm" style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000))" }}><i className="fa-solid fa-layer-group text-[11px]" /></span>
+            <div className="mx-1.5 mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 5%, transparent))" }}>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm" style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))" }}><i className="fa-solid fa-layer-group text-[10px]" /></span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-bold" style={{ color: "var(--accent)" }}>{g.name}</div>
-                <div className="text-[9px]" style={{ color: "var(--muted)" }}>{members.length} members · Spread +{Number(g.spread || 0)} pips · {g.managerId ? (managers.find((m: any) => m.id === g.managerId)?.name || "Manager") : "Admin"}</div>
+                <div className="truncate font-bold" style={{ color: "var(--accent)" }}>{g.name}</div>
+                <div className="text-[9px]" style={{ color: "var(--muted)" }}>{members.length} members · +{Number(g.spread || 0)}p · {g.managerId ? (managers.find((m: any) => m.id === g.managerId)?.name || "Manager") : "Admin"}</div>
               </div>
             </div>
 
-            <div className="py-1 px-1.5 space-y-0.5">
-              {/* Leverage */}
-              <button onClick={() => tog("leverage")} className={row + (sec("leverage") ? " bg-[var(--soft)]" : "")}><i className="fa-solid fa-gauge-high w-3.5 text-center text-[10px]" style={{ color: "var(--accent)" }} /><span className="flex-1">Group Leverage</span><i className={"fa-solid text-[8px] " + (sec("leverage") ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} /></button>
-              {sec("leverage") && (
-                <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 text-[10px] space-y-2">
-                  <div className="text-[9px] text-[var(--muted)]">Apply leverage to ALL {members.length} members in this group</div>
-                  <select className={inp} value={grpForm.leverage || 100} onChange={(e) => setGrpForm((f) => ({ ...f, leverage: Number(e.target.value) }))}>
-                    {LEVERAGE_OPTIONS.map((v) => <option key={v} value={v}>1:{v}</option>)}
-                  </select>
-                  <button onClick={() => applyAll({ action: "settings", leverage: grpForm.leverage || 100 })} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "var(--accent)" }}>Apply 1:{grpForm.leverage || 100} to all {members.length} members</button>
+            {/* Group Leverage flyout */}
+            <div className="relative">
+              <button onClick={() => tog("leverage")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (grpSub === "leverage" ? "bg-[var(--soft)]" : "")}>
+                {mIco("fa-gauge-high", "var(--accent)")}<span className="flex-1">Group Leverage</span>
+                <i className="fa-solid fa-chevron-right text-[8px]" style={{ color: grpSub === "leverage" ? "var(--accent)" : "var(--muted)" }} />
+              </button>
+              {grpSub === "leverage" && (
+                <div className={gFlyCls} style={gFlySty}>
+                  <div className="px-3 py-2 space-y-2">
+                    <div className="text-[9px]" style={{ color: "var(--muted)" }}>Apply to ALL {members.length} members</div>
+                    <select className={ginp} value={grpForm.leverage || 100} onChange={(e) => setGrpForm((f) => ({ ...f, leverage: Number(e.target.value) }))}>
+                      {LEVERAGE_OPTIONS.map((v) => <option key={v} value={v}>1:{v}</option>)}
+                    </select>
+                    <button onClick={() => applyAll({ action: "settings", leverage: grpForm.leverage || 100 })} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "var(--accent)" }}>Apply to all members</button>
+                  </div>
                 </div>
               )}
+            </div>
 
-              {/* Margin Call */}
-              <button onClick={() => tog("mclevel")} className={row + (sec("mclevel") ? " bg-[var(--soft)]" : "")}><i className="fa-solid fa-triangle-exclamation w-3.5 text-center text-[10px]" style={{ color: "#f59e0b" }} /><span className="flex-1">Group Margin Call</span><i className={"fa-solid text-[8px] " + (sec("mclevel") ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} /></button>
-              {sec("mclevel") && (
-                <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 text-[10px] space-y-2">
-                  <div className="text-[9px] text-[var(--muted)]">Set margin call % for ALL {members.length} members</div>
-                  <input type="number" min="0" max="500" step="1" className={inp} value={grpForm.mcLevel ?? 50} onChange={(e) => setGrpForm((f) => ({ ...f, mcLevel: Number(e.target.value) }))} placeholder="e.g. 50 (0 = off)" />
-                  <button onClick={() => applyAll({ action: "settings", mcLevel: grpForm.mcLevel ?? 50 })} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#f59e0b" }}>Apply {grpForm.mcLevel ?? 50}% to all {members.length} members</button>
+            {/* Group Margin Call flyout */}
+            <div className="relative">
+              <button onClick={() => tog("mclevel")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (grpSub === "mclevel" ? "bg-[var(--soft)]" : "")}>
+                {mIco("fa-triangle-exclamation", "#f59e0b")}<span className="flex-1">Group Margin Call</span>
+                <i className="fa-solid fa-chevron-right text-[8px]" style={{ color: grpSub === "mclevel" ? "var(--accent)" : "var(--muted)" }} />
+              </button>
+              {grpSub === "mclevel" && (
+                <div className={gFlyCls} style={gFlySty}>
+                  <div className="px-3 py-2 space-y-2">
+                    <div className="text-[9px]" style={{ color: "var(--muted)" }}>Set margin call % for ALL {members.length} members</div>
+                    <input type="number" min="0" max="500" step="1" className={ginp} value={grpForm.mcLevel ?? 50} onChange={(e) => setGrpForm((f) => ({ ...f, mcLevel: Number(e.target.value) }))} placeholder="e.g. 50 (0 = off)" />
+                    <button onClick={() => applyAll({ action: "settings", mcLevel: grpForm.mcLevel ?? 50 })} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#f59e0b" }}>Apply to all members</button>
+                  </div>
                 </div>
               )}
+            </div>
 
-              {/* Spread */}
-              <button onClick={() => tog("spread")} className={row + (sec("spread") ? " bg-[var(--soft)]" : "")}><i className="fa-solid fa-arrows-left-right w-3.5 text-center text-[10px]" style={{ color: "#22c55e" }} /><span className="flex-1">Spread Settings</span><span className="text-[9px] tabular-nums" style={{ color: "var(--muted)" }}>+{Number(g.spread || 0)}p</span><i className={"fa-solid text-[8px] ml-1 " + (sec("spread") ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} /></button>
-              {sec("spread") && (
-                <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 text-[10px] space-y-2">
-                  <div className="text-[9px] text-[var(--muted)]">Group markup added on top of symbol spread</div>
-                  {/* Fixed / Floating toggle */}
-                  <div className="flex gap-1">
-                    {["FIXED","FLOATING"].map((t) => { const active = (grpForm.spreadType ?? g.spreadType ?? "FIXED") === t; return (
-                      <button key={t} onClick={() => setGrpForm((f: any) => ({ ...f, spreadType: t }))} className="flex-1 rounded py-1 text-[10px] font-semibold border transition-colors" style={{ background: active ? "#22c55e" : "var(--bg)", color: active ? "#fff" : "var(--muted)", borderColor: active ? "#22c55e" : "var(--border)" }}>{t.charAt(0) + t.slice(1).toLowerCase()}</button>
-                    ); })}
-                  </div>
-                  <div><div className="mb-1 text-[9px] text-[var(--muted)]">{(grpForm.spreadType ?? g.spreadType ?? "FIXED") === "FLOATING" ? "Min spread markup (pips)" : "Spread markup (pips)"}</div>
-                    <input type="number" min="0" step="0.1" className={inp} value={grpForm.spread ?? Number(g.spread ?? 0)} onChange={(e) => setGrpForm((f: any) => ({ ...f, spread: Number(e.target.value) }))} />
-                  </div>
-                  {(grpForm.spreadType ?? g.spreadType ?? "FIXED") === "FLOATING" && (
-                    <div><div className="mb-1 text-[9px] text-[var(--muted)]">Max spread markup (pips, off-hours)</div>
-                      <input type="number" min="0" step="0.1" className={inp} value={grpForm.spreadMax ?? Number(g.spreadMax ?? 0)} onChange={(e) => setGrpForm((f: any) => ({ ...f, spreadMax: Number(e.target.value) }))} />
+            {/* Spread Settings flyout */}
+            <div className="relative">
+              <button onClick={() => tog("spread")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (grpSub === "spread" ? "bg-[var(--soft)]" : "")}>
+                {mIco("fa-arrows-left-right", "#22c55e")}<span className="flex-1">Spread Settings</span>
+                <span className="text-[9px] tabular-nums mr-1" style={{ color: "var(--muted)" }}>+{Number(g.spread || 0)}p</span>
+                <i className="fa-solid fa-chevron-right text-[8px]" style={{ color: grpSub === "spread" ? "var(--accent)" : "var(--muted)" }} />
+              </button>
+              {grpSub === "spread" && (
+                <div className={gFlyCls} style={gFlySty}>
+                  <div className="px-3 py-2 space-y-2">
+                    <div className="text-[9px]" style={{ color: "var(--muted)" }}>Group markup on top of symbol spread</div>
+                    <div className="flex gap-1">
+                      {["FIXED","FLOATING"].map((t) => { const active = (grpForm.spreadType ?? g.spreadType ?? "FIXED") === t; return (
+                        <button key={t} onClick={() => setGrpForm((f: any) => ({ ...f, spreadType: t }))} className="flex-1 rounded py-1 text-[10px] font-semibold border transition-colors" style={{ background: active ? "#22c55e" : "var(--bg)", color: active ? "#fff" : "var(--muted)", borderColor: active ? "#22c55e" : "var(--border)" }}>{t.charAt(0) + t.slice(1).toLowerCase()}</button>
+                      ); })}
                     </div>
-                  )}
-                  <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: grpForm.spread ?? Number(g.spread ?? 0), spreadType: grpForm.spreadType ?? g.spreadType ?? "FIXED", spreadMax: grpForm.spreadMax ?? Number(g.spreadMax ?? 0), managerId: g.managerId }) }); const d2 = await r.json(); if (d2.ok) { setOk("Group spread saved"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d2.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#22c55e" }}>Save group spread</button>
-                  <div className="border-t border-[var(--border)] pt-1.5">
-                    <div className="mb-1 text-[9px] font-semibold" style={{ color: "var(--muted)" }}>Set spread per symbol for all group members:</div>
-                    <button onClick={() => { setGrpCtx(null); setGrpSub(""); openSymPerm(); }} className="w-full rounded py-1 text-[9px] text-center" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)" }}>Open Symbol Spread Editor →</button>
+                    <div>
+                      <div className="mb-1 text-[9px]" style={{ color: "var(--muted)" }}>{(grpForm.spreadType ?? g.spreadType ?? "FIXED") === "FLOATING" ? "Min markup (pips)" : "Spread markup (pips)"}</div>
+                      <input type="number" min="0" step="0.1" className={ginp} value={grpForm.spread ?? Number(g.spread ?? 0)} onChange={(e) => setGrpForm((f: any) => ({ ...f, spread: Number(e.target.value) }))} />
+                    </div>
+                    {(grpForm.spreadType ?? g.spreadType ?? "FIXED") === "FLOATING" && (
+                      <div>
+                        <div className="mb-1 text-[9px]" style={{ color: "var(--muted)" }}>Max markup (pips, off-hours)</div>
+                        <input type="number" min="0" step="0.1" className={ginp} value={grpForm.spreadMax ?? Number(g.spreadMax ?? 0)} onChange={(e) => setGrpForm((f: any) => ({ ...f, spreadMax: Number(e.target.value) }))} />
+                      </div>
+                    )}
+                    <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: grpForm.spread ?? Number(g.spread ?? 0), spreadType: grpForm.spreadType ?? g.spreadType ?? "FIXED", spreadMax: grpForm.spreadMax ?? Number(g.spreadMax ?? 0), managerId: g.managerId }) }); const d2 = await r.json(); if (d2.ok) { setOk("Group spread saved"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d2.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#22c55e" }}>Save group spread</button>
+                    <button onClick={() => { setGrpCtx(null); setGrpSub(""); openSymPerm(); }} className="w-full rounded py-1 text-[9px] text-center" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)" }}>Symbol Spread Editor →</button>
                   </div>
                 </div>
               )}
-
-              {/* Symbol Access — per-group disabled list (stored in group config) */}
-              <button onClick={() => { const dis: string[] = (g.config as any)?.disabledSymbols || []; setGrpSymOv({ g, disabled: dis, q: "" }); setGrpCtx(null); setGrpSub(""); }} className={row}><i className="fa-solid fa-eye-slash w-3.5 text-center text-[10px]" style={{ color: "var(--accent)" }} /><span className="flex-1">Symbol Access</span><span className="text-[9px] rounded px-1" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)" }}>group only</span></button>
-
-              <div className="my-1 border-t mx-1" style={{ borderColor: "var(--border)" }} />
-
-              {/* Rename */}
-              <button onClick={() => tog("rename")} className={row + (sec("rename") ? " bg-[var(--soft)]" : "")}><i className="fa-solid fa-pen w-3.5 text-center text-[10px]" style={{ color: "var(--muted)" }} /><span className="flex-1">Rename Group</span><i className={"fa-solid text-[8px] " + (sec("rename") ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} /></button>
-              {sec("rename") && (
-                <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 space-y-2">
-                  <input className={inp} value={grpForm.name || ""} onChange={(e) => setGrpForm((f) => ({ ...f, name: e.target.value }))} placeholder="Group name" />
-                  <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpForm.name, spread: Number(g.spread || 0), managerId: g.managerId || null }) }); const d = await r.json(); if (d.ok) { setOk("Group renamed"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save name</button>
-                </div>
-              )}
-
-              {/* Manager */}
-              <button onClick={() => tog("manager")} className={row + (sec("manager") ? " bg-[var(--soft)]" : "")}><i className="fa-solid fa-user-tie w-3.5 text-center text-[10px]" style={{ color: "var(--muted)" }} /><span className="flex-1">Change Manager</span><i className={"fa-solid text-[8px] " + (sec("manager") ? "fa-chevron-down" : "fa-chevron-right")} style={{ color: "var(--muted)" }} /></button>
-              {sec("manager") && (
-                <div className="mx-1 mb-1 rounded-lg border border-[var(--border)] p-2.5 space-y-2">
-                  <select className={inp} value={grpForm.managerId || ""} onChange={(e) => setGrpForm((f) => ({ ...f, managerId: e.target.value || null }))}>
-                    <option value="">Admin-level (no manager)</option>
-                    {managers.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
-                  <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: g.name, spread: Number(g.spread || 0), managerId: grpForm.managerId || null }) }); const d = await r.json(); if (d.ok) { setOk("Manager updated"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save manager</button>
-                </div>
-              )}
-
-              <div className="my-1 border-t mx-1" style={{ borderColor: "var(--border)" }} />
-
-              {/* Members */}
-              <div className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Members ({members.length})</div>
-              <div className="max-h-32 overflow-y-auto">
-                {members.map((c: any) => (
-                  <button key={c.id} onClick={() => { setSelAcc(c); setGrpCtx(null); setGrpSub(""); }} className={row + " text-[10px]"}>
-                    <i className="fa-solid fa-user w-3.5 text-center text-[9px]" style={{ color: "var(--muted)" }} /> {c.login} — {titleCaseName(c.name)}
-                  </button>
-                ))}
-                {members.length === 0 && <div className="px-3 py-1.5 text-[9px]" style={{ color: "var(--muted)" }}>No members assigned</div>}
-              </div>
-
-              <div className="my-1 border-t mx-1" style={{ borderColor: "var(--border)" }} />
-
-              {/* Delete */}
-              <button onClick={() => { const gg = g; setGrpCtx(null); setGrpSub(""); askDelete(`Delete group "${gg.name}"? All ${members.length} members will be unassigned.`, async () => { const r = await fetch("/api/admin/groups/" + gg.id, { method: "DELETE" }); const d = await r.json(); if (d.ok) { setOk("Group deleted"); loadAll(); } else setErr(d.error || "Failed"); }); }} className={row} style={{ color: "#dc2626" }}><i className="fa-solid fa-trash w-3.5 text-center text-[10px]" style={{ color: "#dc2626" }} /> Delete Group</button>
             </div>
+
+            {/* Symbol Access — direct action */}
+            <button onClick={() => { const dis: string[] = (g.config as any)?.disabledSymbols || []; setGrpSymOv({ g, disabled: dis, q: "" }); setGrpCtx(null); setGrpSub(""); }} className={gmi}>
+              {mIco("fa-eye-slash", "var(--accent)")}<span className="flex-1">Symbol Access</span>
+              <span className="text-[9px] rounded px-1" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)" }}>group</span>
+            </button>
+
+            <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
+
+            {/* Members flyout */}
+            <div className="relative">
+              <button onClick={() => tog("members")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (grpSub === "members" ? "bg-[var(--soft)]" : "")}>
+                {mIco("fa-users")}<span className="flex-1">Members</span>
+                <span className="text-[9px] tabular-nums mr-1" style={{ color: "var(--muted)" }}>{members.length}</span>
+                <i className="fa-solid fa-chevron-right text-[8px]" style={{ color: grpSub === "members" ? "var(--accent)" : "var(--muted)" }} />
+              </button>
+              {grpSub === "members" && (
+                <div className={gFlyCls} style={gFlySty}>
+                  <div className="max-h-48 overflow-y-auto py-1">
+                    {members.map((c: any) => (
+                      <button key={c.id} onClick={() => { setSelAcc(c); setGrpCtx(null); setGrpSub(""); }} className={gsubi}>
+                        {mIco("fa-user")}{c.login} — {titleCaseName(c.name)}
+                      </button>
+                    ))}
+                    {members.length === 0 && <div className="px-3 py-2 text-[10px]" style={{ color: "var(--muted)" }}>No members assigned</div>}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Rename Group flyout */}
+            <div className="relative">
+              <button onClick={() => tog("rename")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (grpSub === "rename" ? "bg-[var(--soft)]" : "")}>
+                {mIco("fa-pen")}<span className="flex-1">Rename Group</span>
+                <i className="fa-solid fa-chevron-right text-[8px]" style={{ color: grpSub === "rename" ? "var(--accent)" : "var(--muted)" }} />
+              </button>
+              {grpSub === "rename" && (
+                <div className={gFlyCls} style={gFlySty}>
+                  <div className="px-3 py-2 space-y-2">
+                    <input className={ginp} value={grpForm.name || ""} onChange={(e) => setGrpForm((f) => ({ ...f, name: e.target.value }))} placeholder="Group name" autoFocus />
+                    <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpForm.name, spread: Number(g.spread || 0), managerId: g.managerId || null }) }); const d = await r.json(); if (d.ok) { setOk("Group renamed"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save name</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Change Manager flyout */}
+            <div className="relative">
+              <button onClick={() => tog("manager")} className={"flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-[var(--soft)] " + (grpSub === "manager" ? "bg-[var(--soft)]" : "")}>
+                {mIco("fa-user-tie")}<span className="flex-1">Change Manager</span>
+                <i className="fa-solid fa-chevron-right text-[8px]" style={{ color: grpSub === "manager" ? "var(--accent)" : "var(--muted)" }} />
+              </button>
+              {grpSub === "manager" && (
+                <div className={gFlyCls} style={gFlySty}>
+                  <div className="px-3 py-2 space-y-2">
+                    <select className={ginp} value={grpForm.managerId || ""} onChange={(e) => setGrpForm((f) => ({ ...f, managerId: e.target.value || null }))}>
+                      <option value="">Admin-level (no manager)</option>
+                      {managers.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                    <button onClick={async () => { const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: g.name, spread: Number(g.spread || 0), managerId: grpForm.managerId || null }) }); const d = await r.json(); if (d.ok) { setOk("Manager updated"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save manager</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
+
+            {/* Delete Group */}
+            <button onClick={() => { const gg = g; setGrpCtx(null); setGrpSub(""); askDelete(`Delete group "${gg.name}"? All ${members.length} members will be unassigned.`, async () => { const r = await fetch("/api/admin/groups/" + gg.id, { method: "DELETE" }); const d = await r.json(); if (d.ok) { setOk("Group deleted"); loadAll(); } else setErr(d.error || "Failed"); }); }} className={gmi} style={{ color: "#dc2626" }}>
+              {mIco("fa-trash", "#dc2626")}Delete Group
+            </button>
           </div>
         </>);
       })()}
