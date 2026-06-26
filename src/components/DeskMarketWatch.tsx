@@ -21,6 +21,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
   groupSpread?: number;
 }) {
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [realBids, setRealBids] = useState<Record<string, number>>({}); // real bid from LP feed
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -28,22 +29,25 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
-    const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const prev: Record<string, number> = {};
+    const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const pB: Record<string, number> = {}; const prev: Record<string, number> = {};
     const flush = () => {
-      const pk = Object.keys(pP), dk = Object.keys(pD);
-      if (!pk.length && !dk.length) return;
-      const px = { ...pP }; const dr = { ...pD };
-      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k];
+      const pk = Object.keys(pP), dk = Object.keys(pD), bk = Object.keys(pB);
+      if (!pk.length && !dk.length && !bk.length) return;
+      const px = { ...pP }; const dr = { ...pD }; const bd = { ...pB };
+      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pB) delete pB[k];
       startTransition(() => {
         if (pk.length) setPrices((pp) => ({ ...pp, ...px }));
         if (dk.length) setDirs((dd) => ({ ...dd, ...dr }));
+        if (bk.length) setRealBids((bb) => ({ ...bb, ...bd }));
       });
     };
     socket.on("prices", (snap: Record<string, number>) => { startTransition(() => setPrices((pp) => ({ ...pp, ...snap }))); for (const k in snap) prev[k] = snap[k]; });
-    socket.on("tick", ({ symbol, price }: any) => {
+    socket.on("bids", (snap: Record<string, number>) => { startTransition(() => setRealBids((bb) => ({ ...bb, ...snap }))); });
+    socket.on("tick", ({ symbol, price, bid }: any) => {
       const pv = prev[symbol];
       if (pv != null && pv !== price) pD[symbol] = price > pv ? 1 : -1;
       prev[symbol] = price; pP[symbol] = price;
+      if (bid != null) pB[symbol] = bid;
     });
     const fv = setInterval(flush, 120);
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
@@ -88,7 +92,12 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const rawSp = symbolSpreads && symbolSpreads[s.symbol];
               const spPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
               const spPx = spPips * Math.pow(10, -(d - 1));
-              const ask = p != null ? gnum(p, d) : "—"; const bid = p != null ? gnum(p - spPx, d) : "—"; const dir = dirs[s.symbol] || 0;
+              // Use real LP bid from feed when available; otherwise calculate from spread
+              const lpBid = realBids[s.symbol];
+              const ask = p != null ? gnum(p, d) : "—";
+              const bid = p != null ? (lpBid != null ? gnum(lpBid, d) : gnum(p - spPx, d)) : "—";
+              const realSpPips = lpBid != null && p != null ? Math.max(0, (p - lpBid) / Math.pow(10, -(d - 1))) : spPips;
+              const dir = dirs[s.symbol] || 0;
               const isOff = !!(disabledSyms && disabledSyms.includes(s.symbol));
               return (
                 <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)}
@@ -98,7 +107,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                   <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} /><span className="truncate">{s.symbol}</span>{isOff && <span className="text-[8px] rounded px-1" style={{ background: "rgba(224,82,96,0.18)", color: "#ef5350" }}>OFF</span>}</span>
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
-                  <span className="flex items-center justify-end pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{spPips > 0 ? Math.round(spPips * 10) : "—"}</span>
+                  <span className="flex items-center justify-end pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}</span>
                 </div>);
             })}
           </div>
