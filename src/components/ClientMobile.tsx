@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, startTransition } from "react";
+import { io } from "socket.io-client";
 import dynamic from "next/dynamic";
 import WalletPanel from "@/components/WalletPanel";
 import WorldMapBg from "@/components/ui/WorldMapBg";
@@ -108,15 +109,35 @@ export default function ClientMobile({ t }: { t: any }) {
   const _mobSymSpreads = (): Record<string, { min: number; max: number; type: string }> => (t as any).symbolSpreads || {};
   const _mobGrpSpread = (): number => (t as any).groupSpread || 0;
   const _mobAccMarkup = (): number => (t as any).accountSpreadMarkup || 0;
+  // Live bids from tick events — used to compute real floating spread
+  const [_liveBids, _setLiveBids] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const s = io({ path: "/socket.io" });
+    s.on("tick", ({ symbol: sym, bid }: any) => { if (bid != null && bid > 0) _setLiveBids((p) => ({ ...p, [sym]: bid })); });
+    s.on("bids", (snap: Record<string, number>) => { _setLiveBids((p) => ({ ...p, ...snap })); });
+    return () => { s.disconnect(); };
+  }, []);
   const _mobSpreadPips = (sym: string) => {
     const s = _mobSymSpreads()[sym];
-    if (!s) return _mobGrpSpread() + _mobAccMarkup();
+    const grp = _mobGrpSpread();
+    const markup = _mobAccMarkup();
+    const dig = dg(sym);
+    const pip = Math.pow(10, -(dig - 1));
+    const px = (t as any).prices?.[sym] ?? price;
+    const realBid = _liveBids[sym];
+    // Live spread = ask − bid from feed (floating, no admin config needed)
+    if (realBid != null && realBid > 0 && px != null && realBid < px) {
+      const liveSpread = (px - realBid) / pip;
+      return liveSpread + grp + markup; // add group markup + account markup on top of live
+    }
+    // No real bid → fall back to admin configured spread
+    if (!s) return grp + markup;
     let base = s.min;
     if (s.type === "FLOATING" && s.max > s.min) {
       const h = new Date().getUTCHours(), d = new Date().getUTCDay();
       if (!(d >= 1 && d <= 5 && h >= 8 && h < 17)) base = s.max;
     }
-    return base + _mobGrpSpread() + _mobAccMarkup();
+    return base + grp + markup;
   };
 
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "profile">("dashboard");
