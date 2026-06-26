@@ -7,7 +7,7 @@ WORKDIR /app
 
 # ---- dependencies ----
 FROM base AS deps
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 COPY prisma ./prisma
 RUN npm ci
 
