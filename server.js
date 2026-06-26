@@ -418,10 +418,10 @@ function connectBinance() {
       const sym = BN_TO_SYM[d.s.toUpperCase()];
       if (!sym || !state[sym]) return;
       const bid = parseFloat(d.b), ask = parseFloat(d.a);
-      if (bid > 0 && ask > 0 && ask >= bid) {
+      if (bid > 0 && ask > 0 && ask > bid) {
         const digits = BN_DIGITS[sym] || (meta[sym] ? meta[sym].digits : 2);
-        if (meta[sym]) meta[sym].digits = digits; // fix digits runtime for low-price assets
-        if (bid > 0 && bid < ask) state[sym].bid = r(bid, digits);
+        if (meta[sym]) meta[sym].digits = digits;
+        state[sym].bid = r(bid, digits);
         applyPrice(sym, ask, "BN");
       }
     } catch (e) {}
