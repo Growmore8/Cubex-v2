@@ -77,6 +77,7 @@ export default function AdminDeskPage() {
   const [grpSymOv, setGrpSymOv] = useState<{ g: any; disabled: string[]; q: string } | null>(null);
   const [grpEdit, setGrpEdit] = useState<any>(null);
   const [catEdit, setCatEdit] = useState<{ cat: string; syms: string[]; spread: number; spreadType: string; spreadMax: number } | null>(null);
+  const [allSymEdit, setAllSymEdit] = useState<{ type: string; pips: number } | null>(null);
   const [open, setOpen] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
@@ -1005,7 +1006,15 @@ export default function AdminDeskPage() {
         {panels.mw && (<>
           <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">
+              MARKET WATCH
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => setAllSymEdit({ type: "FIXED", pips: 1.5 })} title="Set spread for all symbols" className="rounded px-1.5 py-0.5 text-[9px] font-semibold border transition-colors hover:bg-[var(--soft)]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
+                  <i className="fa-solid fa-sliders mr-1" />All Spreads
+                </button>
+                <button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button>
+              </div>
+            </div>
             <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile}
               disabledSyms={symPerm?.disabled || []}
               onCategoryEdit={(cat, syms) => { const first = syms[0]; setCatEdit({ cat, syms, spread: adminSymSpreads[first] ?? 0, spreadType: adminSymTypes[first] ?? "FIXED", spreadMax: adminSymMax[first] ?? 0 }); }}
@@ -1389,20 +1398,14 @@ export default function AdminDeskPage() {
                   ); })}
                 </div>
               </div>
-              {symEdit.spreadType === "FLOATING" ? (
-                <div className="rounded-lg border px-3 py-2.5 text-[11px]" style={{ borderColor: "var(--accent)", background: "color-mix(in srgb, var(--accent) 8%, transparent)" }}>
-                  <div className="font-semibold mb-0.5" style={{ color: "var(--accent)" }}>Live market spread</div>
-                  <div style={{ color: "var(--muted)" }}>No markup added — clients see the real-time feed spread for this symbol.</div>
-                </div>
-              ) : (
-                <div>
-                  <div className="mb-1 text-[10px] text-[var(--muted)]">Spread (pips)</div>
-                  <input type="number" min="0" step="0.1" value={symEdit.spread} onChange={(e) => setSymEdit((s) => s ? { ...s, spread: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
-                </div>
-              )}
+              <div>
+                <div className="mb-1 text-[10px] text-[var(--muted)]">{symEdit.spreadType === "FLOATING" ? "Base spread (pips)" : "Spread (pips)"}</div>
+                <input type="number" min="0" step="0.1" value={symEdit.spread} onChange={(e) => setSymEdit((s) => s ? { ...s, spread: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                {symEdit.spreadType === "FLOATING" && <div className="mt-1 text-[9px]" style={{ color: "#22c55e" }}>Floating: spread may widen automatically during off-market hours</div>}
+              </div>
             </div>
             <div className="mt-4 flex gap-2">
-              <button onClick={async () => { const spread = symEdit.spreadType === "FLOATING" ? 0 : symEdit.spread; const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread, spreadType: symEdit.spreadType, spreadMax: 0 }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: spread })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setOk(symEdit.sym + " spread saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
+              <button onClick={async () => { const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: symEdit.spread, spreadType: symEdit.spreadType, spreadMax: 0 }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: symEdit.spread })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setOk(symEdit.sym + " spread saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
               <button onClick={() => setSymEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
             </div>
           </div>
@@ -1425,21 +1428,15 @@ export default function AdminDeskPage() {
                   ); })}
                 </div>
               </div>
-              {catEdit.spreadType === "FLOATING" ? (
-                <div className="rounded-lg border px-3 py-2.5 text-[11px]" style={{ borderColor: "var(--accent)", background: "color-mix(in srgb, var(--accent) 8%, transparent)" }}>
-                  <div className="font-semibold mb-0.5" style={{ color: "var(--accent)" }}>Live market spread</div>
-                  <div style={{ color: "var(--muted)" }}>No markup added — clients see the real-time feed spread for all {catEdit.cat} symbols.</div>
-                </div>
-              ) : (
-                <div><div className="mb-1 text-[10px] text-[var(--muted)]">Spread (pips)</div>
-                  <input type="number" min="0" step="0.1" value={catEdit.spread} onChange={(e) => setCatEdit((s) => s ? { ...s, spread: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
-                </div>
-              )}
+              <div>
+                <div className="mb-1 text-[10px] text-[var(--muted)]">{catEdit.spreadType === "FLOATING" ? "Base spread (pips)" : "Spread (pips)"}</div>
+                <input type="number" min="0" step="0.1" value={catEdit.spread} onChange={(e) => setCatEdit((s) => s ? { ...s, spread: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                {catEdit.spreadType === "FLOATING" && <div className="mt-1 text-[9px]" style={{ color: "#22c55e" }}>Floating: spread may widen automatically during off-market hours</div>}
+              </div>
             </div>
             <div className="mt-4 flex gap-2">
               <button onClick={async () => {
-                const { syms, spreadType } = catEdit!;
-                const spread = spreadType === "FLOATING" ? 0 : catEdit!.spread;
+                const { syms, spreadType, spread } = catEdit!;
                 await Promise.all(syms.map(async (sym) => {
                   const sid = adminSymIds[sym]; if (!sid) return;
                   await fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread, spreadType, spreadMax: 0 }) }).catch(() => {});
@@ -1450,6 +1447,46 @@ export default function AdminDeskPage() {
                 setOk(`Spread set for all ${catEdit!.cat} symbols`); setCatEdit(null);
               }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Apply to all {catEdit!.syms.length} symbols</button>
               <button onClick={() => setCatEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* All Symbols bulk spread modal */}
+      {allSymEdit && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setAllSymEdit(null)}>
+          <div className="w-[320px] rounded-xl border p-5 text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <div><div className="text-[14px] font-bold">All Symbols</div><div className="text-[10px] text-[var(--muted)]">Apply spread settings to every symbol</div></div>
+              <button onClick={() => setAllSymEdit(null)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <div className="space-y-3">
+              <div><div className="mb-1 text-[10px] text-[var(--muted)]">Spread type</div>
+                <div className="flex gap-1">
+                  {["FIXED","FLOATING"].map((t) => { const active = allSymEdit.type === t; return (
+                    <button key={t} onClick={() => setAllSymEdit((s) => s ? { ...s, type: t } : s)} className="flex-1 rounded py-1.5 text-[11px] font-semibold border transition-colors" style={{ background: active ? "var(--accent)" : "var(--bg)", color: active ? "#fff" : "var(--muted)", borderColor: active ? "var(--accent)" : "var(--border)" }}>{t.charAt(0) + t.slice(1).toLowerCase()}</button>
+                  ); })}
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 text-[10px] text-[var(--muted)]">{allSymEdit.type === "FLOATING" ? "Base spread (pips) — applied to all" : "Spread (pips) — applied to all"}</div>
+                <input type="number" min="0" step="0.1" value={allSymEdit.pips} onChange={(e) => setAllSymEdit((s) => s ? { ...s, pips: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                {allSymEdit.type === "FLOATING" && <div className="mt-1 text-[9px]" style={{ color: "#22c55e" }}>Floating: spread may widen automatically during off-market hours</div>}
+              </div>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button onClick={async () => {
+                const allSyms = Object.keys(adminSymIds);
+                await Promise.all(allSyms.map(async (sym) => {
+                  const sid = adminSymIds[sym]; if (!sid) return;
+                  await fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: allSymEdit!.pips, spreadType: allSymEdit!.type, spreadMax: 0 }) }).catch(() => {});
+                  setAdminSymSpreads((m) => ({ ...m, [sym]: allSymEdit!.pips }));
+                  setAdminSymTypes((m) => ({ ...m, [sym]: allSymEdit!.type }));
+                  setAdminSymMax((m) => ({ ...m, [sym]: 0 }));
+                }));
+                setOk(`Spread applied to all ${allSyms.length} symbols`); setAllSymEdit(null);
+              }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Apply to all {Object.keys(adminSymIds).length} symbols</button>
+              <button onClick={() => setAllSymEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
             </div>
           </div>
         </div>

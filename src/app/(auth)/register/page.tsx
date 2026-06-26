@@ -164,12 +164,6 @@ function RegisterForm() {
           {resendIn > 0 ? `Resend in ${Math.floor(resendIn / 60)}:${String(resendIn % 60).padStart(2, "0")}` : "Resend"}
         </button>
       </p>
-      <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
-        Wrong email?{" "}
-        <button type="button" onClick={() => { sessionStorage.removeItem("reg_verify_email"); setVerifyEmail(""); setVerifyCode(""); setVerifyErr(""); }} className="font-semibold hover:underline" style={{ color: "var(--muted-foreground)" }}>
-          Start over
-        </button>
-      </p>
     </form>
   );
 
