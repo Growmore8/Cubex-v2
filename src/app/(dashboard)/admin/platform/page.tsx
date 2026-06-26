@@ -640,6 +640,17 @@ export default function AdminDeskPage() {
 
   const liveAccs = clients.filter((c) => !String(c.login).toUpperCase().startsWith("DEMO"));
   const demoAccs = clients.filter((c) => String(c.login).toUpperCase().startsWith("DEMO"));
+
+  // Extra spread to overlay on market watch when a client is selected:
+  // shows exactly what that client sees (symbol base + group markup + account markup)
+  const deskViewLabel = selAcc ? `${selAcc.login} – ${selAcc.name || ""}` : null;
+  const deskExtraSpread = (() => {
+    if (!selAcc) return 0;
+    const accMarkup = (selAcc.spreadMarkupType ?? "FIXED") === "FIXED" ? Number(selAcc.spreadMarkup ?? 0) : 0;
+    const grp = tradeGroups.find((g: any) => g.id === selAcc.groupId);
+    const grpMarkup = grp ? ((grp.spreadType ?? "FIXED") === "FIXED" ? Number(grp.spread ?? 0) : 0) : 0;
+    return accMarkup + grpMarkup;
+  })();
   const groups: Record<string, any[]> = {};
   const mwQ = mwSearch.trim().toLowerCase();
   symbols
@@ -1007,10 +1018,17 @@ export default function AdminDeskPage() {
           <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" />
           <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
             <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5 text-[10px] font-bold tracking-wide text-[var(--text)]">MARKET WATCH<button onClick={() => togglePanel("mw")} aria-label="hide" className="text-[var(--muted)]">x</button></div>
+            {deskViewLabel && (
+              <div className="flex items-center gap-1.5 border-b border-[var(--border)] px-2 py-1" style={{ background: "rgba(37,99,235,0.08)" }}>
+                <i className="fa-solid fa-eye text-[9px]" style={{ color: "var(--accent)" }} />
+                <span className="text-[9px] truncate" style={{ color: "var(--accent)" }}>Viewing as: {deskViewLabel}</span>
+                {deskExtraSpread > 0 && <span className="ml-auto text-[9px] shrink-0" style={{ color: "var(--muted)" }}>+{deskExtraSpread}p markup</span>}
+              </div>
+            )}
             <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile}
               disabledSyms={symPerm?.disabled || []}
               onCategoryEdit={(cat, syms) => { const first = syms[0]; setCatEdit({ cat, syms, spread: adminSymSpreads[first] ?? 0, spreadType: adminSymTypes[first] ?? "FIXED", spreadMax: adminSymMax[first] ?? 0 }); }}
-              symbolSpreads={adminSymSpreads} symbolTypes={adminSymTypes} groupSpread={0} />
+              symbolSpreads={adminSymSpreads} symbolTypes={adminSymTypes} groupSpread={deskExtraSpread} />
           </aside>
         </>)}
       </div>
