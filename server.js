@@ -288,6 +288,36 @@ async function pollFinnhubQuotes() {
   }
 }
 
+// ── Binance WebSocket — free real bid/ask for crypto (no API key needed) ──
+const BN_SYM = { BTCUSD: "btcusdt", ETHUSD: "ethusdt", BNBUSD: "bnbusdt", SOLUSD: "solusdt", DOGEUSD: "dogeusdt" };
+const BN_TO_SYM = Object.fromEntries(Object.entries(BN_SYM).map(([k, v]) => [v.toUpperCase(), k]));
+// Digit overrides for low-price crypto where default digits cause pip > price
+const BN_DIGITS = { DOGEUSD: 5, SOLUSD: 3 };
+let bnWs = null;
+function connectBinance() {
+  const streams = Object.values(BN_SYM).map((s) => s + "@bookTicker").join("/");
+  bnWs = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams);
+  bnWs.on("open", () => console.log("[BN] connected, book ticker:", Object.keys(BN_SYM).join(",")));
+  bnWs.on("message", (data) => {
+    try {
+      const msg = JSON.parse(data);
+      const d = msg.data || msg; // combined stream wraps payload in .data
+      if (!d.s || !d.b || !d.a) return;
+      const sym = BN_TO_SYM[d.s.toUpperCase()];
+      if (!sym || !state[sym]) return;
+      const bid = parseFloat(d.b), ask = parseFloat(d.a);
+      if (bid > 0 && ask > 0 && ask >= bid) {
+        const digits = BN_DIGITS[sym] || (meta[sym] ? meta[sym].digits : 2);
+        if (meta[sym]) meta[sym].digits = digits; // fix digits runtime for low-price assets
+        state[sym].bid = r(bid, digits);
+        applyPrice(sym, ask, "BN");
+      }
+    } catch (e) {}
+  });
+  bnWs.on("close", () => setTimeout(connectBinance, 5000));
+  bnWs.on("error", (e) => console.error("[BN]", e.message));
+}
+
 let tdWs = null;
 let tdWsFail200 = 0; // consecutive WS handshake failures
 function connectTD() {
@@ -792,6 +822,7 @@ app.prepare().then(async () => {
   });
   await seedFromRedis();        // resume last-known prices (survives restarts)
   await loadFeedConfig();       // keys + primary from SuperAdmin (DB overrides env)
+  connectBinance(); // free real bid/ask for crypto — no API key needed
   connectFinnhub();
   connectTD();
   // Delay initial REST poll so WS can connect and subscribe first (avoids rate-limit spike on boot)
