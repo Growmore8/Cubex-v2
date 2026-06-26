@@ -28,8 +28,10 @@ const tfToPeriod = (tf: string) => PERIODS.find((p) => p.text.toUpperCase() === 
 // the x-axis so it always spans the chart. Memoised so it runs a single time.
 let _kcMod: Promise<any> | null = null;
 const loadKc = () => (_kcMod || (_kcMod = import("klinecharts")));
-let _proMod: Promise<any> | null = null;
-const loadPro = () => (_proMod || (_proMod = import("@klinecharts/pro")));
+// Start loading the heavy pro bundle immediately at module-eval time so it's
+// ready (or nearly ready) by the time the first component mounts.
+let _proMod: Promise<any> = import("@klinecharts/pro");
+const loadPro = () => _proMod;
 
 let _ovReg: Promise<void> | null = null;
 function ensureLevelOverlay() {
@@ -104,18 +106,19 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         const ck = "cubex-kl:" + key;
         const toBar = (b: any) => ({ timestamp: b.time * 1000, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume ?? 0 });
 
-        // Read localStorage cache (5-minute TTL) — skip empty caches
+        // localStorage cache — 15-minute TTL, skip empty entries
+        const CACHE_TTL = 15 * 60 * 1000;
         let cached: any[] | null = null;
         try {
           const c = JSON.parse(localStorage.getItem(ck) || "null");
-          if (c && Array.isArray(c.d) && c.d.length > 0 && Date.now() - c.t < 300000) cached = c.d;
-          else if (c) localStorage.removeItem(ck); // clear stale/empty entry
+          if (c && Array.isArray(c.d) && c.d.length > 0 && Date.now() - c.t < CACHE_TTL) cached = c.d;
+          else if (c) localStorage.removeItem(ck);
         } catch {}
 
-        // Fetch fresh if no cache
+        // Initial fetch — 500 bars (fast). Server caches by symbol+tf+limit.
         if (!cached) {
           try {
-            const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}`, { cache: "no-store" }).then((x) => x.json());
+            const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}&limit=500`, { cache: "no-store" }).then((x) => x.json());
             if (r?.ok && r.candles?.length) {
               const fresh: any[] = r.candles.map(toBar);
               cached = fresh;
@@ -126,15 +129,14 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         }
         if (!cached) return [];
 
-        // Load more: user scrolled before our oldest candle — fetch an earlier batch
+        // Load more: user scrolled left past our oldest candle — fetch 2000 earlier bars
         const oldest = cached[0]?.timestamp;
-        if (oldest && from < oldest) {
+        if (oldest && from > 0 && from < oldest) {
           try {
             const beforeSec = Math.floor(oldest / 1000);
-            const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}&before=${beforeSec}`, { cache: "no-store" }).then((x) => x.json());
+            const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}&before=${beforeSec}&limit=2000`, { cache: "no-store" }).then((x) => x.json());
             if (r?.ok && r.candles?.length) {
               const earlier = r.candles.map(toBar);
-              // Merge and deduplicate by timestamp
               const seen = new Set<number>();
               const merged = [...earlier, ...cached].filter((d) => !seen.has(d.timestamp) && seen.add(d.timestamp));
               merged.sort((a, b) => a.timestamp - b.timestamp);
@@ -146,9 +148,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         }
 
         lastBar[key] = cached[cached.length - 1];
-        // Return all fetched candles — KlineChartsPro trims to its visible window.
-        // Filtering by from/to here caused empty results when the library's range
-        // hint used different units or wider bounds than our fetched data.
+        // Return all fetched candles — KlineChartsPro handles its own visible-window trim
         return cached;
       },
       subscribe: (sym: any, period: any, callback: (d: any) => void) => {
