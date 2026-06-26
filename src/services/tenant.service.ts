@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { PACKAGES } from "@/config/packages";
+import { seedDefaultSpreads } from "@/services/spreadDefaults.service";
 
 const PKG_SETTING_KEY = "platform.packages";
 
@@ -86,7 +87,7 @@ export async function createTenant(input: {
   }
   const passwordHash = await hashPassword(input.adminPassword);
   const seats = await effectiveSeatsForPlan(prisma, input.plan);
-  return prisma.tenant.create({
+  const tenant = await prisma.tenant.create({
     data: {
       name: input.name,
       slug: sub,
@@ -109,6 +110,9 @@ export async function createTenant(input: {
     },
     include: { subscription: true },
   });
+  // Auto-seed realistic spread defaults — overwrite=false so manual changes are never lost
+  seedDefaultSpreads(tenant.id, false).catch(() => {});
+  return tenant;
 }
 
 export function updateTenant(id: string, data: {
