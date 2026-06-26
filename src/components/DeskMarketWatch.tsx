@@ -118,8 +118,8 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
                   <span className="flex items-center justify-end pr-1 gap-0.5">
-                    {symbolTypes?.[s.symbol] === "FLOATING"
-                      ? <span style={{ color: "#22c55e", fontSize: 8, fontWeight: 600 }}>~</span>
+                    {validRealBid
+                      ? <span title="Live spread from real bid/ask" style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />
                       : null}
                     <span className="tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}</span>
                   </span>
