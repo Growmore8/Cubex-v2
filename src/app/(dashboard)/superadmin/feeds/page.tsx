@@ -19,7 +19,7 @@ export default function SAFeeds() {
   const [err,        setErr]        = useState("");
   const [msg,        setMsg]        = useState("");
   const [loading,    setLoading]    = useState(true);
-  const [failover,   setFailover]   = useState<{ from: string; to: string; ts: number } | null>(null);
+  const [failoverLog, setFailoverLog] = useState<{ from: string; to: string; ts: number }[]>([]);
 
   useEffect(() => {
     fetch("/api/superadmin/feeds").then((r) => r.json()).then((d) => {
@@ -34,7 +34,10 @@ export default function SAFeeds() {
 
     // Listen for auto-failover events from server
     const sock = io({ path: "/socket.io" });
-    sock.on("feed-failover", (data: any) => setFailover(data));
+    sock.on("feed-failover", (data: any) => {
+      setPrimary(data.to as Primary);
+      setFailoverLog((prev) => [data, ...prev].slice(0, 20));
+    });
     return () => { sock.disconnect(); };
   }, []);
 
@@ -63,12 +66,30 @@ export default function SAFeeds() {
         </p>
       </div>
 
-      {/* Auto-failover alert */}
-      {failover && (
-        <div className="rounded-lg border px-4 py-3 text-sm flex items-center gap-3" style={{ borderColor: "#f97316", background: "rgba(249,115,22,0.08)", color: "#f97316" }}>
-          <i className="fa-solid fa-triangle-exclamation" />
-          <span><strong>Auto-failover triggered:</strong> {failover.from} → {failover.to} at {new Date(failover.ts).toLocaleTimeString()}</span>
-          <button onClick={() => setFailover(null)} className="ml-auto opacity-60 hover:opacity-100"><i className="fa-solid fa-xmark" /></button>
+      {/* Auto-failover log */}
+      {failoverLog.length > 0 && (
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "#f97316", background: "rgba(249,115,22,0.06)" }}>
+          <div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: "rgba(249,115,22,0.3)" }}>
+            <span className="text-sm font-semibold flex items-center gap-2" style={{ color: "#f97316" }}>
+              <i className="fa-solid fa-triangle-exclamation" /> Auto-failover log
+            </span>
+            <button onClick={() => setFailoverLog([])} className="text-xs opacity-60 hover:opacity-100" style={{ color: "#f97316" }}>
+              Clear
+            </button>
+          </div>
+          <div className="divide-y" style={{ borderColor: "rgba(249,115,22,0.15)" }}>
+            {failoverLog.map((ev, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-2 text-sm">
+                <span className="font-mono text-[11px] w-24 shrink-0" style={{ color: "#94a3b8" }}>
+                  {new Date(ev.ts).toLocaleTimeString()}
+                </span>
+                <span style={{ color: "#f97316" }}>{ev.from}</span>
+                <i className="fa-solid fa-arrow-right text-[10px]" style={{ color: "#94a3b8" }} />
+                <span className="font-semibold" style={{ color: "#22c55e" }}>{ev.to}</span>
+                <span className="text-[11px] ml-auto" style={{ color: "#94a3b8" }}>switched to {ev.to}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
