@@ -95,9 +95,8 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const ask = p != null ? gnum(p, d) : "—";
               const lpBid = realBids[s.symbol]; // real bid from TwelveData Pro feed
               const pip = Math.pow(10, -(d - 1));
-              // Cap admin spread at 2% of price to prevent negative bid on low-price assets
-              const maxSpPx = p != null ? p * 0.02 : spPx * pip;
-              const safeSpPx = Math.min(spPx * pip, maxSpPx);
+              // Cap admin spread at 2% of price to prevent negative bid on low-price assets (e.g. DOGE)
+              const safeSpPx = p != null ? Math.min(spPx, p * 0.02) : spPx;
               const bid = p != null
                 ? (lpBid != null && lpBid > 0 ? gnum(lpBid, d) : gnum(Math.max(0, p - safeSpPx), d))
                 : "—";
