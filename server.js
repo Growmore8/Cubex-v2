@@ -426,10 +426,12 @@ const KR_FOREX_PAIRS  = ["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/CAD","USD/
 const KR_METAL_PAIRS  = ["XAU/USD","XAG/USD"];
 const KR_CRYPTO_PAIRS = ["XBT/USD","ETH/USD","SOL/USD","XRP/USD","ADA/USD","DOT/USD","LINK/USD","AVAX/USD","LTC/USD","DOGE/USD"];
 let krWs = null;
+let krPingTimer = null;
 function connectKraken() {
   // Only connect if at least one category uses Kraken
   if (!["KR"].some(k => [CRYPTO_FEED, FOREX_FEED, COMM_FEED].includes(k))) return;
   if (krWs) { try { krWs.removeAllListeners(); krWs.terminate(); } catch (_) {} krWs = null; }
+  if (krPingTimer) { clearInterval(krPingTimer); krPingTimer = null; }
   krWs = new WebSocket("wss://ws.kraken.com");
   krWs.on("open", () => {
     const pairs = [
@@ -440,6 +442,10 @@ function connectKraken() {
     if (!pairs.length) return;
     krWs.send(JSON.stringify({ event: "subscribe", pair: pairs, subscription: { name: "spread" } }));
     console.log("[KR] connected, subscribed spread for", pairs.length, "pairs");
+    // Kraken requires a ping every 30s to keep the connection alive
+    krPingTimer = setInterval(() => {
+      if (krWs && krWs.readyState === 1) krWs.send(JSON.stringify({ event: "ping" }));
+    }, 25000);
   });
   krWs.on("message", (data) => {
     try {
@@ -458,6 +464,7 @@ function connectKraken() {
     } catch (e) {}
   });
   krWs.on("close", () => {
+    if (krPingTimer) { clearInterval(krPingTimer); krPingTimer = null; }
     logFeedError("system", "KR", "WS_CONNECT", "Kraken WebSocket closed, reconnecting in 5s");
     setTimeout(connectKraken, 5000);
   });
