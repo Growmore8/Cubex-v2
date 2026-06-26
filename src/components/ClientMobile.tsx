@@ -385,7 +385,7 @@ export default function ClientMobile({ t }: { t: any }) {
     <>
     {/* Dark backdrop behind the phone-width app column (fills desktop sides). */}
     <div style={{ position: "fixed", inset: 0, zIndex: 0, background: theme === "dark" ? "#06080f" : "#dfe5ee" }} />
-    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", top: 0, bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 540, zIndex: 1, paddingTop: "env(safe-area-inset-top)", touchAction: "manipulation", boxShadow: "0 0 60px rgba(0,0,0,0.45)",
+    <div style={{ ...(theme === "dark" ? DARK : LIGHT), fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", top: 0, bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 540, zIndex: 1, paddingTop: "env(safe-area-inset-top)", touchAction: tab === "chart" ? "none" : "manipulation", boxShadow: "0 0 60px rgba(0,0,0,0.45)",
       // Frosted-glass design: faint brand-tinted glows behind the content so the
       // .glass-card surfaces have colour to blur (design "A").
       background: "radial-gradient(680px 420px at 50% -6%, rgba(22,199,154,0.08), transparent 60%), var(--bg)" }} className="flex flex-col overflow-hidden text-[var(--text)]">

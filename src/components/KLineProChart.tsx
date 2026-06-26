@@ -297,21 +297,47 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     return coreRef.current;
   }, []);
 
-  // iOS Safari / Android Chrome: attach touch handlers in CAPTURE phase at document
-  // level so we intercept the touch BEFORE the browser evaluates touch-action on
-  // any ancestor and before any passive listener can claim the scroll gesture.
-  // Without capture:true, iOS 17/18 steals swipe-to-scroll even with touch-action:none.
+  // iOS Safari / Android Chrome: block browser scroll/zoom on the chart container.
+  // Strategy: (1) non-passive capture listeners on the document so we intercept
+  // BEFORE the browser evaluates touch-action on any ancestor, (2) MutationObserver
+  // to add non-passive listeners directly on every canvas klinecharts creates —
+  // klinecharts v9 registers its own listeners as passive (can't be overridden from
+  // outside), so this is the only reliable way to prevent iOS from stealing the swipe.
   useEffect(() => {
     const el = elRef.current;
     if (!el) return;
+
     const prevent = (e: TouchEvent) => {
       if (el.contains(e.target as Node) && e.cancelable) e.preventDefault();
     };
     document.addEventListener("touchstart", prevent, { passive: false, capture: true });
     document.addEventListener("touchmove", prevent, { passive: false, capture: true });
+
+    // Attach non-passive listeners directly to canvas elements as they're created.
+    const patchCanvas = (node: Element) => {
+      if (node.nodeName === "CANVAS") {
+        const c = node as HTMLCanvasElement;
+        if (!(c as any).__cubexTouchPatched) {
+          (c as any).__cubexTouchPatched = true;
+          (c as HTMLElement).style.touchAction = "none";
+          c.addEventListener("touchstart", prevent, { passive: false });
+          c.addEventListener("touchmove", prevent, { passive: false });
+        }
+      }
+      node.querySelectorAll("canvas").forEach(patchCanvas);
+    };
+    // Patch canvases already in DOM (if klinecharts rendered synchronously).
+    el.querySelectorAll("canvas").forEach(patchCanvas);
+    // Watch for canvases added later (klinecharts init is async).
+    const mo = new MutationObserver((mutations) => {
+      for (const m of mutations) m.addedNodes.forEach((n) => { if (n.nodeType === 1) patchCanvas(n as Element); });
+    });
+    mo.observe(el, { childList: true, subtree: true });
+
     return () => {
       document.removeEventListener("touchstart", prevent, { capture: true } as any);
       document.removeEventListener("touchmove", prevent, { capture: true } as any);
+      mo.disconnect();
     };
   }, []);
 
