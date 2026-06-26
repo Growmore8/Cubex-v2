@@ -283,28 +283,44 @@ export default function TVChart({symbol,tf,theme,digits=5,positions,spreadPips,s
     return()=>{ window.removeEventListener("keydown",onKey); try{chart.remove();}catch{}  chartRef.current=null;serRef.current=null;volRef.current=null; };
   },[]);// eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── data loading — handles first load AND symbol/tf changes ───────────────
+  // Sync tf prop → internal activeTf (parent can override)
+  useEffect(()=>{ setActiveTf(normTf(tf)); },[tf]);
+
+  // ── data loading — driven by symbol + activeTf state ─────────────────────
   useEffect(()=>{
-    const chart=chartRef.current,ser=serRef.current,vol=volRef.current;
-    if(!chart||!ser||!vol)return;
-    setOhlc(null);barsRef.current=[];ser.setData([]);vol.setData([]);setLoading(true);
-    const lbl=normTf(tf);setActiveTf(lbl);
+    if(!symbol) return; // wait until parent provides a real symbol
+    let alive=true;
+    const lbl=activeTf;
     const info=TF_MAP[lbl]??TF_MAP["1H"];
     sockRef.current?.disconnect();
 
-    fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${info.period}`,{cache:"no-store"})
-      .then(r=>r.json())
-      .then((r:any)=>{
-        if(!r?.ok||!r.candles?.length){setLoading(false);return;}
-        const bars=r.candles.map((b:any)=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close,volume:b.volume??0}));
+    // Clear existing data when we have valid series refs
+    const chart=chartRef.current,ser=serRef.current,vol=volRef.current;
+    if(chart&&ser&&vol){ setOhlc(null); barsRef.current=[]; try{ser.setData([]);}catch{} try{vol.setData([]);}catch{} }
+    setLoading(true);
+
+    // Async fetch wrapped in alive guard + full try/catch
+    (async()=>{
+      try{
+        const res=await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${info.period}`,{cache:"no-store"});
+        const r=await res.json();
+        if(!alive)return;
+        if(!r?.ok||!r.candles?.length){ setLoading(false); return; }
+        const bars:any[]=r.candles.map((b:any)=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close,volume:b.volume??0}));
         barsRef.current=bars;
-        ser.setData(bars.map((b:any)=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));
-        vol.setData(bars.map((b:any)=>({time:b.time,value:b.volume??0,color:b.close>=b.open?"rgba(38,166,154,0.3)":"rgba(239,83,80,0.3)"})));
+        // Use current refs at resolution time (may differ from closure if chart recreated)
+        const cs=serRef.current,cv=volRef.current,cc=chartRef.current;
+        if(!cs||!cv||!cc||!alive){ setLoading(false); return; }
+        try{ cs.setData(bars.map((b:any)=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}))); }catch{}
+        try{ cv.setData(bars.map((b:any)=>({time:b.time,value:b.volume??0,color:b.close>=b.open?"rgba(38,166,154,0.3)":"rgba(239,83,80,0.3)"}))); }catch{}
         lastBarRef.current[symbol+":"+lbl]=bars[bars.length-1];
-        chart.timeScale().fitContent();
+        try{ cc.timeScale().fitContent(); }catch{}
         applyInds(bars);
-        setLoading(false);
-      }).catch(()=>setLoading(false));
+        if(alive)setLoading(false);
+      }catch{
+        if(alive)setLoading(false);
+      }
+    })();
 
     const sock=io({path:"/socket.io"});sockRef.current=sock;
     sock.on("tick",(msg:any)=>{
@@ -318,8 +334,8 @@ export default function TVChart({symbol,tf,theme,digits=5,positions,spreadPips,s
       volRef.current?.update({time:lb.time,value:lb.volume,color:lb.close>=lb.open?"rgba(38,166,154,0.3)":"rgba(239,83,80,0.3)"});
       if(spRef.current>0){const p=pip(digRef.current),ask=price,bid=Math.max(0,ask-spRef.current*p);askLineRef.current?.applyOptions({price:ask,title:`Ask ${ask.toFixed(digRef.current)}`});bidLineRef.current?.applyOptions({price:bid,title:`Bid ${bid.toFixed(digRef.current)}`});}
     });
-    return()=>{ sock.disconnect(); };
-  },[symbol,tf]);// eslint-disable-line react-hooks/exhaustive-deps
+    return()=>{ alive=false; sock.disconnect(); };
+  },[symbol,activeTf]);// eslint-disable-line react-hooks/exhaustive-deps
 
   function applyInds(bars:any[]){
     if(smaRef.current)smaRef.current.setData(calcMA(bars,20,false));
@@ -532,8 +548,8 @@ export default function TVChart({symbol,tf,theme,digits=5,positions,spreadPips,s
           {/* Timeframes */}
           <div style={{display:"flex",alignItems:"center",height:"100%",borderRight:`1px solid ${BDR}`,flexShrink:0,overflowX:"auto",scrollbarWidth:"none"}}>
             {TF_LIST.map(t=>(
-              <button key={t.label} onClick={()=>{const chart=chartRef.current,ser=serRef.current,vol=volRef.current;if(!chart||!ser||!vol)return;setOhlc(null);barsRef.current=[];ser.setData([]);vol.setData([]);setLoading(true);const lbl=t.label;setActiveTf(lbl);const info=TF_MAP[lbl]??TF_MAP["1H"];sockRef.current?.disconnect();fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${info.period}`,{cache:"no-store"}).then(r=>r.json()).then((r:any)=>{if(!r?.ok||!r.candles?.length){setLoading(false);return;}const bars=r.candles.map((b:any)=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close,volume:b.volume??0}));barsRef.current=bars;ser.setData(bars.map((b:any)=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));vol.setData(bars.map((b:any)=>({time:b.time,value:b.volume??0,color:b.close>=b.open?"rgba(38,166,154,0.3)":"rgba(239,83,80,0.3)"})));lastBarRef.current[symbol+":"+lbl]=bars[bars.length-1];chart.timeScale().fitContent();applyInds(bars);setLoading(false);}).catch(()=>setLoading(false));const sock=io({path:"/socket.io"});sockRef.current=sock;sock.on("tick",(msg:any)=>{if(msg.symbol!==symRef.current)return;const price=msg.price;if(price==null)return;const real=msg.real??price,sec=info.sec,tt=Math.floor(Date.now()/1000/sec)*sec;const key=symbol+":"+lbl;let lb=lastBarRef.current[key];if(lb&&lb.time===tt){lb.high=Math.max(lb.high,price,real);lb.low=Math.min(lb.low,price,real);lb.close=price;}else{const open=lb?lb.close:price;lb={time:tt,open,high:Math.max(open,price,real),low:Math.min(open,price,real),close:price,volume:0};lastBarRef.current[key]=lb;}serRef.current?.update({time:lb.time,open:lb.open,high:lb.high,low:lb.low,close:lb.close});volRef.current?.update({time:lb.time,value:lb.volume,color:lb.close>=lb.open?"rgba(38,166,154,0.3)":"rgba(239,83,80,0.3)"});if(spRef.current>0){const p=pip(digRef.current),ask=price,bid=Math.max(0,ask-spRef.current*p);askLineRef.current?.applyOptions({price:ask,title:`Ask ${ask.toFixed(digRef.current)}`});bidLineRef.current?.applyOptions({price:bid,title:`Bid ${bid.toFixed(digRef.current)}`});}});}}
-              style={{padding:"0 8px",height:"100%",fontSize:12,fontWeight:600,cursor:"pointer",border:"none",whiteSpace:"nowrap",background:activeTf===t.label?"rgba(41,98,255,0.12)":"transparent",color:activeTf===t.label?BLUE:MUT,borderBottom:activeTf===t.label?`2px solid ${BLUE}`:"2px solid transparent"}}>
+              <button key={t.label} onClick={()=>setActiveTf(t.label)}
+                style={{padding:"0 8px",height:"100%",fontSize:12,fontWeight:600,cursor:"pointer",border:"none",whiteSpace:"nowrap",background:activeTf===t.label?"rgba(41,98,255,0.12)":"transparent",color:activeTf===t.label?BLUE:MUT,borderBottom:activeTf===t.label?`2px solid ${BLUE}`:"2px solid transparent"}}>
                 {t.label}
               </button>
             ))}
