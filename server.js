@@ -84,9 +84,23 @@ function presenceDisconnect(socket) {
   p.offTimer = setTimeout(() => { presence.delete(uid); presenceMarkOffline(p.info); }, PRESENCE_GRACE_MS);
 }
 let TD_KEY = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
-// Primary feed ("TD" or "FH"). The other feed is a fallback used only when the
-// primary hasn't priced a symbol recently. Configurable from the SuperAdmin UI.
+let MASSIVE_KEY = process.env.MASSIVE_KEY || ""; // Massive.com (ex-Polygon.io) API key
+// Primary feed ("TD", "FH", or "MV"). Fallback kicks in when primary goes quiet.
 let PRIMARY = "TD";
+// Auto-failover: track consecutive primary feed failures
+let primaryFailCount = 0;
+const PRIMARY_FAIL_THRESHOLD = 5; // auto-switch after 5 consecutive WS failures
+function recordFeedFailure(feed) {
+  if (feed !== PRIMARY) return;
+  primaryFailCount++;
+  if (primaryFailCount >= PRIMARY_FAIL_THRESHOLD) {
+    const next = PRIMARY === "TD" ? (MASSIVE_KEY ? "MV" : "FH") : (TD_KEY ? "TD" : "FH");
+    console.warn(`[feed] AUTO-FAILOVER: ${PRIMARY} failed ${primaryFailCount}x → switching to ${next}`);
+    PRIMARY = next;
+    primaryFailCount = 0;
+    if (global.__io) global.__io.emit("feed-failover", { from: feed, to: next, ts: Date.now() });
+  }
+}
 // Price display mode:
 //   DEFAULT (smoothed)  — the real feed sets each symbol's TARGET; the display
 //     crawls toward it one pip at a time (4100.31 -> .32 -> .33) and jitters the
@@ -104,19 +118,23 @@ async function loadFeedConfig() {
     const v = (rec && rec.value) || {};
     if (typeof v.tdKey === "string" && v.tdKey.trim()) TD_KEY = v.tdKey.trim();
     if (typeof v.finnhubKey === "string" && v.finnhubKey.trim()) FINNHUB_KEY = v.finnhubKey.trim();
-    if (v.primary === "TD" || v.primary === "FH") PRIMARY = v.primary;
+    if (typeof v.massiveKey === "string" && v.massiveKey.trim()) MASSIVE_KEY = v.massiveKey.trim();
+    if (["TD", "FH", "MV"].includes(v.primary)) PRIMARY = v.primary;
   } catch (e) { console.error("[feed] config load failed:", e.message); }
   recomputeExact();
   console.log("[feed] config:", { td: TD_KEY ? "set" : "none", fh: FINNHUB_KEY ? "set" : "none", primary: PRIMARY, exact: REAL_EXACT });
 }
-// Tear down and re-open both feed sockets with the current keys (after a config change).
+// Tear down and re-open all feed sockets with current keys (after a config change).
 function reconnectFeeds() {
   try { if (tdWs) { tdWs.removeAllListeners(); tdWs.close(); } } catch (e) {}
   tdWs = null;
   try { if (fhWs) { fhWs.removeAllListeners(); fhWs.close(); } } catch (e) {}
   fhWs = null;
+  try { if (mvWs) { mvWs.removeAllListeners(); mvWs.close(); } } catch (e) {}
+  mvWs = null;
   connectFinnhub();
   connectTD();
+  if (MASSIVE_KEY) connectMassive();
 }
 
 const CANDLE_MS = 5000, HISTORY = 300, MONITOR_MS = 2000;
@@ -326,6 +344,38 @@ function connectBinance() {
   bnWs.on("error", (e) => console.error("[BN]", e.message));
 }
 
+// ── Massive.com (ex-Polygon.io) WebSocket — forex real bid/ask ──
+let mvWs = null;
+const MV_FOREX = { EURUSD:"C.EUR/USD",GBPUSD:"C.GBP/USD",AUDUSD:"C.AUD/USD",NZDUSD:"C.NZD/USD",USDCAD:"C.USD/CAD",USDCHF:"C.USD/CHF",USDJPY:"C.USD/JPY",EURGBP:"C.EUR/GBP",EURJPY:"C.EUR/JPY",EURCAD:"C.EUR/CAD",EURCHF:"C.EUR/CHF",GBPJPY:"C.GBP/JPY",GBPCHF:"C.GBP/CHF",AUDJPY:"C.AUD/JPY",AUDNZD:"C.AUD/NZD",AUDCAD:"C.AUD/CAD",NZDJPY:"C.NZD/JPY",USDHKD:"C.USD/HKD",USDSGD:"C.USD/SGD",USDTRY:"C.USD/TRY",USDIDR:"C.USD/IDR",USDMXN:"C.USD/MXN",USDZAR:"C.USD/ZAR",GBPAUD:"C.GBP/AUD",GBPCAD:"C.GBP/CAD",GBPNZD:"C.GBP/NZD",EURNZD:"C.EUR/NZD",EURAUD:"C.EUR/AUD",CADCHF:"C.CAD/CHF",CADJPY:"C.CAD/JPY",CHFJPY:"C.CHF/JPY",NZDCAD:"C.NZD/CAD",NZDCHF:"C.NZD/CHF" };
+const MV_TO_SYM = Object.fromEntries(Object.entries(MV_FOREX).map(([k,v])=>[v,k]));
+function connectMassive() {
+  if (!MASSIVE_KEY) return;
+  if (mvWs) { try { mvWs.removeAllListeners(); mvWs.terminate(); } catch (_) {} mvWs = null; }
+  // Massive.com uses same WebSocket format as old Polygon.io
+  mvWs = new WebSocket("wss://socket.polygon.io/forex");
+  mvWs.on("open", () => {
+    console.log("[MV] connected");
+    mvWs.send(JSON.stringify({ action: "auth", params: MASSIVE_KEY }));
+  });
+  mvWs.on("message", (data) => {
+    try {
+      const msgs = JSON.parse(data);
+      for (const m of (Array.isArray(msgs) ? msgs : [msgs])) {
+        if (m.ev === "authenticated") { mvWs.send(JSON.stringify({ action: "subscribe", params: Object.values(MV_FOREX).join(",") })); console.log("[MV] auth ok, subscribed forex"); }
+        if (m.ev === "C" && m.b && m.a) {
+          const sym = MV_TO_SYM["C." + m.p];
+          if (sym && state[sym]) {
+            state[sym].bid = r(parseFloat(m.b), meta[sym] ? meta[sym].digits : 5);
+            applyPrice(sym, parseFloat(m.a), "MV");
+          }
+        }
+      }
+    } catch (e) {}
+  });
+  mvWs.on("close", () => { recordFeedFailure("MV"); setTimeout(() => { if (MASSIVE_KEY) connectMassive(); }, 5000); });
+  mvWs.on("error", (e) => { console.error("[MV]", e.message); recordFeedFailure("MV"); });
+}
+
 let tdWs = null;
 let tdWsFail200 = 0; // consecutive WS handshake failures
 function connectTD() {
@@ -343,6 +393,7 @@ function connectTD() {
   tdWs.on("error", (e) => {
     tdWsFail200++;
     console.error("[TD] WS error #" + tdWsFail200 + ":", e.message);
+    recordFeedFailure("TD");
   });
 }
 
@@ -833,6 +884,7 @@ app.prepare().then(async () => {
   connectBinance(); // free real bid/ask for crypto — no API key needed
   connectFinnhub();
   connectTD();
+  if (MASSIVE_KEY) connectMassive(); // Massive.com (ex-Polygon.io) — forex real bid/ask
   // Delay initial REST poll so WS can connect and subscribe first (avoids rate-limit spike on boot)
   setTimeout(pollPrices, 15000);
   setTimeout(pollFinnhubQuotes, 10000);
