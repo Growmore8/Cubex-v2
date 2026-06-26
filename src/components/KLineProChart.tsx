@@ -349,12 +349,25 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   // theme sync (no rebuild)
   useEffect(() => { try { proRef.current?.setTheme(theme); } catch {} }, [theme]);
   // follow the app's symbol selection (skip if the chart already shows it, so a
-  // dropdown pick in the chart doesn't bounce back)
+  // dropdown pick in the chart doesn't bounce back). Retry if pro not ready yet.
   useEffect(() => {
-    try {
-      const cur = proRef.current?.getSymbol?.()?.ticker;
-      if (proRef.current && symbol && cur !== symbol) proRef.current.setSymbol({ ticker: symbol, shortName: symbol, pricePrecision: digits, volumePrecision: 0, type: "forex" });
-    } catch {}
+    if (!symbol) return;
+    let cancelled = false;
+    const apply = () => {
+      if (cancelled) return true;
+      const pro = proRef.current;
+      if (!pro) return false;
+      try {
+        const cur = pro.getSymbol?.()?.ticker;
+        if (cur !== symbol) pro.setSymbol({ ticker: symbol, shortName: symbol, pricePrecision: digits, volumePrecision: 0, type: "forex" });
+      } catch {}
+      return true;
+    };
+    if (!apply()) {
+      const id = setInterval(() => { if (apply()) clearInterval(id); }, 50);
+      return () => { cancelled = true; clearInterval(id); };
+    }
+    return () => { cancelled = true; };
   }, [symbol, digits]);
 
   // Trade overlays (entry / SL / TP / pending) drawn on the REAL core chart.
@@ -393,15 +406,17 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
 
   // Bid/Ask price lines — live socket listener updates them on every tick.
   useEffect(() => {
-    // Clean up any overlays from a previous effect run before resetting IDs
-    (async () => {
-      const core = await getCore();
-      if (core) {
-        if (bidAskIds.current.bid) try { core.removeOverlay(bidAskIds.current.bid); } catch {}
-        if (bidAskIds.current.ask) try { core.removeOverlay(bidAskIds.current.ask); } catch {}
-      }
-    })();
+    // Capture IDs BEFORE resetting so the async removal uses the right values
+    const oldBid = bidAskIds.current.bid;
+    const oldAsk = bidAskIds.current.ask;
     bidAskIds.current = { bid: null, ask: null };
+    if (oldBid || oldAsk) {
+      getCore().then((core) => {
+        if (!core) return;
+        if (oldBid) try { core.removeOverlay(oldBid); } catch {}
+        if (oldAsk) try { core.removeOverlay(oldAsk); } catch {}
+      });
+    }
 
     const sock: any = io({ path: "/socket.io" });
     const symRef = { current: symbol };
