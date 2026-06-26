@@ -118,7 +118,7 @@ export default function AdminDeskPage() {
   function askDelete(msg: string, onYes: () => void) { setConfirmInput(""); setConfirmBox({ msg, danger: true, onYes, requireWord: randomConfirmWord() }); }
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [navW, setNavW] = useState(248);
-  const [mwW, setMwW] = useState(278);
+  const [mwW, setMwW] = useState(310);
   const [tbH, setTbH] = useState(180);
   const [layout, setLayout] = useState(1);
   const [openCharts, setOpenCharts] = useState<string[]>([]);
