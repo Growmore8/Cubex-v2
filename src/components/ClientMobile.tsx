@@ -541,7 +541,7 @@ export default function ClientMobile({ t }: { t: any }) {
       {/* CONTENT */}
       {/* overflow-hidden when chart is active — overflow-auto creates a scroll
           context on iOS/Android that intercepts touch before klinecharts sees it */}
-      <div className="min-h-0 flex-1" style={{ overflowY: tab === "chart" ? "hidden" : "auto" }}>
+      <div className="min-h-0 flex-1" style={{ overflowY: tab === "chart" ? "hidden" : "auto", touchAction: tab === "chart" ? "none" : "auto" }}>
 
         {/* ───────── DASHBOARD ───────── */}
         <KeepAlive active={tab === "dashboard"}>{(
@@ -780,7 +780,7 @@ export default function ClientMobile({ t }: { t: any }) {
               </>
             )}
             {/* Preview chart — bare KLine (no toolbar/rail); full features in full-screen */}
-            <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
+            <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]" style={{ touchAction: "none" }}>
               <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} symbols={symbols} bare spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),

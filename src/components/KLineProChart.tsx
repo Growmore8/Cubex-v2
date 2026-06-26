@@ -297,18 +297,21 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     return coreRef.current;
   }, []);
 
-  // iOS Safari: klinecharts registers touchstart as passive:true (can't call
-  // preventDefault), so iOS claims the touch for page scroll before the chart
-  // gets it. We add our own non-passive listeners to explicitly block that.
+  // iOS Safari / Android Chrome: attach touch handlers in CAPTURE phase at document
+  // level so we intercept the touch BEFORE the browser evaluates touch-action on
+  // any ancestor and before any passive listener can claim the scroll gesture.
+  // Without capture:true, iOS 17/18 steals swipe-to-scroll even with touch-action:none.
   useEffect(() => {
     const el = elRef.current;
     if (!el) return;
-    const prevent = (e: TouchEvent) => { if (e.cancelable) e.preventDefault(); };
-    el.addEventListener("touchstart", prevent, { passive: false });
-    el.addEventListener("touchmove", prevent, { passive: false });
+    const prevent = (e: TouchEvent) => {
+      if (el.contains(e.target as Node) && e.cancelable) e.preventDefault();
+    };
+    document.addEventListener("touchstart", prevent, { passive: false, capture: true });
+    document.addEventListener("touchmove", prevent, { passive: false, capture: true });
     return () => {
-      el.removeEventListener("touchstart", prevent);
-      el.removeEventListener("touchmove", prevent);
+      document.removeEventListener("touchstart", prevent, { capture: true } as any);
+      document.removeEventListener("touchmove", prevent, { capture: true } as any);
     };
   }, []);
 
