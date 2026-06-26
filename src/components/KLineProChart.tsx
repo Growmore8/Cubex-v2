@@ -387,12 +387,15 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
     bidAskIds.current = { bid: null, ask: null }; // reset stale IDs when symbol changes
     const sock: any = io({ path: "/socket.io" });
     const symRef = { current: symbol };
-    const updateLines = async (ask: number) => {
+    let lastRealBid: number | null = null;
+    const updateLines = async (ask: number, tickBid?: number | null) => {
       const core = await getCore();
       if (!core || typeof core.createOverlay !== "function") return;
+      // Prefer: real bid from LP (Binance/Kraken), then admin-spread calc, then no gap
+      if (tickBid != null && tickBid > 0 && tickBid < ask) lastRealBid = tickBid;
       const spPips = spreadPipsRef.current;
       const spPx = spPips * Math.pow(10, -(digits - 1));
-      const bid = ask - spPx;
+      const bid = lastRealBid != null && spPips === 0 ? lastRealBid : ask - spPx;
       let ts: number | undefined;
       try { const dl = core.getDataList?.() || []; if (dl.length) ts = dl[dl.length - 1].timestamp; } catch {}
       const upsert = (ref: "bid" | "ask", price: number, color: string, label: string) => {
@@ -403,7 +406,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       upsert("ask", ask, "#26a69a", `Ask ${ask.toFixed(digits)}`);
       upsert("bid", bid, "#ef5350", `Bid ${bid.toFixed(digits)}`);
     };
-    sock.on("tick", ({ symbol: sym, price }: any) => { if (sym === symRef.current && price != null) updateLines(price); });
+    sock.on("tick", ({ symbol: sym, price, bid }: any) => { if (sym === symRef.current && price != null) updateLines(price, bid); });
     return () => { sock.disconnect(); };
   }, [symbol, digits, getCore]);
 
