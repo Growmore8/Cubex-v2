@@ -18,7 +18,7 @@ async function feedKeys(): Promise<{ td: string; fh: string; primary: string }> 
 }
 
 const INTERVAL: Record<string, string> = {
-  "1M": "1min", "5M": "5min", "15M": "15min", "30M": "30min", "1H": "1h", "4H": "4h", "1D": "1day",
+  "1M": "1min", "5M": "5min", "15M": "15min", "30M": "30min", "1H": "1h", "4H": "4h", "1D": "1day", "1W": "1week",
 };
 // Finnhub candle resolution (forex/stock) — used for symbols with an OANDA feed.
 const FH_RES: Record<string, string> = { "1M": "1", "5M": "5", "15M": "15", "30M": "30", "1H": "60", "4H": "60", "1D": "D" };
@@ -56,10 +56,14 @@ function tdSymbol(sym: string, feed?: string | null): string {
   return s; // stocks/indices as-is
 }
 
-// Short in-memory cache (custom server is long-lived) so symbol switches and
-// multiple users don't refetch the provider every time — much faster loads.
+// In-memory cache keyed by symbol|tf. TTL scales with TF:
+// 1M→45s, 5M→2min, 15M→4min, 30M→6min, 1H/4H→10min, 1D/1W→30min
 const candleCache = new Map<string, { t: number; candles: any[]; source?: string }>();
-const CACHE_MS = 20000;
+const CACHE_TTL: Record<string,number> = {
+  "1M":45000,"5M":120000,"15M":240000,"30M":360000,
+  "1H":600000,"4H":600000,"1D":1800000,"1W":1800000,
+};
+function cacheTtl(tf:string){ return CACHE_TTL[tf] ?? 120000; }
 
 export async function GET(req: Request) {
   const s = await getSession();
@@ -75,7 +79,7 @@ export async function GET(req: Request) {
 
   const ckey = symbol + "|" + tf + (beforeSec ? "|b" + beforeSec : "");
   const hit = candleCache.get(ckey);
-  if (hit && Date.now() - hit.t < CACHE_MS) return NextResponse.json({ ok: true, candles: hit.candles, source: hit.source, cached: true });
+  if (hit && Date.now() - hit.t < cacheTtl(tf)) return NextResponse.json({ ok: true, candles: hit.candles, source: hit.source, cached: true });
 
   let feed: string | null = null;
   try { const gs = await prisma.globalSymbol.findUnique({ where: { symbol } }); feed = gs?.feed || null; } catch {}
