@@ -384,6 +384,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
 
   // Bid/Ask price lines — live socket listener updates them on every tick.
   useEffect(() => {
+    bidAskIds.current = { bid: null, ask: null }; // reset stale IDs when symbol changes
     const sock: any = io({ path: "/socket.io" });
     const symRef = { current: symbol };
     const updateLines = async (ask: number) => {
@@ -396,7 +397,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       try { const dl = core.getDataList?.() || []; if (dl.length) ts = dl[dl.length - 1].timestamp; } catch {}
       const upsert = (ref: "bid" | "ask", price: number, color: string, label: string) => {
         const id = bidAskIds.current[ref];
-        if (id) { try { core.overrideOverlay({ id, points: [{ timestamp: ts, value: price }] }); return; } catch {} }
+        if (id) { try { core.overrideOverlay({ id, points: [{ timestamp: ts, value: price }], extendData: { color, text: label } }); return; } catch {} }
         try { const newId = core.createOverlay({ name: "cubexLevel", points: [{ timestamp: ts, value: price }], lock: true, extendData: { color, text: label } }); if (typeof newId === "string") bidAskIds.current[ref] = newId; } catch {}
       };
       upsert("ask", ask, "#26a69a", `Ask ${ask.toFixed(digits)}`);
