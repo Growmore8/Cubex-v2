@@ -478,6 +478,15 @@ function connectKraken() {
   krWs.on("message", (data) => {
     try {
       const m = JSON.parse(data);
+      // Log subscription status so we can see which pairs Kraken accepts/rejects
+      if (m.event === "subscriptionStatus") {
+        if (m.status === "error") {
+          console.warn(`[KR] subscription rejected for ${m.pair}: ${m.errorMessage}`);
+          logFeedError("system", "KR", "SUBSCRIBE_ERROR", `${m.pair}: ${m.errorMessage}`);
+        } else {
+          console.log(`[KR] subscription ${m.status}: ${m.pair} (${m.subscription?.name})`);
+        }
+      }
       // Spread message: [channelID, [bid, ask, ts, bidSize, askSize], "spread", "EUR/USD"]
       if (Array.isArray(m) && m[2] === "spread") {
         const pair = m[3];
