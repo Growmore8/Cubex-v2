@@ -8,7 +8,7 @@ const CAT_FEEDS: Record<string, { key: string; name: string; free: boolean; hasB
   crypto: [
     { key: "BN", name: "Binance",      free: true,  hasBidAsk: true,  info: "Real bid/ask · no key needed" },
     { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · no key needed" },
-    { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Price only · TwelveData key required" },
+    { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Price only · crypto + forex · key required" },
     { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "Price only · Finnhub key required" },
   ],
   forex: [
@@ -58,7 +58,7 @@ function getApiKey(feedKey: string, keys: Record<string, string>) {
 const PRIMARY_CARDS = [
   { key: "BN", name: "Binance",     icon: "fa-brands fa-btc",      color: "#f59e0b", free: true,  desc: "Crypto bid/ask" },
   { key: "KR", name: "Kraken",      icon: "fa-solid fa-anchor",    color: "#6366f1", free: true,  desc: "Forex + crypto bid/ask" },
-  { key: "TD", name: "TwelveData",  icon: "fa-solid fa-database",  color: "#3b82f6", free: false, desc: "Forex/indices/metals" },
+  { key: "TD", name: "TwelveData",  icon: "fa-solid fa-database",  color: "#3b82f6", free: false, desc: "Forex/crypto/indices/metals" },
   { key: "FH", name: "Finnhub",     icon: "fa-solid fa-satellite-dish", color: "#22c55e", free: false, desc: "Stocks/forex/crypto" },
   { key: "MV", name: "Massive",     icon: "fa-solid fa-bolt",      color: "#ec4899", free: false, desc: "Forex real bid/ask" },
 ];
