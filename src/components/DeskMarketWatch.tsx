@@ -21,6 +21,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
   groupSpread?: number;
 }) {
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [realBids, setRealBids] = useState<Record<string, number | null>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -28,22 +29,25 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
-    const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const prev: Record<string, number> = {};
+    const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const pB: Record<string, number | null> = {}; const prev: Record<string, number> = {};
     const flush = () => {
-      const pk = Object.keys(pP), dk = Object.keys(pD);
-      if (!pk.length && !dk.length) return;
-      const px = { ...pP }; const dr = { ...pD };
-      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k];
+      const pk = Object.keys(pP), dk = Object.keys(pD), bk = Object.keys(pB);
+      if (!pk.length && !dk.length && !bk.length) return;
+      const px = { ...pP }; const dr = { ...pD }; const bd = { ...pB };
+      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pB) delete pB[k];
       startTransition(() => {
         if (pk.length) setPrices((pp) => ({ ...pp, ...px }));
         if (dk.length) setDirs((dd) => ({ ...dd, ...dr }));
+        if (bk.length) setRealBids((bb) => ({ ...bb, ...bd }));
       });
     };
     socket.on("prices", (snap: Record<string, number>) => { startTransition(() => setPrices((pp) => ({ ...pp, ...snap }))); for (const k in snap) prev[k] = snap[k]; });
-    socket.on("tick", ({ symbol, price }: any) => {
+    socket.on("bids", (snap: Record<string, number>) => { startTransition(() => setRealBids((bb) => ({ ...bb, ...snap }))); });
+    socket.on("tick", ({ symbol, price, bid }: any) => {
       const pv = prev[symbol];
       if (pv != null && pv !== price) pD[symbol] = price > pv ? 1 : -1;
       prev[symbol] = price; pP[symbol] = price;
+      if (bid !== undefined) pB[symbol] = bid;
     });
     const fv = setInterval(flush, 120);
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
@@ -89,12 +93,17 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const spPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
               const spPx = spPips * Math.pow(10, -(d - 1));
               const ask = p != null ? gnum(p, d) : "—";
-              // Cap spread at 2% of price to prevent negative bid on low-price assets (e.g. DOGE with large pip)
-              const maxSpPx = p != null ? p * 0.02 : spPx;
-              const safeSpPx = Math.min(spPx, maxSpPx);
-              const safeSpPips = safeSpPx / Math.pow(10, -(d - 1));
-              const bid = p != null ? gnum(Math.max(0, p - safeSpPx), d) : "—";
-              const realSpPips = safeSpPips;
+              const lpBid = realBids[s.symbol]; // real bid from TwelveData Pro feed
+              const pip = Math.pow(10, -(d - 1));
+              // Cap admin spread at 2% of price to prevent negative bid on low-price assets
+              const maxSpPx = p != null ? p * 0.02 : spPx * pip;
+              const safeSpPx = Math.min(spPx * pip, maxSpPx);
+              const bid = p != null
+                ? (lpBid != null && lpBid > 0 ? gnum(lpBid, d) : gnum(Math.max(0, p - safeSpPx), d))
+                : "—";
+              const realSpPips = p != null && lpBid != null && lpBid > 0
+                ? (p - lpBid) / pip
+                : safeSpPx / pip;
               const dir = dirs[s.symbol] || 0;
               const isOff = !!(disabledSyms && disabledSyms.includes(s.symbol));
               return (

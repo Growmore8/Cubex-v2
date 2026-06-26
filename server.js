@@ -218,7 +218,7 @@ async function loadCatalog() {
     // Finnhub fallback feed (skip derived/calculated symbols)
     const fh = x.feed || (DERIVED_SET.has(x.symbol) ? null : toFinnhub(x.symbol, x.category));
     meta[x.symbol] = { digits: x.digits || 5, contract: contractFor(x.category, x.symbol), feed: fh, td, cat: x.category };
-    state[x.symbol] = { price: null, candles: [], bucket: 0 };
+    state[x.symbol] = { price: null, bid: null, candles: [], bucket: 0 };
     if (fh) feedToSym[fh] = x.symbol;
     tdToSym[td] = x.symbol;
   }
@@ -261,7 +261,7 @@ function commitPrice(sym, p) {
   // feed price (the chart builds its candles from this so they match the market,
   // while the ticker stays smooth). Falls back to the display when no live feed.
   const real = (st.realAt && Date.now() - st.realAt < REAL_TTL && st.target != null) ? st.target : p;
-  if (global.__io) global.__io.emit("tick", { symbol: sym, price: p, real, candle });
+  if (global.__io) global.__io.emit("tick", { symbol: sym, price: p, bid: st.bid ?? null, real, candle });
   recomputeDerived(sym);
 }
 
@@ -295,7 +295,7 @@ function connectTD() {
   if (tdWsFail200 >= 3) return; // WS not available on this plan — REST poller handles prices
   tdWs = new WebSocket("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY);
   tdWs.on("open", () => { tdWsFail200 = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
-  tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) applyPrice(s, parseFloat(m.price), "TD"); } } catch (e) {} });
+  tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits); else state[s].bid = null; applyPrice(s, ask, "TD"); } } } catch (e) {} });
   tdWs.on("close", () => { if (tdWsFail200 < 3) setTimeout(connectTD, 5000); });
   tdWs.on("error", (e) => {
     if (e.message && e.message.includes("Unexpected server response: 200")) {
@@ -344,9 +344,10 @@ function ensureSeeded() {
   }
   // Broadcast a full snapshot so clients connected before seeding pick up all prices at once.
   if (global.__io) {
-    const px = {};
-    for (const s of symbols) { const st = state[s]; if (st && st.price != null) px[s] = st.price; }
+    const px = {}; const bids = {};
+    for (const s of symbols) { const st = state[s]; if (st && st.price != null) { px[s] = st.price; if (st.bid != null) bids[s] = st.bid; } }
     global.__io.emit("prices", px);
+    if (Object.keys(bids).length) global.__io.emit("bids", bids);
   }
 }
 
@@ -647,24 +648,24 @@ async function checkPending(io) {
 // plans, so we batch-poll /price for every base symbol. One request covers all;
 // derived symbols recompute automatically from the base prices.
 async function pollChunk(chunk) {
-  // chunk: array of internal symbols. Map to TD symbols (dedupe), fetch, apply.
-  const tdByInternal = {};
-  for (const s of chunk) tdByInternal[s] = meta[s].td;
   const uniqTd = Array.from(new Set(chunk.map((s) => meta[s].td)));
   try {
-    const url = "https://api.twelvedata.com/price?symbol=" + encodeURIComponent(uniqTd.join(",")) + "&apikey=" + TD_KEY;
+    // Use /quote (Pro plan) to get bid+ask where available; falls back to close/price
+    const url = "https://api.twelvedata.com/quote?symbol=" + encodeURIComponent(uniqTd.join(",")) + "&apikey=" + TD_KEY;
     const res = await fetch(url);
     const data = await res.json();
     if (!data) return;
-    // Single-symbol response: { price: "..." }
-    if (data.price && uniqTd.length === 1) {
-      for (const s of chunk) if (meta[s].td === uniqTd[0]) applyPrice(s, parseFloat(data.price), "TD");
-      return;
-    }
-    for (const s of chunk) {
-      const entry = data[meta[s].td];
-      if (entry && entry.price) { const p = parseFloat(entry.price); if (p > 0) applyPrice(s, p, "TD"); }
-    }
+    const applyEntry = (s, entry) => {
+      if (!entry) return;
+      const ask = parseFloat(entry.ask || entry.close || entry.price || 0);
+      const bid = parseFloat(entry.bid || 0);
+      if (ask > 0) {
+        if (bid > 0 && bid < ask) { state[s].bid = r(bid, meta[s].digits); applyPrice(s, ask, "TD"); }
+        else { state[s].bid = null; applyPrice(s, ask, "TD"); }
+      }
+    };
+    if (uniqTd.length === 1) { for (const s of chunk) if (meta[s].td === uniqTd[0]) applyEntry(s, data); return; }
+    for (const s of chunk) applyEntry(s, data[meta[s].td]);
   } catch (e) { /* transient — Finnhub WS covers the gap */ }
 }
 async function pollPrices() {
