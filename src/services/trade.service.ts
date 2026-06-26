@@ -19,15 +19,25 @@ export async function assertMarketOpen(symbol: string) {
   if (!isMarketOpen(symbol, cat)) throw new Error("Market is closed for " + symbol + ". Trading resumes when the market reopens.");
 }
 
-// Short, per-tenant sequential trade ticket (MT5-style, e.g. 1000001) instead of a
-// 16-digit timestamp. Atomic upsert+increment keeps Trade.ticket (@unique) safe.
+// Short, per-tenant sequential trade ticket (MT5-style, e.g. 1000001).
+// Uses upsert+increment but falls back to a raw increment when two requests
+// race on first creation (both see "no row" → both try to insert → collision).
 export async function nextTicket(tenantId: string): Promise<bigint> {
-  const c = await prisma.counter.upsert({
-    where: { tenantId_name: { tenantId, name: "ticket" } },
-    create: { tenantId, name: "ticket", nextVal: BigInt(1000001) },
-    update: { nextVal: { increment: 1 } },
-  });
-  return c.nextVal as bigint;
+  try {
+    const c = await prisma.counter.upsert({
+      where: { tenantId_name: { tenantId, name: "ticket" } },
+      create: { tenantId, name: "ticket", nextVal: BigInt(1000001) },
+      update: { nextVal: { increment: 1 } },
+    });
+    return c.nextVal as bigint;
+  } catch {
+    // Race condition on first creation: row now exists, so the plain update works.
+    const c = await prisma.counter.update({
+      where: { tenantId_name: { tenantId, name: "ticket" } },
+      data: { nextVal: { increment: 1 } },
+    });
+    return c.nextVal as bigint;
+  }
 }
 
 // Reject a new trade when the account's free margin can't cover it. Free margin
@@ -82,14 +92,24 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
 
   await assertMargin(account, { symbol: input.symbol, type: input.side, lots: Number(input.lots) }, ask);
 
-  const ticket = await nextTicket(tenantId);
-  const trade = await prisma.trade.create({
-    data: {
-      ticket, accountId: account.id, symbol: input.symbol, type: input.side,
-      lots: new Prisma.Decimal(input.lots), openPrice: new Prisma.Decimal(openPrice),
-      sl: new Prisma.Decimal(input.sl || 0), tp: new Prisma.Decimal(input.tp || 0),
-    },
-  });
+  // Retry up to 3 times if ticket collides (two simultaneous orders).
+  let trade: any;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const ticket = await nextTicket(tenantId);
+    try {
+      trade = await prisma.trade.create({
+        data: {
+          ticket, accountId: account.id, symbol: input.symbol, type: input.side,
+          lots: new Prisma.Decimal(input.lots), openPrice: new Prisma.Decimal(openPrice),
+          sl: new Prisma.Decimal(input.sl || 0), tp: new Prisma.Decimal(input.tp || 0),
+        },
+      });
+      break;
+    } catch (e: any) {
+      if (attempt < 2 && e?.code === "P2002" && e?.meta?.target?.includes("ticket")) continue;
+      throw e;
+    }
+  }
   const label = `${account.login} ${input.side} ${input.symbol} ${input.lots}L @ ${openPrice}`;
   audit(tenantId, "trade.open", label, account.login, "CLIENT" as any);
   notifyStaff(tenantId, { type: "TRADE", title: "Trade opened", body: label }, (account as any).managerId).catch(() => {});
