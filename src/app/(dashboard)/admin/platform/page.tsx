@@ -2399,7 +2399,26 @@ export default function AdminDeskPage() {
               symPerm.symbols.forEach((s: any) => { const c = s.category || "other"; (cats[c] || (cats[c] = [])).push(s.symbol); });
               return (
                 <div className="mb-3 rounded-lg border border-[var(--border)] p-2">
-                  <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Set spread by category</div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Set spread by category</span>
+                    <button onClick={async () => {
+                      if (!confirm("Apply realistic per-symbol spreads? This sets different spreads for each symbol based on real market conditions.")) return;
+                      const r = await fetch("/api/admin/symbols/seed-spreads", { method: "POST" });
+                      const d = await r.json();
+                      if (d.ok) {
+                        const r2 = await fetch("/api/admin/symbols");
+                        const asr = await r2.json();
+                        if (asr.ok) {
+                          const sp: Record<string, number> = {}; const ty: Record<string, string> = {}; const mx: Record<string, number> = {}; const ids: Record<string, string> = {};
+                          for (const x of asr.symbols) { sp[x.symbol] = Number(x.spread ?? 0); ty[x.symbol] = x.spreadType ?? "FIXED"; mx[x.symbol] = Number(x.spreadMax ?? 0); ids[x.symbol] = x.id; }
+                          setAdminSymSpreads(sp); setAdminSymTypes(ty); setAdminSymMax(mx); setAdminSymIds(ids);
+                        }
+                        setOk(`Realistic spreads applied to ${d.count} symbols`);
+                      }
+                    }} className="rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>
+                      Realistic defaults
+                    </button>
+                  </div>
                   {/* All Symbols row */}
                   <div className="flex items-center gap-2 py-1 border-b border-[var(--border)]">
                     <span className="capitalize text-[10px] font-semibold w-20 shrink-0">All Symbols</span>
