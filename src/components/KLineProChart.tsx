@@ -104,11 +104,12 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         const ck = "cubex-kl:" + key;
         const toBar = (b: any) => ({ timestamp: b.time * 1000, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume ?? 0 });
 
-        // Read localStorage cache (5-minute TTL)
+        // Read localStorage cache (5-minute TTL) — skip empty caches
         let cached: any[] | null = null;
         try {
           const c = JSON.parse(localStorage.getItem(ck) || "null");
-          if (c && c.d?.length && Date.now() - c.t < 300000) cached = c.d;
+          if (c && Array.isArray(c.d) && c.d.length > 0 && Date.now() - c.t < 300000) cached = c.d;
+          else if (c) localStorage.removeItem(ck); // clear stale/empty entry
         } catch {}
 
         // Fetch fresh if no cache
@@ -145,7 +146,10 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         }
 
         lastBar[key] = cached[cached.length - 1];
-        return cached.filter((d: any) => d.timestamp >= from && d.timestamp <= to);
+        // Return all fetched candles — KlineChartsPro trims to its visible window.
+        // Filtering by from/to here caused empty results when the library's range
+        // hint used different units or wider bounds than our fetched data.
+        return cached;
       },
       subscribe: (sym: any, period: any, callback: (d: any) => void) => {
         try { onSymRef.current?.(sym.ticker); } catch {} // sync app when the user picks a symbol in the chart
