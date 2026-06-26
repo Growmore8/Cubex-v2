@@ -296,7 +296,10 @@ function connectTD() {
   tdWs = new WebSocket("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY, { headers: { "Origin": "https://twelvedata.com" } });
   tdWs.on("open", () => { tdWsFail200 = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
   tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits); else state[s].bid = null; applyPrice(s, ask, "TD"); } } } catch (e) {} });
-  tdWs.on("close", () => { if (tdWsFail200 < 3) setTimeout(connectTD, 5000); });
+  tdWs.on("close", () => {
+    const delay = tdWsFail200 > 0 ? 30000 : 5000; // back off 30s after errors
+    if (tdWsFail200 < 5) setTimeout(connectTD, delay);
+  });
   tdWs.on("error", (e) => {
     tdWsFail200++;
     console.error("[TD] WS error #" + tdWsFail200 + ":", e.message);
@@ -768,8 +771,9 @@ app.prepare().then(async () => {
   await loadFeedConfig();       // keys + primary from SuperAdmin (DB overrides env)
   connectFinnhub();
   connectTD();
-  pollPrices();
-  pollFinnhubQuotes();              // seed REAL prices for Finnhub-fed symbols (Quote endpoint)
+  // Delay initial REST poll so WS can connect and subscribe first (avoids rate-limit spike on boot)
+  setTimeout(pollPrices, 15000);
+  setTimeout(pollFinnhubQuotes, 10000);
   setTimeout(ensureSeeded, 4000); // after feeds connect, seed anything still unpriced
   // REST poll is a fallback only — WebSocket handles real-time. Poll slowly to stay under rate limit.
   // 57 symbols × 1 credit = 57 credits per call. At 60s: 57/min → leaves ~550/min for WS + overhead.
