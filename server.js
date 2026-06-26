@@ -344,26 +344,41 @@ function connectBinance() {
   bnWs.on("error", (e) => console.error("[BN]", e.message));
 }
 
-// ── Massive.com (ex-Polygon.io) WebSocket — forex real bid/ask ──
+// ── Massive.com WebSocket — forex real bid/ask ──
+// Docs: https://massive.com/docs/websocket/forex/quotes
+// Endpoint: wss://<base>/forex/C?ticker=EUR-USD,GBP-USD&apikey=KEY
+// Message:  {"ev":"C","p":"EUR/USD","b":1.0856,"a":1.0858,"t":...}
 let mvWs = null;
-const MV_FOREX = { EURUSD:"C.EUR/USD",GBPUSD:"C.GBP/USD",AUDUSD:"C.AUD/USD",NZDUSD:"C.NZD/USD",USDCAD:"C.USD/CAD",USDCHF:"C.USD/CHF",USDJPY:"C.USD/JPY",EURGBP:"C.EUR/GBP",EURJPY:"C.EUR/JPY",EURCAD:"C.EUR/CAD",EURCHF:"C.EUR/CHF",GBPJPY:"C.GBP/JPY",GBPCHF:"C.GBP/CHF",AUDJPY:"C.AUD/JPY",AUDNZD:"C.AUD/NZD",AUDCAD:"C.AUD/CAD",NZDJPY:"C.NZD/JPY",USDHKD:"C.USD/HKD",USDSGD:"C.USD/SGD",USDTRY:"C.USD/TRY",USDIDR:"C.USD/IDR",USDMXN:"C.USD/MXN",USDZAR:"C.USD/ZAR",GBPAUD:"C.GBP/AUD",GBPCAD:"C.GBP/CAD",GBPNZD:"C.GBP/NZD",EURNZD:"C.EUR/NZD",EURAUD:"C.EUR/AUD",CADCHF:"C.CAD/CHF",CADJPY:"C.CAD/JPY",CHFJPY:"C.CHF/JPY",NZDCAD:"C.NZD/CAD",NZDCHF:"C.NZD/CHF" };
-const MV_TO_SYM = Object.fromEntries(Object.entries(MV_FOREX).map(([k,v])=>[v,k]));
+let MV_BASE_URL = process.env.MASSIVE_WS_URL || "wss://socket.massive.com"; // override via env if different
+// Internal symbol → Massive ticker (dash format)
+const MV_TICKERS = {
+  EURUSD:"EUR-USD",GBPUSD:"GBP-USD",AUDUSD:"AUD-USD",NZDUSD:"NZD-USD",
+  USDCAD:"USD-CAD",USDCHF:"USD-CHF",USDJPY:"USD-JPY",
+  EURGBP:"EUR-GBP",EURJPY:"EUR-JPY",EURCAD:"EUR-CAD",EURCHF:"EUR-CHF",
+  GBPJPY:"GBP-JPY",GBPCHF:"GBP-CHF",AUDJPY:"AUD-JPY",
+  AUDNZD:"AUD-NZD",AUDCAD:"AUD-CAD",NZDJPY:"NZD-JPY",
+  USDHKD:"USD-HKD",USDSGD:"USD-SGD",USDTRY:"USD-TRY",USDIDR:"USD-IDR",
+  USDMXN:"USD-MXN",USDZAR:"USD-ZAR",GBPAUD:"GBP-AUD",GBPCAD:"GBP-CAD",
+  GBPNZD:"GBP-NZD",EURNZD:"EUR-NZD",EURAUD:"EUR-AUD",CADCHF:"CAD-CHF",
+  CADJPY:"CAD-JPY",CHFJPY:"CHF-JPY",NZDCAD:"NZD-CAD",NZDCHF:"NZD-CHF",
+};
+// Reverse: "EUR/USD" → "EURUSD"
+const MV_MSG_TO_SYM = {};
+for (const [sym, tick] of Object.entries(MV_TICKERS)) MV_MSG_TO_SYM[tick.replace("-", "/")] = sym;
+
 function connectMassive() {
   if (!MASSIVE_KEY) return;
   if (mvWs) { try { mvWs.removeAllListeners(); mvWs.terminate(); } catch (_) {} mvWs = null; }
-  // Massive.com uses same WebSocket format as old Polygon.io
-  mvWs = new WebSocket("wss://socket.polygon.io/forex");
-  mvWs.on("open", () => {
-    console.log("[MV] connected");
-    mvWs.send(JSON.stringify({ action: "auth", params: MASSIVE_KEY }));
-  });
+  const tickers = Object.values(MV_TICKERS).join(",");
+  const url = `${MV_BASE_URL}/forex/C?ticker=${encodeURIComponent(tickers)}&apikey=${MASSIVE_KEY}`;
+  mvWs = new WebSocket(url);
+  mvWs.on("open", () => console.log("[MV] connected, streaming", Object.keys(MV_TICKERS).length, "forex pairs"));
   mvWs.on("message", (data) => {
     try {
       const msgs = JSON.parse(data);
       for (const m of (Array.isArray(msgs) ? msgs : [msgs])) {
-        if (m.ev === "authenticated") { mvWs.send(JSON.stringify({ action: "subscribe", params: Object.values(MV_FOREX).join(",") })); console.log("[MV] auth ok, subscribed forex"); }
-        if (m.ev === "C" && m.b && m.a) {
-          const sym = MV_TO_SYM["C." + m.p];
+        if (m.ev === "C" && m.b != null && m.a != null) {
+          const sym = MV_MSG_TO_SYM[m.p];
           if (sym && state[sym]) {
             state[sym].bid = r(parseFloat(m.b), meta[sym] ? meta[sym].digits : 5);
             applyPrice(sym, parseFloat(m.a), "MV");
@@ -372,7 +387,7 @@ function connectMassive() {
       }
     } catch (e) {}
   });
-  mvWs.on("close", () => { recordFeedFailure("MV"); setTimeout(() => { if (MASSIVE_KEY) connectMassive(); }, 5000); });
+  mvWs.on("close", () => { console.log("[MV] closed"); recordFeedFailure("MV"); setTimeout(() => { if (MASSIVE_KEY) connectMassive(); }, 5000); });
   mvWs.on("error", (e) => { console.error("[MV]", e.message); recordFeedFailure("MV"); });
 }
 
