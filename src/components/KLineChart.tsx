@@ -194,6 +194,7 @@ export default function KLineChart({
   const posRef    = useRef(positions);      posRef.current    = positions;
   const symRef    = useRef(symbol);         symRef.current    = symbol;
   const digRef    = useRef(digits);         digRef.current    = digits;
+  const tfRef     = useRef(tf);             tfRef.current     = tf;
   const spRef     = useRef(spreadPips??0);  spRef.current     = spreadPips??0;
   const onSymRef  = useRef(onSymbolChange); onSymRef.current  = onSymbolChange;
   const activeToolRef = useRef<string|null>(null);
@@ -357,8 +358,9 @@ export default function KLineChart({
         },
       });
 
-      const initTf = normTf(tf);
-      chart.setSymbol({ ticker: symbol, pricePrecision: digits, volumePrecision: 0 });
+      // Use refs here — the async import may resolve AFTER symbol/tf props changed
+      const initTf = normTf(tfRef.current ?? tf);
+      chart.setSymbol({ ticker: symRef.current || symbol, pricePrecision: digRef.current ?? digits, volumePrecision: 0 });
       chart.setPeriod(TF_MAP[initTf] ?? { type:"hour", span:1 });
 
       return () => {
@@ -395,10 +397,20 @@ export default function KLineChart({
     } catch {}
   }, [theme]);
 
-  // ── Symbol ────────────────────────────────────────────────────────────────
+  // ── Symbol — retry if chart not ready yet (async import may still be in flight)
   useEffect(() => {
-    const chart = chartRef.current; if (!chart) return;
-    try { chart.setSymbol({ ticker:symbol, pricePrecision:digits, volumePrecision:0 }); } catch {}
+    if (!symbol) return;
+    const apply = () => {
+      const chart = chartRef.current;
+      if (!chart) return false;
+      try { chart.setSymbol({ ticker: symbol, pricePrecision: digits, volumePrecision: 0 }); } catch {}
+      return true;
+    };
+    if (!apply()) {
+      // Chart init is still loading — retry once it's ready
+      const id = setInterval(() => { if (apply()) clearInterval(id); }, 50);
+      return () => clearInterval(id);
+    }
   }, [symbol, digits]);
 
   // ── Timeframe ─────────────────────────────────────────────────────────────
