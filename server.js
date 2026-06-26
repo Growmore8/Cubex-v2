@@ -771,8 +771,10 @@ app.prepare().then(async () => {
   pollPrices();
   pollFinnhubQuotes();              // seed REAL prices for Finnhub-fed symbols (Quote endpoint)
   setTimeout(ensureSeeded, 4000); // after feeds connect, seed anything still unpriced
-  setInterval(pollPrices, 5000);
-  setInterval(pollFinnhubQuotes, 12000); // Quote fallback so prices stay real if the WS is quiet
+  // REST poll is a fallback only — WebSocket handles real-time. Poll slowly to stay under rate limit.
+  // 57 symbols × 1 credit = 57 credits per call. At 60s: 57/min → leaves ~550/min for WS + overhead.
+  setInterval(pollPrices, 60000);
+  setInterval(pollFinnhubQuotes, 30000); // Quote fallback so prices stay real if the WS is quiet
   setInterval(microTick, 140);
   setInterval(() => monitor(io), MONITOR_MS);
   setInterval(() => checkPending(io), 2000);
