@@ -524,8 +524,10 @@ function connectTD() {
   tdWs.on("open", () => { tdWsFail200 = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
   tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits); else state[s].bid = null; applyPrice(s, ask, "TD"); } } } catch (e) {} });
   tdWs.on("close", () => {
-    const delay = tdWsFail200 > 0 ? 30000 : 5000; // back off 30s after errors
+    // Exponential backoff: 5s → 15s → 30s → 60s → 120s to avoid rate-limit 200 responses
+    const delay = tdWsFail200 === 0 ? 5000 : Math.min(120000, 5000 * Math.pow(2, tdWsFail200));
     if (tdWsFail200 < 5) setTimeout(connectTD, delay);
+    else console.warn("[TD] gave up after 5 failures — REST poller covering prices");
   });
   tdWs.on("error", (e) => {
     tdWsFail200++;
