@@ -58,7 +58,7 @@ export default function SAFeeds() {
     <div className="max-w-3xl space-y-4 ui-fade-up">
       <div>
         <h1 className="text-2xl font-bold" style={{ color: "var(--text)" }}>Market Data Feeds</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
+        <p className="text-sm mt-1" style={{ color: "#94a3b8" }}>
           Real-time prices &amp; candles. Primary feed drives the market; others are automatic fallback when primary goes quiet.
         </p>
       </div>
@@ -78,7 +78,7 @@ export default function SAFeeds() {
       {/* Priority cards — click any card to set as primary */}
       <div className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>Priority <span className="font-normal text-xs ml-1" style={{ color: "var(--muted)" }}>— click a card to set as primary</span></span>
+          <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>Priority <span className="font-normal text-xs ml-1" style={{ color: "#94a3b8" }}>— click a card to set as primary</span></span>
         </div>
         <div className="grid grid-cols-3 gap-3">
           {FEEDS.map((f) => {
@@ -101,11 +101,11 @@ export default function SAFeeds() {
                   <span className="rounded-full px-2 py-0.5 text-[10px] font-bold"
                     style={isPrimary
                       ? { background: "rgba(34,197,94,0.2)", color: "#22c55e" }
-                      : { background: "rgba(100,116,139,0.15)", color: "var(--muted)" }}>
+                      : { background: "rgba(100,116,139,0.25)", color: "#94a3b8" }}>
                     {isPrimary ? "PRIMARY" : "FALLBACK"}
                   </span>
                 </div>
-                <div className="text-[11px] mb-2" style={{ color: "var(--muted)" }}>{f.info}</div>
+                <div className="text-[11px] mb-2" style={{ color: "#94a3b8" }}>{f.info}</div>
                 <div className="flex items-center gap-1 text-[11px]" style={{ color: hasKey ? "#22c55e" : "#ef4444" }}>
                   <i className={hasKey ? "fa-solid fa-circle-check" : "fa-solid fa-circle-xmark"} />
                   {hasKey ? "key set" : "no key"}
@@ -121,12 +121,12 @@ export default function SAFeeds() {
         {[
           { label: "Twelve Data API key", hint: "Needs real-time + WebSocket plan. Powers forex, metals, crypto and stocks.", value: tdKey, set: setTdKey, ph: "twelvedata.com key" },
           { label: "Finnhub API key", hint: "Fallback feed. Free tier available at finnhub.io.", value: finnhubKey, set: setFinnhubKey, ph: "finnhub.io key" },
-          { label: "Massive.com API key", hint: "Ex-Polygon.io. Provides real forex bid/ask via WebSocket. Enter your Access Key ID.", value: massiveKey, set: setMassiveKey, ph: "massive.com access key" },
+          { label: "Massive.com Access Key ID", hint: "Ex-Polygon.io. Provides real forex bid/ask via WebSocket.", value: massiveKey, set: setMassiveKey, ph: "massive.com access key ID" },
         ].map(({ label, hint, value, set, ph }) => (
           <div key={label}>
             <div className="mb-1 text-xs font-medium" style={{ color: "var(--text)" }}>{label}</div>
             <PasswordInput className={inp} placeholder={ph} value={value} onChange={(e: any) => set(e.target.value)} />
-            <div className="mt-1 text-[11px]" style={{ color: "var(--muted)" }}>{hint}</div>
+            <div className="mt-1 text-[11px]" style={{ color: "#94a3b8" }}>{hint}</div>
           </div>
         ))}
         <button
@@ -140,10 +140,10 @@ export default function SAFeeds() {
       </div>
 
       {/* Auto-failover info */}
-      <div className="rounded-xl border p-4 text-[12px] space-y-1" style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--muted)" }}>
-        <div className="font-semibold" style={{ color: "var(--text)" }}>Auto-failover</div>
-        <div>If the primary feed fails 5 consecutive times, the server automatically switches to the next available feed and sends an alert here in real-time.</div>
-        <div className="mt-1">Saving applies instantly — the price engine reconnects with the new keys. Keys are stored in your database, never in the code.</div>
+      <div className="rounded-xl border p-4 text-[12px] space-y-1" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+        <div className="font-semibold mb-1" style={{ color: "var(--text)" }}>Auto-failover</div>
+        <div style={{ color: "#94a3b8" }}>If the primary feed fails 5 consecutive times, the server automatically switches to the next available feed and sends an alert here in real-time.</div>
+        <div className="mt-1" style={{ color: "#94a3b8" }}>Saving applies instantly — the price engine reconnects with the new keys. Keys are stored in your database, never in the code.</div>
       </div>
     </div>
   );
