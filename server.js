@@ -112,9 +112,10 @@ function logFeedError(category, provider, errorType, message) {
 function recordFeedFailure(feed) {
   if (feed !== PRIMARY) return;
   primaryFailCount++;
-  // If admin manually pinned a primary, never auto-failover away from it
-  if (manualPrimaryOverride) return;
-  if (primaryFailCount >= PRIMARY_FAIL_THRESHOLD) {
+  // Manual primary = admin preference. Block normal failover (10 failures).
+  // But if truly dead (30+ failures = extended outage), still emergency-failover.
+  const threshold = manualPrimaryOverride ? 30 : PRIMARY_FAIL_THRESHOLD;
+  if (primaryFailCount >= threshold) {
     let next = "FH";
     if (PRIMARY === "TD" && FINNHUB_KEY) next = "FH";
     else if (PRIMARY === "TD" && !FINNHUB_KEY && MASSIVE_KEY) next = "MV";
@@ -124,9 +125,12 @@ function recordFeedFailure(feed) {
     else next = FINNHUB_KEY ? "FH" : (TD_KEY ? "TD" : PRIMARY);
     if (next === PRIMARY) { primaryFailCount = 0; return; }
     const prev = PRIMARY;
-    console.warn(`[feed] AUTO-FAILOVER: ${prev} failed ${primaryFailCount}x → switching to ${next}`);
+    const reason = manualPrimaryOverride
+      ? `${prev} manually pinned but failed ${threshold}x (extended outage) → emergency failover`
+      : `${prev} failed ${threshold}x consecutively`;
+    console.warn(`[feed] AUTO-FAILOVER: ${reason}`);
     setPrimary(next); primaryFailCount = 0;
-    prisma.feedFailoverLog.create({ data: { fromFeed: prev, toFeed: next, reason: `${prev} failed ${PRIMARY_FAIL_THRESHOLD}x consecutively` } }).catch(() => {});
+    prisma.feedFailoverLog.create({ data: { fromFeed: prev, toFeed: next, reason } }).catch(() => {});
     if (global.__io) global.__io.emit("feed-failover", { from: prev, to: next, ts: Date.now() });
   }
 }
