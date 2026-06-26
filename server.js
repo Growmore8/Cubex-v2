@@ -91,16 +91,16 @@ let CRYPTO_FEED = "BN";   // BN | KR | TD | FH
 let FOREX_FEED  = "TD";   // KR | TD | MV | FH
 let COMM_FEED   = "TD";   // KR | TD  (commodities = metals + energy)
 let IDX_FEED    = "TD";   // TD | FH  (indices)
-// Legacy PRIMARY kept for auto-failover fallback logic
+// TD is always the intended primary. FH/MV are secondary fallbacks only.
+// When TD fails → switch to FH. Background probe tests TD every 2 min → auto-return when TD recovers.
 let PRIMARY = "TD";
-let manualPrimaryOverride = null; // set by SuperAdmin → blocks auto-failover
+let manualPrimaryOverride = null; // set by SuperAdmin card click
 let primaryFailCount = 0;
-const PRIMARY_FAIL_THRESHOLD = 10; // increased: TD reconnects count as failures, need higher bar
-// Expose current runtime primary to Next.js API routes (same process via custom server)
+let tdRecoveryTimer = null; // background probe: tests TD WebSocket, returns when healthy
+const PRIMARY_FAIL_THRESHOLD = 10;
 global.__PRIMARY = PRIMARY;
 function setPrimary(feed) { PRIMARY = feed; global.__PRIMARY = feed; }
-// Call this whenever a feed successfully delivers a price — resets failover counter
-function recordFeedSuccess(feed) { if (feed === PRIMARY) primaryFailCount = 0; }
+function recordFeedSuccess(feed) { if (feed === PRIMARY) { primaryFailCount = 0; } }
 
 // Persist an error event to DB and emit via socket
 function logFeedError(category, provider, errorType, message) {
@@ -109,29 +109,45 @@ function logFeedError(category, provider, errorType, message) {
   if (global.__io) global.__io.emit("feed-error", { category, provider, errorType, message, ts: Date.now() });
 }
 
+// Background probe: try a TD WebSocket handshake. If it succeeds → TD is back → restore it as primary.
+function startTdRecoveryProbe() {
+  if (tdRecoveryTimer) return; // already probing
+  if (!TD_KEY) return;
+  console.log("[TD] starting recovery probe every 2min...");
+  tdRecoveryTimer = setInterval(() => {
+    if (PRIMARY === "TD") { clearInterval(tdRecoveryTimer); tdRecoveryTimer = null; return; } // already recovered
+    const ws = new (require("ws"))("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY, { headers: { "Origin": "https://twelvedata.com" } });
+    let resolved = false;
+    const done = (ok) => { if (resolved) return; resolved = true; try { ws.removeAllListeners(); ws.terminate(); } catch {} if (ok) {
+      console.log("[TD] recovery probe succeeded → restoring TD as primary");
+      clearInterval(tdRecoveryTimer); tdRecoveryTimer = null;
+      const prev = PRIMARY; setPrimary("TD"); primaryFailCount = 0; tdWsFail200 = 0;
+      prisma.feedFailoverLog.create({ data: { fromFeed: prev, toFeed: "TD", reason: "TD recovered — auto-restored from recovery probe" } }).catch(() => {});
+      if (global.__io) global.__io.emit("feed-failover", { from: prev, to: "TD", ts: Date.now() });
+      connectTD(); // reconnect TD WebSocket
+    }};
+    const t = setTimeout(() => done(false), 8000);
+    ws.on("open", () => { clearTimeout(t); done(true); });
+    ws.on("error", () => { clearTimeout(t); done(false); });
+  }, 2 * 60 * 1000); // probe every 2 minutes
+}
+
 function recordFeedFailure(feed) {
   if (feed !== PRIMARY) return;
   primaryFailCount++;
-  // Manual primary = admin preference. Block normal failover (10 failures).
-  // But if truly dead (30+ failures = extended outage), still emergency-failover.
   const threshold = manualPrimaryOverride ? 30 : PRIMARY_FAIL_THRESHOLD;
   if (primaryFailCount >= threshold) {
-    let next = "FH";
-    if (PRIMARY === "TD" && FINNHUB_KEY) next = "FH";
-    else if (PRIMARY === "TD" && !FINNHUB_KEY && MASSIVE_KEY) next = "MV";
-    else if (PRIMARY === "MV" && TD_KEY) next = "TD";
-    else if (PRIMARY === "MV" && !TD_KEY && FINNHUB_KEY) next = "FH";
-    else if (PRIMARY === "FH" && TD_KEY) next = "TD";
-    else next = FINNHUB_KEY ? "FH" : (TD_KEY ? "TD" : PRIMARY);
+    // Always prefer FH as fallback; fall back to MV if no FH key
+    const next = FINNHUB_KEY ? "FH" : (MASSIVE_KEY ? "MV" : PRIMARY);
     if (next === PRIMARY) { primaryFailCount = 0; return; }
     const prev = PRIMARY;
-    const reason = manualPrimaryOverride
-      ? `${prev} manually pinned but failed ${threshold}x (extended outage) → emergency failover`
-      : `${prev} failed ${threshold}x consecutively`;
-    console.warn(`[feed] AUTO-FAILOVER: ${reason}`);
+    const reason = `${prev} failed ${primaryFailCount}x → switching to ${next} (will auto-restore when ${prev} recovers)`;
+    console.warn("[feed] AUTO-FAILOVER:", reason);
     setPrimary(next); primaryFailCount = 0;
     prisma.feedFailoverLog.create({ data: { fromFeed: prev, toFeed: next, reason } }).catch(() => {});
     if (global.__io) global.__io.emit("feed-failover", { from: prev, to: next, ts: Date.now() });
+    // If TD was primary → start background probe to auto-restore when TD comes back
+    if (prev === "TD") startTdRecoveryProbe();
   }
 }
 
@@ -178,9 +194,10 @@ async function loadFeedConfig() {
     if (["TD","FH","MV","BN","KR"].includes(v.manualPrimary)) {
       manualPrimaryOverride = v.manualPrimary;
       setPrimary(v.manualPrimary);
-      primaryFailCount = 0; // clear any accumulated failures when admin pins a feed
+      primaryFailCount = 0;
     } else {
       manualPrimaryOverride = null;
+      // TD is always preferred primary — FH/MV are secondary only
       setPrimary(TD_KEY ? "TD" : (FINNHUB_KEY ? "FH" : PRIMARY));
     }
   } catch (e) { console.error("[feed] config load failed:", e.message); }
