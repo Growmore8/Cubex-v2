@@ -9,10 +9,9 @@ import { SymIcon } from "@/lib/symIcon";
 import { iconForNotification } from "@/lib/notif";
 import { COUNTRIES } from "@/config/countries";
 
-// Use LWChart (lightweight-charts) for mobile — it has proven touch/pointer event
-// handling on iOS and Android Chrome PWA. KLineProChart (klinecharts-pro v0.1.1)
-// does not reliably intercept touch events on mobile despite CSS touch-action:none.
-const MobileChart = dynamic(() => import("@/components/LWChart").then((m) => ({ default: m.default })), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">Loading chart…</div> });
+// KLineChart v10 — sets touch-action:none before init(), which is the correct
+// mobile fix. Testing on iOS/Android to confirm scroll/pan works.
+const MobileChart = dynamic(() => import("@/components/KLineChart"), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">Loading chart…</div> });
 
 const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD@tv-basicstudies"], ["Stoch", "Stochastic@tv-basicstudies"], ["BBands", "BB@tv-basicstudies"], ["MA", "MASimple@tv-basicstudies"], ["ROC", "ROC@tv-basicstudies"]];
 
@@ -780,14 +779,13 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               </>
             )}
-            {/* Preview chart — LWChart (lightweight-charts has native mobile touch support) */}
+            {/* Preview chart — KLineChart v10 (touch-action:none before init) */}
             <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
-              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={false} spreadPips={_mobSpreadPips(selSym)}
+              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showToolbar={false} spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]}
-                calcPnl={(p: any, price: number) => pnlOf(p, price, csz(selSym))} />
+                ]} />
             </div>
             <div className="glass flex items-stretch gap-1.5 border-t border-[var(--border)] p-2.5" style={{ background: theme === "dark" ? "rgba(20,24,34,0.6)" : "rgba(255,255,255,0.6)" }}>
               <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, boxShadow: `0 8px 18px -8px ${SELLBTN}`, touchAction: "manipulation" }}>
@@ -816,12 +814,11 @@ export default function ClientMobile({ t }: { t: any }) {
               </button>
             </div>
             <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
-              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showTools={true} spreadPips={_mobSpreadPips(selSym)}
+              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} showToolbar={true} spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]}
-                calcPnl={(p: any, price: number) => pnlOf(p, price, csz(selSym))} />
+                ]} />
             </div>
           </div>
         )}
