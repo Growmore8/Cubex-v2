@@ -93,11 +93,14 @@ let COMM_FEED   = "TD";   // KR | TD  (commodities = metals + energy)
 let IDX_FEED    = "TD";   // TD | FH  (indices)
 // Legacy PRIMARY kept for auto-failover fallback logic
 let PRIMARY = "TD";
+let manualPrimaryOverride = null; // set by SuperAdmin → blocks auto-failover
 let primaryFailCount = 0;
-const PRIMARY_FAIL_THRESHOLD = 5;
+const PRIMARY_FAIL_THRESHOLD = 10; // increased: TD reconnects count as failures, need higher bar
 // Expose current runtime primary to Next.js API routes (same process via custom server)
 global.__PRIMARY = PRIMARY;
 function setPrimary(feed) { PRIMARY = feed; global.__PRIMARY = feed; }
+// Call this whenever a feed successfully delivers a price — resets failover counter
+function recordFeedSuccess(feed) { if (feed === PRIMARY) primaryFailCount = 0; }
 
 // Persist an error event to DB and emit via socket
 function logFeedError(category, provider, errorType, message) {
@@ -109,17 +112,17 @@ function logFeedError(category, provider, errorType, message) {
 function recordFeedFailure(feed) {
   if (feed !== PRIMARY) return;
   primaryFailCount++;
+  // If admin manually pinned a primary, never auto-failover away from it
+  if (manualPrimaryOverride) return;
   if (primaryFailCount >= PRIMARY_FAIL_THRESHOLD) {
-    // Pick next: prefer FH (free, stable) over MV (paid, may have bad key)
-    // Never bounce back to MV if it already failed — use FH as stable fallback
     let next = "FH";
     if (PRIMARY === "TD" && FINNHUB_KEY) next = "FH";
     else if (PRIMARY === "TD" && !FINNHUB_KEY && MASSIVE_KEY) next = "MV";
     else if (PRIMARY === "MV" && TD_KEY) next = "TD";
     else if (PRIMARY === "MV" && !TD_KEY && FINNHUB_KEY) next = "FH";
     else if (PRIMARY === "FH" && TD_KEY) next = "TD";
-    else next = FINNHUB_KEY ? "FH" : (TD_KEY ? "TD" : PRIMARY); // stay if nothing better
-    if (next === PRIMARY) { primaryFailCount = 0; return; } // nothing to switch to
+    else next = FINNHUB_KEY ? "FH" : (TD_KEY ? "TD" : PRIMARY);
+    if (next === PRIMARY) { primaryFailCount = 0; return; }
     const prev = PRIMARY;
     console.warn(`[feed] AUTO-FAILOVER: ${prev} failed ${primaryFailCount}x → switching to ${next}`);
     setPrimary(next); primaryFailCount = 0;
@@ -169,8 +172,11 @@ async function loadFeedConfig() {
     if (["TD","FH"].includes(v.idxFeed))                IDX_FEED    = v.idxFeed;
     // Manual primary override (saved by SuperAdmin) or auto-pick best available
     if (["TD","FH","MV","BN","KR"].includes(v.manualPrimary)) {
+      manualPrimaryOverride = v.manualPrimary;
       setPrimary(v.manualPrimary);
+      primaryFailCount = 0; // clear any accumulated failures when admin pins a feed
     } else {
+      manualPrimaryOverride = null;
       setPrimary(TD_KEY ? "TD" : (FINNHUB_KEY ? "FH" : PRIMARY));
     }
   } catch (e) { console.error("[feed] config load failed:", e.message); }
@@ -529,8 +535,8 @@ function connectTD() {
   // Close previous connection before creating a new one to avoid exhausting the 3-connection limit
   if (tdWs) { try { tdWs.removeAllListeners(); tdWs.terminate(); } catch (_) {} tdWs = null; }
   tdWs = new WebSocket("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY, { headers: { "Origin": "https://twelvedata.com" } });
-  tdWs.on("open", () => { tdWsFail200 = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
-  tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits); else state[s].bid = null; applyPrice(s, ask, "TD"); } } } catch (e) {} });
+  tdWs.on("open", () => { tdWsFail200 = 0; primaryFailCount = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
+  tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits); else state[s].bid = null; applyPrice(s, ask, "TD"); recordFeedSuccess("TD"); } } } catch (e) {} });
   tdWs.on("close", () => {
     // Exponential backoff: 5s → 15s → 30s → 60s → 120s to avoid rate-limit 200 responses
     const delay = tdWsFail200 === 0 ? 5000 : Math.min(120000, 5000 * Math.pow(2, tdWsFail200));
