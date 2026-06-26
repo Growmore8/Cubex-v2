@@ -1010,7 +1010,7 @@ export default function AdminDeskPage() {
             <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile}
               disabledSyms={symPerm?.disabled || []}
               onCategoryEdit={(cat, syms) => { const first = syms[0]; setCatEdit({ cat, syms, spread: adminSymSpreads[first] ?? 0, spreadType: adminSymTypes[first] ?? "FIXED", spreadMax: adminSymMax[first] ?? 0 }); }}
-              symbolSpreads={adminSymSpreads} groupSpread={0} />
+              symbolSpreads={adminSymSpreads} symbolTypes={adminSymTypes} groupSpread={0} />
           </aside>
         </>)}
       </div>

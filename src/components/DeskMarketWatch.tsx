@@ -11,13 +11,14 @@ const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "
 
 // Self-contained market watch with its OWN socket + price state, so it ticks
 // pip-by-pip independently of the (heavy) desk re-render — as smooth as the client.
-function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit, symbolSpreads, groupSpread }: {
+function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit, symbolSpreads, symbolTypes, groupSpread }: {
   symbols: Sym[];
   selSym?: string;
   onPick: (sym: string) => void;
   disabledSyms?: string[];
   onCategoryEdit?: (cat: string, syms: string[]) => void;
   symbolSpreads?: Record<string, { min: number; max: number; type: string } | number>;
+  symbolTypes?: Record<string, string>;
   groupSpread?: number;
 }) {
   const [prices, setPrices] = useState<Record<string, number>>({});
@@ -113,7 +114,12 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                   <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} /><span className="truncate">{s.symbol}</span>{isOff && <span className="text-[8px] rounded px-1" style={{ background: "rgba(224,82,96,0.18)", color: "#ef5350" }}>OFF</span>}</span>
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
-                  <span className="flex items-center justify-end pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}</span>
+                  <span className="flex items-center justify-end pr-1 gap-0.5">
+                    {symbolTypes?.[s.symbol] === "FLOATING"
+                      ? <span style={{ color: "#22c55e", fontSize: 8, fontWeight: 600 }}>~</span>
+                      : null}
+                    <span className="tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}</span>
+                  </span>
                 </div>);
             })}
           </div>
