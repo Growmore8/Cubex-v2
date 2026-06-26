@@ -384,7 +384,16 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
 
   // Bid/Ask price lines — live socket listener updates them on every tick.
   useEffect(() => {
-    bidAskIds.current = { bid: null, ask: null }; // reset stale IDs when symbol changes
+    // Clean up any overlays from a previous effect run before resetting IDs
+    (async () => {
+      const core = await getCore();
+      if (core) {
+        if (bidAskIds.current.bid) try { core.removeOverlay(bidAskIds.current.bid); } catch {}
+        if (bidAskIds.current.ask) try { core.removeOverlay(bidAskIds.current.ask); } catch {}
+      }
+    })();
+    bidAskIds.current = { bid: null, ask: null };
+
     const sock: any = io({ path: "/socket.io" });
     const symRef = { current: symbol };
     let lastRealBid: number | null = null;
@@ -400,8 +409,20 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       try { const dl = core.getDataList?.() || []; if (dl.length) ts = dl[dl.length - 1].timestamp; } catch {}
       const upsert = (ref: "bid" | "ask", price: number, color: string, label: string) => {
         const id = bidAskIds.current[ref];
-        if (id) { try { core.overrideOverlay({ id, points: [{ timestamp: ts, value: price }], extendData: { color, text: label } }); return; } catch {} }
-        try { const newId = core.createOverlay({ name: "cubexLevel", points: [{ timestamp: ts, value: price }], lock: true, extendData: { color, text: label } }); if (typeof newId === "string") bidAskIds.current[ref] = newId; } catch {}
+        if (id) {
+          try {
+            core.overrideOverlay({ id, points: [{ timestamp: ts, value: price }], extendData: { color, text: label } });
+            return; // updated in place — done
+          } catch {
+            // stale ID — remove the ghost overlay then fall through to create fresh
+            try { core.removeOverlay(id); } catch {}
+            bidAskIds.current[ref] = null;
+          }
+        }
+        try {
+          const newId = core.createOverlay({ name: "cubexLevel", points: [{ timestamp: ts, value: price }], lock: true, extendData: { color, text: label } });
+          if (typeof newId === "string") bidAskIds.current[ref] = newId;
+        } catch {}
       };
       upsert("ask", ask, "#26a69a", `Ask ${ask.toFixed(digits)}`);
       upsert("bid", bid, "#ef5350", `Bid ${bid.toFixed(digits)}`);
