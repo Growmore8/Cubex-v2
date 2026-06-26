@@ -50,12 +50,25 @@ function RegisterForm() {
   const [googleOn, setGoogleOn] = useState(false);
   useEffect(() => { fetch("/api/public/brand").then((r) => r.json()).then((d) => { if (d.ok) setGoogleOn(!!d.googleEnabled); }).catch(() => {}); }, []);
 
-  // Email verification state
-  const [verifyEmail, setVerifyEmail] = useState("");
+  // Email verification state — persisted to sessionStorage so page refresh doesn't close the OTP screen
+  const [verifyEmail, setVerifyEmailState] = useState("");
   const [verifyCode, setVerifyCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verifyErr, setVerifyErr] = useState("");
-  const [resendIn, setResendIn] = useState(0); // resend OTP cooldown (seconds)
+  const [resendIn, setResendIn] = useState(0);
+
+  // Restore pending verification from sessionStorage on mount (handles mobile tab-switch/page refresh)
+  useEffect(() => {
+    const saved = sessionStorage.getItem("reg_verify_email");
+    if (saved) { setVerifyEmailState(saved); setEmail(saved); setResendIn(0); }
+  }, []);
+
+  function setVerifyEmail(email: string) {
+    setVerifyEmailState(email);
+    if (email) sessionStorage.setItem("reg_verify_email", email);
+    else sessionStorage.removeItem("reg_verify_email");
+  }
+
   useEffect(() => {
     if (resendIn <= 0) return;
     const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
@@ -101,6 +114,7 @@ function RegisterForm() {
     const d = await r.json();
     setVerifying(false);
     if (!d.ok) { setVerifyErr(d.error || "Verification failed"); return; }
+    sessionStorage.removeItem("reg_verify_email");
     window.location.href = d.redirect;
   }
 
@@ -148,6 +162,12 @@ function RegisterForm() {
         Didn&apos;t receive the code?{" "}
         <button type="button" onClick={resendCode} disabled={resendIn > 0} className="font-semibold hover:underline disabled:no-underline disabled:opacity-60" style={{ color: "var(--brand-primary)" }}>
           {resendIn > 0 ? `Resend in ${Math.floor(resendIn / 60)}:${String(resendIn % 60).padStart(2, "0")}` : "Resend"}
+        </button>
+      </p>
+      <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
+        Wrong email?{" "}
+        <button type="button" onClick={() => { sessionStorage.removeItem("reg_verify_email"); setVerifyEmail(""); setVerifyCode(""); setVerifyErr(""); }} className="font-semibold hover:underline" style={{ color: "var(--muted-foreground)" }}>
+          Start over
         </button>
       </p>
     </form>
