@@ -18,8 +18,8 @@ const CAT_FEEDS: Record<string, { key: string; name: string; free: boolean; hasB
     { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "Price only · key required" },
   ],
   commodities: [
-    { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Metals + energy · key required" },
     { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · gold & silver only" },
+    { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Metals + energy · key required" },
   ],
   indices: [
     { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "All major indices · key required" },
@@ -54,9 +54,19 @@ function getApiKey(feedKey: string, keys: Record<string, string>) {
   return "";
 }
 
+// Primary feed provider cards
+const PRIMARY_CARDS = [
+  { key: "BN", name: "Binance",     icon: "fa-brands fa-btc",      color: "#f59e0b", free: true,  desc: "Crypto bid/ask" },
+  { key: "KR", name: "Kraken",      icon: "fa-solid fa-anchor",    color: "#6366f1", free: true,  desc: "Forex + crypto bid/ask" },
+  { key: "TD", name: "TwelveData",  icon: "fa-solid fa-database",  color: "#3b82f6", free: false, desc: "Forex/indices/metals" },
+  { key: "FH", name: "Finnhub",     icon: "fa-solid fa-satellite-dish", color: "#22c55e", free: false, desc: "Stocks/forex/crypto" },
+  { key: "MV", name: "Massive",     icon: "fa-solid fa-bolt",      color: "#ec4899", free: false, desc: "Forex real bid/ask" },
+];
+
 export default function SAFeeds() {
   const [keys, setKeys] = useState({ tdKey: "", finnhubKey: "", massiveKey: "" });
-  const [feeds, setFeeds] = useState({ cryptoFeed: "BN", forexFeed: "TD", commFeed: "TD", idxFeed: "TD" });
+  const [feeds, setFeeds] = useState({ cryptoFeed: "BN", forexFeed: "KR", commFeed: "KR", idxFeed: "TD" });
+  const [primary, setPrimaryState] = useState("TD");
   const [err,  setErr]  = useState("");
   const [msg,  setMsg]  = useState("");
   const [loading, setLoading] = useState(true);
@@ -70,6 +80,7 @@ export default function SAFeeds() {
       if (d.ok && d.feeds) {
         setKeys({ tdKey: d.feeds.tdKey || "", finnhubKey: d.feeds.finnhubKey || "", massiveKey: d.feeds.massiveKey || "" });
         setFeeds({ cryptoFeed: d.feeds.cryptoFeed || "BN", forexFeed: d.feeds.forexFeed || "TD", commFeed: d.feeds.commFeed || "TD", idxFeed: d.feeds.idxFeed || "TD" });
+        if (d.feeds.currentPrimary) setPrimaryState(d.feeds.currentPrimary);
       }
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -84,6 +95,7 @@ export default function SAFeeds() {
 
     const sock = io({ path: "/socket.io" });
     sock.on("feed-failover", (data: any) => {
+      setPrimaryState(data.to);
       setFailoverLog((prev) => [{ from: data.from, to: data.to, ts: data.ts }, ...prev].slice(0, 50));
     });
     sock.on("feed-error", (data: any) => {
@@ -127,6 +139,15 @@ export default function SAFeeds() {
     setTimeout(() => setMsg(""), 3000);
   }
 
+  async function setManualPrimary(feedKey: string) {
+    setPrimaryState(feedKey);
+    await fetch("/api/superadmin/feeds", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ manualPrimary: feedKey }),
+    });
+  }
+
   function changeFeed(catKey: string, feedKey: string) {
     setFeeds((p) => ({ ...p, [catKey]: feedKey }));
     setTestStatus((p) => ({ ...p, [catKey]: { status: "idle" } }));
@@ -150,6 +171,47 @@ export default function SAFeeds() {
 
         {/* ── LEFT ── */}
         <div className="flex-1 min-w-0 space-y-4">
+
+          {/* Primary feed cards */}
+          <div className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>Active Primary Feed</div>
+              <div className="text-[11px]" style={{ color: "#94a3b8" }}>Click a card to switch manually</div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {PRIMARY_CARDS.map((card) => {
+                const isActive = primary === card.key;
+                const hasKey = card.key === "BN" || card.key === "KR"
+                  || (card.key === "TD" && keys.tdKey)
+                  || (card.key === "FH" && keys.finnhubKey)
+                  || (card.key === "MV" && keys.massiveKey);
+                return (
+                  <button
+                    key={card.key}
+                    onClick={() => hasKey && setManualPrimary(card.key)}
+                    title={!hasKey ? "API key required" : `Set ${card.name} as primary`}
+                    className="flex-1 min-w-[100px] rounded-xl border p-3 text-left transition-all"
+                    style={{
+                      background: isActive ? `${card.color}18` : "var(--bg)",
+                      borderColor: isActive ? card.color : "var(--border)",
+                      opacity: hasKey ? 1 : 0.45,
+                      cursor: hasKey ? "pointer" : "not-allowed",
+                      boxShadow: isActive ? `0 0 0 1px ${card.color}55` : "none",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <i className={card.icon + " text-sm"} style={{ color: card.color }} />
+                      <span className="text-xs font-bold" style={{ color: isActive ? card.color : "var(--text)" }}>{card.name}</span>
+                      {isActive && <span className="ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: card.color, color: "#fff" }}>LIVE</span>}
+                    </div>
+                    <div className="text-[10px]" style={{ color: "#94a3b8" }}>{card.desc}</div>
+                    {!hasKey && <div className="text-[10px] mt-0.5" style={{ color: "#f97316" }}>⚠ key needed</div>}
+                    {card.key === "MV" && !keys.massiveKey && <div className="text-[10px] mt-0.5" style={{ color: "#94a3b8" }}>$49/mo plan</div>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Category feed rows */}
           <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>

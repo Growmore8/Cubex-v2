@@ -95,6 +95,9 @@ let IDX_FEED    = "TD";   // TD | FH  (indices)
 let PRIMARY = "TD";
 let primaryFailCount = 0;
 const PRIMARY_FAIL_THRESHOLD = 5;
+// Expose current runtime primary to Next.js API routes (same process via custom server)
+global.__PRIMARY = PRIMARY;
+function setPrimary(feed) { PRIMARY = feed; global.__PRIMARY = feed; }
 
 // Persist an error event to DB and emit via socket
 function logFeedError(category, provider, errorType, message) {
@@ -119,7 +122,7 @@ function recordFeedFailure(feed) {
     if (next === PRIMARY) { primaryFailCount = 0; return; } // nothing to switch to
     const prev = PRIMARY;
     console.warn(`[feed] AUTO-FAILOVER: ${prev} failed ${primaryFailCount}x → switching to ${next}`);
-    PRIMARY = next; primaryFailCount = 0;
+    setPrimary(next); primaryFailCount = 0;
     prisma.feedFailoverLog.create({ data: { fromFeed: prev, toFeed: next, reason: `${prev} failed ${PRIMARY_FAIL_THRESHOLD}x consecutively` } }).catch(() => {});
     if (global.__io) global.__io.emit("feed-failover", { from: prev, to: next, ts: Date.now() });
   }
@@ -164,8 +167,12 @@ async function loadFeedConfig() {
     if (["KR","TD","MV","FH"].includes(v.forexFeed))   FOREX_FEED  = v.forexFeed;
     if (["KR","TD"].includes(v.commFeed))               COMM_FEED   = v.commFeed;
     if (["TD","FH"].includes(v.idxFeed))                IDX_FEED    = v.idxFeed;
-    // Legacy PRIMARY for auto-failover
-    PRIMARY = TD_KEY ? "TD" : (FINNHUB_KEY ? "FH" : PRIMARY);
+    // Manual primary override (saved by SuperAdmin) or auto-pick best available
+    if (["TD","FH","MV","BN","KR"].includes(v.manualPrimary)) {
+      setPrimary(v.manualPrimary);
+    } else {
+      setPrimary(TD_KEY ? "TD" : (FINNHUB_KEY ? "FH" : PRIMARY));
+    }
   } catch (e) { console.error("[feed] config load failed:", e.message); }
   recomputeExact();
   console.log("[feed] config:", { td: !!TD_KEY, fh: !!FINNHUB_KEY, mv: !!MASSIVE_KEY, crypto: CRYPTO_FEED, forex: FOREX_FEED, comm: COMM_FEED, idx: IDX_FEED });

@@ -33,8 +33,10 @@ const DIGITS_FIX: Record<string, number> = {
 
 /**
  * Seed realistic spread defaults for a tenant.
- * @param overwrite - false (default): only creates missing symbols, never touches manually set ones.
- *                   true: force-resets ALL symbols to defaults (used by "Realistic defaults" button).
+ * overwrite=false (default): creates missing symbols; also updates existing ones where spread=0
+ *   (spread=0 means "never set by admin" — auto-fill with realistic default).
+ *   Symbols with spread > 0 that admin set manually are NEVER touched.
+ * overwrite=true: force-resets ALL symbols (used by admin "Realistic defaults" button).
  */
 export async function seedDefaultSpreads(tenantId: string, overwrite = false): Promise<number> {
   const globals = await prisma.globalSymbol.findMany({ where: { enabled: true } });
@@ -49,23 +51,36 @@ export async function seedDefaultSpreads(tenantId: string, overwrite = false): P
     const spread = SPREADS[g.symbol] ?? null;
     if (spread === null) return;
     const digits = DIGITS_FIX[g.symbol] ?? g.digits ?? 5;
-    await prisma.symbol.upsert({
+
+    const existing = await prisma.symbol.findUnique({
       where: { tenantId_symbol: { tenantId, symbol: g.symbol } },
-      create: {
-        tenantId,
-        symbol: g.symbol,
-        display: g.display || g.symbol,
-        category: g.category || "forex",
-        digits,
-        feed: (g as any).feed || null,
-        spread,
-        spreadType: "FIXED",
-        spreadMax: 0,
-      },
-      // overwrite=true → reset to defaults; overwrite=false → skip if already set manually
-      update: overwrite ? { spread, spreadType: "FIXED", spreadMax: 0, digits } : {},
     });
-    count++;
+
+    if (!existing) {
+      // Never existed — create with defaults
+      await prisma.symbol.create({
+        data: {
+          tenantId,
+          symbol: g.symbol,
+          display: g.display || g.symbol,
+          category: g.category || "forex",
+          digits,
+          feed: (g as any).feed || null,
+          spread,
+          spreadType: "FIXED",
+          spreadMax: 0,
+        },
+      });
+      count++;
+    } else if (overwrite || Number(existing.spread) === 0) {
+      // Force reset (button) OR spread is 0 = admin never set it manually → apply default
+      await prisma.symbol.update({
+        where: { tenantId_symbol: { tenantId, symbol: g.symbol } },
+        data: { spread, spreadType: "FIXED", spreadMax: 0, digits },
+      });
+      count++;
+    }
+    // else: spread > 0 and overwrite=false → admin set this manually, leave it alone
   }));
 
   return count;
