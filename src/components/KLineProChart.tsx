@@ -451,7 +451,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       };
       // Show ask line above the chart when spread > 0; hide when zero spread
       if (spPx > Math.pow(10, -(digits)) * 0.5) {
-        upsert("ask", ask, "#26a69a", `Ask ${ask.toFixed(digits)}`);
+        upsert("ask", ask, "#2196F3", `Ask ${ask.toFixed(digits)}`);
       } else {
         const askId = bidAskIds.current.ask;
         if (askId) { try { core.removeOverlay(askId); } catch {} bidAskIds.current.ask = null; }

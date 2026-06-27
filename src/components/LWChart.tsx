@@ -300,7 +300,7 @@ function LWChart({
     chartRef.current = chart;
     seriesRef.current = series;
     // Bid / Ask price lines (MT5 style) — created once, updated on each tick via ref
-    askLineRef.current = series.createPriceLine({ price: 0, color: "#26a69a", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "Ask" });
+    askLineRef.current = series.createPriceLine({ price: 0, color: "#2196F3", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "Ask" });
     bidLineRef.current = series.createPriceLine({ price: 0, color: "#ef5350", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "Bid" });
     // a recreated chart loses prior drawings/indicators — drop the stale refs
     hlineRefs.current = []; trendRefs.current = []; smaRef.current = null; emaRef.current = null; psarRef.current = null; markersRef.current = null; sigMarkersRef.current = null; ribbonRefs.current = []; trendStart.current = null;
@@ -669,7 +669,7 @@ function LWChart({
         const spPx = spreadPipsRef.current * Math.pow(10, -(digits - 1));
         try {
           askLineRef.current?.applyOptions(spPx > 0
-            ? { price: close + spPx, color: "#26a69a", axisLabelVisible: true }
+            ? { price: close + spPx, color: "#2196F3", axisLabelVisible: true }
             : { price: close, color: "transparent", axisLabelVisible: false });
           bidLineRef.current?.applyOptions({ price: close, color: "transparent", axisLabelVisible: false });
         } catch {}

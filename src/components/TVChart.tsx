@@ -262,7 +262,7 @@ export default function TVChart({symbol,tf,theme,digits=5,positions,spreadPips,s
     const vol=chart.addSeries(HistogramSeries,{priceFormat:{type:"volume"},priceScaleId:"vol"});
     chart.priceScale("vol").applyOptions({scaleMargins:{top:0.85,bottom:0},borderVisible:false});
     volRef.current=vol;
-    askLineRef.current=ser.createPriceLine({price:0,color:UP,lineWidth:1,lineStyle:LineStyle.Dashed,axisLabelVisible:true,title:"Ask"});
+    askLineRef.current=ser.createPriceLine({price:0,color:"#2196F3",lineWidth:1,lineStyle:LineStyle.Dashed,axisLabelVisible:true,title:"Ask"});
     bidLineRef.current=ser.createPriceLine({price:0,color:DN,lineWidth:1,lineStyle:LineStyle.Dashed,axisLabelVisible:true,title:"Bid"});
     // OHLCV legend
     chart.subscribeCrosshairMove((p:any)=>{
@@ -332,7 +332,7 @@ export default function TVChart({symbol,tf,theme,digits=5,positions,spreadPips,s
       else{const open=lb?lb.close:price;lb={time:t,open,high:Math.max(open,price,real),low:Math.min(open,price,real),close:price,volume:0};lastBarRef.current[key]=lb;}
       serRef.current?.update({time:lb.time,open:lb.open,high:lb.high,low:lb.low,close:lb.close});
       volRef.current?.update({time:lb.time,value:lb.volume,color:lb.close>=lb.open?"rgba(38,166,154,0.3)":"rgba(239,83,80,0.3)"});
-      {const p=pip(digRef.current),bid=price,sp=spRef.current;const ask=bid+sp*p;if(sp>0){askLineRef.current?.applyOptions({price:ask,color:"#26a69a",axisLabelVisible:true,title:`Ask ${ask.toFixed(digRef.current)}`});}else{askLineRef.current?.applyOptions({price:bid,color:"transparent",axisLabelVisible:false,title:""});}bidLineRef.current?.applyOptions({price:bid,color:"transparent",axisLabelVisible:false});}
+      {const p=pip(digRef.current),bid=price,sp=spRef.current;const ask=bid+sp*p;if(sp>0){askLineRef.current?.applyOptions({price:ask,color:"#2196F3",axisLabelVisible:true,title:`Ask ${ask.toFixed(digRef.current)}`});}else{askLineRef.current?.applyOptions({price:bid,color:"transparent",axisLabelVisible:false,title:""});}bidLineRef.current?.applyOptions({price:bid,color:"transparent",axisLabelVisible:false});}
     });
     return()=>{ alive=false; sock.disconnect(); };
   },[symbol,activeTf]);// eslint-disable-line react-hooks/exhaustive-deps
