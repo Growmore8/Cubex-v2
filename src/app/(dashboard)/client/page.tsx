@@ -528,7 +528,10 @@ export default function ClientTerminal() {
     if (!s) return grpAcc;
     // FIXED: always use configured pips
     if (s.type === "FIXED") return (s.min || 0) + grpAcc;
-    // FLOATING: use real live bid from exchange (true ECN — min/max may both be 0)
+    // FLOATING: use pre-computed live spread (raw ask − raw bid, same tick = exact market spread)
+    const liveSp = liveSpreadPips[sym];
+    if (liveSp != null && liveSp > 0) return liveSp + grpAcc;
+    // Fallback: compute from stale liveBids when liveSpreadPips not yet available
     const lb = liveBids[sym];
     const p = prices[sym];
     if (lb != null && lb > 0 && p != null && lb < p) {

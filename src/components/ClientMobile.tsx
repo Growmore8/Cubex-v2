@@ -120,7 +120,10 @@ export default function ClientMobile({ t }: { t: any }) {
     const grpAcc = _mobGrpSpread() + _mobAccMarkup();
     if (!s) return grpAcc;
     if (s.type === "FIXED") return (s.min || 0) + grpAcc;
-    // FLOATING: use real live bid from exchange (min/max may both be 0 for pure ECN)
+    // FLOATING: use pre-computed live spread (raw ask − raw bid, exact market spread)
+    const liveSp = t.liveSpreadPips[sym];
+    if (liveSp != null && liveSp > 0) return liveSp + grpAcc;
+    // Fallback: compute from stale liveBids
     const lb = _liveBids[sym];
     const p = t.prices[sym];
     if (lb != null && lb > 0 && p != null && lb < p) {
