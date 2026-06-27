@@ -960,8 +960,8 @@ export default function ClientMobile({ t }: { t: any }) {
 
             <div className="flex items-center justify-between">
               <div className="text-[11px] font-semibold text-[var(--muted)]">Open Positions {(positions || []).length ? "(" + positions.length + ")" : ""}</div>
-              <button onClick={() => { setMobAlertForm({ symbol: selSym || (symbols?.[0]?.symbol ?? ""), condition: "ABOVE", price: price != null ? price.toFixed(dg(selSym)) : "", note: "" }); setMobAlertErr(""); setMobAlertOpen(true); }} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: mobAlerts.length > 0 ? "rgba(245,158,11,0.18)" : "var(--soft)", color: mobAlerts.length > 0 ? "#f59e0b" : "var(--muted)" }} title="Price Alerts">
-                <i className="fa-solid fa-bell text-[10px]" />{mobAlerts.length > 0 && <span>{mobAlerts.length}</span>}
+              <button onClick={() => { setMobAlertForm({ symbol: selSym || (symbols?.[0]?.symbol ?? ""), condition: "ABOVE", price: price != null ? price.toFixed(dg(selSym)) : "", note: "" }); setMobAlertErr(""); setMobAlertOpen(true); }} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: mobAlerts.filter((a: any) => !a.triggered).length > 0 ? "rgba(245,158,11,0.18)" : "var(--soft)", color: mobAlerts.filter((a: any) => !a.triggered).length > 0 ? "#f59e0b" : "var(--muted)" }} title="Price Alerts">
+                <i className="fa-solid fa-bell text-[10px]" />{mobAlerts.filter((a: any) => !a.triggered).length > 0 && <span>{mobAlerts.filter((a: any) => !a.triggered).length}</span>}
               </button>
             </div>
             {(positions || []).length === 0 ? <div className="py-4 text-center text-[12px] text-[var(--muted)]">No open positions.</div> : (positions || []).map((p: any) => {
@@ -997,6 +997,9 @@ export default function ClientMobile({ t }: { t: any }) {
                         <div><div className="text-[var(--muted)]">S/L</div><div className="font-semibold">{p.sl ? gnum(Number(p.sl), dd) : "—"}</div></div>
                         <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{p.tp ? gnum(Number(p.tp), dd) : "—"}</div></div>
                         <div><div className="text-[var(--muted)]">TYPE</div><div className="font-semibold">{p.type}</div></div>
+                        {Number(p.trailingStop ?? 0) > 0 && <div><div className="text-[var(--muted)]">TRAIL</div><div className="font-semibold" style={{ color: "#f59e0b" }}>{Number(p.trailingStop)}p</div></div>}
+                        {Number(p.commission ?? 0) !== 0 && <div><div className="text-[var(--muted)]">COMM</div><div className="font-semibold" style={{ color: SELL }}>-{fmt(Math.abs(Number(p.commission)))}</div></div>}
+                        {Number(p.swap ?? 0) !== 0 && <div><div className="text-[var(--muted)]">SWAP</div><div className="font-semibold" style={{ color: Number(p.swap) >= 0 ? BUY : SELL }}>{Number(p.swap) >= 0 ? "+" : ""}{fmt(Number(p.swap))}</div></div>}
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2">
                         <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-pen mr-1" />Modify</button>
@@ -1089,7 +1092,7 @@ export default function ClientMobile({ t }: { t: any }) {
                           <div className="text-sm font-bold" style={{ color: Number(h.pnl) >= 0 ? BUY : SELL }}>{(Number(h.pnl) >= 0 ? "+" : "") + fmt(Number(h.pnl))}</div>
                         </div>
                       </div>
-                      <div className="mt-1 text-[10px] text-[var(--muted)]">{gnum(Number(h.openPrice), dd)} → {gnum(Number(h.closePrice), dd)}</div>
+                      <div className="mt-1 flex gap-2 text-[10px] text-[var(--muted)]"><span className="tabular-nums">#{h.ticket || "—"}</span><span>{gnum(Number(h.openPrice), dd)} → {gnum(Number(h.closePrice), dd)}</span></div>
                       {(Number(h.swap ?? 0) !== 0 || Number(h.commission ?? 0) !== 0) && (() => { const net = Number(h.pnl) + Number(h.swap ?? 0) - Number(h.commission ?? 0); return (
                         <div className="mt-1 flex gap-3 text-[9px]">
                           {Number(h.swap ?? 0) !== 0 && <span style={{ color: Number(h.swap) >= 0 ? BUY : SELL }}>Swap {Number(h.swap) >= 0 ? "+" : ""}{fmt(Number(h.swap))}</span>}
@@ -1728,12 +1731,18 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
             {/* Active alerts list */}
             {mobAlerts.length === 0 ? <div className="py-4 text-center text-[11px] text-[var(--muted)]">No active alerts.</div> : mobAlerts.map((al) => (
-              <div key={al.id} className="mb-2 flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2">
-                <div>
-                  <div className="text-[12px] font-semibold">{al.symbol} <span style={{ color: "var(--accent)" }}>{al.condition === "ABOVE" ? "↑" : "↓"}</span> {al.price}</div>
+              <div key={al.id} className="mb-2 flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2" style={{ opacity: al.triggered ? 0.6 : 1 }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px] font-semibold">{al.symbol} <span style={{ color: "var(--accent)" }}>{al.condition === "ABOVE" ? "↑" : "↓"}</span> {al.price}</span>
+                    {al.triggered && <span className="rounded px-1 py-0.5 text-[9px] font-bold" style={{ background: "rgba(245,158,11,0.2)", color: "#f59e0b" }}>FIRED</span>}
+                  </div>
                   {al.note && <div className="text-[10px] text-[var(--muted)]">{al.note}</div>}
                 </div>
-                <button onClick={async () => { await fetch(`/api/client/alerts?id=${al.id}`, { method: "DELETE" }); loadMobAlerts(); }} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "rgba(224,82,96,0.15)", color: SELL }}><i className="fa-solid fa-xmark text-[10px]" /></button>
+                <div className="flex items-center gap-1 ml-2">
+                  {al.triggered && <button onClick={async () => { await fetch(`/api/client/alerts?id=${al.id}`, { method: "PATCH" }); loadMobAlerts(); }} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "rgba(47,129,247,0.15)", color: "#2f81f7" }} title="Re-arm alert"><i className="fa-solid fa-rotate-right text-[10px]" /></button>}
+                  <button onClick={async () => { await fetch(`/api/client/alerts?id=${al.id}`, { method: "DELETE" }); loadMobAlerts(); }} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "rgba(224,82,96,0.15)", color: SELL }}><i className="fa-solid fa-xmark text-[10px]" /></button>
+                </div>
               </div>
             ))}
           </div>

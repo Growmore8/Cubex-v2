@@ -15,8 +15,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const a = await getAccount(s, url.searchParams.get("accountId") || undefined);
   if (!a) return NextResponse.json({ ok: true, alerts: [] });
-  const alerts = await prisma.priceAlert.findMany({ where: { accountId: a.id, triggered: false }, orderBy: { createdAt: "desc" } });
-  return NextResponse.json({ ok: true, alerts: alerts.map((al) => ({ id: al.id, symbol: al.symbol, condition: al.condition, price: Number(al.price), note: al.note })) });
+  const alerts = await prisma.priceAlert.findMany({ where: { accountId: a.id }, orderBy: [{ triggered: "asc" }, { createdAt: "desc" }] });
+  return NextResponse.json({ ok: true, alerts: alerts.map((al) => ({ id: al.id, symbol: al.symbol, condition: al.condition, price: Number(al.price), note: al.note, triggered: al.triggered })) });
 }
 
 export async function POST(req: Request) {
@@ -29,6 +29,14 @@ export async function POST(req: Request) {
     const alert = await prisma.priceAlert.create({ data: { tenantId: a.tenantId, accountId: a.id, symbol: b.symbol, condition: b.condition, price: b.price, note: b.note || null } });
     return NextResponse.json({ ok: true, id: alert.id });
   } catch (e: any) { return NextResponse.json({ ok: false, error: e.message }, { status: 400 }); }
+}
+
+export async function PATCH(req: Request) {
+  const s = await requireClient(); if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id"); if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  await prisma.priceAlert.updateMany({ where: { id, account: { tenantId: s.tenantId!, userId: s.sub } }, data: { triggered: false } });
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(req: Request) {
