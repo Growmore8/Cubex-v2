@@ -121,10 +121,14 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
             {!collapsed[cat] && list.map((s) => {
               const p = prices[s.symbol]; const d = dgFor(s);
               const pip = Math.pow(10, -(d - 1));
-              const ask = p != null ? gnum(p, d) : "—";
               const lpBid = realBids[s.symbol];
-              // Prefer live spread from feed (real ask – real bid, same tick, most accurate)
-              const liveSp = liveSpreadPips[s.symbol];
+              // Use real exchange ask (same tick as bid) — not smoothed display price
+              const liveSp2 = liveSpreadPips[s.symbol];
+              const realAskPx = (lpBid != null && lpBid > 0 && liveSp2 != null && liveSp2 > 0)
+                ? lpBid + liveSp2 * pip
+                : p;
+              const ask = realAskPx != null ? gnum(realAskPx, d) : "—";
+              const liveSp = liveSp2;
               const hasLive = liveSp != null && liveSp > 0;
               // Configured spread as fallback only (FIXED or FLOATING min from admin settings)
               const rawSp = symbolSpreads && symbolSpreads[s.symbol];
@@ -132,11 +136,8 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const realSpPips = hasLive ? liveSp : cfgSpPips;
               const spPx = realSpPips * pip;
               const safeSpPx = p != null ? Math.min(spPx, p * 0.02) : spPx;
-              // Bid: use real feed bid if valid, else compute from spread
-              const validRealBid = lpBid != null && lpBid > 0 && p != null && lpBid < p;
-              const bid = p != null
-                ? (validRealBid ? gnum(lpBid!, d) : gnum(Math.max(0, p - safeSpPx), d))
-                : "—";
+              const validRealBid = lpBid != null && lpBid > 0 && (realAskPx == null || lpBid < realAskPx);
+              const bid = validRealBid ? gnum(lpBid!, d) : (p != null ? gnum(Math.max(0, p - safeSpPx), d) : "—");
               const dir = dirs[s.symbol] || 0;
               const spDir = spreadDirs[s.symbol] || 0;
               const isOff = !!(disabledSyms && disabledSyms.includes(s.symbol));
