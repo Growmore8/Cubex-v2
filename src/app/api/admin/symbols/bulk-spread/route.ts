@@ -17,6 +17,7 @@ export async function POST(req: Request) {
       // FLOATING → spread = 0 (live bid/ask is the spread; no fixed floor imposed)
       // FIXED    → spread = admin-provided pip value
       const pip = type === "FIXED" ? (spread != null ? Number(spread) : 0) : 0;
+      const cat = g.category || "forex";
 
       return prisma.symbol.upsert({
         where: { tenantId_symbol: { tenantId: s.tenantId!, symbol: g.symbol } },
