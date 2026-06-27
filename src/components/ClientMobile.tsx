@@ -804,17 +804,17 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
                 <button onClick={() => setChartVol((v) => +(v + 0.01).toFixed(2))} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] active:scale-95" style={{ touchAction: "manipulation" }}>+</button>
               </div>
-              {/* SELL | vol+sprd | BUY */}
+              {/* SELL | − lot + | BUY */}
               <div className="flex items-stretch gap-1.5 px-2.5 pb-2">
                 <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", chartVol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, touchAction: "manipulation" }}>
                   <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Sell</div>
                   <div className="text-[13px] font-bold tabular-nums">{bid != null ? gnum(bid, dg(selSym)) : "…"}</div>
                 </button>
-                <button onPointerDown={(e) => { e.preventDefault(); setOrderSheet(true); }} className="flex shrink-0 flex-col items-center justify-center gap-0 rounded-xl border border-[var(--border)] px-3 py-1.5" style={{ background: "var(--soft)", touchAction: "manipulation" }}>
-                  <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>lots</span>
-                  <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{chartVol}</span>
-                  <span className="text-[7px] tabular-nums" style={{ color: "var(--muted)" }}>{Math.round(_mobSpreadPips(selSym) * 10)} sprd</span>
-                </button>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button onClick={() => setChartVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-9 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] active:scale-95" style={{ background: "var(--soft)", touchAction: "manipulation" }}>−</button>
+                  <input type="number" step="0.01" value={chartVol} onChange={(e) => setChartVol(Number(e.target.value))} className="h-9 w-14 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[12px] font-bold tabular-nums text-[var(--text)] outline-none" style={{ touchAction: "manipulation" }} />
+                  <button onClick={() => setChartVol((v) => +(v + 0.01).toFixed(2))} className="flex h-9 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] active:scale-95" style={{ background: "var(--soft)", touchAction: "manipulation" }}>+</button>
+                </div>
                 <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", chartVol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, touchAction: "manipulation" }}>
                   <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Buy</div>
                   <div className="text-[13px] font-bold tabular-nums">{ask != null ? gnum(ask, dg(selSym)) : "…"}</div>
