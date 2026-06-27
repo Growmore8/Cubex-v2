@@ -130,7 +130,6 @@ export default function ClientTerminal() {
   const [pendingPrice, setPendingPrice] = useState("");
   const [pending, setPending] = useState<any[]>([]);
   const [notiOpen, setNotiOpen] = useState(false);
-  const [acctMenu, setAcctMenu] = useState(false);
   const [acctSwitchOpen, setAcctSwitchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [mwW, setMwW] = useState(260);
@@ -547,47 +546,6 @@ export default function ClientTerminal() {
                 ))}
               </div></>)}
           </div>
-          {/* Consolidated account/funds/security menu */}
-          <div className="relative">
-            <button onClick={() => setAcctMenu((o) => !o)} className="flex items-center gap-1.5 rounded border border-[var(--border)] px-2.5 py-1 hover:bg-[var(--soft)]"><i className="fa-solid fa-bars-staggered" /> Menu <i className="fa-solid fa-chevron-down text-[8px] opacity-60" /></button>
-            {acctMenu && (() => {
-              const close = () => setAcctMenu(false);
-              const mItem = (onClick: () => void, icon: string, label: string, color?: string, disabled?: boolean) => (
-                <button disabled={disabled} onClick={() => { if (disabled) return; onClick(); close(); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[var(--soft)] disabled:opacity-40 disabled:cursor-not-allowed">
-                  <i className={"fa-solid " + icon} style={{ width: 14, textAlign: "center", color: color || "var(--muted)" }} />{label}
-                </button>
-              );
-              const head = (t: string) => <div className="px-3 pt-2 pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{t}</div>;
-              const div = <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />;
-              return (<><div className="fixed inset-0 z-[80]" onClick={close} />
-                <div className="ui-pop absolute right-0 z-[90] mt-1 w-56 overflow-hidden rounded-xl border py-1 text-[11px]" style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 12px 32px rgba(0,0,0,0.45)" }}>
-                  {head("Funds")}
-                  {curAcct?.type === "LIVE" ? (<>
-                    {mItem(() => { close(); setWalletModal("deposit"); }, "fa-circle-dollar-to-slot", "Deposit", BUY)}
-                    {mItem(() => { close(); setWalletModal("withdraw"); }, "fa-hand-holding-dollar", "Withdraw", GOLD)}
-                    {accts.length >= 2 && mItem(() => { setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); }, "fa-money-bill-transfer", "Transfer", undefined, readOnly)}
-                  </>) : (
-                    mItem(topUp, "fa-coins", "Top up Demo", GOLD, readOnly)
-                  )}
-                  {div}
-                  {head("Accounts")}
-                  {!isTrial && !accts.some((a: any) => a.type === "DEMO") && mItem(() => openAccount("DEMO"), "fa-vial", "Open Demo Account", undefined, readOnly)}
-                  {!isTrial && mItem(async () => { const r = await openAccount("LIVE"); if (r?.pending) { setMyReqsLoaded(false); setBotTab("requests"); } }, "fa-bolt", "Open Live Account", BUY, readOnly)}
-                  {curAcct?.type === "LIVE" && mItem(() => { close(); setWalletModal("kyc"); }, "fa-id-card", "KYC Verification")}
-                  {div}
-                  {head("Reports")}
-                  {mItem(() => { close(); setRepPreset("all"); setRepFrom(""); setRepTo(""); setRepMsg(""); setStmtRep(true); }, "fa-file-invoice", "Statement / Report", BUY)}
-                  {div}
-                  {(!account?.phone || !account?.country) && <>{head("Profile")}{mItem(() => { openProfileEdit(); }, "fa-user-pen", "Complete Profile")}</>}
-                  {div}
-                  {head("Security")}
-                  {mItem(() => { setPinErr(""); setPinForm({}); setPinModal(true); }, "fa-shield-halved", pinHasPin ? "Change PIN" : "Set PIN")}
-                  {pinHasPin && mItem(async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } }, "fa-shield-slash", "Disable PIN", SELL)}
-                  {mItem(addPasskey, "fa-fingerprint", "Biometrics / Face ID")}
-                  {mItem(enablePush, "fa-bell-concierge", "Push Notifications")}
-                </div></>);
-            })()}
-          </div>
           <button onClick={toggleTheme} title={theme === "dark" ? "Light mode" : "Dark mode"} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className={"fa-solid " + (theme === "dark" ? "fa-sun" : "fa-moon")} /></button>
           <div className="relative">
             <button onClick={() => { const w = !notiOpen; setNotiOpen(w); if (w && unread > 0) { fetch("/api/client/notifications", { method: "POST" }).then(() => setNotis((ns) => ns.map((n) => ({ ...n, read: true })))); } }} title="Notifications" className="relative rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-bell" />{unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 text-[8px] font-bold" style={{ background: SELL, color: "#fff" }}>{unread}</span>}</button>
@@ -665,61 +623,116 @@ export default function ClientTerminal() {
       {profileOpen && (
         <>
           <div className="fixed inset-0 z-[150]" onClick={() => setProfileOpen(false)} />
-          <div className="fixed right-0 top-0 z-[160] flex h-full w-72 flex-col border-l overflow-y-auto" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
+          <div className="fixed right-0 top-0 z-[160] flex h-full w-72 flex-col border-l" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
             {/* header */}
-            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
-              <span className="text-[12px] font-semibold tracking-wide">PROFILE</span>
-              <button onClick={() => setProfileOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark text-[12px]" /></button>
+            <div className="flex shrink-0 items-center justify-between border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+              <span className="text-[11px] font-semibold tracking-wide">PROFILE</span>
+              <button onClick={() => setProfileOpen(false)} className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark text-[11px]" /></button>
             </div>
+
             {/* avatar + name */}
-            <div className="flex flex-col items-center gap-2 border-b px-4 py-5" style={{ borderColor: "var(--border)" }}>
-              <div className="relative">
+            <div className="shrink-0 flex items-center gap-3 border-b px-3 py-3" style={{ borderColor: "var(--border)" }}>
+              <div className="relative shrink-0">
                 <input type="file" accept="image/*" style={{ display: "none" }} ref={avatarInputRef} onChange={uploadAvatar} />
-                <button onClick={() => avatarInputRef.current?.click()} className="relative h-16 w-16 overflow-hidden rounded-full border-2" style={{ borderColor: "var(--accent)" }}>
-                  {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-xl font-bold" style={{ background: "var(--soft)", color: "var(--accent)" }}>{(account?.ownerName || account?.name || "?")[0].toUpperCase()}</span>}
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"><i className="fa-solid fa-camera text-white text-xs" /></span>
+                <button onClick={() => avatarInputRef.current?.click()} className="relative h-11 w-11 overflow-hidden rounded-full border-2" style={{ borderColor: "var(--accent)" }}>
+                  {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-base font-bold" style={{ background: "var(--soft)", color: "var(--accent)" }}>{(account?.ownerName || account?.name || "?")[0].toUpperCase()}</span>}
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"><i className="fa-solid fa-camera text-white text-[9px]" /></span>
                 </button>
               </div>
-              <div className="text-center">
-                <div className="font-semibold">{account?.ownerName || account?.name}</div>
-                <div className="text-[11px] text-[var(--muted)]">{account?.email}</div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12px] font-semibold">{account?.ownerName || account?.name}</div>
+                <div className="truncate text-[10px] text-[var(--muted)]">{account?.email}</div>
+                <div className="mt-0.5 flex items-center gap-1.5 text-[10px]">
+                  <i className="fa-solid fa-phone text-[8px] text-[var(--muted)]" /><span className="text-[var(--muted)]">{account?.phone || <span style={{ color: SELL }}>—</span>}</span>
+                  <i className="fa-solid fa-globe text-[8px] text-[var(--muted)] ml-1" /><span className="text-[var(--muted)]">{account?.country || <span style={{ color: SELL }}>—</span>}</span>
+                </div>
               </div>
-            </div>
-            {/* info rows */}
-            <div className="border-b px-4 py-3 space-y-2" style={{ borderColor: "var(--border)" }}>
-              <div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Personal Info</div>
-              <div className="flex items-center gap-2 text-[12px]"><i className="fa-solid fa-phone w-4 text-center text-[var(--muted)]" /><span>{account?.phone || <span style={{ color: SELL }}>Not set</span>}</span></div>
-              <div className="flex items-center gap-2 text-[12px]"><i className="fa-solid fa-globe w-4 text-center text-[var(--muted)]" /><span>{account?.country || <span style={{ color: SELL }}>Not set</span>}</span></div>
               {(!account?.phone || !account?.country) && (
-                <button onClick={() => { setProfileOpen(false); openProfileEdit(); }} className="mt-1 w-full rounded-lg py-1.5 text-[11px] font-semibold text-white" style={{ background: SELL }}>Complete Profile</button>
+                <button onClick={() => { setProfileOpen(false); openProfileEdit(); }} className="shrink-0 rounded-lg px-2 py-1 text-[9px] font-semibold text-white" style={{ background: SELL }}>Fix</button>
               )}
             </div>
-            {/* account summary */}
-            <div className="border-b px-4 py-3 space-y-1.5" style={{ borderColor: "var(--border)" }}>
-              <div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Account</div>
-              <div className="flex justify-between text-[12px]"><span className="text-[var(--muted)]">Login</span><span className="font-medium">{curAcct?.login} · {curAcct?.type}</span></div>
-              <div className="flex justify-between text-[12px]"><span className="text-[var(--muted)]">Balance</span><span className="font-medium" style={{ color: BUY }}>${fmt(balance)}</span></div>
-              <div className="flex justify-between text-[12px]"><span className="text-[var(--muted)]">Equity</span><span>${fmt(equity)}</span></div>
-              <div className="flex justify-between text-[12px]"><span className="text-[var(--muted)]">Leverage</span><span>1:{account?.leverage || 100}</span></div>
-              <div className="flex justify-between text-[12px]"><span className="text-[var(--muted)]">Currency</span><span>{account?.currency || "USD"}</span></div>
+
+            {/* account stats 2-col */}
+            <div className="shrink-0 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+              <div className="mb-1 text-[8px] font-semibold uppercase tracking-wide text-[var(--muted)]">Account — {curAcct?.login} · {curAcct?.type}</div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                {[
+                  ["Balance", "$" + fmt(balance), BUY],
+                  ["Equity", "$" + fmt(equity), undefined],
+                  ["Leverage", "1:" + (account?.leverage || 100), undefined],
+                  ["Currency", account?.currency || "USD", undefined],
+                ].map(([k, v, c]) => (
+                  <div key={k as string} className="flex justify-between text-[11px]">
+                    <span className="text-[var(--muted)]">{k}</span>
+                    <span className="font-medium tabular-nums" style={c ? { color: c as string } : undefined}>{v}</span>
+                  </div>
+                ))}
+              </div>
             </div>
+
+            {/* funds */}
+            <div className="shrink-0 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+              <div className="mb-1 text-[8px] font-semibold uppercase tracking-wide text-[var(--muted)]">Funds</div>
+              {curAcct?.type === "LIVE" ? (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { icon: "fa-circle-dollar-to-slot", label: "Deposit", color: BUY, onClick: () => { setProfileOpen(false); setWalletModal("deposit"); } },
+                    { icon: "fa-hand-holding-dollar", label: "Withdraw", color: GOLD, onClick: () => { setProfileOpen(false); setWalletModal("withdraw"); } },
+                    ...(accts.length >= 2 ? [{ icon: "fa-money-bill-transfer", label: "Transfer", color: undefined, onClick: () => { setProfileOpen(false); setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); } }] : []),
+                  ].map((item) => (
+                    <button key={item.label} onClick={item.onClick} disabled={readOnly} className="flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold hover:bg-[var(--soft)] disabled:opacity-40">
+                      <i className={"fa-solid " + item.icon} style={{ color: item.color || "var(--muted)" }} />
+                      <span style={{ color: "var(--muted)" }}>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <button onClick={() => { setProfileOpen(false); topUp(); }} disabled={readOnly} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-[var(--soft)] disabled:opacity-40">
+                  <i className="fa-solid fa-coins w-4 text-center" style={{ color: GOLD }} />Top up Demo
+                </button>
+              )}
+            </div>
+
+            {/* accounts + reports */}
+            <div className="shrink-0 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+              <div className="mb-1 text-[8px] font-semibold uppercase tracking-wide text-[var(--muted)]">Accounts & Reports</div>
+              {!isTrial && !accts.some((a: any) => a.type === "DEMO") && (
+                <button onClick={() => { setProfileOpen(false); openAccount("DEMO"); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-[var(--soft)]">
+                  <i className="fa-solid fa-vial w-4 text-center text-[var(--muted)]" />Open Demo Account
+                </button>
+              )}
+              {!isTrial && (
+                <button onClick={async () => { const r = await openAccount("LIVE"); if (r?.pending) { setMyReqsLoaded(false); setBotTab("requests"); } setProfileOpen(false); }} disabled={readOnly} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-[var(--soft)] disabled:opacity-40">
+                  <i className="fa-solid fa-bolt w-4 text-center" style={{ color: BUY }} />Open Live Account
+                </button>
+              )}
+              {curAcct?.type === "LIVE" && (
+                <button onClick={() => { setProfileOpen(false); setWalletModal("kyc"); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-[var(--soft)]">
+                  <i className="fa-solid fa-id-card w-4 text-center text-[var(--muted)]" />KYC Verification
+                </button>
+              )}
+              <button onClick={() => { setProfileOpen(false); setRepPreset("all"); setRepFrom(""); setRepTo(""); setRepMsg(""); setStmtRep(true); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-[var(--soft)]">
+                <i className="fa-solid fa-file-invoice w-4 text-center" style={{ color: BUY }} />Statement / Report
+              </button>
+            </div>
+
             {/* security */}
-            <div className="border-b px-4 py-3 space-y-1" style={{ borderColor: "var(--border)" }}>
-              <div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Security & Settings</div>
+            <div className="shrink-0 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+              <div className="mb-1 text-[8px] font-semibold uppercase tracking-wide text-[var(--muted)]">Security</div>
               {[
                 { icon: "fa-shield-halved", label: pinHasPin ? "Change PIN" : "Set PIN", onClick: () => { setProfileOpen(false); setPinErr(""); setPinForm({}); setPinModal(true); } },
                 { icon: "fa-fingerprint", label: "Biometrics / Face ID", onClick: () => { setProfileOpen(false); addPasskey(); } },
                 { icon: "fa-bell-concierge", label: "Push Notifications", onClick: () => { setProfileOpen(false); enablePush(); } },
-                { icon: "fa-id-card", label: "KYC Verification", onClick: () => { setProfileOpen(false); setWalletModal("kyc"); }, hide: curAcct?.type !== "LIVE" },
-              ].filter((x) => !x.hide).map((item) => (
-                <button key={item.label} onClick={item.onClick} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[12px] hover:bg-[var(--soft)]">
+              ].map((item) => (
+                <button key={item.label} onClick={item.onClick} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-[var(--soft)]">
                   <i className={"fa-solid " + item.icon} style={{ width: 14, textAlign: "center", color: "var(--muted)" }} />{item.label}
                 </button>
               ))}
             </div>
+
             {/* logout */}
-            <div className="px-4 py-3 mt-auto">
-              <button onClick={async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-[12px] hover:bg-[var(--soft)]" style={{ color: SELL }}>
+            <div className="px-3 py-2 mt-auto shrink-0">
+              <button onClick={async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-[var(--soft)]" style={{ color: SELL }}>
                 <i className="fa-solid fa-right-from-bracket" style={{ width: 14, textAlign: "center" }} />Logout
               </button>
             </div>
