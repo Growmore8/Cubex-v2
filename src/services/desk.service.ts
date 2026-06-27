@@ -26,6 +26,7 @@ export async function listOpen(s: any) {
     accountLogin: t.account.login, accountName: t.account.name,
     symbol: t.symbol, type: t.type, lots: Number(t.lots),
     openPrice: Number(t.openPrice), sl: Number(t.sl), tp: Number(t.tp), openedAt: t.openedAt,
+    commission: Number((t as any).commission ?? 0), swap: Number((t as any).swap ?? 0), comment: (t as any).comment || null,
   }));
 }
 
@@ -50,6 +51,7 @@ export async function listHistory(s: any) {
     sl: Number(h.sl), tp: Number(h.tp), pnl: Number(h.pnl),
     closeReason: h.closeReason, desc: h.closeReason,
     openedAt: h.openedAt, closedAt: h.closedAt, at: h.closedAt,
+    commission: Number((h as any).commission ?? 0), swap: Number((h as any).swap ?? 0), comment: (h as any).comment || null,
   }));
   const NEG = new Set(["WITHDRAWAL", "CREDIT_OUT", "TRANSFER_OUT"]);
   const finRows = fins.map((f: any) => {

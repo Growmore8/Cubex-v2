@@ -1109,14 +1109,14 @@ export default function AdminDeskPage() {
                     <th className={thc}><input type="checkbox" checked={tAllOn} onChange={tToggleAll} /></th>
                     <SortTh tbl="trade" k="date" label="Date Time" cls={thc} /><SortTh tbl="trade" k="oid" label="Order ID" cls={thc} /><SortTh tbl="trade" k="symbol" label="Symbol" cls={thc} /><SortTh tbl="trade" k="type" label="Type" cls={thc} />
                     <SortTh tbl="trade" k="lots" label="Lots" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="openPrice" label="Open Price" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="sl" label="S/L" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="tp" label="T/P" align="right" cls={thc + " text-right"} />
-                    <SortTh tbl="trade" k="current" label="Current" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="pnl" label="PnL" align="right" cls={thc + " text-right"} /><th className={thc + " text-right"}>Action</th>
+                    <SortTh tbl="trade" k="current" label="Current" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="pnl" label="PnL" align="right" cls={thc + " text-right"} /><th className={thc + " text-right"}>Swap</th><th className={thc + " text-right"}>Comm</th><th className={thc + " text-right"}>Action</th>
                   </tr></thead>
                   <tbody>
-                    {tSelIds.length > 0 && (<tr><td colSpan={12} className="px-2 py-1 space-x-1">
+                    {tSelIds.length > 0 && (<tr><td colSpan={14} className="px-2 py-1 space-x-1">
                       <button onClick={() => askConfirm("Close " + tSelIds.length + " trade(s)?", () => { tSelIds.forEach((id) => close(id)); setTradeSel({}); })} className="rounded px-2 py-0.5 text-[9px] font-medium" style={{ background: SELL, color: "#fff" }}>Close Selected ({tSelIds.length})</button>
                       {can("deleteTrades") && <button onClick={() => askConfirm("Delete " + tSelIds.length + " open trade(s)? This removes them entirely (no P/L realized).", () => delTradesBulk(tSelIds))} className="rounded px-2 py-0.5 text-[9px] font-medium" style={{ background: "var(--soft)", color: SELL, border: "1px solid rgba(224,82,96,0.4)" }}>Delete Selected ({tSelIds.length})</button>}
                     </td></tr>)}
-                    {accOpen.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No open trades.</td></tr> : sortRows("trade", accOpen, {
+                    {accOpen.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={14}>No open trades.</td></tr> : sortRows("trade", accOpen, {
                       date: (p) => { const v = p.openedAt || p.createdAt || p.openTime || p.time; return v ? new Date(v).getTime() : null; },
                       oid: (p) => oid(p), symbol: (p) => p.symbol, type: (p) => p.type, lots: (p) => Number(p.lots),
                       openPrice: (p) => Number(p.openPrice), sl: (p) => Number(p.sl), tp: (p) => Number(p.tp),
@@ -1155,6 +1155,8 @@ export default function AdminDeskPage() {
                           </td>
                           <td className="px-2 py-1 text-right">{pxFmt(p.symbol, cur)}</td>
                           <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{gnum(pl, 2)}</td>
+                          <td className="px-2 py-1 text-right" style={{ color: Number(p.swap ?? 0) >= 0 ? BUY : SELL }} title="Accumulated swap">{Number(p.swap ?? 0) !== 0 ? gnum(Number(p.swap), 2) : "—"}</td>
+                          <td className="px-2 py-1 text-right" style={{ color: SELL }} title="Commission charged">{Number(p.commission ?? 0) !== 0 ? gnum(Number(p.commission), 2) : "—"}</td>
                           <td className="px-2 py-1 text-right whitespace-nowrap">
                             {isEditing ? (<>
                               <button onClick={() => modifyTrade(p.id, { sl: ie.sl !== undefined ? Number(ie.sl) : Number(p.sl) || 0, tp: ie.tp !== undefined ? Number(ie.tp) : Number(p.tp) || 0, ...(ie.lots ? { lots: ie.lots } : {}), ...(ie.openPrice ? { openPrice: ie.openPrice } : {}), ...(ie.type ? { type: ie.type } : {}), ...(ie.openedAt ? { openedAt: ie.openedAt } : {}) })} className="mr-1 rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: BUY, color: "#fff" }}>Save</button>
@@ -1175,7 +1177,7 @@ export default function AdminDeskPage() {
                         </tr>);
                     })}
                     {accPending.length > 0 && (
-                      <tr><td colSpan={12} className="px-2 pt-2 pb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--accent)" }}>
+                      <tr><td colSpan={14} className="px-2 pt-2 pb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--accent)" }}>
                         <i className="fa-solid fa-hourglass-half mr-1" />Pending Orders ({accPending.length})
                       </td></tr>
                     )}
@@ -1187,12 +1189,17 @@ export default function AdminDeskPage() {
                         <td className="px-2 py-1">{o.symbol}</td>
                         <td className="px-2 py-1" style={{ color: o.side === "BUY" ? BUY : SELL }}>{o.side} {o.kind}</td>
                         <td className="px-2 py-1 text-right">{o.lots}</td>
-                        <td className="px-2 py-1 text-right" title="Trigger price">{pxFmt(o.symbol, o.price)} <span className="text-[8px] text-[var(--muted)]">trig</span></td>
+                        <td className="px-2 py-1 text-right" title={o.kind === "STOP_LIMIT" ? `Stop: ${pxFmt(o.symbol, o.price)} → Limit: ${pxFmt(o.symbol, o.stopLimit)}` : "Trigger price"}>
+                          {pxFmt(o.symbol, o.price)} <span className="text-[8px] text-[var(--muted)]">{o.kind === "STOP_LIMIT" ? "stop" : "trig"}</span>
+                          {o.kind === "STOP_LIMIT" && <><br /><span className="text-[8px]">{pxFmt(o.symbol, o.stopLimit)} <span className="text-[var(--muted)]">lmt</span></span></>}
+                        </td>
                         <td className="px-2 py-1 text-right">{o.sl ? pxFmt(o.symbol, o.sl) : "-"}</td>
                         <td className="px-2 py-1 text-right">{o.tp ? pxFmt(o.symbol, o.tp) : "-"}</td>
                         <td className="px-2 py-1 text-right">{pxFmt(o.symbol, prices[o.symbol] ?? o.price)}</td>
                         <td className="px-2 py-1 text-right text-[var(--muted)]">pending</td>
-                        <td className="px-2 py-1 text-right whitespace-nowrap">
+                        <td className="px-2 py-1 text-right text-[var(--muted)]">—</td>
+                        <td className="px-2 py-1 text-right whitespace-nowrap" title={o.comment || ""}>
+                          {o.comment && <span className="mr-1 text-[var(--muted)]" title={o.comment}><i className="fa-solid fa-comment text-[8px]" /></span>}
                           <button onClick={() => cancelPending(o.id)} className="rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "rgba(224,82,96,0.15)", color: SELL, border: "1px solid rgba(224,82,96,0.3)" }}>Cancel ×</button>
                         </td>
                       </tr>
@@ -1235,10 +1242,10 @@ export default function AdminDeskPage() {
                         <th className={thc}><input type="checkbox" checked={hAllOn} onChange={hToggleAll} /></th>
                         <SortTh tbl="hist" k="date" label="Date/Time" cls={thc} /><SortTh tbl="hist" k="ref" label="Order/Ref" cls={thc} /><SortTh tbl="hist" k="type" label="Type" cls={thc} /><SortTh tbl="hist" k="symbol" label="Symbol" cls={thc} /><SortTh tbl="hist" k="desc" label="Desc" cls={thc} />
                         <SortTh tbl="hist" k="openPx" label="Open Px" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="closePx" label="Close Px" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="sl" label="S/L" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="tp" label="T/P" align="right" cls={thc + " text-right"} />
-                        <SortTh tbl="hist" k="closeTime" label="Close Time" cls={thc} /><SortTh tbl="hist" k="pnl" label="P&L" align="right" cls={thc + " text-right"} /><th className={thc + " text-right"}>Edit</th>
+                        <SortTh tbl="hist" k="closeTime" label="Close Time" cls={thc} /><SortTh tbl="hist" k="pnl" label="Gross P&L" align="right" cls={thc + " text-right"} /><th className={thc + " text-right"}>Swap</th><th className={thc + " text-right"}>Comm</th><th className={thc + " text-right"}>Net P&L</th><th className={thc + " text-right"}>Edit</th>
                       </tr></thead>
                       <tbody>
-                        {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={13}>No history.</td></tr> : sortRows("hist", rows, {
+                        {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={16}>No history.</td></tr> : sortRows("hist", rows, {
                           date: (h) => { const v = h.openedAt || h.openTime || h.at || h.createdAt; return v ? new Date(v).getTime() : null; },
                           ref: (h) => h.ticket ?? h.orderId ?? h.id,
                           type: (h) => hType(h), symbol: (h) => h.symbol, desc: (h) => h.closeReason || h.description || h.desc,
@@ -1258,7 +1265,10 @@ export default function AdminDeskPage() {
                             <td className="px-2 py-1 text-right">{h.tp ? pxFmt(h.symbol, h.tp) : "-"}</td>
                             <td className="px-2 py-1 text-[var(--muted)]">{hdt(h) ? new Date(hdt(h)).toLocaleString() : "-"}</td>
                             <td className="px-2 py-1 text-right" style={{ color: (h.pnl ?? 0) >= 0 ? BUY : SELL }}>{h.pnl != null ? gnum(h.pnl, 2) : "-"}</td>
-                            <td className="px-2 py-1 text-right whitespace-nowrap"><button title="Edit" onClick={() => openHEdit(h)} className="mr-1.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen" /></button><button title="Delete" onClick={() => delHist(h)} className="rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button></td>
+                            <td className="px-2 py-1 text-right" style={{ color: Number(h.swap ?? 0) >= 0 ? BUY : SELL }}>{h.kind === "TRADE" && Number(h.swap ?? 0) !== 0 ? gnum(Number(h.swap), 2) : "—"}</td>
+                            <td className="px-2 py-1 text-right" style={{ color: SELL }}>{h.kind === "TRADE" && Number(h.commission ?? 0) !== 0 ? gnum(Number(h.commission), 2) : "—"}</td>
+                            {(() => { const net = Number(h.pnl ?? 0) + Number(h.swap ?? 0) - Number(h.commission ?? 0); return <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{h.kind === "TRADE" ? gnum(net, 2) : "—"}</td>; })()}
+                            <td className="px-2 py-1 text-right whitespace-nowrap" title={h.comment || ""}>{h.comment && <i className="fa-solid fa-comment mr-1 text-[8px] text-[var(--muted)]" title={h.comment} />}<button title="Edit" onClick={() => openHEdit(h)} className="mr-1.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen" /></button><button title="Delete" onClick={() => delHist(h)} className="rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button></td>
                           </tr>
                         ))}
                       </tbody>

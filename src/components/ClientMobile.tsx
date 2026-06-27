@@ -160,6 +160,12 @@ export default function ClientMobile({ t }: { t: any }) {
   const [modifyId, setModifyId] = useState<string | null>(null);
   const [mSl, setMSl] = useState("");
   const [mTp, setMTp] = useState("");
+  const [mobPartial, setMobPartial] = useState<{id: string; lots: number; sym: string} | null>(null);
+  const [mobPartialLots, setMobPartialLots] = useState("");
+  const [mobAlertOpen, setMobAlertOpen] = useState(false);
+  const [mobAlerts, setMobAlerts] = useState<any[]>([]);
+  const [mobAlertForm, setMobAlertForm] = useState({ symbol: "", condition: "ABOVE", price: "", note: "" });
+  const [mobAlertErr, setMobAlertErr] = useState("");
   const [notisOpen, setNotisOpen] = useState(false);
   const [reqsOpen, setReqsOpen] = useState(false);
   const [cfgSheet, setCfgSheet] = useState(false);
@@ -178,6 +184,8 @@ export default function ClientMobile({ t }: { t: any }) {
     setMyReqsLoaded(true);
   });
   useEffect(() => { if (tab === "profile" && !myReqsLoaded) loadMyReqs(); }, [tab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadMobAlerts = () => { if (!accId) return; fetch(`/api/client/alerts?accountId=${accId}`).then((r) => r.json()).then((r) => { if (r.ok) setMobAlerts(r.alerts || []); }).catch(() => {}); };
+  useEffect(() => { loadMobAlerts(); }, [accId]); // eslint-disable-line react-hooks/exhaustive-deps
   const reqRow = (req: any) => {
     const isAcc = req.kind === "ACCOUNT";
     const ic = isAcc ? "fa-circle-plus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";
@@ -812,7 +820,10 @@ export default function ClientMobile({ t }: { t: any }) {
                   if (!mobPendingPrice || !mobStopLimitEntry) return;
                   await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side, kind: "STOP_LIMIT", lots: chartVol, price: Number(mobPendingPrice), stopLimit: Number(mobStopLimitEntry), sl: Number(sl)||0, tp: Number(tp)||0, comment: mobComment||undefined, accountId: accId }) });
                   (t as any).load?.();
-                } else { placePending(selSym, side, mobOrderType as "LIMIT"|"STOP", Number(mobPendingPrice), chartVol, Number(sl)||0, Number(tp)||0); }
+                } else {
+                  await fetch("/api/client/pending", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ symbol: selSym, side, kind: mobOrderType, lots: chartVol, price: Number(mobPendingPrice), sl: Number(sl)||0, tp: Number(tp)||0, comment: mobComment||undefined, accountId: accId }) });
+                  (t as any).load?.();
+                }
                 setOrderSheet(false);
               };
               return (
@@ -947,7 +958,12 @@ export default function ClientMobile({ t }: { t: any }) {
           <div className="space-y-3 p-3">
             <button onClick={() => { setNoForm({ idx: 0, lots: vol || 0.01, trigger: "", sl: "", tp: "" }); setNoOpen(true); }} className="w-full rounded-xl py-3 text-sm font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus mr-1.5" /> New Order / Pending</button>
 
-            <div className="text-[11px] font-semibold text-[var(--muted)]">Open Positions {(positions || []).length ? "(" + positions.length + ")" : ""}</div>
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-semibold text-[var(--muted)]">Open Positions {(positions || []).length ? "(" + positions.length + ")" : ""}</div>
+              <button onClick={() => { setMobAlertForm({ symbol: selSym || (symbols?.[0]?.symbol ?? ""), condition: "ABOVE", price: price != null ? price.toFixed(dg(selSym)) : "", note: "" }); setMobAlertErr(""); setMobAlertOpen(true); }} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: mobAlerts.length > 0 ? "rgba(245,158,11,0.18)" : "var(--soft)", color: mobAlerts.length > 0 ? "#f59e0b" : "var(--muted)" }} title="Price Alerts">
+                <i className="fa-solid fa-bell text-[10px]" />{mobAlerts.length > 0 && <span>{mobAlerts.length}</span>}
+              </button>
+            </div>
             {(positions || []).length === 0 ? <div className="py-4 text-center text-[12px] text-[var(--muted)]">No open positions.</div> : (positions || []).map((p: any) => {
               const cur = prices[p.symbol] ?? p.openPrice; const plv = pnlOf(p, cur, csz(p.symbol)); const dd = dg(p.symbol);
               const open = expanded === p.id;
@@ -981,9 +997,10 @@ export default function ClientMobile({ t }: { t: any }) {
                         <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{p.tp ? gnum(Number(p.tp), dd) : "—"}</div></div>
                         <div><div className="text-[var(--muted)]">TYPE</div><div className="font-semibold">{p.type}</div></div>
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[12px] font-semibold"><i className="fa-solid fa-pen mr-1.5" />Modify TP/SL</button>
-                        <button onClick={() => close(p.id)} className="rounded-lg py-2 text-[12px] font-semibold text-white" style={{ background: SELL }}><i className="fa-solid fa-xmark mr-1.5" />Close</button>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-pen mr-1" />Modify</button>
+                        <button onClick={() => { setMobPartial({id: p.id, lots: Number(p.lots), sym: p.symbol}); setMobPartialLots(""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-scissors mr-1" />Partial</button>
+                        <button onClick={() => close(p.id)} className="rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: SELL }}><i className="fa-solid fa-xmark mr-1" />Close</button>
                       </div>
                       {modifyId === p.id && (
                         <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--soft)] p-3">
@@ -1063,9 +1080,19 @@ export default function ClientMobile({ t }: { t: any }) {
                             return <span className="rounded px-1.5 py-0.5 text-[9px] font-bold" style={{ background: col, color: "#fff" }} title={"Closed: " + lbl}>{lbl}</span>;
                           })()}
                         </div>
-                        <div className="text-sm font-bold" style={{ color: Number(h.pnl) >= 0 ? BUY : SELL }}>{(Number(h.pnl) >= 0 ? "+" : "") + fmt(Number(h.pnl))}</div>
+                        <div>
+                          <div className="text-[10px] text-right text-[var(--muted)]">Gross</div>
+                          <div className="text-sm font-bold" style={{ color: Number(h.pnl) >= 0 ? BUY : SELL }}>{(Number(h.pnl) >= 0 ? "+" : "") + fmt(Number(h.pnl))}</div>
+                        </div>
                       </div>
                       <div className="mt-1 text-[10px] text-[var(--muted)]">{gnum(Number(h.openPrice), dd)} → {gnum(Number(h.closePrice), dd)}</div>
+                      {(Number(h.swap ?? 0) !== 0 || Number(h.commission ?? 0) !== 0) && (() => { const net = Number(h.pnl) + Number(h.swap ?? 0) - Number(h.commission ?? 0); return (
+                        <div className="mt-1 flex gap-3 text-[9px]">
+                          {Number(h.swap ?? 0) !== 0 && <span style={{ color: Number(h.swap) >= 0 ? BUY : SELL }}>Swap {Number(h.swap) >= 0 ? "+" : ""}{fmt(Number(h.swap))}</span>}
+                          {Number(h.commission ?? 0) !== 0 && <span style={{ color: SELL }}>Comm -{fmt(Number(h.commission))}</span>}
+                          <span className="ml-auto font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>Net {net >= 0 ? "+" : ""}{fmt(net)}</span>
+                        </div>
+                      ); })()}
                       <div className="mt-1 flex gap-3 text-[9px] text-[var(--muted)]">
                         <span><i className="fa-solid fa-play mr-1" />{h.openedAt ? new Date(h.openedAt).toLocaleString() : "—"}</span>
                         <span><i className="fa-solid fa-stop mr-1" />{h.closedAt ? new Date(h.closedAt).toLocaleString() : "—"}</span>
@@ -1338,7 +1365,8 @@ export default function ClientMobile({ t }: { t: any }) {
             const r = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side, kind: "STOP_LIMIT", lots: Number(noOpenVol), price: Number(mobPendingPrice), stopLimit: Number(mobStopLimitEntry), sl: Number(sl)||0, tp: Number(tp)||0, comment: mobComment||undefined, accountId: accId }) }).then((x) => x.json()).catch(() => ({ ok: false }));
             ok = r.ok; if (ok) (t as any).load?.();
           } else {
-            ok = !!(await placePending(selSym, side, kind as "LIMIT"|"STOP", Number(mobPendingPrice), Number(noOpenVol), Number(sl) || 0, Number(tp) || 0));
+            const rp = await fetch("/api/client/pending", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ symbol: selSym, side, kind, lots: Number(noOpenVol), price: Number(mobPendingPrice), sl: Number(sl)||0, tp: Number(tp)||0, comment: mobComment||undefined, accountId: accId }) }).then((x) => x.json()).catch(() => ({ok:false}));
+            ok = rp.ok; if (ok) (t as any).load?.();
           }
           if (ok) { setNoOpen(false); setMobTpEnabled(false); setMobSlEnabled(false); }
         };
@@ -1630,6 +1658,80 @@ export default function ClientMobile({ t }: { t: any }) {
                 {profileSaving ? "Saving…" : "Submit & Continue"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PARTIAL CLOSE MODAL */}
+      {mobPartial && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setMobPartial(null)}>
+          <div className="glass-card w-full max-w-[320px] rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 text-[14px] font-bold">Partial Close — {mobPartial.sym}</div>
+            <div className="mb-1 text-[10px] text-[var(--muted)]">Total lots: {mobPartial.lots} · Enter lots to close (leave blank = close all)</div>
+            <input type="number" inputMode="decimal" step="0.01" min="0.01" max={mobPartial.lots} value={mobPartialLots} onChange={(e) => setMobPartialLots(e.target.value)} placeholder={String(mobPartial.lots)} className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[15px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" autoFocus />
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => setMobPartial(null)} className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Cancel</button>
+              <button onClick={async () => {
+                const lots = Number(mobPartialLots) || undefined;
+                const r = await fetch(`/api/client/orders/${mobPartial.id}/close`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ lots, accountId: accId }) }).then((x) => x.json()).catch(() => ({ok:false}));
+                if (r.ok) { setMobPartial(null); (t as any).load?.(); }
+              }} className="flex-1 rounded-xl py-2.5 text-[12px] font-semibold text-white" style={{ background: SELL }}>Close {mobPartialLots ? mobPartialLots + " lots" : "All"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRICE ALERTS MODAL */}
+      {mobAlertOpen && (
+        <div className="fixed inset-0 z-[110] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setMobAlertOpen(false)}>
+          <div className="glass w-full rounded-t-[26px] p-5" style={{ background: "var(--panel)", maxHeight: "80dvh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-[14px] font-bold">Price Alerts</div>
+              <button onClick={() => setMobAlertOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-xmark text-[11px]" /></button>
+            </div>
+            {/* New alert form */}
+            <div className="mb-3 space-y-2 rounded-xl border border-[var(--border)] p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>New Alert</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <div className="mb-1 text-[9px] text-[var(--muted)]">Symbol</div>
+                  <select value={mobAlertForm.symbol} onChange={(e) => setMobAlertForm((f) => ({...f, symbol: e.target.value}))} className="h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[11px] text-[var(--text)]">
+                    {(symbols || []).map((s: any) => <option key={s.symbol} value={s.symbol}>{s.symbol}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div className="mb-1 text-[9px] text-[var(--muted)]">Condition</div>
+                  <select value={mobAlertForm.condition} onChange={(e) => setMobAlertForm((f) => ({...f, condition: e.target.value}))} className="h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[11px] text-[var(--text)]">
+                    <option value="ABOVE">Price Above</option>
+                    <option value="BELOW">Price Below</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 text-[9px] text-[var(--muted)]">Target Price</div>
+                <input type="number" inputMode="decimal" value={mobAlertForm.price} onChange={(e) => setMobAlertForm((f) => ({...f, price: e.target.value}))} placeholder="0.00000" className="h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+              </div>
+              <div>
+                <div className="mb-1 text-[9px] text-[var(--muted)]">Note (optional)</div>
+                <input type="text" value={mobAlertForm.note} onChange={(e) => setMobAlertForm((f) => ({...f, note: e.target.value}))} placeholder="" className="h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+              </div>
+              {mobAlertErr && <div className="text-[10px]" style={{ color: SELL }}>{mobAlertErr}</div>}
+              <button onClick={async () => {
+                if (!mobAlertForm.symbol || !mobAlertForm.price) { setMobAlertErr("Symbol and price are required"); return; }
+                const r = await fetch("/api/client/alerts", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ ...mobAlertForm, price: Number(mobAlertForm.price), accountId: accId }) }).then((x) => x.json()).catch(() => ({ok:false}));
+                if (r.ok) { loadMobAlerts(); setMobAlertForm({ symbol: mobAlertForm.symbol, condition: "ABOVE", price: "", note: "" }); setMobAlertErr(""); } else setMobAlertErr(r.error || "Failed");
+              }} className="w-full rounded-xl py-2 text-[12px] font-semibold text-white" style={{ background: "var(--accent)" }}>Set Alert</button>
+            </div>
+            {/* Active alerts list */}
+            {mobAlerts.length === 0 ? <div className="py-4 text-center text-[11px] text-[var(--muted)]">No active alerts.</div> : mobAlerts.map((al) => (
+              <div key={al.id} className="mb-2 flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                <div>
+                  <div className="text-[12px] font-semibold">{al.symbol} <span style={{ color: "var(--accent)" }}>{al.condition === "ABOVE" ? "↑" : "↓"}</span> {al.price}</div>
+                  {al.note && <div className="text-[10px] text-[var(--muted)]">{al.note}</div>}
+                </div>
+                <button onClick={async () => { await fetch(`/api/client/alerts?id=${al.id}`, { method: "DELETE" }); loadMobAlerts(); }} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "rgba(224,82,96,0.15)", color: SELL }}><i className="fa-solid fa-xmark text-[10px]" /></button>
+              </div>
+            ))}
           </div>
         </div>
       )}

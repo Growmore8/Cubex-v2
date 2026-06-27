@@ -21,6 +21,7 @@ export async function GET() {
       id: o.id, accountId: o.accountId, accountLogin: o.account?.login, accountName: o.account?.name,
       symbol: o.symbol, side: o.side, kind: o.kind, lots: Number(o.lots), price: Number(o.price),
       sl: Number(o.sl), tp: Number(o.tp), createdAt: o.createdAt,
+      stopLimit: Number((o as any).stopLimit ?? 0), comment: (o as any).comment || null,
     })),
   });
 }
