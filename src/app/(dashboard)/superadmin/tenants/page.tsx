@@ -488,10 +488,16 @@ export default function SATenantsPage() {
                   <span>Allow client self-registration <span className="text-yellow-500 text-xs ml-1">🔒 blocked on demo — unlocks on convert to paid</span></span>
                 </div>
               ) : (
-                <label className="col-span-2 mt-1 flex cursor-pointer select-none items-center gap-2 text-sm">
-                  <input type="checkbox" className="h-4 w-4" checked={editForm.allowRegistration !== false} onChange={(e) => setEditForm({ ...editForm, allowRegistration: e.target.checked })} />
-                  <span>Allow client self-registration <span className="text-gray-400">(shows the Open Account / Register link on this tenant's login)</span></span>
-                </label>
+                <>
+                  <label className="col-span-2 mt-1 flex cursor-pointer select-none items-center gap-2 text-sm">
+                    <input type="checkbox" className="h-4 w-4" checked={editForm.allowRegistration !== false} onChange={(e) => setEditForm({ ...editForm, allowRegistration: e.target.checked })} />
+                    <span>Allow client self-registration <span className="text-gray-400">(shows the Open Account / Register link on this tenant's login)</span></span>
+                  </label>
+                  <label className="col-span-2 mt-2 flex cursor-pointer select-none items-center gap-2 text-sm">
+                    <input type="checkbox" className="h-4 w-4" checked={!!(editForm as any).swapEnabled} onChange={(e) => setEditForm({ ...editForm, swapEnabled: e.target.checked } as any)} />
+                    <span>Enable overnight swap charges <span className="text-gray-400">(tenant admin configures rates per symbol; Islamic accounts are exempt)</span></span>
+                  </label>
+                </>
               )}
             </div>
             <div className="mt-4 flex justify-end gap-2">

@@ -910,6 +910,23 @@ async function monitor(io) {
         if (tp > 0 && ask <= tp) reason = "TP";
         else if (sl > 0 && ask >= sl) reason = "SL";
       }
+      // Trailing stop: adjust SL as price moves in favour
+      const trailDist = Number(t.trailingStop);
+      if (!reason && trailDist > 0) {
+        if (t.type === "BUY") {
+          const newSl = bid - trailDist;
+          if (newSl > Number(t.sl)) {
+            if (bid <= newSl) { reason = "SL"; }
+            else { await prisma.trade.update({ where: { id: t.id }, data: { sl: newSl } }).catch(() => {}); }
+          }
+        } else {
+          const newSl = ask + trailDist;
+          if (newSl < Number(t.sl) || Number(t.sl) === 0) {
+            if (ask >= newSl) { reason = "SL"; }
+            else { await prisma.trade.update({ where: { id: t.id }, data: { sl: newSl } }).catch(() => {}); }
+          }
+        }
+      }
       // Close at bid (BUY) or ask (SELL)
       if (reason) closeTpSl(t, reason, t.type === "BUY" ? bid : ask, io);
     }
@@ -938,15 +955,29 @@ async function checkPending(io) {
       if (!trig) continue;
       // BUY orders trigger on ask; SELL orders trigger on bid (MT5 style)
       let fill = false;
-      if (o.side === "BUY" && o.kind === "LIMIT") fill = ask <= trig;
-      else if (o.side === "BUY" && o.kind === "STOP") fill = ask >= trig;
+      if (o.side === "BUY"  && o.kind === "LIMIT")      fill = ask <= trig;
+      else if (o.side === "BUY"  && o.kind === "STOP")  fill = ask >= trig;
       else if (o.side === "SELL" && o.kind === "LIMIT") fill = bid >= trig;
-      else if (o.side === "SELL" && o.kind === "STOP") fill = bid <= trig;
+      else if (o.side === "SELL" && o.kind === "STOP")  fill = bid <= trig;
+      // STOP_LIMIT: stop price hit → place limit at stopLimit price
+      else if (o.kind === "STOP_LIMIT") {
+        const stopHit = o.side === "BUY" ? ask >= trig : bid <= trig;
+        if (stopHit) {
+          const limitPx = Number(o.stopLimit) || trig;
+          // Convert to a LIMIT order at limitPx
+          await prisma.pendingOrder.update({ where: { id: o.id }, data: { kind: o.side === "BUY" ? "LIMIT" : "LIMIT", price: limitPx } }).catch(() => {});
+        }
+        continue;
+      }
       if (!fill) continue;
       // BUY opens at ask, SELL opens at bid
       const openPx = o.side === "BUY" ? ask : bid;
+      // Commission on pending fill
+      const symForComm = await prisma.symbol.findFirst({ where: { tenantId: o.account.tenantId, symbol: o.symbol }, select: { commissionPerLot: true } }).catch(() => null);
+      const pendComm = Number(o.lots) * Number(symForComm?.commissionPerLot ?? 0);
       const ticket = await nextTicket(o.account.tenantId);
-      await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: openPx, sl: o.sl, tp: o.tp } });
+      await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: openPx, sl: o.sl, tp: o.tp, commission: pendComm, comment: o.comment || null } });
+      if (pendComm > 0) await prisma.account.update({ where: { id: o.accountId }, data: { pnl: { decrement: pendComm } } }).catch(() => {});
       await prisma.pendingOrder.delete({ where: { id: o.id } });
       const pbody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + openPx;
       if (o.account && o.account.userId) { await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: pbody, type: "TRADE" } }).catch(() => {}); pushToUser(o.account.userId, { title: "Pending order filled", body: pbody }); }
@@ -1009,6 +1040,65 @@ async function statementCronTick() {
     if (d && (d.weekly || d.monthly)) console.log("[statements] sent", d.weekly || 0, "weekly,", d.monthly || 0, "monthly");
   } catch (e) { /* transient — retried next hour */ }
 }
+// ── Price Alerts ─────────────────────────────────────────────────────────────
+async function checkPriceAlerts(io) {
+  try {
+    const alerts = await prisma.priceAlert.findMany({ where: { triggered: false }, include: { account: true } });
+    for (const al of alerts) {
+      const st = state[al.symbol];
+      if (!st || st.price == null) continue;
+      const price = st.price;
+      const hit = al.condition === "ABOVE" ? price >= Number(al.price) : price <= Number(al.price);
+      if (!hit) continue;
+      await prisma.priceAlert.update({ where: { id: al.id }, data: { triggered: true } });
+      const body = `${al.symbol} ${al.condition === "ABOVE" ? "rose above" : "fell below"} ${Number(al.price)}${al.note ? " — " + al.note : ""}`;
+      if (al.account?.userId) {
+        await prisma.notification.create({ data: { tenantId: al.tenantId, userId: al.account.userId, title: "Price alert triggered", body, type: "TRADE" } }).catch(() => {});
+        pushToUser(al.account.userId, { title: "Price alert triggered", body });
+      }
+      if (io) io.emit("refresh", { kind: "notification" });
+    }
+  } catch (e) { console.error("[alerts]", e); }
+}
+
+// ── Swap Daily Cron ───────────────────────────────────────────────────────────
+// Runs at 00:00 UTC. Charges swapLong (BUY) or swapShort (SELL) pips × pip value × lots.
+// Triple on Wednesday (covers Sat+Sun, MT5 standard).
+async function swapCronTick() {
+  try {
+    const now = new Date();
+    const isWed = now.getUTCDay() === 3; // Wednesday UTC
+    const multiplier = isWed ? 3 : 1;
+    // Only process tenants where swap is enabled
+    const tenants = await prisma.tenant.findMany({ where: { swapEnabled: true }, select: { id: true } });
+    const tenantIds = new Set(tenants.map((t) => t.id));
+    if (!tenantIds.size) return;
+    const trades = await prisma.trade.findMany({ where: { account: { tenantId: { in: Array.from(tenantIds) } } }, include: { account: true } });
+    for (const t of trades) {
+      if (t.account.swapFree) continue; // Islamic account — skip
+      const sym = await prisma.symbol.findFirst({ where: { tenantId: t.account.tenantId, symbol: t.symbol }, select: { swapLong: true, swapShort: true, digits: true } }).catch(() => null);
+      if (!sym) continue;
+      const swapRate = t.type === "BUY" ? Number(sym.swapLong) : Number(sym.swapShort);
+      if (swapRate === 0) continue;
+      const pip = Math.pow(10, -(sym.digits - 1));
+      const price = state[t.symbol]?.price ?? Number(t.openPrice);
+      const m = meta[t.symbol];
+      const contract = m ? m.contract : 100000;
+      const swapAmt = swapRate * pip * Number(t.lots) * contract * multiplier;
+      await prisma.trade.update({ where: { id: t.id }, data: { swap: { increment: new (require("@prisma/client").Prisma.Decimal)(swapAmt) } } }).catch(() => {});
+    }
+    console.log("[swap] processed", trades.length, "trades, multiplier:", multiplier);
+  } catch (e) { console.error("[swap]", e); }
+}
+function startSwapCron(io) {
+  // Schedule to run at next 00:00 UTC then every 24h
+  const now = new Date();
+  const nextMidnightUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+  const msToMidnight = nextMidnightUTC.getTime() - now.getTime();
+  setTimeout(() => { swapCronTick(); setInterval(swapCronTick, 24 * 60 * 60 * 1000); }, msToMidnight);
+  console.log("[swap] cron scheduled, next run in", Math.round(msToMidnight / 60000), "min");
+}
+
 function startStatementCron() {
   statementCronTick(); // catch the current hour on boot
   const now = new Date();
@@ -1111,6 +1201,8 @@ app.prepare().then(async () => {
   setInterval(microTick, 140);
   setInterval(() => monitor(io), MONITOR_MS);
   setInterval(() => checkPending(io), 2000);
+  setInterval(() => checkPriceAlerts(io), 5000); // price alert monitor every 5s
+  startSwapCron(io);
   startStatementCron();
   startTrialCleanup();
   startDemoCleanup();

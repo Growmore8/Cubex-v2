@@ -10,6 +10,8 @@ const schema = z.object({
   lots: z.number().positive(),
   sl: z.number().optional(),
   tp: z.number().optional(),
+  trailingStop: z.number().optional(), // pips; 0 = disabled
+  comment: z.string().max(128).optional(),
   accountId: z.string().optional(),
 });
 
@@ -19,7 +21,7 @@ export async function POST(req: Request) {
   try {
     const input = schema.parse(await req.json());
     const trade = await placeOrder(s.tenantId!, s.sub, input);
-    emitRefresh(); // sync the client's other open devices (desktop + mobile)
+    emitRefresh();
     return NextResponse.json({ ok: true, trade });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Order failed" }, { status: 400 });

@@ -82,7 +82,7 @@ export default function ClientTerminal() {
   }
   const [selSym, setSelSym] = useState("");
   const [tf, setTf] = useState("1M");
-  const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP">("MARKET");
+  const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP" | "STOP_LIMIT">("MARKET");
   const [ordIdx, setOrdIdx] = useState(0); // selected order kind (app-style grid)
   const [walletModal, setWalletModal] = useState<null | "deposit" | "withdraw" | "kyc">(null);
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false, psar: false, cdl: false, stoch: false, atr: false, adx: false, sig: false, ribbon: false });
@@ -102,6 +102,15 @@ export default function ClientTerminal() {
   const [sl, setSl] = useState("");
   const [tp, setTp] = useState("");
   const [trail, setTrail] = useState("");
+  const [comment, setComment] = useState("");
+  const [stopLimitType, setStopLimitType] = useState<"MARKET" | "LIMIT" | "STOP" | "STOP_LIMIT">("MARKET");
+  const [stopLimitEntry, setStopLimitEntry] = useState(""); // stop limit trigger price
+  const [partialClose, setPartialClose] = useState<{ id: string; sym: string; lots: number; closeLots: string } | null>(null);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [alertsLoaded, setAlertsLoaded] = useState(false);
+  const [alertModal, setAlertModal] = useState(false);
+  const [alertForm, setAlertForm] = useState({ condition: "ABOVE", price: "", note: "" });
+  const loadAlerts = () => fetch("/api/client/alerts?accountId=" + (accIdRef.current || "")).then((r) => r.json()).then((d) => { if (d.ok) { setAlerts(d.alerts); setAlertsLoaded(true); } }).catch(() => {});
   const [rightTab, setRightTab] = useState("TRADE");
   const [ctx, setCtx] = useState<{ x: number; y: number; sym: string } | null>(null);
   const [botTab, setBotTab] = useState<"positions" | "pending" | "history" | "summary" | "requests">("positions");
@@ -299,12 +308,20 @@ export default function ClientTerminal() {
     if (orderType === "LIMIT" || orderType === "STOP") {
       const trig = Number(pendingPrice); if (!trig) { setErr("Enter an entry price"); return; }
       const kind = orderType;
-      const rp = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), price: trig, kind, sl: Number(sl) || 0, tp: Number(tp) || 0, accountId: accIdRef.current }) });
+      const rp = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), price: trig, kind, sl: Number(sl) || 0, tp: Number(tp) || 0, comment: comment || undefined, accountId: accIdRef.current, currentAsk: (prices[selSym] || 0) + _spreadPips(selSym) * Math.pow(10, -(dg(selSym) - 1)) }) });
       const dp = await rp.json(); if (!dp.ok) { setErr(dp.error || "Failed"); return; }
       pushToast({ title: `${type} ${kind} ${selSym} placed`, type: "TRADE" }); setPendingPrice(""); load(); return;
     }
+    if (orderType === "STOP_LIMIT") {
+      const trig = Number(pendingPrice); const limit = Number(stopLimitEntry);
+      if (!trig) { setErr("Enter stop price"); return; }
+      if (!limit) { setErr("Enter limit price"); return; }
+      const rp = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), price: trig, kind: "STOP_LIMIT", stopLimit: limit, sl: Number(sl) || 0, tp: Number(tp) || 0, comment: comment || undefined, accountId: accIdRef.current }) });
+      const dp = await rp.json(); if (!dp.ok) { setErr(dp.error || "Failed"); return; }
+      pushToast({ title: `${type} STOP_LIMIT ${selSym} placed`, type: "TRADE" }); setPendingPrice(""); setStopLimitEntry(""); load(); return;
+    }
     const r = await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), sl: Number(sl) || 0, tp: Number(tp) || 0, accountId: accIdRef.current }) });
+      body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), sl: Number(sl) || 0, tp: Number(tp) || 0, trailingStop: Number(trail) || 0, comment: comment || undefined, accountId: accIdRef.current }) });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Order failed"); return; }
     pushToast({ title: `${type} ${selSym} ${vol}L opened`, type: "TRADE" }); load();
@@ -437,11 +454,12 @@ export default function ClientTerminal() {
     if (!d.ok) { setErr(d.error || "Failed"); return; }
     load();
   }
-  async function close(id: string) {
+  async function close(id: string, closeLots?: number) {
     if (account?.locked) { setErr("Your account is read-only. Closing is disabled."); return; }
-    const r = await fetch("/api/client/orders/" + id + "/close", { method: "POST" });
+    const body = closeLots != null ? { lots: closeLots } : {};
+    const r = await fetch("/api/client/orders/" + id + "/close", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Close failed"); return; }
-    pushToast({ title: "Trade closed" + (d.pnl != null ? ` · P/L $${gnum(d.pnl, 2)}` : ""), type: "TRADE" }); load();
+    pushToast({ title: (d.isPartial ? `Partial close ${closeLots}L` : "Trade closed") + (d.pnl != null ? ` · P/L $${gnum(d.pnl, 2)}` : ""), type: "TRADE" }); load();
   }
   function switchAcc(id: string) { accIdRef.current = id; setAccId(id); load(); }
   async function doTransfer() {
@@ -898,6 +916,9 @@ export default function ClientTerminal() {
             <div className="flex items-center gap-1.5">
               <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "var(--soft)", color: "#2f81f7" }}>{selSym}</span>
               {price != null && <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{gnum(price, d)}</span>}
+              <button title="Price Alerts" onClick={() => { if (!alertsLoaded) loadAlerts(); setAlertModal(true); }} className="rounded p-1 text-[11px]" style={{ color: alerts.filter((a) => a.symbol === selSym).length > 0 ? "#f59e0b" : "var(--muted)" }}>
+                <i className="fa-solid fa-bell" />
+              </button>
             </div>
           </div>
           {/* Scrollable form area */}
@@ -916,23 +937,29 @@ export default function ClientTerminal() {
           ) : (
             <div className="flex flex-col gap-2 p-2">
 
-              {/* Order type: MARKET | LIMIT | STOP */}
+              {/* Order type: MARKET | LIMIT | STOP | STOP_LIMIT */}
               <div>
                 <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Order Type</div>
                 <div className="flex overflow-hidden rounded-lg border border-[var(--border)]">
-                  {(["MARKET", "LIMIT", "STOP"] as const).map((t) => (
-                    <button key={t} onClick={() => { setOrderType(t); if (t !== "MARKET" && !pendingPrice && price != null) setPendingPrice(price.toFixed(d)); }} className="flex-1 py-1.5 text-[10px] font-semibold transition-colors" style={orderType === t ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }}>{t}</button>
+                  {(["MARKET", "LIMIT", "STOP", "STOP_LIMIT"] as const).map((t) => (
+                    <button key={t} onClick={() => { setOrderType(t); if (t !== "MARKET" && !pendingPrice && price != null) setPendingPrice(price.toFixed(d)); }} className="flex-1 py-1.5 text-[9px] font-semibold transition-colors" style={orderType === t ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }}>{t.replace("_", " ")}</button>
                   ))}
                 </div>
               </div>
 
-              {/* Entry price — Limit / Stop only */}
+              {/* Entry price — Limit / Stop / Stop Limit only */}
               {orderType !== "MARKET" && (
                 <div className="flex flex-col gap-1.5">
                   <div>
-                    <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Entry Price</div>
+                    <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{orderType === "STOP_LIMIT" ? "Stop Price (trigger)" : "Entry Price"}</div>
                     <input type="number" value={pendingPrice} onChange={(e) => setPendingPrice(e.target.value)} placeholder="Target Price" className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[12px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                   </div>
+                  {orderType === "STOP_LIMIT" && (
+                    <div>
+                      <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Limit Price (fill at)</div>
+                      <input type="number" value={stopLimitEntry} onChange={(e) => setStopLimitEntry(e.target.value)} placeholder="Limit Price" className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[12px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                    </div>
+                  )}
                   <div>
                     <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Expiry (GTD — leave blank for GTC)</div>
                     <input type="datetime-local" value={gtdExpiry} onChange={(e) => setGtdExpiry(e.target.value)} className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[10px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
@@ -965,6 +992,18 @@ export default function ClientTerminal() {
                   <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "#e0394a" }}>Stop Loss</div>
                   <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="" className="h-7 w-full rounded-lg border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)] text-center" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
                 </div>
+              </div>
+
+              {/* Trailing Stop (market orders only) + Comment */}
+              {orderType === "MARKET" && (
+                <div>
+                  <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Trailing Stop (pips, 0 = off)</div>
+                  <input type="number" min="0" step="1" value={trail} onChange={(e) => setTrail(e.target.value)} placeholder="0" className="h-7 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[10px] tabular-nums text-[var(--text)] outline-none text-center" />
+                </div>
+              )}
+              <div>
+                <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Comment (optional)</div>
+                <input type="text" maxLength={128} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="" className="h-7 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[10px] text-[var(--text)] outline-none" />
               </div>
 
               {/* Info block: Margin / Free Margin / Spread */}
@@ -1036,10 +1075,11 @@ export default function ClientTerminal() {
           )}
           {botTab === "positions" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /><Sth tbl="pos" k="pnl" label="Net P/L" align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right">Commission</th><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /><Sth tbl="pos" k="pnl" label="Net P/L" align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
               <tbody>
-                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={11}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
-                  <tr key={p.id} className="border-t border-[var(--border)]">
+                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={13}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
+                  <tr key={p.id} className="border-t border-[var(--border)]" title={p.comment || undefined}>
+                    <td className="px-2 py-1 text-[var(--muted)] tabular-nums">{p.ticket ? String(p.ticket) : "—"}</td>
                     <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span></td>
                     <td className="px-2 py-1 text-[var(--muted)]">{new Date(p.openedAt).toLocaleDateString()}</td>
                     <td className="px-2 py-1 text-right">{p.lots}</td><td className="px-2 py-1 text-right">{gnum(p.openPrice, dg(p.symbol))}</td>
@@ -1058,10 +1098,18 @@ export default function ClientTerminal() {
                         <span style={{ color: p.sl ? "#f43f5e" : "var(--muted)" }}>{p.sl ? gnum(p.sl, dg(p.symbol)) : <span className="text-[9px]">+ SL</span>}</span>
                       )}
                     </td>
-                    <td className="px-2 py-1 text-right text-[var(--muted)]">0.00</td>
+                    {/* Commission and Swap — always negative charges */}
+                    <td className="px-2 py-1 text-right" style={{ color: Number(p.commission) !== 0 ? SELL : "var(--muted)" }}>{Number(p.commission) !== 0 ? "-$" + fmt(Math.abs(Number(p.commission))) : "0.00"}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: Number(p.swap) !== 0 ? SELL : "var(--muted)" }}>{Number(p.swap) !== 0 ? (Number(p.swap) >= 0 ? "+$" : "-$") + fmt(Math.abs(Number(p.swap))) : "0.00"}</td>
                     <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
-                    <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
-                    <td className="px-2 py-1 text-right"><button style={{ color: SELL }} onClick={() => close(p.id)}>X</button></td>
+                    {/* Net P/L = gross + swap - commission */}
+                    {(() => { const net = pl + Number(p.swap) - Number(p.commission); return <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+$" : "-$") + fmt(Math.abs(net))}</td>; })()}
+                    <td className="px-2 py-1 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button title="Partial close" style={{ color: "var(--muted)" }} onClick={() => setPartialClose({ id: p.id, sym: p.symbol, lots: Number(p.lots), closeLots: "" })} className="text-[9px] px-1">½</button>
+                        <button style={{ color: SELL }} onClick={() => close(p.id)}>X</button>
+                      </div>
+                    </td>
                   </tr>); })}
               </tbody>
             </table>
@@ -1342,6 +1390,51 @@ export default function ClientTerminal() {
         </div>
       )}
       {dragging && <div className="fixed inset-0 z-[60]" />}
+
+      {/* Partial Close Modal */}
+      {partialClose && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setPartialClose(null)}>
+          <div className="w-72 rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 text-[13px] font-bold">Partial Close — {partialClose.sym}</div>
+            <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Open lots: {partialClose.lots} — enter lots to close</div>
+            <input type="number" min="0.01" max={partialClose.lots - 0.01} step="0.01" value={partialClose.closeLots} onChange={(e) => setPartialClose((s) => s ? { ...s, closeLots: e.target.value } : s)} placeholder="Lots" className="mb-3 h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[14px] font-bold tabular-nums outline-none focus:border-[var(--accent)]" style={{ color: "var(--text)" }} autoFocus />
+            <div className="flex gap-2">
+              <button onClick={() => setPartialClose(null)} className="flex-1 rounded-lg border border-[var(--border)] py-2 text-[11px]">Cancel</button>
+              <button onClick={async () => { const lots = Number(partialClose.closeLots); if (!lots || lots <= 0 || lots >= partialClose.lots) { setErr("Enter a valid partial lot size (less than total)"); setPartialClose(null); return; } await close(partialClose.id, lots); setPartialClose(null); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: SELL }}>Close {partialClose.closeLots || "?"} Lots</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Price Alerts Modal */}
+      {alertModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setAlertModal(false)}>
+          <div className="w-80 rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-[13px] font-bold">Price Alerts — {selSym}</div>
+              <button onClick={() => setAlertModal(false)} className="text-[var(--muted)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <div className="mb-3 space-y-1">
+              {alerts.filter((a) => a.symbol === selSym).length === 0 && <div className="text-[10px]" style={{ color: "var(--muted)" }}>No alerts for {selSym}</div>}
+              {alerts.filter((a) => a.symbol === selSym).map((a) => (
+                <div key={a.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-1.5 text-[10px]">
+                  <span>{a.condition} {a.price}{a.note ? ` — ${a.note}` : ""}</span>
+                  <button onClick={async () => { await fetch("/api/client/alerts?id=" + a.id, { method: "DELETE" }); loadAlerts(); }} className="ml-2 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-trash-can text-[9px]" /></button>
+                </div>
+              ))}
+            </div>
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Add Alert</div>
+            <div className="flex gap-2 mb-2">
+              {["ABOVE", "BELOW"].map((c) => (
+                <button key={c} onClick={() => setAlertForm((f) => ({ ...f, condition: c }))} className="flex-1 rounded py-1 text-[10px] font-semibold border" style={{ background: alertForm.condition === c ? "var(--accent)" : "transparent", color: alertForm.condition === c ? "#fff" : "var(--muted)", borderColor: "var(--border)" }}>{c}</button>
+              ))}
+            </div>
+            <input type="number" value={alertForm.price} onChange={(e) => setAlertForm((f) => ({ ...f, price: e.target.value }))} placeholder="Price" className="mb-2 h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-[11px] text-[var(--text)] outline-none text-center" />
+            <input type="text" maxLength={80} value={alertForm.note} onChange={(e) => setAlertForm((f) => ({ ...f, note: e.target.value }))} placeholder="Note (optional)" className="mb-3 h-7 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-[10px] text-[var(--text)] outline-none" />
+            <button onClick={async () => { if (!alertForm.price) return; const r = await fetch("/api/client/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, condition: alertForm.condition, price: Number(alertForm.price), note: alertForm.note || undefined, accountId: accIdRef.current }) }); const d = await r.json(); if (d.ok) { setAlertForm({ condition: "ABOVE", price: "", note: "" }); loadAlerts(); } }} className="w-full rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Set Alert</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -32,7 +32,8 @@ export async function POST(req: Request) {
     if (!lots || lots <= 0) throw new Error("Invalid lots");
     if (!price || price <= 0) throw new Error("Invalid trigger price");
     const side = b.side === "SELL" ? "SELL" : "BUY";
-    const kind = b.kind === "STOP" ? "STOP" : "LIMIT";
+    const validKinds = ["LIMIT", "STOP", "STOP_LIMIT"];
+    const kind = validKinds.includes(b.kind) ? b.kind : "LIMIT";
     // Validate trigger price direction against current market price
     const curAsk = Number(b.currentAsk) || 0;
     if (curAsk > 0) {
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
       if (side === "SELL" && kind === "STOP"  && price >= curAsk) throw new Error("Sell Stop must be below current price (" + curAsk + ")");
     }
     const expiresAt = b.expiresAt ? new Date(b.expiresAt) : null;
-    await prisma.pendingOrder.create({ data: { tenantId: a.tenantId, accountId: a.id, symbol: b.symbol, side: side as any, kind, lots, price, sl: Number(b.sl) || 0, tp: Number(b.tp) || 0, expiresAt } });
+    await prisma.pendingOrder.create({ data: { tenantId: a.tenantId, accountId: a.id, symbol: b.symbol, side: side as any, kind, lots, price, sl: Number(b.sl) || 0, tp: Number(b.tp) || 0, stopLimit: Number(b.stopLimit) || 0, comment: b.comment || null, expiresAt } });
     const label = `${a.login} placed ${kind} ${side} ${b.symbol} ${lots}L @ ${price}${Number(b.sl) ? " SL:" + b.sl : ""}${Number(b.tp) ? " TP:" + b.tp : ""}`;
     audit(a.tenantId, "trade.pending_placed", label, a.login, "CLIENT");
     notifyStaff(a.tenantId, { type: "TRADE", title: "Pending order placed", body: label }, a.managerId).catch(() => {});

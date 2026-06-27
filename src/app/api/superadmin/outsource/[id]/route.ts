@@ -41,6 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const currentSub = await prisma.subscription.findUnique({ where: { tenantId: t.id }, select: { status: true } });
       if (b.allowRegistration !== undefined && currentSub?.status !== "TRIALING") data.allowRegistration = !!b.allowRegistration;
       if (currentSub?.status === "TRIALING") data.allowRegistration = false;
+      if (b.swapEnabled !== undefined) data.swapEnabled = !!b.swapEnabled;
       await prisma.tenant.update({ where: { id: t.id }, data });
       // Plan can also be changed here; seats follow the (live) package limit.
       if (b.plan) {

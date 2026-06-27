@@ -20,6 +20,9 @@ export async function updateSymbol(tenantId: string, id: string, input: any) {
   if (input.spreadMax !== undefined) data.spreadMax = Number(input.spreadMax);
   if (input.enabled !== undefined) data.enabled = !!input.enabled;
   if (input.feed !== undefined) data.feed = input.feed;
+  if (input.swapLong !== undefined) data.swapLong = Number(input.swapLong);
+  if (input.swapShort !== undefined) data.swapShort = Number(input.swapShort);
+  if (input.commissionPerLot !== undefined) data.commissionPerLot = Number(input.commissionPerLot);
   return prisma.symbol.update({ where: { id }, data });
 }
 export async function deleteSymbol(tenantId: string, id: string) {

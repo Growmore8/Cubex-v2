@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/guard";
 import { updateSymbol, deleteSymbol } from "@/services/symbol.service";
 import { Redis } from "ioredis";
 
-const schema = z.object({ display: z.string().optional(), category: z.string().optional(), digits: z.number().int().optional(), spread: z.number().min(0).optional(), spreadType: z.enum(["FIXED", "FLOATING"]).optional(), spreadMax: z.number().min(0).optional(), enabled: z.boolean().optional() });
+const schema = z.object({ display: z.string().optional(), category: z.string().optional(), digits: z.number().int().optional(), spread: z.number().min(0).optional(), spreadType: z.enum(["FIXED", "FLOATING"]).optional(), spreadMax: z.number().min(0).optional(), enabled: z.boolean().optional(), swapLong: z.number().optional(), swapShort: z.number().optional(), commissionPerLot: z.number().min(0).optional() });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

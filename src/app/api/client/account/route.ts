@@ -131,12 +131,16 @@ export async function GET(req: Request) {
     })) : [],
     positions: account ? account.trades.map((t) => ({
       id: t.id.toString(), ticket: t.ticket.toString(), symbol: t.symbol, type: t.type,
-      lots: Number(t.lots), openPrice: Number(t.openPrice), sl: Number(t.sl), tp: Number(t.tp), openedAt: t.openedAt,
+      lots: Number(t.lots), openPrice: Number(t.openPrice), sl: Number(t.sl), tp: Number(t.tp),
+      commission: Number((t as any).commission ?? 0), swap: Number((t as any).swap ?? 0),
+      comment: (t as any).comment || null, openedAt: t.openedAt,
     })) : [],
     history: account ? account.history.map((h) => ({
       id: h.id.toString(), symbol: h.symbol, side: h.side, lots: Number(h.lots),
       openPrice: Number(h.openPrice), closePrice: Number(h.closePrice), pnl: Number(h.pnl),
       sl: Number(h.sl), tp: Number(h.tp),
+      commission: Number((h as any).commission ?? 0), swap: Number((h as any).swap ?? 0),
+      comment: (h as any).comment || null,
       closeReason: h.closeReason, openedAt: h.openedAt, closedAt: h.closedAt,
     })) : [],
     symbols,

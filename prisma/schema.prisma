@@ -28,6 +28,7 @@ model Tenant {
   smtpHost     String? // explicit SMTP server (e.g. mail.privateemail.com); blank = auto-detect from email domain
   permissions  Json          @default("{}")
   allowRegistration Boolean   @default(true) // show the client Register link on this tenant's login
+  swapEnabled  Boolean       @default(false) // SuperAdmin controls: enables overnight swap charges for this tenant
   subscription     Subscription?
   invoices         Invoice[]
   expiredAccounts  ExpiredAccount[]
@@ -114,6 +115,7 @@ model Account {
   leverage        Int                @default(100)
   currency        Currency           @default(USD)
   mcLevel         Decimal            @default(50) @db.Decimal(6, 2)
+  swapFree        Boolean            @default(false) // Islamic account — no swap charged
   doNotLiquidate  Boolean            @default(false)
   locked          Boolean            @default(false)
   deactivated     Boolean            @default(false)
@@ -145,6 +147,7 @@ model Account {
   paymentRequests PaymentRequest[]
   pendingOrders   PendingOrder[]
   symbolOverrides AccountSymbolOverride[]
+  priceAlerts     PriceAlert[]
   expiresAt       DateTime?          // DEMO only: set to createdAt+30d; null = never expires (LIVE)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
@@ -164,15 +167,19 @@ model Trade {
   id        BigInt   @id @default(autoincrement())
   ticket    BigInt   @unique
   accountId String
-  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  symbol    String
-  type      Side
-  lots      Decimal  @db.Decimal(10, 2)
-  openPrice Decimal  @db.Decimal(18, 5)
-  sl        Decimal  @default(0) @db.Decimal(18, 5)
-  tp        Decimal  @default(0) @db.Decimal(18, 5)
-  openedAt  DateTime @default(now())
-  createdAt DateTime @default(now())
+  account       Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol        String
+  type          Side
+  lots          Decimal  @db.Decimal(10, 2)
+  openPrice     Decimal  @db.Decimal(18, 5)
+  sl            Decimal  @default(0) @db.Decimal(18, 5)
+  tp            Decimal  @default(0) @db.Decimal(18, 5)
+  trailingStop  Decimal  @default(0) @db.Decimal(18, 5) // trailing stop distance in price units; 0 = disabled
+  commission    Decimal  @default(0) @db.Decimal(18, 2)
+  swap          Decimal  @default(0) @db.Decimal(18, 2)
+  comment       String?
+  openedAt      DateTime @default(now())
+  createdAt     DateTime @default(now())
   @@index([accountId])
   @@index([symbol])
 }
@@ -189,6 +196,9 @@ model TradeHistory {
   sl          Decimal     @default(0) @db.Decimal(18, 5)
   tp          Decimal     @default(0) @db.Decimal(18, 5)
   pnl         Decimal     @db.Decimal(18, 2)
+  commission  Decimal     @default(0) @db.Decimal(18, 2)
+  swap        Decimal     @default(0) @db.Decimal(18, 2)
+  comment     String?
   closeReason CloseReason @default(MANUAL)
   openedAt    DateTime
   closedAt    DateTime    @default(now())
@@ -218,12 +228,15 @@ model Symbol {
   category   String  @default("forex")
   digits     Int     @default(5)
   feed       String?
-  spread     Decimal @default(0) @db.Decimal(10, 2)
-  spreadType String  @default("FIXED")
-  spreadMax  Decimal @default(0) @db.Decimal(10, 2)
+  spread           Decimal @default(0) @db.Decimal(10, 2)
+  spreadType       String  @default("FIXED")
+  spreadMax        Decimal @default(0) @db.Decimal(10, 2)
   // markup: extra pips added on top of live bid/ask spread (for BN/KR feeds). 0 = no markup.
-  markup     Decimal @default(0) @db.Decimal(10, 2)
-  enabled    Boolean @default(true)
+  markup           Decimal @default(0) @db.Decimal(10, 2)
+  swapLong         Decimal @default(0) @db.Decimal(10, 5) // swap rate for BUY positions (pips per night)
+  swapShort        Decimal @default(0) @db.Decimal(10, 5) // swap rate for SELL positions (pips per night)
+  commissionPerLot Decimal @default(0) @db.Decimal(10, 2) // commission charged per lot on open
+  enabled          Boolean @default(true)
   @@unique([tenantId, symbol])
 }
 model AccountSymbolOverride {
@@ -375,9 +388,26 @@ model PendingOrder {
   price     Decimal   @default(0) @db.Decimal(18, 8)
   sl        Decimal   @default(0) @db.Decimal(18, 8)
   tp        Decimal   @default(0) @db.Decimal(18, 8)
+  stopLimit Decimal   @default(0) @db.Decimal(18, 8) // for STOP_LIMIT: limit price after stop triggers
+  comment   String?
   expiresAt DateTime?
   createdAt DateTime  @default(now())
   @@index([accountId])
+}
+
+model PriceAlert {
+  id        String   @id @default(uuid())
+  tenantId  String
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  symbol    String
+  condition String   // ABOVE | BELOW
+  price     Decimal  @db.Decimal(18, 5)
+  note      String?
+  triggered Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@index([accountId])
+  @@index([tenantId])
 }
 model PaymentRequest {
   id           String        @id @default(uuid())
