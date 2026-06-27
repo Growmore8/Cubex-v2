@@ -66,8 +66,8 @@ export default function ClientTerminal() {
   const [groupSpread, setGroupSpread] = useState(0);
   const [accountSpreadMarkup, setAccountSpreadMarkup] = useState(0);
   const [prices, setPrices] = useState<Record<string, number>>({});
-  const [realPrices, setRealPrices] = useState<Record<string, number>>({});
   const [liveBids, setLiveBids] = useState<Record<string, number>>({});
+  const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const notifSeen = useRef<Set<string>>(new Set());
   const notifPrimed = useRef(false);
@@ -229,24 +229,25 @@ export default function ClientTerminal() {
     const socket: Socket = io({ path: "/socket.io" });
     const pP: Record<string, number> = {};
     const pD: Record<string, number> = {};
-    const rP: Record<string, number> = {};
-    // Coalesce all incoming ticks and apply them on a fixed ~12fps cadence. Without
-    // this the entire (monolithic) desk re-rendered on every animation frame, which
-    // caused the slow/glitchy feel. The chart and the Buy/Sell buttons both read this
-    // same `prices` state, so they now update in lockstep at the same speed.
+    const pB: Record<string, number> = {};
+    const pS: Record<string, number> = {};
+    // Coalesce all incoming ticks and flush on a fixed ~12fps cadence so the entire
+    // component re-renders once per frame, not once per symbol per tick.
+    // Spread is computed HERE (inside the tick, while bid and real-ask are coherent)
+    // so the Sprd column updates live just like price.
     const flush = () => {
-      const pxKeys = Object.keys(pP), drKeys = Object.keys(pD), rpKeys = Object.keys(rP);
-      if (!pxKeys.length && !drKeys.length && !rpKeys.length) return;
-      const px = { ...pP }, dr = { ...pD }, rp = { ...rP };
+      const pxKeys = Object.keys(pP), drKeys = Object.keys(pD), bkKeys = Object.keys(pB), skKeys = Object.keys(pS);
+      if (!pxKeys.length && !drKeys.length && !bkKeys.length && !skKeys.length) return;
+      const px = { ...pP }, dr = { ...pD }, bd = { ...pB }, sp = { ...pS };
       for (const k in pP) delete pP[k];
       for (const k in pD) delete pD[k];
-      for (const k in rP) delete rP[k];
-      // Low-priority: lets urgent updates (a nav tap) interrupt the price re-render,
-      // so switching tabs feels instant instead of waiting on the price churn.
+      for (const k in pB) delete pB[k];
+      for (const k in pS) delete pS[k];
       startTransition(() => {
         if (pxKeys.length) setPrices((pp) => ({ ...pp, ...px }));
         if (drKeys.length) setDirs((dd) => ({ ...dd, ...dr }));
-        if (rpKeys.length) setRealPrices((pp) => ({ ...pp, ...rp }));
+        if (bkKeys.length) setLiveBids((bb) => ({ ...bb, ...bd }));
+        if (skKeys.length) setLiveSpreadPips((ss) => ({ ...ss, ...sp }));
       });
     };
     socket.on("tick", ({ symbol, price, bid, real }: any) => {
@@ -254,8 +255,16 @@ export default function ClientTerminal() {
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
-      if (real != null && real > 0) rP[symbol] = real;
-      if (bid != null) startTransition(() => setLiveBids((b) => ({ ...b, [symbol]: bid })));
+      if (bid != null) pB[symbol] = bid;
+      // Compute spread from this tick's coherent real-ask + bid (not from stale state)
+      if (bid != null && bid > 0) {
+        const realAsk = (real != null && real > 0) ? real : price;
+        if (realAsk > bid) {
+          const d = DIGITS[symbol] ?? 2;
+          const pip = Math.pow(10, -(d - 1));
+          pS[symbol] = (realAsk - bid) / pip;
+        }
+      }
     });
     // Real bid snapshot from Binance/Kraken on connect
     socket.on("bids", (snap: Record<string, number>) => {
@@ -469,26 +478,24 @@ export default function ClientTerminal() {
   const _spreadPips = (sym: string) => {
     const s = symbolSpreads[sym];
     const markup = groupSpread + accountSpreadMarkup;
-    // FIXED type: admin explicitly locked this spread — always use configured pips
-    if (s?.type === "FIXED") return (s.min || 0) + markup;
-    // FLOATING (or no config): live exchange bid/ask is the real spread.
-    // Use realPrices (true Binance ask) not simulated display price — avoids
-    // the display animation drift inflating the computed spread.
-    const ask = realPrices[sym] ?? prices[sym]; const rawBid = liveBids[sym];
-    if (ask != null && rawBid != null && rawBid > 0 && rawBid < ask) {
-      const pipSize = Math.pow(10, -(dg(sym) - 1));
-      const marketSpreadPips = (ask - rawBid) / pipSize;
-      const minFloor = s?.min || 0;
-      return Math.max(minFloor, marketSpreadPips) + markup;
+    // FLOATING: use live spread computed directly from the tick's coherent bid/ask
+    if (s?.type !== "FIXED") {
+      const live = liveSpreadPips[sym];
+      if (live != null && live > 0) {
+        const minFloor = s?.min || 0;
+        return Math.max(minFloor, live) + markup;
+      }
+      // No live data yet → fallback to configured floor
+      if (!s) return markup;
+      let base = s.min;
+      if (s.max > s.min) {
+        const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
+        if (!(wd >= 1 && wd <= 5 && h >= 8 && h < 17)) base = s.max;
+      }
+      return base + markup;
     }
-    // No live bid yet → fallback to configured min (time-based max for off-hours)
-    if (!s) return markup;
-    let base = s.min;
-    if (s.max > s.min) {
-      const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
-      if (!(wd >= 1 && wd <= 5 && h >= 8 && h < 17)) base = s.max;
-    }
-    return base + markup;
+    // FIXED: admin explicitly locked this spread
+    return (s.min || 0) + markup;
   };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
   const ask = price ?? 0;
