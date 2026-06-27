@@ -1010,11 +1010,11 @@ export default function ClientTerminal() {
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "#facc15" }}>
         <span>Balance: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(balance) : "--"}</span></span>
-        <span>Flt P/L: <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+$" : "-$") + fmt(Math.abs(floating)) : "--"}</span></span>
-        <span>Equity: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(equity) : "--"}</span></span>
-        <span>Used Margin: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(used) : "--"}</span></span>
+        <span>Equity: <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? "$" + fmt(equity) : "--"}</span></span>
+        <span>Margin: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(used) : "--"}</span></span>
         <span>Free Margin: <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? "$" + fmt(free) : "--"}</span></span>
         <span>Margin Level: <span className="font-mono font-bold" style={{ color: !account || !level ? "var(--muted)" : level >= 200 ? "#22c55e" : level >= 150 ? "#facc15" : level >= 100 ? "#f97316" : SELL }}>{account && level ? level.toFixed(1) + "%" : "--"}</span></span>
+        <span>Profit: <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+$" : "-$") + fmt(Math.abs(floating)) : "--"}</span></span>
       </div>
 
       <div onMouseDown={dragY} className="h-1 cursor-row-resize bg-[var(--border)] hover:bg-[#3b82f6]" />

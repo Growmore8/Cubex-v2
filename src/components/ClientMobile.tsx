@@ -572,7 +572,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="relative grid grid-cols-3 gap-2 text-white">
                   <div><div className="text-[8px] tracking-[0.12em] text-white/50">EQUITY</div><div className="text-[13px] font-bold tabular-nums">${fmt(equity)}</div></div>
                   <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE</div><div className="text-[13px] font-bold tabular-nums">${fmt(free)}</div></div>
-                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">FLT P/L</div><div className="text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#5ef2b3" : "#ff9a9a" }}>{floating >= 0 ? "+" : ""}{fmt(floating)}</div></div>
+                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">PROFIT</div><div className="text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#5ef2b3" : "#ff9a9a" }}>{floating >= 0 ? "+" : ""}{fmt(floating)}</div></div>
                 </div>
               </div>
             </div>
@@ -1114,11 +1114,11 @@ export default function ClientMobile({ t }: { t: any }) {
             <div className="glass-card p-4">
               <div className="mb-2 text-[11px] font-bold tracking-wide">RUNNING TRADE SUMMARY</div>
               <div className="mb-2 text-[10px] text-[var(--muted)]">Showing: {account?.login} · {account?.type} · {(positions || []).length} open</div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Floating P/L</span><span style={{ color: floating >= 0 ? BUY : SELL }}>${fmt(floating)}</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Equity</span><span>${fmt(equity)}</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Used Margin</span><span>${fmt(used)}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Equity</span><span style={{ color: equity >= balance ? BUY : SELL }}>${fmt(equity)}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Margin</span><span>${fmt(used)}</span></div>
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Free Margin</span><span>${fmt(free)}</span></div>
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Margin Level</span><span>{level ? level.toFixed(2) : "0.00"}%</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Profit</span><span style={{ color: floating >= 0 ? BUY : SELL }}>${fmt(floating)}</span></div>
             </div>
 
             {/* by direction */}

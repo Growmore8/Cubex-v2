@@ -1037,10 +1037,11 @@ export default function AdminDeskPage() {
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "#facc15" }}>
         <span>Balance: <span className="text-[var(--text)]">{selAcc ? fmt(balance) : "--"}</span></span>
-        <span>Flt P/L: <span style={{ color: floating >= 0 ? BUY : SELL }}>{selAcc ? fmt(floating) : "--"}</span></span>
-        <span>Equity: <span className="text-[var(--text)]">{selAcc ? fmt(equity) : "--"}</span></span>
-        <span>Free: <span className="text-[var(--text)]">{selAcc ? fmt(free) : "--"}</span></span>
-        <span>Level: <span className="text-[var(--text)]">{selAcc && level ? level.toFixed(1) + "%" : "--"}</span></span>
+        <span>Equity: <span style={{ color: !selAcc ? "var(--text)" : equity >= balance ? BUY : SELL }}>{selAcc ? fmt(equity) : "--"}</span></span>
+        <span>Margin: <span className="text-[var(--text)]">{selAcc ? fmt(used) : "--"}</span></span>
+        <span>Free Margin: <span className="text-[var(--text)]">{selAcc ? fmt(free) : "--"}</span></span>
+        <span>Margin Level: <span style={{ color: !selAcc || !level ? "var(--muted)" : level >= 200 ? "#22c55e" : level >= 150 ? "#facc15" : level >= 100 ? "#f97316" : SELL }}>{selAcc && level ? level.toFixed(1) + "%" : "--"}</span></span>
+        <span>Profit: <span style={{ color: floating >= 0 ? BUY : SELL }}>{selAcc ? (floating >= 0 ? "+" : "-") + fmt(Math.abs(floating)) : "--"}</span></span>
         {selAcc && <span>MC: <span style={{ color: Number(selAcc.mcLevel) > 0 ? SELL : "var(--muted)" }}>{Number(selAcc.mcLevel) > 0 ? selAcc.mcLevel + "%" : "Off"}</span></span>}
         {selAcc && <span>DNL: <span style={{ color: selAcc.doNotLiquidate ? GOLD : "var(--muted)" }}>{selAcc.doNotLiquidate ? "On" : "Off"}</span></span>}
         <span>{selAcc ? selAcc.login + " - " + titleCaseName(selAcc.name) : "No account selected"}</span>
