@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen } from "@/lib/perms";
-import { getPrice, getBid } from "@/lib/prices";
+import { getPrice } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
 import { pnlFor, validateSlTp, usedMargin } from "@/lib/trademath";
@@ -74,18 +74,15 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   if (ask == null) throw new Error("No price for " + input.symbol);
 
   // Compute spread-adjusted open price: BUY opens at ask, SELL opens at bid (MT5 standard)
-  const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol: input.symbol }, select: { digits: true, spreadType: true } }).catch(() => null);
+  const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol: input.symbol }, select: { digits: true } }).catch(() => null);
   const digits = symRow?.digits ?? 5;
   const pip = pipForDigits(digits);
   const adminPips = await getSpreadPips(tenantId, input.symbol, (account as any).groupId, account.id);
-  // FIXED: bid = ask − fixedPips (exact spread, real exchange bid ignored)
-  // FLOATING: bid = realBid − markupPips (live exchange bid minus admin markup)
-  const isFixed = (symRow?.spreadType ?? "FLOATING") === "FIXED";
-  const realBid = isFixed ? null : await getBid(input.symbol);
-  const validRealBid = realBid != null && realBid > 0 && realBid < ask;
-  const bid = validRealBid
-    ? Math.max(0, realBid - adminPips * pip)   // FLOATING: live bid − markup
-    : Math.max(0, ask - adminPips * pip);       // FIXED or no real bid: ask − configured spread
+  // MT5 standard: bid = ask − configuredSpread (same formula for FIXED and FLOATING).
+  // FLOATING just means the pips widen during off-hours — it is NOT a pass-through of
+  // the real exchange bid. Using realBid here would create a mismatch with the server's
+  // TP/SL/MC checks (server.js getBid) which also use ask-based bid consistently.
+  const bid = Math.max(0, ask - adminPips * pip);
   const openPrice = input.side === "BUY" ? ask : bid;
 
   const slErr = validateSlTp(input.side, openPrice, input.sl, input.tp);
@@ -129,16 +126,12 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
   const ask = await getPrice(trade.symbol);
   if (ask == null) throw new Error("No price");
   // BUY closes at bid (ask − spread), SELL closes at ask (MT5 standard)
-  const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol: trade.symbol }, select: { digits: true, spreadType: true } }).catch(() => null);
+  const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol: trade.symbol }, select: { digits: true } }).catch(() => null);
   const digits = symRow?.digits ?? 5;
   const pip = pipForDigits(digits);
   const adminPips = await getSpreadPips(tenantId, trade.symbol, (trade.account as any).groupId, trade.accountId.toString());
-  const isFixed = (symRow?.spreadType ?? "FLOATING") === "FIXED";
-  const realBid = isFixed ? null : await getBid(trade.symbol);
-  const validRealBid = realBid != null && realBid > 0 && realBid < ask;
-  const closeBid = validRealBid
-    ? Math.max(0, realBid - adminPips * pip)   // FLOATING: live bid − markup
-    : Math.max(0, ask - adminPips * pip);       // FIXED or no real bid: ask − configured spread
+  // MT5 standard: bid = ask − configuredSpread (consistent with server.js TP/SL/MC checks)
+  const closeBid = Math.max(0, ask - adminPips * pip);
   const price = trade.type === "BUY" ? closeBid : ask;
   const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
 

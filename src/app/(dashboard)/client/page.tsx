@@ -476,25 +476,20 @@ export default function ClientTerminal() {
   const level = used > 0 ? (equity / used) * 100 : 0;
   const price = prices[selSym];
   const d = dg(selSym);
-  // Effective spread the client pays: matches server execution exactly.
-  // FIXED: sym.min pips always (constant, ignores live exchange spread).
-  // FLOATING: live exchange spread + sym.min markup + group/account markups.
+  // Effective spread the client pays — matches MT5 model and server execution exactly.
+  // bid = ask − spreadPips × pip (same formula used by server.js for TP/SL/MC/pending).
+  // FIXED: sym.min pips always constant.
+  // FLOATING: sym.min during peak hours (Mon–Fri 08–17 UTC), sym.max off-hours.
+  // Group/account FIXED markups are added on top.
   const _spreadPips = (sym: string) => {
     const s = symbolSpreads[sym];
-    const grpAcc = groupSpread + accountSpreadMarkup; // group + account FIXED markups
-    if (s?.type === "FIXED") return (s.min || 0) + grpAcc; // always constant, no live
-    // FLOATING: live exchange spread + symbol markup + group/account markups
-    const symMarkup = s?.min ?? 0;
-    const live = liveSpreadPips[sym];
-    if (live != null && live > 0) return live + symMarkup + grpAcc;
-    // No live data: use time-adjusted configured spread as fallback
-    if (!s) return symMarkup + grpAcc;
-    let base = s.min;
-    if (s.max > s.min) {
-      const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
-      if (!(wd >= 1 && wd <= 5 && h >= 8 && h < 17)) base = s.max;
-    }
-    return base + grpAcc;
+    const grpAcc = groupSpread + accountSpreadMarkup;
+    if (!s) return grpAcc;
+    if (s.type === "FIXED" || s.max <= s.min) return (s.min || 0) + grpAcc;
+    // FLOATING with off-hours widening
+    const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
+    const isPeak = wd >= 1 && wd <= 5 && h >= 8 && h < 17;
+    return (isPeak ? s.min : s.max) + grpAcc;
   };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
   const ask = price ?? 0;
