@@ -160,6 +160,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [modifyId, setModifyId] = useState<string | null>(null);
   const [mSl, setMSl] = useState("");
   const [mTp, setMTp] = useState("");
+  const [mTrail, setMTrail] = useState("");
   const [mobPartial, setMobPartial] = useState<{id: string; lots: number; sym: string} | null>(null);
   const [mobPartialLots, setMobPartialLots] = useState("");
   const [mobAlertOpen, setMobAlertOpen] = useState(false);
@@ -359,7 +360,9 @@ export default function ClientMobile({ t }: { t: any }) {
 
   const saveModify = async (id: string) => {
     try {
-      await fetch("/api/client/orders/" + id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sl: mSl, tp: mTp }) });
+      const body: any = { sl: mSl, tp: mTp };
+      if (mTrail !== "") body.trailingStop = Number(mTrail) || 0;
+      await fetch("/api/client/orders/" + id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     } catch { }
     setModifyId(null); setExpanded(null);
   };
@@ -1002,16 +1005,17 @@ export default function ClientMobile({ t }: { t: any }) {
                         {Number(p.swap ?? 0) !== 0 && <div><div className="text-[var(--muted)]">SWAP</div><div className="font-semibold" style={{ color: Number(p.swap) >= 0 ? BUY : SELL }}>{Number(p.swap) >= 0 ? "+" : ""}{fmt(Number(p.swap))}</div></div>}
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2">
-                        <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-pen mr-1" />Modify</button>
+                        <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); setMTrail(p.trailingStop > 0 ? String(p.trailingStop) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-pen mr-1" />Modify</button>
                         <button onClick={() => { setMobPartial({id: p.id, lots: Number(p.lots), sym: p.symbol}); setMobPartialLots(""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-scissors mr-1" />Partial</button>
                         <button onClick={() => close(p.id)} className="rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: SELL }}><i className="fa-solid fa-xmark mr-1" />Close</button>
                       </div>
                       {modifyId === p.id && (
                         <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--soft)] p-3">
-                          <div className="mb-2 text-[11px] font-semibold">Modify SL / TP</div>
+                          <div className="mb-2 text-[11px] font-semibold">Modify SL / TP / Trail</div>
                           <div className="grid grid-cols-2 gap-2">
                             <input value={mSl} onChange={(e) => setMSl(e.target.value)} placeholder="Stop loss" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
                             <input value={mTp} onChange={(e) => setMTp(e.target.value)} placeholder="Take profit" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
+                            <input value={mTrail} onChange={(e) => setMTrail(e.target.value)} type="number" min="0" placeholder="Trail pips (0=off)" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)] col-span-2" style={{ borderColor: mTrail ? "#f59e0b" : undefined }} />
                           </div>
                           <div className="mt-2 flex gap-2">
                             <button onClick={() => setModifyId(null)} className="flex-1 rounded-lg border border-[var(--border)] py-2 text-[12px]">Cancel</button>

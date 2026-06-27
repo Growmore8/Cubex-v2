@@ -427,7 +427,7 @@ export default function AdminDeskPage() {
     const trig = Number(tform.price); if (!trig) { setErr("Enter a trigger price"); return; }
     const side = tform.type.indexOf("Buy") === 0 ? "BUY" : "SELL";
     const kind = tform.type.indexOf("Stop") !== -1 ? "STOP" : "LIMIT";
-    const r = await fetch("/api/desk/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: selAcc.id, symbol: ticket, side, kind, lots: tform.vol, price: trig, sl: tform.sl, tp: tform.tp }) });
+    const r = await fetch("/api/desk/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: selAcc.id, symbol: ticket, side, kind, lots: tform.vol, price: trig, sl: tform.sl, tp: tform.tp, comment: tform.comment || undefined }) });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
     setTicket(null); loadAll();
   }
