@@ -702,7 +702,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       </div>
                       <div className="flex items-center gap-2">
                         <Sparkline data={hist} up={upTrend} />
-                        <span className="text-[10px] text-[var(--muted)]">Sprd {Math.round(spread * 10)}</span>
+                        <span className="text-[10px] text-[var(--muted)]">Spread: {Math.round(spread * 10)}</span>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 items-center gap-2">
@@ -882,7 +882,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-[var(--border)] px-3" style={{ background: "var(--soft)" }}>
                         <span className="text-[12px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{chartVol}</span>
                         <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>Lots</span>
-                        <span className="text-[8px] font-semibold" style={{ color: "var(--muted)" }}>{Math.round(sprd * 10)} sprd</span>
+                        <span className="text-[8px] font-semibold" style={{ color: "var(--muted)" }}>{Math.round(sprd * 10)}</span>
                       </div>
                       <button onPointerDown={(e) => { e.preventDefault(); doPlace("BUY"); }} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)", touchAction: "manipulation" }}>
                         <span className="text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up mr-0.5 text-[8px]" />Buy</span>
@@ -1385,7 +1385,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-[var(--border)] px-3" style={{ background: "var(--soft)" }}>
                     <span className="text-[12px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{noOpenVol}</span>
                     <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>Lots</span>
-                    <span className="text-[8px] font-semibold" style={{ color: "var(--muted)" }}>{Math.round(sprd * 10)} sprd</span>
+                    <span className="text-[8px] font-semibold" style={{ color: "var(--muted)" }}>{Math.round(sprd * 10)}</span>
                   </div>
                   <button onClick={() => doPlace("BUY")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)" }}>
                     <span className="text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up mr-1 text-[9px]" />Buy</span>

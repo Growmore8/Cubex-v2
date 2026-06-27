@@ -808,7 +808,7 @@ export default function ClientTerminal() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" style={{ color: "var(--muted)" }}>Sprd</span></div>
+          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" style={{ color: "var(--muted)" }}>Spread</span></div>
             {favs.length > 0 && (
               <div>
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
@@ -926,7 +926,7 @@ export default function ClientTerminal() {
                 </div>
                 <div className="flex items-center justify-between px-2.5 py-1">
                   <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_spreadPips(selSym) * 10)} pips</span>
+                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_spreadPips(selSym) * 10)}</span>
                 </div>
               </div>
 
@@ -945,8 +945,7 @@ export default function ClientTerminal() {
                   <span className="text-[14px] tabular-nums">{bid != null ? gnum(bid, d) : "…"}</span>
                 </button>
                 <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 px-1">
-                  <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>sprd</span>
-                  <span className="text-[10px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_spreadPips(selSym) * 10)}</span>
+                  <span className="text-[10px] font-bold tabular-nums" style={{ color: "var(--muted)" }}>{Math.round(_spreadPips(selSym) * 10)}</span>
                 </div>
                 <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)" }}>
                   <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up text-[8px]" />Buy</span>
