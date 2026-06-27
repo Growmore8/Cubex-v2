@@ -646,9 +646,9 @@ export default function AdminDeskPage() {
   const deskViewLabel = selAcc ? `${selAcc.login} – ${selAcc.name || ""}` : null;
   const deskExtraSpread = (() => {
     if (!selAcc) return 0;
-    const accMarkup = (selAcc.spreadMarkupType ?? "FIXED") === "FIXED" ? Number(selAcc.spreadMarkup ?? 0) : 0;
+    const accMarkup = (selAcc.spreadMarkupType ?? "FLOATING") === "FIXED" ? Number(selAcc.spreadMarkup ?? 0) : 0;
     const grp = tradeGroups.find((g: any) => g.id === selAcc.groupId);
-    const grpMarkup = grp ? ((grp.spreadType ?? "FIXED") === "FIXED" ? Number(grp.spread ?? 0) : 0) : 0;
+    const grpMarkup = grp ? ((grp.spreadType ?? "FLOATING") === "FIXED" ? Number(grp.spread ?? 0) : 0) : 0;
     return accMarkup + grpMarkup;
   })();
   const groups: Record<string, any[]> = {};
@@ -1027,7 +1027,7 @@ export default function AdminDeskPage() {
             )}
             <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile}
               disabledSyms={symPerm?.disabled || []}
-              onCategoryEdit={(cat, syms) => { const first = syms[0]; setCatEdit({ cat, syms, spread: adminSymSpreads[first] ?? 0, spreadType: adminSymTypes[first] ?? "FIXED", spreadMax: adminSymMax[first] ?? 0 }); }}
+              onCategoryEdit={(cat, syms) => { const first = syms[0]; setCatEdit({ cat, syms, spread: adminSymSpreads[first] ?? 0, spreadType: adminSymTypes[first] ?? "FLOATING", spreadMax: adminSymMax[first] ?? 0 }); }}
               symbolSpreads={adminSymSpreads} symbolTypes={adminSymTypes} groupSpread={deskExtraSpread} />
           </aside>
         </>)}
@@ -1643,11 +1643,11 @@ export default function AdminDeskPage() {
                   <div className="px-3 py-2 space-y-2">
                     <div className="text-[9px]" style={{ color: "var(--muted)" }}>Group markup on top of symbol spread</div>
                     <div className="flex gap-1">
-                      {["FIXED","FLOATING"].map((t) => { const active = (grpForm.spreadType ?? g.spreadType ?? "FIXED") === t; return (
+                      {["FLOATING","FIXED"].map((t) => { const active = (grpForm.spreadType ?? g.spreadType ?? "FLOATING") === t; return (
                         <button key={t} onClick={() => setGrpForm((f: any) => ({ ...f, spreadType: t }))} className="flex-1 rounded py-1 text-[10px] font-semibold border transition-colors" style={{ background: active ? "#22c55e" : "var(--bg)", color: active ? "#fff" : "var(--muted)", borderColor: active ? "#22c55e" : "var(--border)" }}>{t.charAt(0) + t.slice(1).toLowerCase()}</button>
                       ); })}
                     </div>
-                    {(grpForm.spreadType ?? g.spreadType ?? "FIXED") === "FLOATING" ? (
+                    {(grpForm.spreadType ?? g.spreadType ?? "FLOATING") === "FLOATING" ? (
                       <div className="rounded border px-2.5 py-2 text-[10px]" style={{ borderColor: "#22c55e", background: "rgba(34,197,94,0.08)" }}>
                         <div className="font-semibold mb-0.5" style={{ color: "#22c55e" }}>Live market spread</div>
                         <div style={{ color: "var(--muted)" }}>No group markup — clients in this group see the raw live feed spread.</div>
@@ -1658,7 +1658,7 @@ export default function AdminDeskPage() {
                         <input type="number" min="0" step="0.1" className={ginp} value={grpForm.spread ?? Number(g.spread ?? 0)} onChange={(e) => setGrpForm((f: any) => ({ ...f, spread: Number(e.target.value) }))} />
                       </div>
                     )}
-                    <button onClick={async () => { const sType = grpForm.spreadType ?? g.spreadType ?? "FIXED"; const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: sType === "FLOATING" ? 0 : (grpForm.spread ?? Number(g.spread ?? 0)), spreadType: sType, spreadMax: 0, managerId: g.managerId }) }); const d2 = await r.json(); if (d2.ok) { setOk("Group spread saved"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d2.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#22c55e" }}>Save group spread</button>
+                    <button onClick={async () => { const sType = grpForm.spreadType ?? g.spreadType ?? "FLOATING"; const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: sType === "FLOATING" ? 0 : (grpForm.spread ?? Number(g.spread ?? 0)), spreadType: sType, spreadMax: 0, managerId: g.managerId }) }); const d2 = await r.json(); if (d2.ok) { setOk("Group spread saved"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d2.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#22c55e" }}>Save group spread</button>
                     <button onClick={() => { setGrpCtx(null); setGrpSub(""); openSymPerm(); }} className="w-full rounded py-1 text-[9px] text-center" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)" }}>Symbol Spread Editor →</button>
                   </div>
                 </div>
@@ -2091,12 +2091,12 @@ export default function AdminDeskPage() {
               <div className="mb-2 text-[10px] text-[var(--muted)]">Extra markup added on top of symbol + group spread for this account only.</div>
               <div className="mb-3"><div className={flab}>Spread Type</div>
                 <div className="flex gap-1 mt-1">
-                  {["FIXED","FLOATING"].map((t) => { const active = (aform.spreadMarkupType ?? act.acc.spreadMarkupType ?? "FIXED") === t; return (
+                  {["FLOATING","FIXED"].map((t) => { const active = (aform.spreadMarkupType ?? act.acc.spreadMarkupType ?? "FLOATING") === t; return (
                     <button key={t} onClick={() => af("spreadMarkupType", t)} className="flex-1 rounded-lg py-1.5 text-[11px] font-semibold border transition-colors" style={{ background: active ? "var(--accent)" : "var(--bg)", color: active ? "#fff" : "var(--muted)", borderColor: active ? "var(--accent)" : "var(--border)" }}>{t.charAt(0) + t.slice(1).toLowerCase()}</button>
                   ); })}
                 </div>
               </div>
-              {(aform.spreadMarkupType ?? act.acc.spreadMarkupType ?? "FIXED") === "FLOATING" ? (
+              {(aform.spreadMarkupType ?? act.acc.spreadMarkupType ?? "FLOATING") === "FLOATING" ? (
                 <div className="rounded-lg border px-3 py-2.5 text-[11px]" style={{ borderColor: "var(--accent)", background: "color-mix(in srgb, var(--accent) 8%, transparent)" }}>
                   <div className="font-semibold mb-0.5" style={{ color: "var(--accent)" }}>Live market spread</div>
                   <div style={{ color: "var(--muted)" }}>No extra markup — this account sees the raw live market spread (no account markup added).</div>
@@ -2106,7 +2106,7 @@ export default function AdminDeskPage() {
                   <input type="number" min="0" step="0.1" className={inp} value={aform.spreadMarkup ?? Number(act.acc.spreadMarkup ?? 0)} onChange={(e) => af("spreadMarkup", e.target.value)} autoFocus />
                 </div>
               )}
-              <div className="mt-1 text-[10px] text-[var(--muted)]">Current: <b>{Number(act.acc.spreadMarkup ?? 0)} pips</b> · {act.acc.spreadMarkupType || "FIXED"}</div>
+              <div className="mt-1 text-[10px] text-[var(--muted)]">Current: <b>{Number(act.acc.spreadMarkup ?? 0)} pips</b> · {act.acc.spreadMarkupType || "FLOATING"}</div>
             </>)}
             {act.kind === "settings" && (<>
               <div className="grid grid-cols-2 gap-2">
@@ -2417,31 +2417,14 @@ export default function AdminDeskPage() {
               symPerm.symbols.forEach((s: any) => { const c = s.category || "other"; (cats[c] || (cats[c] = [])).push(s.symbol); });
               return (
                 <div className="mb-3 rounded-lg border border-[var(--border)] p-2">
-                  <div className="mb-1.5 flex items-center justify-between">
+                  <div className="mb-1.5">
                     <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Set spread by category</span>
-                    <button onClick={async () => {
-                      if (!confirm("Apply realistic per-symbol spreads? This sets different spreads for each symbol based on real market conditions.")) return;
-                      const r = await fetch("/api/admin/symbols/seed-spreads", { method: "POST" });
-                      const d = await r.json();
-                      if (d.ok) {
-                        const r2 = await fetch("/api/admin/symbols");
-                        const asr = await r2.json();
-                        if (asr.ok) {
-                          const sp: Record<string, number> = {}; const ty: Record<string, string> = {}; const mx: Record<string, number> = {}; const ids: Record<string, string> = {};
-                          for (const x of asr.symbols) { sp[x.symbol] = Number(x.spread ?? 0); ty[x.symbol] = x.spreadType ?? "FIXED"; mx[x.symbol] = Number(x.spreadMax ?? 0); ids[x.symbol] = x.id; }
-                          setAdminSymSpreads(sp); setAdminSymTypes(ty); setAdminSymMax(mx); setAdminSymIds(ids);
-                        }
-                        setOk(`Realistic spreads applied to ${d.count} symbols`);
-                      }
-                    }} className="rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>
-                      Realistic defaults
-                    </button>
                   </div>
                   {/* All Symbols row */}
                   <div className="flex items-center gap-2 py-1 border-b border-[var(--border)]">
                     <span className="capitalize text-[10px] font-semibold w-20 shrink-0">All Symbols</span>
                     <span className="text-[9px] shrink-0" style={{ color: "var(--muted)" }}>{symPerm.symbols.length} sym</span>
-                    <button onClick={() => setAllSymEdit({ type: "FIXED", pips: 1.5 })}
+                    <button onClick={() => setAllSymEdit({ type: "FLOATING", pips: 0 })}
                       className="ml-auto rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)" }}>
                       Set spread
                     </button>
@@ -2450,7 +2433,7 @@ export default function AdminDeskPage() {
                     <div key={cat} className="flex items-center gap-2 py-1 border-b border-[var(--border)] last:border-0">
                       <span className="capitalize text-[10px] font-semibold w-20 shrink-0">{cat}</span>
                       <span className="text-[9px] shrink-0" style={{ color: "var(--muted)" }}>{syms.length} sym</span>
-                      <button onClick={() => setCatEdit({ cat, syms, spread: adminSymSpreads[syms[0]] ?? 0, spreadType: adminSymTypes[syms[0]] ?? "FIXED", spreadMax: adminSymMax[syms[0]] ?? 0 })}
+                      <button onClick={() => setCatEdit({ cat, syms, spread: adminSymSpreads[syms[0]] ?? 0, spreadType: adminSymTypes[syms[0]] ?? "FLOATING", spreadMax: adminSymMax[syms[0]] ?? 0 })}
                         className="ml-auto rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)" }}>
                         Set spread
                       </button>
@@ -2471,10 +2454,10 @@ export default function AdminDeskPage() {
                       </button>
                     </div>
                     <div className="flex items-center gap-2">
-                      <select value={adminSymTypes[s.symbol] || "FIXED"} onChange={(e) => { const v = e.target.value; setAdminSymTypes((m) => ({ ...m, [s.symbol]: v })); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spreadType: v }) }).catch(() => {}); }} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[9px]" style={{ color: "var(--text)" }}>
-                        <option value="FIXED">Fixed</option><option value="FLOATING">Float</option>
+                      <select value={adminSymTypes[s.symbol] || "FLOATING"} onChange={(e) => { const v = e.target.value; setAdminSymTypes((m) => ({ ...m, [s.symbol]: v })); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spreadType: v }) }).catch(() => {}); }} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[9px]" style={{ color: "var(--text)" }}>
+                        <option value="FLOATING">Float</option><option value="FIXED">Fixed</option>
                       </select>
-                      {(adminSymTypes[s.symbol] || "FIXED") === "FIXED" ? (<>
+                      {(adminSymTypes[s.symbol] || "FLOATING") === "FIXED" ? (<>
                         <span style={{ color: "var(--muted)", fontSize: 9 }}>Pips</span>
                         <input type="number" min="0" step="0.1" value={adminSymSpreads[s.symbol] ?? 0} onChange={(e) => setAdminSymSpreads((m) => ({ ...m, [s.symbol]: Number(e.target.value) }))}
                           onBlur={(e) => { const v = Math.max(0, Number(e.target.value)); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: v, spreadMax: 0 }) }).catch(() => {}); setAdminSymSpreads((m) => ({ ...m, [s.symbol]: v })); }}

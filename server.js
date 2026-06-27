@@ -704,9 +704,9 @@ async function loadSpreads() {
     const syms = await prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true, spreadType: true, spreadMax: true } });
     const tenantSpreadMap = {}; // tenantId → { symbol → {min,max,type} }
     for (const s of syms) {
-      symSpreads[s.tenantId + ":" + s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FIXED" };
+      symSpreads[s.tenantId + ":" + s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FLOATING" };
       if (!tenantSpreadMap[s.tenantId]) tenantSpreadMap[s.tenantId] = {};
-      tenantSpreadMap[s.tenantId][s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FIXED" };
+      tenantSpreadMap[s.tenantId][s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FLOATING" };
     }
     const grps = await prisma.tradeGroup.findMany({ select: { id: true, spread: true, spreadType: true } });
     for (const g of grps) grpSpreads[g.id] = Number(g.spread || 0);
