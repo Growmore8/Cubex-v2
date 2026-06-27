@@ -824,9 +824,10 @@ async function closeTpSl(t, reason, price, io) {
   closing.add(t.id.toString());
   try {
     const pnl = calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
-    await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: t.accountId, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl, closeReason: reason, openedAt: t.openedAt } });
+    const swap = Number(t.swap ?? 0);
+    await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: t.accountId, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl, swap, commission: t.commission ?? 0, comment: t.comment || null, closeReason: reason, openedAt: t.openedAt } });
     await prisma.trade.delete({ where: { id: t.id } });
-    await prisma.account.update({ where: { id: t.accountId }, data: { pnl: { increment: pnl } } });
+    await prisma.account.update({ where: { id: t.accountId }, data: { pnl: { increment: pnl + swap } } });
     if (t.account && t.account.userId) {
       const title = reason === "TP" ? "Take Profit hit ✓" : "Stop Loss hit";
       const body = `${t.symbol} ${t.type} closed @ ${price} | P/L ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}`;
@@ -850,8 +851,9 @@ async function liquidate(acc, list, io) {
       const ask = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
       const price = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, acc.id, ask) : ask;
       const pnl = calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
-      total += pnl;
-      await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnl, closeReason: "MC", openedAt: t.openedAt } });
+      const swapAmt = Number(t.swap ?? 0);
+      total += pnl + swapAmt;
+      await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl, swap: swapAmt, commission: t.commission ?? 0, comment: t.comment || null, closeReason: "MC", openedAt: t.openedAt } });
       await prisma.trade.delete({ where: { id: t.id } });
     }
     await prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: total } } });

@@ -353,7 +353,7 @@ export default function ClientTerminal() {
       if (side === "SELL" && kind === "STOP"  && trigger >= pBid) { setErr("Sell Stop must be below bid " + gnum(pBid, dg(sym))); return false; }
     }
     const r = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol: sym, side, kind, lots: Number(lots), price: trigger, sl: slv, tp: tpv, accountId: accIdRef.current, currentAsk: pAsk, expiresAt: expiresAt ?? null }) });
+      body: JSON.stringify({ symbol: sym, side, kind, lots: Number(lots), price: trigger, sl: slv, tp: tpv, comment: comment || undefined, accountId: accIdRef.current, currentAsk: pAsk, expiresAt: expiresAt ?? null }) });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Pending failed"); return false; }
     pushToast({ title: `Pending ${side} ${sym} placed`, type: "TRADE" }); load(); return true;
@@ -1165,13 +1165,14 @@ export default function ClientTerminal() {
           )}
           {botTab === "history" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><Sth tbl="chist" k="name" label="Name" /><Sth tbl="chist" k="opened" label="Opened" /><Sth tbl="chist" k="closed" label="Closed" /><Sth tbl="chist" k="qty" label="Qty" align="right" /><Sth tbl="chist" k="open" label="Open" align="right" /><Sth tbl="chist" k="close" label="Close" align="right" /><Sth tbl="chist" k="sl" label="SL" align="right" /><Sth tbl="chist" k="tp" label="TP" align="right" /><Sth tbl="chist" k="reason" label="Reason" /><Sth tbl="chist" k="pnl" label="P/L" align="right" /></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><Sth tbl="chist" k="name" label="Name" /><Sth tbl="chist" k="opened" label="Opened" /><Sth tbl="chist" k="closed" label="Closed" /><Sth tbl="chist" k="qty" label="Qty" align="right" /><Sth tbl="chist" k="open" label="Open" align="right" /><Sth tbl="chist" k="close" label="Close" align="right" /><Sth tbl="chist" k="sl" label="SL" align="right" /><Sth tbl="chist" k="tp" label="TP" align="right" /><Sth tbl="chist" k="reason" label="Reason" /><Sth tbl="chist" k="swap" label="Swap" align="right" /><Sth tbl="chist" k="comm" label="Comm" align="right" /><Sth tbl="chist" k="pnl" label="Net P/L" align="right" /></tr></thead>
               <tbody>
-                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={10}>No history.</td></tr> : sortRows("chist", histShown, { name: (h) => h.symbol, opened: (h) => h.openedAt ? new Date(h.openedAt).getTime() : null, closed: (h) => h.closedAt ? new Date(h.closedAt).getTime() : null, qty: (h) => Number(h.lots), open: (h) => Number(h.openPrice), close: (h) => Number(h.closePrice), sl: (h) => Number(h.sl), tp: (h) => Number(h.tp), reason: (h) => h.closeReason || "MANUAL", pnl: (h) => Number(h.pnl) }).map((h) => {
+                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No history.</td></tr> : sortRows("chist", histShown, { name: (h) => h.symbol, opened: (h) => h.openedAt ? new Date(h.openedAt).getTime() : null, closed: (h) => h.closedAt ? new Date(h.closedAt).getTime() : null, qty: (h) => Number(h.lots), open: (h) => Number(h.openPrice), close: (h) => Number(h.closePrice), sl: (h) => Number(h.sl), tp: (h) => Number(h.tp), reason: (h) => h.closeReason || "MANUAL", swap: (h) => Number(h.swap), comm: (h) => Number(h.commission), pnl: (h) => Number(h.pnl) + Number(h.swap) - Number(h.commission) }).map((h) => {
                   const r = h.closeReason || "MANUAL";
                   const rc = r === "TP" ? "#10b981" : r === "SL" ? "#f43f5e" : r === "MC" ? "#f59e0b" : "var(--muted)";
+                  const net = Number(h.pnl) + Number(h.swap || 0) - Number(h.commission || 0);
                   return (
-                  <tr key={h.id} className="border-t border-[var(--border)]">
+                  <tr key={h.id} className="border-t border-[var(--border)]" title={h.comment || undefined}>
                     <td className="px-2 py-1">{h.symbol} <span style={{ color: h.side === "BUY" ? BUY : SELL }}>{h.side}</span></td>
                     <td className="px-2 py-1 text-[var(--muted)]">{h.openedAt ? new Date(h.openedAt).toLocaleString() : "—"}</td>
                     <td className="px-2 py-1 text-[var(--muted)]">{h.closedAt ? new Date(h.closedAt).toLocaleString() : "—"}</td>
@@ -1181,7 +1182,9 @@ export default function ClientTerminal() {
                     <td className="px-2 py-1 text-right" style={{ color: h.sl ? "#f43f5e" : "var(--muted)" }}>{h.sl ? gnum(h.sl, dg(h.symbol)) : "—"}</td>
                     <td className="px-2 py-1 text-right" style={{ color: h.tp ? "#10b981" : "var(--muted)" }}>{h.tp ? gnum(h.tp, dg(h.symbol)) : "—"}</td>
                     <td className="px-2 py-1"><span style={{ color: rc, fontWeight: r !== "MANUAL" ? 600 : "normal" }}>{r === "MANUAL" ? "—" : r}</span></td>
-                    <td className="px-2 py-1 text-right" style={{ color: h.pnl >= 0 ? BUY : SELL }}>{(h.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(h.pnl))}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: Number(h.swap) !== 0 ? (Number(h.swap) >= 0 ? BUY : SELL) : "var(--muted)" }}>{Number(h.swap) !== 0 ? (Number(h.swap) >= 0 ? "+" : "") + fmt(Number(h.swap)) : "—"}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: Number(h.commission) > 0 ? SELL : "var(--muted)" }}>{Number(h.commission) > 0 ? "-$" + fmt(Number(h.commission)) : "—"}</td>
+                    <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+$" : "-$") + fmt(Math.abs(net))}</td>
                   </tr>); })}
               </tbody>
             </table>

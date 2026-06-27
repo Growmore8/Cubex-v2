@@ -141,8 +141,11 @@ export default function ClientMobile({ t }: { t: any }) {
   }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
   const [mInd, setMInd] = useState<string[]>([]);
   const [orderSheet, setOrderSheet] = useState(false);
-  const [mobOrderType, setMobOrderType] = useState<"MARKET" | "LIMIT" | "STOP">("MARKET");
+  const [mobOrderType, setMobOrderType] = useState<"MARKET" | "LIMIT" | "STOP" | "STOP_LIMIT">("MARKET");
   const [mobPendingPrice, setMobPendingPrice] = useState("");
+  const [mobStopLimitEntry, setMobStopLimitEntry] = useState("");
+  const [mobTrail, setMobTrail] = useState("");
+  const [mobComment, setMobComment] = useState("");
   const [chartVol, setChartVol] = useState(0.01);  // isolated lot for chart tab
   const [noOpenVol, setNoOpenVol] = useState(0.01); // isolated lot for New Order modal
   const [mobTpEnabled, setMobTpEnabled] = useState(false);
@@ -796,7 +799,22 @@ export default function ClientMobile({ t }: { t: any }) {
             {orderSheet && (() => {
               const dd = dg(selSym); const sprd = _mobSpreadPips(selSym);
               const mobMg = price != null ? ((chartVol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0;
-              const doPlace = (side: "BUY" | "SELL") => { if (mobOrderType === "MARKET") quickTrade(selSym, side, chartVol); else placePending(selSym, side, mobOrderType, Number(mobPendingPrice), chartVol, Number(sl)||0, Number(tp)||0); setOrderSheet(false); };
+              const doPlace = async (side: "BUY" | "SELL") => {
+                if (mobOrderType === "MARKET") {
+                  const trailPips = Number(mobTrail) || 0;
+                  const cmt = mobComment || undefined;
+                  if (trailPips > 0 || cmt) {
+                    // need trailing stop or comment — call API directly
+                    await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side, lots: chartVol, sl: Number(sl)||0, tp: Number(tp)||0, trailingStop: trailPips, comment: cmt, accountId: accId }) }).then((r) => r.json());
+                    (t as any).load?.();
+                  } else { quickTrade(selSym, side, chartVol); }
+                } else if (mobOrderType === "STOP_LIMIT") {
+                  if (!mobPendingPrice || !mobStopLimitEntry) return;
+                  await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side, kind: "STOP_LIMIT", lots: chartVol, price: Number(mobPendingPrice), stopLimit: Number(mobStopLimitEntry), sl: Number(sl)||0, tp: Number(tp)||0, comment: mobComment||undefined, accountId: accId }) });
+                  (t as any).load?.();
+                } else { placePending(selSym, side, mobOrderType as "LIMIT"|"STOP", Number(mobPendingPrice), chartVol, Number(sl)||0, Number(tp)||0); }
+                setOrderSheet(false);
+              };
               return (
               <>
                 <div className="fixed inset-0 z-[80]" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setOrderSheet(false)} />
@@ -813,14 +831,17 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div className="flex flex-col gap-2.5 px-4 pb-3">
                     {/* Order type */}
                     <div className="flex overflow-hidden rounded-xl border border-[var(--border)]">
-                      {(["MARKET","LIMIT","STOP"] as const).map((ot) => (
-                        <button key={ot} onClick={() => { setMobOrderType(ot); if (ot !== "MARKET" && !mobPendingPrice && price != null) setMobPendingPrice(price.toFixed(dd)); }} className="flex-1 py-2 text-[11px] font-semibold transition-colors" style={mobOrderType === ot ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }}>{ot}</button>
+                      {(["MARKET","LIMIT","STOP","STOP_LIMIT"] as const).map((ot) => (
+                        <button key={ot} onClick={() => { setMobOrderType(ot); if (ot !== "MARKET" && !mobPendingPrice && price != null) setMobPendingPrice(price.toFixed(dd)); }} className="flex-1 py-2 text-[10px] font-semibold transition-colors" style={mobOrderType === ot ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }}>{ot.replace("_"," ")}</button>
                       ))}
                     </div>
 
-                    {/* Entry price (LIMIT/STOP only) */}
+                    {/* Entry price (LIMIT/STOP/STOP_LIMIT only) */}
                     {mobOrderType !== "MARKET" && (
-                      <input type="number" inputMode="decimal" value={mobPendingPrice} onChange={(e) => setMobPendingPrice(e.target.value)} placeholder="Entry Price" className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[14px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                      <input type="number" inputMode="decimal" value={mobPendingPrice} onChange={(e) => setMobPendingPrice(e.target.value)} placeholder={mobOrderType === "STOP_LIMIT" ? "Stop Price (trigger)" : "Entry Price"} className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[14px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                    )}
+                    {mobOrderType === "STOP_LIMIT" && (
+                      <input type="number" inputMode="decimal" value={mobStopLimitEntry} onChange={(e) => setMobStopLimitEntry(e.target.value)} placeholder="Limit Price (fill at)" className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[14px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                     )}
 
                     {/* Volume stepper + quick lots */}
@@ -861,6 +882,19 @@ export default function ClientMobile({ t }: { t: any }) {
                         <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</div>
                         <div className="font-semibold tabular-nums">{Math.round(sprd * 10)}</div>
                       </div>
+                    </div>
+
+                    {/* Trailing stop (market only) */}
+                    {mobOrderType === "MARKET" && (
+                      <div>
+                        <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Trailing Stop (pips, 0=off)</div>
+                        <input type="number" inputMode="decimal" min="0" step="1" value={mobTrail} onChange={(e) => setMobTrail(e.target.value)} placeholder="0" className="h-9 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[12px] tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                      </div>
+                    )}
+                    {/* Comment */}
+                    <div>
+                      <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Comment (optional)</div>
+                      <input type="text" maxLength={128} value={mobComment} onChange={(e) => setMobComment(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                     </div>
 
                     {err && <div className="text-center text-[11px]" style={{ color: SELL }}>{err}</div>}
@@ -1290,9 +1324,22 @@ export default function ClientMobile({ t }: { t: any }) {
         const dd = dg(selSym);
         const doPlace = async (side: "BUY" | "SELL") => {
           const kind = mobOrderType;
-          const ok = kind === "MARKET"
-            ? await quickTrade(selSym, side, Number(noOpenVol))
-            : await placePending(selSym, side, kind, Number(mobPendingPrice), Number(noOpenVol), Number(sl) || 0, Number(tp) || 0);
+          let ok: boolean;
+          if (kind === "MARKET") {
+            const trailPips = Number(mobTrail) || 0;
+            const cmt = mobComment || undefined;
+            if (trailPips > 0 || cmt) {
+              const r = await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side, lots: Number(noOpenVol), sl: Number(sl)||0, tp: Number(tp)||0, trailingStop: trailPips, comment: cmt, accountId: accId }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+              ok = r.ok;
+              if (ok) (t as any).load?.();
+            } else { ok = !!(await quickTrade(selSym, side, Number(noOpenVol))); }
+          } else if (kind === "STOP_LIMIT") {
+            if (!mobPendingPrice || !mobStopLimitEntry) return;
+            const r = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side, kind: "STOP_LIMIT", lots: Number(noOpenVol), price: Number(mobPendingPrice), stopLimit: Number(mobStopLimitEntry), sl: Number(sl)||0, tp: Number(tp)||0, comment: mobComment||undefined, accountId: accId }) }).then((x) => x.json()).catch(() => ({ ok: false }));
+            ok = r.ok; if (ok) (t as any).load?.();
+          } else {
+            ok = !!(await placePending(selSym, side, kind as "LIMIT"|"STOP", Number(mobPendingPrice), Number(noOpenVol), Number(sl) || 0, Number(tp) || 0));
+          }
           if (ok) { setNoOpen(false); setMobTpEnabled(false); setMobSlEnabled(false); }
         };
         const sprd = _mobSpreadPips(selSym);
@@ -1310,16 +1357,22 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="flex flex-col gap-3 px-4 pb-5">
                 {/* Order type */}
                 <div className="flex overflow-hidden rounded-xl border border-[var(--border)]">
-                  {(["MARKET","LIMIT","STOP"] as const).map((ot) => (
-                    <button key={ot} onClick={() => { setMobOrderType(ot); if (ot !== "MARKET" && !mobPendingPrice && price != null) setMobPendingPrice(price.toFixed(dd)); }} className="flex-1 py-2.5 text-[12px] font-semibold transition-colors" style={mobOrderType === ot ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }}>{ot}</button>
+                  {(["MARKET","LIMIT","STOP","STOP_LIMIT"] as const).map((ot) => (
+                    <button key={ot} onClick={() => { setMobOrderType(ot); if (ot !== "MARKET" && !mobPendingPrice && price != null) setMobPendingPrice(price.toFixed(dd)); }} className="flex-1 py-2.5 text-[10px] font-semibold transition-colors" style={mobOrderType === ot ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }}>{ot.replace("_"," ")}</button>
                   ))}
                 </div>
 
-                {/* Entry price (LIMIT / STOP only) */}
+                {/* Entry price (LIMIT / STOP / STOP_LIMIT only) */}
                 {mobOrderType !== "MARKET" && (
                   <div>
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Entry Price</div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{mobOrderType === "STOP_LIMIT" ? "Stop Price (trigger)" : "Entry Price"}</div>
                     <input type="number" inputMode="decimal" value={mobPendingPrice} onChange={(e) => setMobPendingPrice(e.target.value)} placeholder="Target Price" className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[15px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                  </div>
+                )}
+                {mobOrderType === "STOP_LIMIT" && (
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Limit Price (fill at)</div>
+                    <input type="number" inputMode="decimal" value={mobStopLimitEntry} onChange={(e) => setMobStopLimitEntry(e.target.value)} placeholder="Limit Price" className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[15px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                   </div>
                 )}
 
@@ -1364,6 +1417,18 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</div>
                     <div className="font-semibold tabular-nums">{Math.round(sprd * 10)}</div>
                   </div>
+                </div>
+
+                {/* Trailing stop (market only) + comment */}
+                {mobOrderType === "MARKET" && (
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Trailing Stop (pips, 0=off)</div>
+                    <input type="number" inputMode="decimal" min="0" step="1" value={mobTrail} onChange={(e) => setMobTrail(e.target.value)} placeholder="0" className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[13px] tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                  </div>
+                )}
+                <div>
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Comment (optional)</div>
+                  <input type="text" maxLength={128} value={mobComment} onChange={(e) => setMobComment(e.target.value)} placeholder="" className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                 </div>
 
                 {err && <div className="text-center text-[11px]" style={{ color: SELL }}>{err}</div>}

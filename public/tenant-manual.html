@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Platform Setup Manual — OrbitFxSolution</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',sans-serif;color:#1a1a2e;background:#fff;font-size:14px;line-height:1.6}
+
+  /* ── COVER PAGE ── */
+  .cover{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f2027 100%);color:#fff;text-align:center;padding:60px 40px;page-break-after:always}
+  .cover-logo{width:80px;height:80px;background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:36px;box-shadow:0 20px 60px rgba(34,197,94,0.4)}
+  .cover h1{font-size:42px;font-weight:800;letter-spacing:-1px;margin-bottom:8px}
+  .cover h1 span{color:#22c55e}
+  .cover .sub{font-size:18px;color:#94a3b8;margin-bottom:48px}
+  .cover .badge{display:inline-block;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);color:#22c55e;padding:6px 18px;border-radius:99px;font-size:12px;font-weight:600;letter-spacing:1px;margin-bottom:16px}
+  .cover-info{margin-top:60px;border-top:1px solid rgba(255,255,255,0.1);padding-top:32px;display:flex;gap:60px;justify-content:center}
+  .cover-info div{text-align:left}
+  .cover-info .label{font-size:10px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+  .cover-info .val{font-size:14px;font-weight:600;color:#e2e8f0}
+
+  /* ── LAYOUT ── */
+  .page{max-width:860px;margin:0 auto;padding:60px 40px}
+  .chapter{page-break-before:always;padding-top:20px}
+
+  /* ── CHAPTER HEADER ── */
+  .ch-header{display:flex;align-items:center;gap:16px;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #f1f5f9}
+  .ch-num{width:48px;height:48px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex-shrink:0}
+  .ch-title{font-size:26px;font-weight:800;color:#0f172a}
+  .ch-sub{font-size:13px;color:#64748b;margin-top:2px}
+
+  /* ── SECTION ── */
+  h2{font-size:18px;font-weight:700;color:#0f172a;margin:32px 0 12px;padding-left:12px;border-left:3px solid #22c55e}
+  h3{font-size:14px;font-weight:700;color:#334155;margin:20px 0 8px}
+  p{color:#475569;margin-bottom:12px}
+
+  /* ── SCREENSHOT PLACEHOLDER ── */
+  .img-box{background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;padding:40px 20px;text-align:center;margin:16px 0;color:#94a3b8;font-size:12px}
+  .img-box .icon{font-size:32px;margin-bottom:8px}
+  .img-box strong{display:block;font-size:13px;color:#64748b;margin-bottom:4px}
+
+  /* ── CALLOUT BOXES ── */
+  .info-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin:16px 0;display:flex;gap:12px}
+  .warn-box{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:16px 20px;margin:16px 0;display:flex;gap:12px}
+  .tip-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px 20px;margin:16px 0;display:flex;gap:12px}
+  .box-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+  .box-content strong{display:block;font-size:13px;font-weight:700;margin-bottom:4px;color:#0f172a}
+  .box-content p{margin:0;font-size:13px;color:#475569}
+
+  /* ── HIERARCHY DIAGRAM ── */
+  .hierarchy{display:flex;flex-direction:column;gap:0;margin:20px 0}
+  .hier-item{display:flex;align-items:stretch;gap:0}
+  .hier-line{width:24px;display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+  .hier-dot{width:12px;height:12px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:6px}
+  .hier-connector{width:2px;background:#e2e8f0;flex:1;margin:2px auto}
+  .hier-content{flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin:4px 0 4px 8px}
+  .hier-content .tier{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:2px}
+  .hier-content .name{font-size:14px;font-weight:700;color:#0f172a}
+  .hier-content .desc{font-size:12px;color:#64748b;margin-top:2px}
+  .hier-content.accent{background:#f0fdf4;border-color:#86efac}
+  .hier-content.accent .name{color:#16a34a}
+
+  /* ── TABLE ── */
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+  th{background:#f8fafc;padding:10px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;border-bottom:2px solid #e2e8f0}
+  td{padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+  .tag-green{background:#dcfce7;color:#16a34a}
+  .tag-blue{background:#dbeafe;color:#1d4ed8}
+  .tag-amber{background:#fef3c7;color:#d97706}
+  .tag-red{background:#fee2e2;color:#dc2626}
+  .tag-purple{background:#ede9fe;color:#7c3aed}
+
+  /* ── STEPS ── */
+  .steps{counter-reset:step;margin:16px 0}
+  .step{display:flex;gap:14px;margin-bottom:16px;align-items:flex-start}
+  .step-num{width:28px;height:28px;background:#22c55e;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px}
+  .step-body strong{display:block;font-size:13px;font-weight:700;color:#0f172a;margin-bottom:2px}
+  .step-body p{font-size:13px;color:#64748b;margin:0}
+
+  /* ── PERMISSION GRID ── */
+  .perm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+  .perm-item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;font-size:12px}
+  .perm-item .perm-key{font-weight:700;color:#0f172a;font-size:13px;margin-bottom:2px}
+  .perm-item .perm-desc{color:#64748b}
+
+  /* ── FOOTER ── */
+  .footer-bar{margin-top:80px;padding:24px 0 0;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#94a3b8}
+  .footer-bar strong{color:#22c55e}
+
+  /* ── TOC ── */
+  .toc{page-break-after:always}
+  .toc h2{border:none;padding:0;margin-bottom:24px;font-size:22px;color:#0f172a}
+  .toc-item{display:flex;align-items:baseline;gap:8px;padding:10px 0;border-bottom:1px solid #f1f5f9}
+  .toc-item .toc-num{width:28px;font-size:12px;font-weight:700;color:#22c55e;flex-shrink:0}
+  .toc-item .toc-title{font-size:14px;font-weight:600;color:#334155;flex:1}
+  .toc-item .toc-dots{flex:1;border-bottom:1px dotted #cbd5e1;margin:0 8px;position:relative;top:-3px}
+  .toc-item .toc-page{font-size:12px;color:#94a3b8}
+
+  .mock-wrap{border-radius:14px;overflow:hidden;margin:16px 0;box-shadow:0 8px 40px rgba(0,0,0,0.35);border:1px solid #1e293b;font-family:'Inter',sans-serif}
+  .mock-bar{background:#0f172a;padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1e293b}
+  .mock-dot{width:10px;height:10px;border-radius:50%}
+  .mock-url{flex:1;background:#1e293b;border-radius:6px;padding:3px 10px;font-size:11px;color:#64748b;margin:0 8px}
+  .mock-body{background:#0f172a;padding:0}
+
+  @media print{
+    .chapter{page-break-before:always}
+    .cover{page-break-after:always}
+    .toc{page-break-after:always}
+    body{font-size:13px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════ COVER ══════════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">🌿</div>
+  <div class="badge">WHITE-LABEL TENANT GUIDE</div>
+  <h1>Platform <span>Setup</span> Manual</h1>
+  <p class="sub">Complete guide to managing your trading platform —<br>spreads, groups, managers, symbols &amp; permissions</p>
+
+  <div class="cover-info">
+    <div>
+      <div class="label">Support</div>
+      <div class="val">support@orbitfxsolution.com</div>
+    </div>
+    <div>
+      <div class="label">Website</div>
+      <div class="val">orbitfxsolution.com</div>
+    </div>
+    <div>
+      <div class="label">Version</div>
+      <div class="val">2.0 — 2026</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ TOC ══════════════════════════════ -->
+<div class="page toc">
+  <h2>Table of Contents</h2>
+
+  <div class="toc-item"><span class="toc-num">01</span><span class="toc-title">Platform Overview</span><span class="toc-dots"></span><span class="toc-page">4</span></div>
+  <div class="toc-item"><span class="toc-num">02</span><span class="toc-title">User Roles & Access Levels</span><span class="toc-dots"></span><span class="toc-page">5</span></div>
+  <div class="toc-item"><span class="toc-num">03</span><span class="toc-title">Manager Management</span><span class="toc-dots"></span><span class="toc-page">6</span></div>
+  <div class="toc-item"><span class="toc-num">04</span><span class="toc-title">Group Management</span><span class="toc-dots"></span><span class="toc-page">8</span></div>
+  <div class="toc-item"><span class="toc-num">05</span><span class="toc-title">Client Management</span><span class="toc-dots"></span><span class="toc-page">10</span></div>
+  <div class="toc-item"><span class="toc-num">06</span><span class="toc-title">Spread System (3-Level Hierarchy)</span><span class="toc-dots"></span><span class="toc-page">12</span></div>
+  <div class="toc-item"><span class="toc-num">07</span><span class="toc-title">Symbol Access Control</span><span class="toc-dots"></span><span class="toc-page">15</span></div>
+  <div class="toc-item"><span class="toc-num">08</span><span class="toc-title">Leverage & Margin Call</span><span class="toc-dots"></span><span class="toc-page">17</span></div>
+  <div class="toc-item"><span class="toc-num">09</span><span class="toc-title">Permissions Reference</span><span class="toc-dots"></span><span class="toc-page">19</span></div>
+  <div class="toc-item"><span class="toc-num">10</span><span class="toc-title">Support & Contact</span><span class="toc-dots"></span><span class="toc-page">21</span></div>
+</div>
+
+<!-- ══════════════════════════════ CH 01 ══════════════════════════════ -->
+<div class="page chapter">
+  <div class="ch-header">
+    <div class="ch-num">1</div>
+    <div><div class="ch-title">Platform Overview</div><div class="ch-sub">Understanding the trading platform structure</div></div>
+  </div>
+
+  <p>Your white-label trading platform is a fully managed, multi-tenant system. As a tenant (broker), you get a dedicated environment where you control your clients, managers, groups, spreads, and trading conditions — completely isolated from other brokers on the same infrastructure.</p>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/platform</div>
+    </div>
+    <div class="mock-body" style="display:flex;height:320px;overflow:hidden">
+      <!-- Left Navigator -->
+      <div style="width:180px;background:#0f172a;border-right:1px solid #1e293b;display:flex;flex-direction:column;flex-shrink:0">
+        <div style="padding:8px 10px;background:#1e293b;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:1px">NAVIGATOR</div>
+        <div style="display:flex;border-bottom:1px solid #1e293b">
+          <div style="flex:1;padding:5px 8px;font-size:10px;font-weight:600;color:#22c55e;background:#0f172a;text-align:center;border-bottom:2px solid #22c55e">LIVE (13)</div>
+          <div style="flex:1;padding:5px 8px;font-size:10px;font-weight:600;color:#64748b;text-align:center">DEMO (13)</div>
+        </div>
+        <div style="overflow-y:auto;flex:1;padding:4px 0">
+          <div style="padding:6px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e293b">
+            <div style="width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0"></div>
+            <span style="font-size:11px;color:#e2e8f0">900017 - Grow More</span>
+          </div>
+          <div style="padding:6px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e293b">
+            <div style="width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0"></div>
+            <span style="font-size:11px;color:#e2e8f0">900016 - Rishi</span>
+          </div>
+          <div style="padding:6px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e293b">
+            <div style="width:7px;height:7px;border-radius:50%;background:#f59e0b;flex-shrink:0"></div>
+            <span style="font-size:11px;color:#e2e8f0">900015 - Karan</span>
+          </div>
+          <div style="padding:6px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e293b">
+            <div style="width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0"></div>
+            <span style="font-size:11px;color:#e2e8f0">900014 - Priya</span>
+          </div>
+          <div style="padding:6px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e293b">
+            <div style="width:7px;height:7px;border-radius:50%;background:#64748b;flex-shrink:0"></div>
+            <span style="font-size:11px;color:#94a3b8">900013 - Ali</span>
+          </div>
+        </div>
+      </div>
+      <!-- Middle Chart -->
+      <div style="flex:1;display:flex;flex-direction:column;background:#0f172a;min-width:0">
+        <div style="display:flex;align-items:center;gap:0;padding:6px 12px;border-bottom:1px solid #1e293b;background:#0f172a">
+          <span style="font-size:12px;font-weight:700;color:#e2e8f0;margin-right:16px">EURUSD</span>
+          <span style="font-size:11px;color:#22c55e;padding:3px 8px;background:rgba(34,197,94,0.1);border-radius:4px;margin-right:4px;cursor:pointer">1m</span>
+          <span style="font-size:11px;color:#64748b;padding:3px 8px;cursor:pointer">5m</span>
+          <span style="font-size:11px;color:#64748b;padding:3px 8px;cursor:pointer">15m</span>
+          <span style="font-size:11px;color:#64748b;padding:3px 8px;cursor:pointer">1H</span>
+          <span style="font-size:11px;color:#64748b;padding:3px 8px;cursor:pointer">4H</span>
+          <span style="font-size:11px;color:#64748b;padding:3px 8px;cursor:pointer">1D</span>
+        </div>
+        <div style="flex:1;position:relative;overflow:hidden">
+          <!-- Grid lines -->
+          <svg width="100%" height="100%" viewBox="0 0 400 260" preserveAspectRatio="none" style="position:absolute;top:0;left:0">
+            <line x1="0" y1="52" x2="400" y2="52" stroke="#1e293b" stroke-width="1"/>
+            <line x1="0" y1="104" x2="400" y2="104" stroke="#1e293b" stroke-width="1"/>
+            <line x1="0" y1="156" x2="400" y2="156" stroke="#1e293b" stroke-width="1"/>
+            <line x1="0" y1="208" x2="400" y2="208" stroke="#1e293b" stroke-width="1"/>
+            <line x1="80" y1="0" x2="80" y2="260" stroke="#1e293b" stroke-width="1"/>
+            <line x1="160" y1="0" x2="160" y2="260" stroke="#1e293b" stroke-width="1"/>
+            <line x1="240" y1="0" x2="240" y2="260" stroke="#1e293b" stroke-width="1"/>
+            <line x1="320" y1="0" x2="320" y2="260" stroke="#1e293b" stroke-width="1"/>
+            <!-- Candles -->
+            <line x1="30" y1="80" x2="30" y2="180" stroke="#22c55e" stroke-width="1.5"/>
+            <rect x="24" y="100" width="12" height="60" fill="#22c55e"/>
+            <line x1="55" y1="90" x2="55" y2="170" stroke="#ef4444" stroke-width="1.5"/>
+            <rect x="49" y="110" width="12" height="50" fill="#ef4444"/>
+            <line x1="80" y1="70" x2="80" y2="160" stroke="#22c55e" stroke-width="1.5"/>
+            <rect x="74" y="85" width="12" height="55" fill="#22c55e"/>
+            <line x1="105" y1="85" x2="105" y2="155" stroke="#ef4444" stroke-width="1.5"/>
+            <rect x="99" y="100" width="12" height="45" fill="#ef4444"/>
+            <line x1="130" y1="75" x2="130" y2="150" stroke="#22c55e" stroke-width="1.5"/>
+            <rect x="124" y="90" width="12" height="45" fill="#22c55e"/>
+            <line x1="155" y1="65" x2="155" y2="140" stroke="#22c55e" stroke-width="1.5"/>
+            <rect x="149" y="80" width="12" height="45" fill="#22c55e"/>
+            <line x1="180" y1="80" x2="180" y2="160" stroke="#ef4444" stroke-width="1.5"/>
+            <rect x="174" y="95" width="12" height="50" fill="#ef4444"/>
+            <line x1="205" y1="70" x2="205" y2="145" stroke="#22c55e" stroke-width="1.5"/>
+            <rect x="199" y="82" width="12" height="48" fill="#22c55e"/>
+            <line x1="230" y1="60" x2="230" y2="135" stroke="#22c55e" stroke-width="1.5"/>
+            <rect x="224" y="72" width="12" height="45" fill="#22c55e"/>
+            <line x1="255" y1="75" x2="255" y2="150" stroke="#ef4444" stroke-width="1.5"/>
+            <rect x="249" y="90" width="12" height="45" fill="#ef4444"/>
+            <line x1="280" y1="65" x2="280" y2="135" stroke="#22c55e" stroke-width="1.5"/>
+            <rect x="274" y="78" width="12" height="42" fill="#22c55e"/>
+            <line x1="305" y1="55" x2="305" y2="130" stroke="#22c55e" stroke-width="1.5"/>
+            <rect x="299" y="68" width="12" height="45" fill="#22c55e"/>
+            <line x1="330" y1="70" x2="330" y2="145" stroke="#ef4444" stroke-width="1.5"/>
+            <rect x="324" y="85" width="12" height="42" fill="#ef4444"/>
+            <line x1="355" y1="60" x2="355" y2="130" stroke="#22c55e" stroke-width="1.5"/>
+            <rect x="349" y="72" width="12" height="40" fill="#22c55e"/>
+            <text x="8" y="56" font-size="9" fill="#475569">1.0828</text>
+            <text x="8" y="108" font-size="9" fill="#475569">1.0824</text>
+            <text x="8" y="160" font-size="9" fill="#475569">1.0820</text>
+          </svg>
+        </div>
+      </div>
+      <!-- Right Market Watch -->
+      <div style="width:200px;background:#0f172a;border-left:1px solid #1e293b;display:flex;flex-direction:column;flex-shrink:0">
+        <div style="padding:8px 10px;background:#1e293b;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:1px">MARKET WATCH</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 40px;padding:5px 8px;border-bottom:1px solid #1e293b">
+          <span style="font-size:9px;font-weight:700;color:#64748b">SYMBOL</span>
+          <span style="font-size:9px;font-weight:700;color:#64748b">BID</span>
+          <span style="font-size:9px;font-weight:700;color:#64748b">ASK</span>
+          <span style="font-size:9px;font-weight:700;color:#64748b">SPRD</span>
+        </div>
+        <div style="overflow-y:auto;flex:1">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 40px;padding:5px 8px;border-bottom:1px solid #1e293b;align-items:center">
+            <span style="font-size:10px;font-weight:600;color:#e2e8f0">EURUSD</span>
+            <span style="font-size:10px;color:#94a3b8">1.08234</span>
+            <span style="font-size:10px;color:#94a3b8">1.08236</span>
+            <span style="font-size:10px;color:#22c55e">0.2</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 40px;padding:5px 8px;border-bottom:1px solid #1e293b;align-items:center">
+            <span style="font-size:10px;font-weight:600;color:#e2e8f0">GBPUSD</span>
+            <span style="font-size:10px;color:#94a3b8">1.26541</span>
+            <span style="font-size:10px;color:#94a3b8">1.26543</span>
+            <span style="font-size:10px;color:#22c55e">0.2</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 40px;padding:5px 8px;border-bottom:1px solid #1e293b;align-items:center">
+            <span style="font-size:10px;font-weight:600;color:#e2e8f0">BTCUSD</span>
+            <span style="font-size:10px;color:#94a3b8">59308</span>
+            <span style="font-size:10px;color:#94a3b8">59310</span>
+            <span style="font-size:10px;color:#22c55e">2.0</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 40px;padding:5px 8px;border-bottom:1px solid #1e293b;align-items:center">
+            <span style="font-size:10px;font-weight:600;color:#e2e8f0">GOLD</span>
+            <span style="font-size:10px;color:#94a3b8">2341.2</span>
+            <span style="font-size:10px;color:#94a3b8">2341.6</span>
+            <span style="font-size:10px;color:#22c55e">0.4</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 40px;padding:5px 8px;border-bottom:1px solid #1e293b;align-items:center">
+            <span style="font-size:10px;font-weight:600;color:#e2e8f0">AAPL</span>
+            <span style="font-size:10px;color:#94a3b8">178.20</span>
+            <span style="font-size:10px;color:#94a3b8">178.22</span>
+            <span style="font-size:10px;color:#22c55e">0.02</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Platform Structure</h2>
+
+  <div class="hierarchy">
+    <div class="hier-item">
+      <div class="hier-line"><div class="hier-dot" style="background:#7c3aed"></div><div class="hier-connector"></div></div>
+      <div class="hier-content" style="background:#faf5ff;border-color:#c4b5fd">
+        <div class="tier">Level 1</div>
+        <div class="name" style="color:#7c3aed">Super Admin (OrbitFxSolution)</div>
+        <div class="desc">Manages all tenants, platform-wide symbols, billing, and global settings. You do not have access to this level.</div>
+      </div>
+    </div>
+    <div class="hier-item">
+      <div class="hier-line"><div class="hier-dot" style="background:#2563eb"></div><div class="hier-connector"></div></div>
+      <div class="hier-content" style="background:#eff6ff;border-color:#bfdbfe">
+        <div class="tier">Level 2</div>
+        <div class="name" style="color:#2563eb">Admin (You — the Broker/Tenant)</div>
+        <div class="desc">Full control over your tenant: create clients, managers, groups, set spreads, leverage, symbol access, and all trading conditions.</div>
+      </div>
+    </div>
+    <div class="hier-item">
+      <div class="hier-line"><div class="hier-dot" style="background:#22c55e"></div><div class="hier-connector"></div></div>
+      <div class="hier-content accent">
+        <div class="tier">Level 3</div>
+        <div class="name">Manager</div>
+        <div class="desc">Handles a subset of clients assigned to them. Can perform actions (deposits, trades, etc.) based on permissions you grant.</div>
+      </div>
+    </div>
+    <div class="hier-item">
+      <div class="hier-line"><div class="hier-dot" style="background:#94a3b8"></div></div>
+      <div class="hier-content">
+        <div class="tier">Level 4</div>
+        <div class="name">Client (Trader)</div>
+        <div class="desc">End users who trade on the platform. They see their own accounts, balances, positions, and history only.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <div class="box-icon">💡</div>
+    <div class="box-content">
+      <strong>Key concept</strong>
+      <p>Everything you configure as Admin applies only to your own clients. Other tenants on the platform are completely isolated — they cannot see your clients or settings, and you cannot see theirs.</p>
+    </div>
+  </div>
+
+  <div class="footer-bar"><span>OrbitFxSolution Platform Manual v2.0</span><strong>orbitfxsolution.com</strong></div>
+</div>
+
+<!-- ══════════════════════════════ CH 02 ══════════════════════════════ -->
+<div class="page chapter">
+  <div class="ch-header">
+    <div class="ch-num">2</div>
+    <div><div class="ch-title">User Roles & Access Levels</div><div class="ch-sub">What each role can and cannot do</div></div>
+  </div>
+
+  <table>
+    <thead><tr><th>Feature</th><th>Super Admin</th><th>Admin (You)</th><th>Manager</th><th>Client</th></tr></thead>
+    <tbody>
+      <tr><td>Create/manage tenants</td><td><span class="tag tag-green">Yes</span></td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>Create/manage admins</td><td><span class="tag tag-green">Yes</span></td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>Create/manage managers</td><td><span class="tag tag-green">Yes</span></td><td><span class="tag tag-green">Yes</span></td><td>—</td><td>—</td></tr>
+      <tr><td>Create/manage clients</td><td>—</td><td><span class="tag tag-green">Yes</span></td><td><span class="tag tag-amber">If permitted</span></td><td>—</td></tr>
+      <tr><td>Set symbol base spread</td><td>—</td><td><span class="tag tag-green">Yes</span></td><td>—</td><td>—</td></tr>
+      <tr><td>Set group spread markup</td><td>—</td><td><span class="tag tag-green">Yes</span></td><td>—</td><td>—</td></tr>
+      <tr><td>Set account spread markup</td><td>—</td><td><span class="tag tag-green">Yes</span></td><td><span class="tag tag-amber">If permitted</span></td><td>—</td></tr>
+      <tr><td>Set leverage</td><td>—</td><td><span class="tag tag-green">Yes</span></td><td><span class="tag tag-amber">If permitted</span></td><td>—</td></tr>
+      <tr><td>Symbol access control</td><td>—</td><td><span class="tag tag-green">Yes</span></td><td><span class="tag tag-amber">Own clients only</span></td><td>—</td></tr>
+      <tr><td>Process deposits/withdrawals</td><td>—</td><td><span class="tag tag-green">Yes</span></td><td><span class="tag tag-amber">If permitted</span></td><td>—</td></tr>
+      <tr><td>Place manual trades</td><td>—</td><td><span class="tag tag-green">Yes</span></td><td><span class="tag tag-amber">If permitted</span></td><td>—</td></tr>
+      <tr><td>View own trades &amp; balance</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-green">Yes</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="warn-box">
+    <div class="box-icon">⚠️</div>
+    <div class="box-content">
+      <strong>Manager scope is strictly isolated</strong>
+      <p>A manager can only see and act on clients that are assigned to them. They cannot access or affect clients assigned to other managers or directly to Admin.</p>
+    </div>
+  </div>
+
+  <div class="footer-bar"><span>OrbitFxSolution Platform Manual v2.0</span><strong>orbitfxsolution.com</strong></div>
+</div>
+
+<!-- ══════════════════════════════ CH 03 ══════════════════════════════ -->
+<div class="page chapter">
+  <div class="ch-header">
+    <div class="ch-num">3</div>
+    <div><div class="ch-title">Manager Management</div><div class="ch-sub">Creating managers and configuring their permissions</div></div>
+  </div>
+
+  <h2>Creating a Manager</h2>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Open Managers Panel</strong><p>In the Admin platform page, click the top menu → <strong>Managers</strong>. The Manage Managers panel will open.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Click "New Manager"</strong><p>Fill in the manager's full name, email address, and a password (minimum 6 characters).</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Set Permissions</strong><p>After creating, click the <strong>Permissions</strong> button next to the manager's name to configure what they can do.</p></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Assign Clients</strong><p>Go to client right-click → Edit Client → Assign Manager &amp; Group to assign this manager to specific clients.</p></div></div>
+  </div>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/managers</div>
+    </div>
+    <div class="mock-body" style="padding:20px;background:#0f172a">
+      <div style="background:#1e293b;border-radius:12px;padding:20px;max-width:640px;margin:0 auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <span style="font-size:15px;font-weight:700;color:#e2e8f0">Manage Managers</span>
+          <button style="background:#22c55e;color:#fff;border:none;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">+ New Manager</button>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="border-bottom:1px solid #334155">
+              <th style="padding:8px 10px;text-align:left;color:#64748b;font-size:10px;font-weight:700;letter-spacing:.5px">NAME / EMAIL</th>
+              <th style="padding:8px 10px;text-align:left;color:#64748b;font-size:10px;font-weight:700;letter-spacing:.5px">CLIENTS</th>
+              <th style="padding:8px 10px;text-align:left;color:#64748b;font-size:10px;font-weight:700;letter-spacing:.5px">STATUS</th>
+              <th style="padding:8px 10px;text-align:left;color:#64748b;font-size:10px;font-weight:700;letter-spacing:.5px">PERMISSIONS</th>
+              <th style="padding:8px 10px;text-align:left;color:#64748b;font-size:10px;font-weight:700;letter-spacing:.5px">ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid #1e293b">
+              <td style="padding:10px 10px">
+                <div style="font-weight:600;color:#e2e8f0">Harish Raghav</div>
+                <div style="color:#64748b;font-size:11px">harish@brokerfirm.com</div>
+              </td>
+              <td style="padding:10px 10px;color:#94a3b8">4</td>
+              <td style="padding:10px 10px"><span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600">ACTIVE</span></td>
+              <td style="padding:10px 10px"><button style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Permissions</button></td>
+              <td style="padding:10px 10px">
+                <div style="display:flex;gap:6px">
+                  <span style="color:#64748b;cursor:pointer;font-size:14px" title="Edit">✏️</span>
+                  <span style="color:#64748b;cursor:pointer;font-size:14px" title="Reset Password">🔑</span>
+                  <span style="color:#64748b;cursor:pointer;font-size:14px" title="Lock">🔒</span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:10px 10px">
+                <div style="font-weight:600;color:#e2e8f0">Krishanthan</div>
+                <div style="color:#64748b;font-size:11px">krish@brokerfirm.com</div>
+              </td>
+              <td style="padding:10px 10px;color:#94a3b8">3</td>
+              <td style="padding:10px 10px"><span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600">ACTIVE</span></td>
+              <td style="padding:10px 10px"><button style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Permissions</button></td>
+              <td style="padding:10px 10px">
+                <div style="display:flex;gap:6px">
+                  <span style="color:#64748b;cursor:pointer;font-size:14px">✏️</span>
+                  <span style="color:#64748b;cursor:pointer;font-size:14px">🔑</span>
+                  <span style="color:#64748b;cursor:pointer;font-size:14px">🔒</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h2>Manager Permissions</h2>
+  <p>Click <strong>Permissions</strong> next to any manager to open the permissions modal. Each checkbox grants or denies that specific capability. Unchecked = denied.</p>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/managers</div>
+    </div>
+    <div class="mock-body" style="padding:20px;background:rgba(0,0,0,0.5)">
+      <div style="background:#1e293b;border-radius:12px;padding:20px;max-width:520px;margin:0 auto">
+        <div style="margin-bottom:4px">
+          <span style="font-size:15px;font-weight:700;color:#e2e8f0">Permissions — Harish Raghav</span>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:16px">Unchecked = denied. Still gated by tenant-level permissions.</div>
+        <!-- USERS -->
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1px;margin-bottom:6px">USERS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Create Clients</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Delete Clients</label>
+        </div>
+        <!-- FUNDS -->
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1px;margin-bottom:6px">FUNDS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Process Deposits</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Process Withdrawals</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Credit / Bonus</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Transfer Funds</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Edit Financial</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Delete Financial</label>
+        </div>
+        <!-- TRADES -->
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1px;margin-bottom:6px">TRADES</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Manual Trade</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Close Trades</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Edit Trades</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Delete Trades</label>
+        </div>
+        <!-- REPORTS -->
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1px;margin-bottom:6px">REPORTS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> View Audit Log</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Export PDF</label>
+        </div>
+        <!-- COMMUNICATION -->
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1px;margin-bottom:6px">COMMUNICATION</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Send Notifications</label>
+        </div>
+        <!-- SPREAD -->
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1px;margin-bottom:6px">SPREAD</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0;border:1px solid #22c55e"><input type="checkbox" checked style="accent-color:#22c55e"> Edit Spread Settings (account markup)</label>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:8px 16px;border-radius:7px;font-size:12px;cursor:pointer">Cancel</button>
+          <button style="background:#22c55e;border:none;color:#fff;padding:8px 16px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Save Permissions</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="perm-grid">
+    <div class="perm-item"><div class="perm-key">Create Clients</div><div class="perm-desc">Manager can register new client accounts</div></div>
+    <div class="perm-item"><div class="perm-key">Delete Clients</div><div class="perm-desc">Manager can permanently delete client accounts</div></div>
+    <div class="perm-item"><div class="perm-key">Process Deposits</div><div class="perm-desc">Can add funds to client accounts</div></div>
+    <div class="perm-item"><div class="perm-key">Process Withdrawals</div><div class="perm-desc">Can process client withdrawal requests</div></div>
+    <div class="perm-item"><div class="perm-key">Credit / Bonus / Insurance</div><div class="perm-desc">Can credit bonuses and insurance to clients</div></div>
+    <div class="perm-item"><div class="perm-key">Transfer Funds</div><div class="perm-desc">Can move funds between accounts</div></div>
+    <div class="perm-item"><div class="perm-key">Edit Financial History</div><div class="perm-desc">Can edit past transaction records</div></div>
+    <div class="perm-item"><div class="perm-key">Manual Trade Entry</div><div class="perm-desc">Can place trades on behalf of clients</div></div>
+    <div class="perm-item"><div class="perm-key">Close Trades</div><div class="perm-desc">Can close open client positions</div></div>
+    <div class="perm-item"><div class="perm-key">Edit Trade Records</div><div class="perm-desc">Can modify existing trade entries</div></div>
+    <div class="perm-item"><div class="perm-key">Send Notifications</div><div class="perm-desc">Can send push/email notifications to clients</div></div>
+    <div class="perm-item"><div class="perm-key">Edit Spread Settings</div><div class="perm-desc">Can adjust spread markup on their clients' accounts</div></div>
+  </div>
+
+  <div class="tip-box">
+    <div class="box-icon">💡</div>
+    <div class="box-content">
+      <strong>Tip: Spread permission for managers</strong>
+      <p>The <strong>Edit Spread Settings</strong> checkbox (in the Spread section) allows a manager to adjust the account-level spread markup for their own clients only. They cannot touch symbol or group spread.</p>
+    </div>
+  </div>
+
+  <h2>Manager Status</h2>
+  <table>
+    <thead><tr><th>Status</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag tag-green">ACTIVE</span></td><td>Manager can sign in and perform all permitted actions</td></tr>
+      <tr><td><span class="tag tag-red">LOCKED</span></td><td>Manager is read-only — can view but cannot make changes</td></tr>
+      <tr><td><span class="tag tag-amber">SUSPENDED</span></td><td>Manager cannot sign in at all</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer-bar"><span>OrbitFxSolution Platform Manual v2.0</span><strong>orbitfxsolution.com</strong></div>
+</div>
+
+<!-- ══════════════════════════════ CH 04 ══════════════════════════════ -->
+<div class="page chapter">
+  <div class="ch-header">
+    <div class="ch-num">4</div>
+    <div><div class="ch-title">Group Management</div><div class="ch-sub">Organise clients into groups and apply bulk settings</div></div>
+  </div>
+
+  <p>Groups let you organise clients into logical buckets (e.g. "VIP", "Retail", "IB Partners") and apply settings to all members at once — leverage, margin call, spread markup, and symbol restrictions.</p>
+
+  <h2>Creating a Group</h2>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Open the Navigator</strong><p>The left navigator panel shows LIVE and DEMO accounts organised by group.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Click "+ New" → New Group</strong><p>Enter a group name and optionally assign a manager to manage this group's clients.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Assign Clients to the Group</strong><p>Right-click a client → Settings → Edit Client → Assign Manager &amp; Group → select the group.</p></div></div>
+  </div>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/platform</div>
+    </div>
+    <div class="mock-body" style="display:flex;height:260px">
+      <div style="width:200px;background:#0f172a;border-right:1px solid #1e293b;display:flex;flex-direction:column">
+        <div style="padding:8px 10px;background:#1e293b;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:1px">NAVIGATOR</div>
+        <div style="display:flex;border-bottom:1px solid #1e293b">
+          <div style="flex:1;padding:5px 8px;font-size:10px;font-weight:600;color:#22c55e;text-align:center;border-bottom:2px solid #22c55e">LIVE</div>
+          <div style="flex:1;padding:5px 8px;font-size:10px;font-weight:600;color:#64748b;text-align:center">DEMO</div>
+        </div>
+        <div style="flex:1;overflow-y:auto">
+          <!-- VIP Group row -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#1e293b;border-bottom:1px solid #0f172a;cursor:pointer">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="color:#22c55e;font-size:11px">▼</span>
+              <span style="color:#22c55e;font-size:11px">📁</span>
+              <span style="font-size:11px;font-weight:600;color:#22c55e">VIP Clients</span>
+            </div>
+            <span style="background:#22c55e;color:#0f172a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px">4</span>
+          </div>
+          <!-- VIP members -->
+          <div style="padding:5px 10px 5px 28px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e293b">
+            <span style="color:#22c55e;font-size:10px">●</span>
+            <span style="font-size:11px;color:#94a3b8">900004 - John Smith</span>
+          </div>
+          <div style="padding:5px 10px 5px 28px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e293b">
+            <span style="color:#22c55e;font-size:10px">●</span>
+            <span style="font-size:11px;color:#94a3b8">900005 - Sarah K</span>
+          </div>
+          <!-- Retail Group -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#1e293b;border-bottom:1px solid #0f172a;cursor:pointer">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="color:#64748b;font-size:11px">▼</span>
+              <span style="font-size:11px">📁</span>
+              <span style="font-size:11px;font-weight:600;color:#e2e8f0">Retail</span>
+            </div>
+            <span style="background:#334155;color:#94a3b8;font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px">3</span>
+          </div>
+          <div style="padding:5px 10px 5px 28px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e293b">
+            <span style="color:#94a3b8;font-size:10px">●</span>
+            <span style="font-size:11px;color:#94a3b8">900010 - Ali Hassan</span>
+          </div>
+          <!-- Pool Account Group -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#1e293b;border-bottom:1px solid #0f172a;cursor:pointer">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="color:#64748b;font-size:11px">▼</span>
+              <span style="font-size:11px">📁</span>
+              <span style="font-size:11px;font-weight:600;color:#e2e8f0">Pool Account</span>
+            </div>
+            <span style="background:#334155;color:#94a3b8;font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px">2</span>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1;background:#0b1120;display:flex;align-items:center;justify-content:center">
+        <span style="color:#1e293b;font-size:13px">Select a client to view details</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Group Right-Click Menu</h2>
+  <p>Right-click on any group header in the Navigator to open the group context menu. All options open as flyout submenus to the right.</p>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/platform</div>
+    </div>
+    <div class="mock-body" style="height:340px;position:relative;background:#0b1120;overflow:hidden">
+      <!-- Navigator hint -->
+      <div style="position:absolute;left:0;top:0;width:180px;height:100%;background:#0f172a;border-right:1px solid #1e293b">
+        <div style="padding:8px 10px;background:#1e293b;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:1px">NAVIGATOR</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#334155;border-bottom:1px solid #0f172a">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="color:#22c55e;font-size:11px">▼</span>
+            <span style="color:#22c55e;font-size:11px">📁</span>
+            <span style="font-size:11px;font-weight:600;color:#22c55e">VIP Clients</span>
+          </div>
+          <span style="background:#22c55e;color:#0f172a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px">4</span>
+        </div>
+      </div>
+      <!-- Context Menu -->
+      <div style="position:absolute;left:172px;top:36px;width:220px;background:#1e293b;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:10;overflow:hidden">
+        <!-- Header -->
+        <div style="padding:10px 14px;background:#0f172a;border-bottom:1px solid #334155">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🗂️</span>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:#22c55e">VIP Clients</div>
+              <div style="font-size:10px;color:#64748b">4 members · +0.5p · Admin</div>
+            </div>
+          </div>
+        </div>
+        <!-- Menu items -->
+        <div style="padding:4px 0">
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">⚡ Group Leverage</span>
+            <span style="font-size:10px;color:#64748b">›</span>
+          </div>
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">⚠️ Group Margin Call</span>
+            <span style="font-size:10px;color:#64748b">›</span>
+          </div>
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:#22c55e18">
+            <span style="font-size:12px;color:#22c55e">↔ Spread Settings  <span style="color:#64748b;font-size:10px">+0.5p</span></span>
+            <span style="font-size:10px;color:#22c55e">›</span>
+          </div>
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">👁 Symbol Access <span style="background:#334155;color:#94a3b8;font-size:9px;padding:1px 5px;border-radius:4px;margin-left:4px">group</span></span>
+            <span style="font-size:10px;color:#64748b"></span>
+          </div>
+          <div style="height:1px;background:#334155;margin:4px 0"></div>
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">👥 Members <span style="color:#64748b;font-size:11px">4</span></span>
+            <span style="font-size:10px;color:#64748b">›</span>
+          </div>
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">✏️ Rename Group</span>
+            <span style="font-size:10px;color:#64748b">›</span>
+          </div>
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">👔 Change Manager</span>
+            <span style="font-size:10px;color:#64748b">›</span>
+          </div>
+          <div style="height:1px;background:#334155;margin:4px 0"></div>
+          <div style="padding:7px 14px;cursor:pointer">
+            <span style="font-size:12px;color:#ef4444">🗑️ Delete Group</span>
+          </div>
+        </div>
+      </div>
+      <!-- Spread Flyout -->
+      <div style="position:absolute;left:400px;top:80px;width:200px;background:#1e293b;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:11;overflow:hidden;padding:14px">
+        <div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:10px">Spread Settings</div>
+        <!-- Toggle -->
+        <div style="display:flex;gap:0;background:#0f172a;border-radius:6px;padding:2px;margin-bottom:12px">
+          <div style="flex:1;text-align:center;padding:4px 8px;background:#22c55e;border-radius:5px;font-size:11px;font-weight:600;color:#fff;cursor:pointer">Fixed</div>
+          <div style="flex:1;text-align:center;padding:4px 8px;font-size:11px;font-weight:600;color:#64748b;cursor:pointer">Floating</div>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:6px">Spread markup (pips)</div>
+        <input type="text" value="0.5" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:13px;box-sizing:border-box;margin-bottom:10px" readonly/>
+        <button style="width:100%;background:#22c55e;border:none;color:#fff;padding:8px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Save group spread</button>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Option</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Group Leverage</strong></td><td>Set leverage (e.g. 1:100) and apply it to ALL clients in this group at once</td></tr>
+      <tr><td><strong>Group Margin Call</strong></td><td>Set the margin call % and apply to all group members</td></tr>
+      <tr><td><strong>Spread Settings</strong></td><td>Set a Fixed or Floating group spread markup (added on top of base symbol spread)</td></tr>
+      <tr><td><strong>Symbol Access</strong></td><td>Disable/enable symbols for all clients in this group</td></tr>
+      <tr><td><strong>Members</strong></td><td>View all clients in this group; click any to select them</td></tr>
+      <tr><td><strong>Rename Group</strong></td><td>Change the group name</td></tr>
+      <tr><td><strong>Change Manager</strong></td><td>Assign or change which manager owns this group</td></tr>
+      <tr><td><strong>Delete Group</strong></td><td>Delete the group (clients are unassigned, not deleted)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <div class="box-icon">ℹ️</div>
+    <div class="box-content">
+      <strong>Group Leverage / Margin Call applies to ALL members</strong>
+      <p>When you apply leverage or margin call via the group menu, it updates every client in that group simultaneously. This is a bulk operation and cannot be undone — individual accounts will each be updated.</p>
+    </div>
+  </div>
+
+  <div class="footer-bar"><span>OrbitFxSolution Platform Manual v2.0</span><strong>orbitfxsolution.com</strong></div>
+</div>
+
+<!-- ══════════════════════════════ CH 05 ══════════════════════════════ -->
+<div class="page chapter">
+  <div class="ch-header">
+    <div class="ch-num">5</div>
+    <div><div class="ch-title">Client Management</div><div class="ch-sub">Managing individual client accounts</div></div>
+  </div>
+
+  <h2>Client Right-Click Menu</h2>
+  <p>Right-click any client account in the Navigator to open the client context menu. Submenus open as flyouts to the right side.</p>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/platform</div>
+    </div>
+    <div class="mock-body" style="height:340px;position:relative;background:#0b1120;overflow:hidden">
+      <!-- Navigator -->
+      <div style="position:absolute;left:0;top:0;width:180px;height:100%;background:#0f172a;border-right:1px solid #1e293b">
+        <div style="padding:8px 10px;background:#1e293b;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:1px">NAVIGATOR</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#1e293b;border-bottom:1px solid #0f172a">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="color:#22c55e;font-size:11px">▼ 📁</span>
+            <span style="font-size:11px;font-weight:600;color:#22c55e">VIP Clients</span>
+          </div>
+          <span style="background:#22c55e;color:#0f172a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px">4</span>
+        </div>
+        <div style="padding:5px 10px 5px 28px;background:#334155;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e293b">
+          <span style="color:#22c55e;font-size:10px">●</span>
+          <span style="font-size:11px;color:#e2e8f0">900004 - John Smith</span>
+        </div>
+      </div>
+      <!-- Context Menu -->
+      <div style="position:absolute;left:172px;top:50px;width:210px;background:#1e293b;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:10;overflow:hidden">
+        <!-- Header -->
+        <div style="padding:10px 14px;background:#0f172a;border-bottom:1px solid #334155;display:flex;align-items:center;gap:10px">
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#22c55e,#16a34a);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0">J</div>
+          <div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;font-weight:700;color:#f59e0b">900004</span>
+              <span style="background:rgba(34,197,94,0.15);color:#22c55e;font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px">LIVE</span>
+            </div>
+            <div style="font-size:10px;color:#64748b">John Smith</div>
+          </div>
+        </div>
+        <div style="padding:4px 0">
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">💰 Money</span>
+            <span style="font-size:10px;color:#64748b">›</span>
+          </div>
+          <div style="padding:7px 14px;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">⚡ Manual Trade</span>
+          </div>
+          <div style="padding:7px 14px;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">🔀 Create Sub-Account</span>
+          </div>
+          <div style="height:1px;background:#334155;margin:4px 0"></div>
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">✏️ Edit Client</span>
+            <span style="font-size:10px;color:#64748b">›</span>
+          </div>
+          <div style="padding:7px 14px;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">🪪 View KYC</span>
+          </div>
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:#22c55e18">
+            <span style="font-size:12px;color:#22c55e">⚙️ Settings</span>
+            <span style="font-size:10px;color:#22c55e">›</span>
+          </div>
+          <div style="height:1px;background:#334155;margin:4px 0"></div>
+          <!-- Status buttons -->
+          <div style="padding:7px 14px;display:flex;gap:6px">
+            <button style="flex:1;background:#1e293b;border:1px solid #ef4444;color:#ef4444;padding:4px 0;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer">Lock</button>
+            <button style="flex:1;background:#1e293b;border:1px solid #f59e0b;color:#f59e0b;padding:4px 0;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer">Deactivate</button>
+            <button style="flex:1;background:#1e293b;border:1px solid #7c3aed;color:#7c3aed;padding:4px 0;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer">DNL</button>
+          </div>
+        </div>
+      </div>
+      <!-- Settings Flyout -->
+      <div style="position:absolute;left:390px;top:160px;width:185px;background:#1e293b;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:11;overflow:hidden;padding:4px 0">
+        <div style="padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e293b">
+          <span style="font-size:12px;color:#e2e8f0">📊 Change Leverage</span>
+        </div>
+        <div style="padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e293b">
+          <span style="font-size:12px;color:#e2e8f0">⚠️ Set Margin Call</span>
+        </div>
+        <div style="padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e293b">
+          <span style="font-size:12px;color:#e2e8f0">👁 Symbol Access</span>
+        </div>
+        <div style="padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e293b">
+          <span style="font-size:12px;color:#e2e8f0">↔ Spread Markup</span>
+        </div>
+        <div style="padding:7px 14px;cursor:pointer">
+          <span style="font-size:12px;color:#e2e8f0">🏊 Promote to Pool</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Money Actions</h2>
+  <table>
+    <thead><tr><th>Action</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Deposit</td><td>Add funds to a client's account balance</td></tr>
+      <tr><td>Withdrawal</td><td>Remove funds from client's account</td></tr>
+      <tr><td>Credit In / Credit Out</td><td>Add or remove credit (does not affect balance, used for trading power)</td></tr>
+      <tr><td>Bonus</td><td>Add a bonus amount</td></tr>
+      <tr><td>Insurance</td><td>Add insurance amount</td></tr>
+      <tr><td>Manual P/L</td><td>Manually adjust profit or loss</td></tr>
+      <tr><td>Transfer Between Accounts</td><td>Move funds between two accounts belonging to the same user</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Edit Client</h2>
+  <table>
+    <thead><tr><th>Action</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Edit Details</td><td>Change name, email, phone, country</td></tr>
+      <tr><td>Change Account ID</td><td>Change the client's login ID number</td></tr>
+      <tr><td>Assign Manager &amp; Group</td><td>Move the client to a different manager or group</td></tr>
+      <tr><td>Reset PIN</td><td>Clear the client's trading PIN</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Settings (Per Account)</h2>
+  <table>
+    <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Change Leverage</td><td>Override leverage for this specific account only</td></tr>
+      <tr><td>Set Margin Call Level</td><td>Override margin call % for this account only</td></tr>
+      <tr><td>Symbol Access</td><td>Enable or disable specific symbols for this account</td></tr>
+      <tr><td>Spread Markup</td><td>Add an extra spread markup on top of the group spread (Fixed or Floating)</td></tr>
+      <tr><td>Promote/Demote Pool Account</td><td>Mark account as a pool/master account</td></tr>
+    </tbody>
+  </table>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/platform</div>
+    </div>
+    <div class="mock-body" style="height:220px;position:relative;background:#0b1120;overflow:hidden">
+      <div style="position:absolute;left:20px;top:20px;width:200px;background:#1e293b;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6);overflow:hidden">
+        <div style="padding:10px 14px;background:#0f172a;border-bottom:1px solid #334155;display:flex;align-items:center;gap:10px">
+          <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#22c55e,#16a34a);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">J</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#f59e0b">900004</div>
+            <div style="font-size:10px;color:#64748b">John Smith</div>
+          </div>
+        </div>
+        <div style="padding:4px 0">
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;background:#22c55e18;cursor:pointer">
+            <span style="font-size:12px;color:#22c55e">⚙️ Settings</span>
+            <span style="font-size:10px;color:#22c55e">›</span>
+          </div>
+        </div>
+      </div>
+      <!-- Settings Flyout -->
+      <div style="position:absolute;left:228px;top:52px;width:190px;background:#1e293b;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6);overflow:hidden">
+        <div style="padding:8px 12px;background:#0f172a;border-bottom:1px solid #334155;font-size:10px;font-weight:700;color:#64748b;letter-spacing:1px">SETTINGS</div>
+        <div style="padding:4px 0">
+          <div style="padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e293b">
+            <span style="font-size:12px;color:#e2e8f0">📊 Change Leverage</span>
+          </div>
+          <div style="padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e293b">
+            <span style="font-size:12px;color:#e2e8f0">⚠️ Set Margin Call</span>
+          </div>
+          <div style="padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e293b">
+            <span style="font-size:12px;color:#e2e8f0">👁 Symbol Access</span>
+          </div>
+          <div style="padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e293b">
+            <span style="font-size:12px;color:#e2e8f0">↔ Spread Markup</span>
+          </div>
+          <div style="padding:7px 14px;cursor:pointer">
+            <span style="font-size:12px;color:#e2e8f0">🏊 Promote to Pool</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Account Status Controls</h2>
+  <p>At the bottom of the client context menu, three quick-action buttons control the account status:</p>
+  <table>
+    <thead><tr><th>Button</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag tag-red">Lock</span></td><td>Client cannot place new trades. Existing positions remain open.</td></tr>
+      <tr><td><span class="tag tag-amber">Deactivate</span></td><td>Client cannot log in to the platform at all.</td></tr>
+      <tr><td><span class="tag tag-purple">DNL</span></td><td>Do Not Liquidate — account will not be auto-closed by margin call engine.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer-bar"><span>OrbitFxSolution Platform Manual v2.0</span><strong>orbitfxsolution.com</strong></div>
+</div>
+
+<!-- ══════════════════════════════ CH 06 ══════════════════════════════ -->
+<div class="page chapter">
+  <div class="ch-header">
+    <div class="ch-num">6</div>
+    <div><div class="ch-title">Spread System</div><div class="ch-sub">3-level spread hierarchy — how the final spread is calculated</div></div>
+  </div>
+
+  <p>The platform uses a <strong>3-level spread hierarchy</strong>. Each level adds a markup on top of the previous one. The final spread a client sees is the sum of all three levels.</p>
+
+  <div class="hierarchy">
+    <div class="hier-item">
+      <div class="hier-line"><div class="hier-dot" style="background:#2563eb"></div><div class="hier-connector"></div></div>
+      <div class="hier-content" style="background:#eff6ff;border-color:#bfdbfe">
+        <div class="tier">Layer 1 — Admin sets</div>
+        <div class="name" style="color:#2563eb">Symbol Spread (Base)</div>
+        <div class="desc">Set in Market Watch → right-click category header. This is the raw spread for each trading symbol (e.g. EURUSD = 1.0 pip base). Applies to all clients in the tenant.</div>
+      </div>
+    </div>
+    <div class="hier-item">
+      <div class="hier-line"><div class="hier-dot" style="background:#22c55e"></div><div class="hier-connector"></div></div>
+      <div class="hier-content accent">
+        <div class="tier">Layer 2 — Admin sets</div>
+        <div class="name">Group Spread Markup</div>
+        <div class="desc">Added on top of Layer 1. Set via group right-click → Spread Settings. Applies to all members of that group. Can be Fixed or Floating.</div>
+      </div>
+    </div>
+    <div class="hier-item">
+      <div class="hier-line"><div class="hier-dot" style="background:#f59e0b"></div></div>
+      <div class="hier-content" style="background:#fffbeb;border-color:#fde68a">
+        <div class="tier">Layer 3 — Admin or Manager sets</div>
+        <div class="name" style="color:#d97706">Account Spread Markup</div>
+        <div class="desc">Added on top of Layer 2. Set via client right-click → Settings → Spread Markup. Applies to this single account only. Can be Fixed or Floating.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Formula</h2>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px 24px;margin:16px 0;font-family:monospace;font-size:15px;color:#0f172a;text-align:center">
+    Final Spread = Symbol Base + Group Markup + Account Markup
+  </div>
+
+  <h3>Example</h3>
+  <table>
+    <thead><tr><th>Layer</th><th>Value</th><th>Running Total</th></tr></thead>
+    <tbody>
+      <tr><td>Symbol base (EURUSD)</td><td>1.0 pip</td><td>1.0 pip</td></tr>
+      <tr><td>Group markup (VIP Group)</td><td>+ 0.5 pip</td><td>1.5 pips</td></tr>
+      <tr><td>Account markup (Client A)</td><td>+ 0.3 pip</td><td><strong>1.8 pips total</strong></td></tr>
+    </tbody>
+  </table>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/platform</div>
+    </div>
+    <div class="mock-body" style="padding:0">
+      <div style="width:260px;background:#0f172a;margin:0 auto">
+        <div style="padding:8px 12px;background:#1e293b;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:1px;display:flex;align-items:center;justify-content:space-between">
+          <span>MARKET WATCH</span>
+          <span style="color:#64748b;cursor:pointer">🔍</span>
+        </div>
+        <div style="padding:5px 10px;background:#0f172a">
+          <input type="text" placeholder="Search symbol..." style="width:100%;background:#1e293b;border:1px solid #334155;border-radius:5px;padding:5px 10px;color:#64748b;font-size:11px;box-sizing:border-box" readonly/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 44px;padding:5px 10px;border-bottom:1px solid #1e293b">
+          <span style="font-size:9px;font-weight:700;color:#64748b">SYMBOL</span>
+          <span style="font-size:9px;font-weight:700;color:#64748b">BID</span>
+          <span style="font-size:9px;font-weight:700;color:#64748b">ASK</span>
+          <span style="font-size:9px;font-weight:700;color:#64748b">SPRD</span>
+        </div>
+        <!-- FOREX category -->
+        <div style="padding:5px 10px;background:#1e293b;border-bottom:1px solid #0f172a">
+          <span style="font-size:10px;font-weight:700;color:#64748b">▼ FOREX</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 44px;padding:5px 10px;border-bottom:1px solid #1e293b;align-items:center">
+          <span style="font-size:11px;color:#e2e8f0">🇪🇺 EURUSD</span>
+          <span style="font-size:10px;color:#94a3b8">1.08234</span>
+          <span style="font-size:10px;color:#94a3b8">1.08236</span>
+          <span style="font-size:10px;color:#22c55e">0.2</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 44px;padding:5px 10px;border-bottom:1px solid #1e293b;align-items:center">
+          <span style="font-size:11px;color:#e2e8f0">🇬🇧 GBPUSD</span>
+          <span style="font-size:10px;color:#94a3b8">1.26541</span>
+          <span style="font-size:10px;color:#94a3b8">1.26545</span>
+          <span style="font-size:10px;color:#22c55e">0.4</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 44px;padding:5px 10px;border-bottom:1px solid #1e293b;align-items:center">
+          <span style="font-size:11px;color:#e2e8f0">🇦🇺 AUDUSD</span>
+          <span style="font-size:10px;color:#94a3b8">0.65123</span>
+          <span style="font-size:10px;color:#94a3b8">0.65125</span>
+          <span style="font-size:10px;color:#22c55e">0.2</span>
+        </div>
+        <!-- CRYPTO category -->
+        <div style="padding:5px 10px;background:#1e293b;border-bottom:1px solid #0f172a;border-top:1px solid #1e293b">
+          <span style="font-size:10px;font-weight:700;color:#64748b">▼ CRYPTO</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 44px;padding:5px 10px;border-bottom:1px solid #1e293b;align-items:center">
+          <span style="font-size:11px;color:#e2e8f0">₿ BTCUSD</span>
+          <span style="font-size:10px;color:#94a3b8">59,308</span>
+          <span style="font-size:10px;color:#94a3b8">59,312</span>
+          <span style="font-size:10px;color:#22c55e">4.0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Fixed vs Floating Spread</h2>
+  <table>
+    <thead><tr><th>Type</th><th>Behaviour</th><th>When to use</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="tag tag-blue">Fixed</span></td>
+        <td>The markup is always the same value regardless of market hours or conditions</td>
+        <td>VIP clients, predictable spread promise</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-amber">Floating</span></td>
+        <td>Markup varies between a <strong>Min</strong> (market hours) and <strong>Max</strong> (off-hours / low liquidity) value</td>
+        <td>Retail clients, volatile or off-hours protection</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>How to Set Symbol Base Spread (Layer 1)</h2>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Open Market Watch</strong><p>The Market Watch panel is on the right side of the Admin platform page.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Right-click a Category Header</strong><p>Right-click on "FOREX", "CRYPTO", "METALS", etc. — the category header, not an individual symbol.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Set Spread per Symbol</strong><p>A symbol spread editor opens. Set Fixed or Floating spread (min/max pips) for each symbol in that category.</p></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Save</strong><p>Changes take effect immediately for all clients in the tenant.</p></div></div>
+  </div>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/platform</div>
+    </div>
+    <div class="mock-body" style="padding:20px;background:rgba(0,0,0,0.4)">
+      <div style="background:#1e293b;border-radius:12px;padding:20px;max-width:360px;margin:0 auto">
+        <div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:4px">FOREX — Symbol Spreads</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:14px">Set base spread per symbol. Applies to all clients.</div>
+        <!-- Toggle -->
+        <div style="display:flex;gap:0;background:#0f172a;border-radius:6px;padding:2px;margin-bottom:14px;max-width:200px">
+          <div style="flex:1;text-align:center;padding:5px 12px;background:#22c55e;border-radius:5px;font-size:11px;font-weight:600;color:#fff;cursor:pointer">Fixed</div>
+          <div style="flex:1;text-align:center;padding:5px 12px;font-size:11px;font-weight:600;color:#64748b;cursor:pointer">Floating</div>
+        </div>
+        <!-- Table -->
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
+          <thead>
+            <tr style="border-bottom:1px solid #334155">
+              <th style="padding:6px 8px;text-align:left;color:#64748b;font-size:10px;font-weight:700;letter-spacing:.5px">SYMBOL</th>
+              <th style="padding:6px 8px;text-align:left;color:#64748b;font-size:10px;font-weight:700;letter-spacing:.5px">MIN PIPS</th>
+              <th style="padding:6px 8px;text-align:left;color:#475569;font-size:10px;font-weight:700;letter-spacing:.5px">MAX PIPS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid #1e293b">
+              <td style="padding:7px 8px;color:#e2e8f0">EURUSD</td>
+              <td style="padding:7px 8px"><input type="text" value="0.2" style="background:#0f172a;border:1px solid #334155;border-radius:5px;padding:4px 8px;color:#22c55e;font-size:12px;width:60px" readonly/></td>
+              <td style="padding:7px 8px;color:#334155">—</td>
+            </tr>
+            <tr style="border-bottom:1px solid #1e293b">
+              <td style="padding:7px 8px;color:#e2e8f0">GBPUSD</td>
+              <td style="padding:7px 8px"><input type="text" value="0.3" style="background:#0f172a;border:1px solid #334155;border-radius:5px;padding:4px 8px;color:#22c55e;font-size:12px;width:60px" readonly/></td>
+              <td style="padding:7px 8px;color:#334155">—</td>
+            </tr>
+            <tr style="border-bottom:1px solid #1e293b">
+              <td style="padding:7px 8px;color:#e2e8f0">AUDUSD</td>
+              <td style="padding:7px 8px"><input type="text" value="0.2" style="background:#0f172a;border:1px solid #334155;border-radius:5px;padding:4px 8px;color:#22c55e;font-size:12px;width:60px" readonly/></td>
+              <td style="padding:7px 8px;color:#334155">—</td>
+            </tr>
+            <tr>
+              <td style="padding:7px 8px;color:#e2e8f0">USDJPY</td>
+              <td style="padding:7px 8px"><input type="text" value="0.3" style="background:#0f172a;border:1px solid #334155;border-radius:5px;padding:4px 8px;color:#22c55e;font-size:12px;width:60px" readonly/></td>
+              <td style="padding:7px 8px;color:#334155">—</td>
+            </tr>
+          </tbody>
+        </table>
+        <button style="background:#22c55e;border:none;color:#fff;padding:9px 20px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Save Spreads</button>
+      </div>
+    </div>
+  </div>
+
+  <h2>How to Set Group Spread Markup (Layer 2)</h2>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Right-click the Group</strong><p>In the Navigator, right-click on the group header row (e.g. "VIP Group").</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Select "Spread Settings"</strong><p>The Spread Settings flyout opens to the right.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Choose Fixed or Floating</strong><p>Enter the min pip value (and max if Floating). Click <strong>Save group spread</strong>.</p></div></div>
+  </div>
+
+  <h2>How to Set Account Spread Markup (Layer 3)</h2>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Right-click the Client</strong><p>In the Navigator, right-click on the client account.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Settings → Spread Markup</strong><p>Open the Settings flyout, then click Spread Markup.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Set Fixed or Floating markup</strong><p>Enter the pip value. If Floating, also set the Max pips. Click Save.</p></div></div>
+  </div>
+
+  <div class="footer-bar"><span>OrbitFxSolution Platform Manual v2.0</span><strong>orbitfxsolution.com</strong></div>
+</div>
+
+<!-- ══════════════════════════════ CH 07 ══════════════════════════════ -->
+<div class="page chapter">
+  <div class="ch-header">
+    <div class="ch-num">7</div>
+    <div><div class="ch-title">Symbol Access Control</div><div class="ch-sub">Enable or disable trading symbols at group or account level</div></div>
+  </div>
+
+  <p>Symbol Access lets you control which trading symbols each group or individual client can trade. A disabled symbol will not appear in the client's Market Watch and cannot be traded.</p>
+
+  <h2>3-Level Symbol Priority</h2>
+  <table>
+    <thead><tr><th>Level</th><th>Who controls</th><th>Scope</th><th>Overrides</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Tenant (platform)</strong></td><td>Super Admin</td><td>All clients in the entire tenant</td><td>Overrides everything below</td></tr>
+      <tr><td><strong>Group</strong></td><td>Admin</td><td>All members of that group</td><td>Overrides account setting</td></tr>
+      <tr><td><strong>Account</strong></td><td>Admin or Manager</td><td>Single account only</td><td>Only takes effect if group allows it</td></tr>
+    </tbody>
+  </table>
+
+  <div class="warn-box">
+    <div class="box-icon">⚠️</div>
+    <div class="box-content">
+      <strong>Disable at higher level = blocked everywhere</strong>
+      <p>If a symbol is disabled at the Tenant level, no client can trade it regardless of group or account settings. If disabled at Group level, all members are blocked even if the account-level says enabled.</p>
+    </div>
+  </div>
+
+  <h2>How to Set Group Symbol Access</h2>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Right-click the Group</strong><p>In the Navigator, right-click the group header.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Click "Symbol Access"</strong><p>The Symbol Access panel opens — it shows the group name in the header so you know which group you are editing.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Toggle Symbols On/Off</strong><p>Search or scroll to find symbols. Toggle the switch to disable or enable each symbol for all group members.</p></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Save</strong><p>Changes apply immediately to all clients in the group.</p></div></div>
+  </div>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/platform</div>
+    </div>
+    <div class="mock-body" style="padding:20px;background:rgba(0,0,0,0.4)">
+      <div style="background:#1e293b;border-radius:12px;padding:20px;max-width:380px;margin:0 auto">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:16px">📁</span>
+          <span style="font-size:14px;font-weight:700;color:#e2e8f0">Symbol Access — VIP Clients</span>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:12px">Toggle symbols on/off for all 4 members in this group</div>
+        <input type="text" placeholder="🔍  Search symbol..." style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:7px 10px;color:#64748b;font-size:12px;box-sizing:border-box;margin-bottom:10px" readonly/>
+        <!-- Symbol list -->
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#e2e8f0">🇪🇺 EURUSD</span>
+            <div style="width:36px;height:20px;background:#22c55e;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#e2e8f0">🇬🇧 GBPUSD</span>
+            <div style="width:36px;height:20px;background:#22c55e;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#94a3b8">₿ BTCUSD <span style="font-size:10px;color:#ef4444;margin-left:4px">● disabled</span></span>
+            <div style="width:36px;height:20px;background:#334155;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#64748b;border-radius:50%;position:absolute;left:2px;top:2px"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#94a3b8">Ξ ETHUSD <span style="font-size:10px;color:#ef4444;margin-left:4px">● disabled</span></span>
+            <div style="width:36px;height:20px;background:#334155;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#64748b;border-radius:50%;position:absolute;left:2px;top:2px"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#e2e8f0">🥇 GOLD</span>
+            <div style="width:36px;height:20px;background:#22c55e;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#e2e8f0">🥈 SILVER</span>
+            <div style="width:36px;height:20px;background:#22c55e;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:#ef4444">● 2 symbols disabled for this group</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>How to Set Account Symbol Access</h2>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Right-click the Client</strong><p>Right-click the client in the Navigator.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Settings → Symbol Access</strong><p>Opens the symbol access panel for this account only.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Toggle Symbols</strong><p>Enable or disable specific symbols for this one account.</p></div></div>
+  </div>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/platform</div>
+    </div>
+    <div class="mock-body" style="padding:20px;background:rgba(0,0,0,0.4)">
+      <div style="background:#1e293b;border-radius:12px;padding:20px;max-width:380px;margin:0 auto">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#22c55e,#16a34a);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">J</div>
+          <span style="font-size:14px;font-weight:700;color:#e2e8f0">Symbol Access — 900004 John Smith</span>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:12px">Toggle symbols on/off for this account only</div>
+        <input type="text" placeholder="🔍  Search symbol..." style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:7px 10px;color:#64748b;font-size:12px;box-sizing:border-box;margin-bottom:10px" readonly/>
+        <!-- Symbol list -->
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#e2e8f0">🇪🇺 EURUSD</span>
+            <div style="width:36px;height:20px;background:#22c55e;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#e2e8f0">🇬🇧 GBPUSD</span>
+            <div style="width:36px;height:20px;background:#22c55e;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#94a3b8">₿ BTCUSD <span style="font-size:10px;color:#ef4444;margin-left:4px">● disabled</span></span>
+            <div style="width:36px;height:20px;background:#334155;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#64748b;border-radius:50%;position:absolute;left:2px;top:2px"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#94a3b8">Ξ ETHUSD <span style="font-size:10px;color:#ef4444;margin-left:4px">● disabled</span></span>
+            <div style="width:36px;height:20px;background:#334155;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#64748b;border-radius:50%;position:absolute;left:2px;top:2px"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#e2e8f0">🥇 GOLD</span>
+            <div style="width:36px;height:20px;background:#22c55e;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#0f172a;border-radius:6px">
+            <span style="font-size:12px;color:#e2e8f0">🥈 SILVER</span>
+            <div style="width:36px;height:20px;background:#22c55e;border-radius:99px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:#ef4444">● 2 symbols disabled for this account</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bar"><span>OrbitFxSolution Platform Manual v2.0</span><strong>orbitfxsolution.com</strong></div>
+</div>
+
+<!-- ══════════════════════════════ CH 08 ══════════════════════════════ -->
+<div class="page chapter">
+  <div class="ch-header">
+    <div class="ch-num">8</div>
+    <div><div class="ch-title">Leverage & Margin Call</div><div class="ch-sub">Setting trading conditions per group or per account</div></div>
+  </div>
+
+  <h2>Leverage</h2>
+  <p>Leverage determines how much buying power a client has relative to their account balance. Higher leverage = more buying power but higher risk.</p>
+
+  <table>
+    <thead><tr><th>Available Options</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>1:25</td><td>Conservative — for regulated or cautious clients</td></tr>
+      <tr><td>1:50</td><td>Standard retail leverage</td></tr>
+      <tr><td>1:100</td><td>Default for most clients</td></tr>
+      <tr><td>1:200</td><td>Higher leverage for experienced traders</td></tr>
+      <tr><td>1:400</td><td>Professional / VIP clients</td></tr>
+      <tr><td>1:500</td><td>High leverage</td></tr>
+      <tr><td>1:1000</td><td>Maximum leverage — use with caution</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Set Leverage for a Group (bulk)</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Right-click the group → Group Leverage</strong><p>The flyout opens with a dropdown selector.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Select the leverage ratio</strong><p>Choose from the dropdown (1:25 to 1:1000).</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Click "Apply to all members"</strong><p>This updates every client in the group simultaneously.</p></div></div>
+  </div>
+
+  <h3>Set Leverage for One Client</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Right-click client → Settings → Change Leverage</strong><p>Opens leverage setting for this account only.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Select ratio and Save</strong><p>Only this account is updated — other group members are not affected.</p></div></div>
+  </div>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/platform</div>
+    </div>
+    <div class="mock-body" style="height:200px;position:relative;background:#0b1120;overflow:hidden">
+      <!-- Partial group context menu -->
+      <div style="position:absolute;left:16px;top:16px;width:200px;background:#1e293b;border:1px solid #334155;border-radius:10px;overflow:hidden">
+        <div style="padding:10px 14px;background:#0f172a;border-bottom:1px solid #334155">
+          <div style="font-size:12px;font-weight:700;color:#22c55e">📁 VIP Clients</div>
+          <div style="font-size:10px;color:#64748b">4 members · Admin</div>
+        </div>
+        <div style="padding:4px 0">
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;background:#22c55e18;cursor:pointer">
+            <span style="font-size:12px;color:#22c55e">⚡ Group Leverage</span>
+            <span style="font-size:10px;color:#22c55e">›</span>
+          </div>
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;opacity:0.5">
+            <span style="font-size:12px;color:#e2e8f0">⚠️ Group Margin Call</span>
+            <span style="font-size:10px;color:#64748b">›</span>
+          </div>
+          <div style="padding:7px 14px;display:flex;align-items:center;justify-content:space-between;opacity:0.5">
+            <span style="font-size:12px;color:#e2e8f0">↔ Spread Settings</span>
+            <span style="font-size:10px;color:#64748b">›</span>
+          </div>
+        </div>
+      </div>
+      <!-- Leverage Flyout -->
+      <div style="position:absolute;left:224px;top:50px;width:210px;background:#1e293b;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,0.6);padding:14px">
+        <div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:4px">⚡ Group Leverage</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:12px">Apply to ALL 4 members</div>
+        <select style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:7px 10px;color:#e2e8f0;font-size:13px;font-weight:600;margin-bottom:10px;box-sizing:border-box">
+          <option>1:25</option>
+          <option>1:50</option>
+          <option selected>1:100</option>
+          <option>1:200</option>
+          <option>1:400</option>
+          <option>1:500</option>
+          <option>1:1000</option>
+        </select>
+        <button style="width:100%;background:#22c55e;border:none;color:#fff;padding:8px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Apply 1:100 to all members</button>
+      </div>
+    </div>
+  </div>
+
+  <h2>Margin Call Level</h2>
+  <p>The Margin Call Level is a percentage at which the system automatically triggers a margin call warning or position close. It is set as a percentage of the required margin.</p>
+
+  <table>
+    <thead><tr><th>Value</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>0%</td><td>Margin call disabled — positions will never be auto-closed by margin</td></tr>
+      <tr><td>50%</td><td>Margin call triggers when equity drops to 50% of required margin (default)</td></tr>
+      <tr><td>100%</td><td>Margin call triggers when equity equals required margin (aggressive)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Set Margin Call for a Group (bulk)</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Right-click the group → Group Margin Call</strong><p>The flyout opens with a number input.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Enter the percentage</strong><p>Type a value between 0 and 500. Set to 0 to disable.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Click "Apply to all members"</strong><p>All clients in the group are updated.</p></div></div>
+  </div>
+
+  <div class="info-box">
+    <div class="box-icon">ℹ️</div>
+    <div class="box-content">
+      <strong>Per-account overrides always win</strong>
+      <p>If you apply a group leverage/margin call then individually change one client, the individual setting takes effect for that client. Future group-level applies will overwrite it again.</p>
+    </div>
+  </div>
+
+  <div class="footer-bar"><span>OrbitFxSolution Platform Manual v2.0</span><strong>orbitfxsolution.com</strong></div>
+</div>
+
+<!-- ══════════════════════════════ CH 09 ══════════════════════════════ -->
+<div class="page chapter">
+  <div class="ch-header">
+    <div class="ch-num">9</div>
+    <div><div class="ch-title">Permissions Reference</div><div class="ch-sub">Complete permissions matrix for admins and managers</div></div>
+  </div>
+
+  <h2>How Permissions Work</h2>
+  <p>There are two layers of permissions that must both be enabled for any action to work:</p>
+
+  <div class="hierarchy">
+    <div class="hier-item">
+      <div class="hier-line"><div class="hier-dot" style="background:#7c3aed"></div><div class="hier-connector"></div></div>
+      <div class="hier-content" style="background:#faf5ff;border-color:#c4b5fd">
+        <div class="tier">Layer 1</div>
+        <div class="name" style="color:#7c3aed">Tenant Permissions (set by Super Admin)</div>
+        <div class="desc">Master gates for the entire tenant. If a permission is OFF here, no one in the tenant can use it — regardless of manager settings. Example: if "editSpread" is off at tenant level, no admin or manager can edit spread.</div>
+      </div>
+    </div>
+    <div class="hier-item">
+      <div class="hier-line"><div class="hier-dot" style="background:#22c55e"></div></div>
+      <div class="hier-content accent">
+        <div class="tier">Layer 2</div>
+        <div class="name">Manager Personal Permissions (set by Admin)</div>
+        <div class="desc">Individual manager permissions within the tenant. Even if tenant-level allows a permission, the manager only gets it if Admin specifically grants it to them.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Full Permissions List</h2>
+
+  <table>
+    <thead><tr><th>Permission</th><th>Section</th><th>Grants ability to…</th></tr></thead>
+    <tbody>
+      <tr><td>createClients</td><td>Users</td><td>Register new client accounts</td></tr>
+      <tr><td>deleteClients</td><td>Users</td><td>Permanently delete client accounts</td></tr>
+      <tr><td>manageManagers</td><td>Users</td><td>Create and manage manager accounts (Admin only)</td></tr>
+      <tr><td>processDeposits</td><td>Funds</td><td>Process deposit transactions</td></tr>
+      <tr><td>processWithdrawals</td><td>Funds</td><td>Process withdrawal transactions</td></tr>
+      <tr><td>creditBonus</td><td>Funds</td><td>Issue credit, bonus, and insurance</td></tr>
+      <tr><td>transferFunds</td><td>Funds</td><td>Transfer funds between accounts</td></tr>
+      <tr><td>editFinancial</td><td>Funds</td><td>Edit financial history records</td></tr>
+      <tr><td>deleteFinancial</td><td>Funds</td><td>Delete financial history records</td></tr>
+      <tr><td>manualTrade</td><td>Trades</td><td>Place manual trades on client accounts</td></tr>
+      <tr><td>closeTrades</td><td>Trades</td><td>Force-close open client positions</td></tr>
+      <tr><td>editTrades</td><td>Trades</td><td>Modify existing trade records</td></tr>
+      <tr><td>deleteTrades</td><td>Trades</td><td>Delete trade records</td></tr>
+      <tr><td>viewAudit</td><td>Reports</td><td>View audit logs and activity history</td></tr>
+      <tr><td>exportPdf</td><td>Reports</td><td>Export reports as PDF documents</td></tr>
+      <tr><td>sendNotifications</td><td>Communication</td><td>Send push and email notifications to clients</td></tr>
+      <tr><td>editSpread</td><td>Spread</td><td>Adjust spread markup on client accounts</td></tr>
+    </tbody>
+  </table>
+
+  <div class="mock-wrap">
+    <div class="mock-bar">
+      <div class="mock-dot" style="background:#ef4444"></div>
+      <div class="mock-dot" style="background:#f59e0b"></div>
+      <div class="mock-dot" style="background:#22c55e"></div>
+      <div class="mock-url">app.orbitfxsolution.com/admin/managers</div>
+    </div>
+    <div class="mock-body" style="padding:20px;background:rgba(0,0,0,0.5)">
+      <div style="background:#1e293b;border-radius:12px;padding:20px;max-width:520px;margin:0 auto">
+        <div style="font-size:15px;font-weight:700;color:#e2e8f0;margin-bottom:4px">Permissions — Harish Raghav</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:14px">Unchecked = denied. Still gated by tenant-level permissions.</div>
+        <!-- TRADES (scrolled mid-point) -->
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1px;margin-bottom:6px">TRADES</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Manual Trade</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Close Trades</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Edit Trades</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Delete Trades</label>
+        </div>
+        <!-- REPORTS -->
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1px;margin-bottom:6px">REPORTS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> View Audit Log</label>
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Export PDF</label>
+        </div>
+        <!-- COMMUNICATION -->
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1px;margin-bottom:6px">COMMUNICATION</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+          <label style="display:flex;align-items:center;gap:6px;background:#0f172a;padding:6px 10px;border-radius:6px;font-size:12px;color:#e2e8f0"><input type="checkbox" checked style="accent-color:#22c55e"> Send Notifications</label>
+        </div>
+        <!-- SPREAD - highlighted section -->
+        <div style="background:#0f172a;border:1px solid #22c55e40;border-radius:8px;padding:12px 14px;margin-bottom:16px">
+          <div style="font-size:10px;font-weight:700;color:#22c55e;letter-spacing:1px;margin-bottom:8px">SPREAD</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;cursor:pointer">
+            <input type="checkbox" checked style="accent-color:#22c55e;width:14px;height:14px">
+            <span>Edit Spread Settings <span style="color:#64748b">(account markup)</span></span>
+          </label>
+          <div style="font-size:11px;color:#475569;margin-top:6px;padding-left:22px">Allows this manager to adjust spread markup on their clients' accounts only.</div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:8px 16px;border-radius:7px;font-size:12px;cursor:pointer">Cancel</button>
+          <button style="background:#22c55e;border:none;color:#fff;padding:8px 16px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Save Permissions</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-box">
+    <div class="box-icon">💡</div>
+    <div class="box-content">
+      <strong>Start restrictive, grant as needed</strong>
+      <p>Best practice: when creating a new manager, start with minimal permissions (only processDeposits and createClients, for example) and add more as trust is established. Avoid granting deleteClients or deleteFinancial unless absolutely necessary.</p>
+    </div>
+  </div>
+
+  <div class="footer-bar"><span>OrbitFxSolution Platform Manual v2.0</span><strong>orbitfxsolution.com</strong></div>
+</div>
+
+<!-- ══════════════════════════════ CH 10 ══════════════════════════════ -->
+<div class="page chapter">
+  <div class="ch-header">
+    <div class="ch-num">10</div>
+    <div><div class="ch-title">Support & Contact</div><div class="ch-sub">Get help from the OrbitFxSolution team</div></div>
+  </div>
+
+  <p>Our support team is available to help with platform setup, configuration questions, technical issues, and billing. Please include your tenant name and account details when contacting us.</p>
+
+  <div style="background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:16px;padding:40px;color:#fff;margin:24px 0;text-align:center">
+    <div style="font-size:36px;margin-bottom:16px">🌿</div>
+    <div style="font-size:22px;font-weight:800;margin-bottom:8px">OrbitFxSolution</div>
+    <div style="color:#94a3b8;margin-bottom:32px">Your white-label trading platform provider</div>
+    <div style="display:flex;gap:32px;justify-content:center;flex-wrap:wrap">
+      <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px 32px">
+        <div style="font-size:11px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Support Email</div>
+        <div style="font-size:16px;font-weight:600;color:#22c55e">support@orbitfxsolution.com</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px 32px">
+        <div style="font-size:11px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Website</div>
+        <div style="font-size:16px;font-weight:600;color:#22c55e">orbitfxsolution.com</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>When to Contact Support</h2>
+  <table>
+    <thead><tr><th>Issue Type</th><th>What to include in your message</th></tr></thead>
+    <tbody>
+      <tr><td>Spread not showing correctly</td><td>Symbol name, expected spread, actual spread, client account ID</td></tr>
+      <tr><td>Client cannot log in</td><td>Client email, account ID, error message they see</td></tr>
+      <tr><td>Symbol missing from market watch</td><td>Symbol name, whether it's disabled at tenant level</td></tr>
+      <tr><td>Manager permission not working</td><td>Manager email, which permission, what error appears</td></tr>
+      <tr><td>Billing / plan upgrade</td><td>Your tenant name and requested plan</td></tr>
+      <tr><td>Technical / server issues</td><td>Screenshot of error, browser, time of occurrence</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <div class="box-icon">⏰</div>
+    <div class="box-content">
+      <strong>Response times</strong>
+      <p>Support emails are typically answered within 24 hours on business days. For urgent issues affecting live trading, please mark your email subject as <strong>[URGENT]</strong>.</p>
+    </div>
+  </div>
+
+  <h2>Quick Reference Summary</h2>
+  <table>
+    <thead><tr><th>Task</th><th>Where to do it</th></tr></thead>
+    <tbody>
+      <tr><td>Create a manager</td><td>Admin Platform → top menu → Managers → New Manager</td></tr>
+      <tr><td>Set manager permissions</td><td>Managers panel → Permissions button</td></tr>
+      <tr><td>Create a group</td><td>Navigator → + New → New Group</td></tr>
+      <tr><td>Apply leverage to group</td><td>Navigator → right-click group → Group Leverage</td></tr>
+      <tr><td>Set group spread</td><td>Navigator → right-click group → Spread Settings</td></tr>
+      <tr><td>Set symbol base spread</td><td>Market Watch → right-click category header</td></tr>
+      <tr><td>Set account spread markup</td><td>Navigator → right-click client → Settings → Spread Markup</td></tr>
+      <tr><td>Disable a symbol for a group</td><td>Navigator → right-click group → Symbol Access</td></tr>
+      <tr><td>Disable a symbol for one client</td><td>Navigator → right-click client → Settings → Symbol Access</td></tr>
+      <tr><td>Deposit / Withdraw</td><td>Navigator → right-click client → Money</td></tr>
+      <tr><td>Lock / Deactivate a client</td><td>Navigator → right-click client → Lock / Deactivate buttons</td></tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:48px;padding:24px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;text-align:center">
+    <div style="font-size:13px;color:#16a34a;font-weight:600">This document is confidential and intended for white-label tenant administrators only.</div>
+    <div style="font-size:12px;color:#64748b;margin-top:4px">© 2026 OrbitFxSolution. All rights reserved. · orbitfxsolution.com</div>
+  </div>
+
+  <div class="footer-bar"><span>OrbitFxSolution Platform Manual v2.0</span><strong>orbitfxsolution.com</strong></div>
+</div>
+
+</body>
+</html>

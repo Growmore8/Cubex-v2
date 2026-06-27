@@ -475,7 +475,7 @@ export default function AdminDeskPage() {
     }
     else if (act.kind === "accountid") { const login = String(aform.login ?? act.acc.login).trim(); if (!login) { setErr("Enter an account ID"); return; } url = "/api/admin/clients/" + id + "/manage"; body = { action: "accountId", login }; }
     else if (act.kind === "assignmgr") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assignManager", managerId: aform.managerId || null }; }
-    else if (act.kind === "settings") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", leverage: Number(aform.leverage ?? act.acc.leverage), mcLevel: Number(aform.mcLevel ?? act.acc.mcLevel), doNotLiquidate: aform.doNotLiquidate ?? act.acc.doNotLiquidate, currency: aform.currency ?? act.acc.currency }; }
+    else if (act.kind === "settings") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", leverage: Number(aform.leverage ?? act.acc.leverage), mcLevel: Number(aform.mcLevel ?? act.acc.mcLevel), doNotLiquidate: aform.doNotLiquidate ?? act.acc.doNotLiquidate, currency: aform.currency ?? act.acc.currency, swapFree: !!(aform.swapFree ?? act.acc.swapFree) }; }
     else if (act.kind === "subaccount") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "subAccount", name: aform.name || "", type: aform.subType || "LIVE", leverage: Number(aform.subLev) || act.acc.leverage, currency: aform.subCcy || act.acc.currency, deposit: Number(aform.subDep) || 0 }; }
     else if (act.kind === "assigngroup") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assignGroup", groupId: aform.groupId || null }; }
     else if (act.kind === "assign") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assign", managerId: (aform.managerId ?? act.acc.managerId) || null, groupId: (aform.groupId ?? act.acc.groupId) || null }; }
@@ -2135,6 +2135,7 @@ export default function AdminDeskPage() {
               </div>
               <div><div className={flab}>Currency</div><select className={inp} value={aform.currency ?? act.acc.currency} onChange={(e) => af("currency", e.target.value)}><option>USD</option><option>EUR</option><option>GBP</option></select></div>
               <label className="flex items-center gap-2 text-[11px]"><input type="checkbox" checked={!!(aform.doNotLiquidate ?? act.acc.doNotLiquidate)} onChange={(e) => af("doNotLiquidate", e.target.checked)} /> Do not liquidate (disable stop-out)</label>
+              <label className="flex items-center gap-2 text-[11px]"><input type="checkbox" checked={!!(aform.swapFree ?? act.acc.swapFree)} onChange={(e) => af("swapFree", e.target.checked)} /> Swap-free (Islamic account — no overnight charges)</label>
             </>)}
             {err && <div className="text-[11px]" style={{ color: SELL }}>{err}</div>}
             </div>
