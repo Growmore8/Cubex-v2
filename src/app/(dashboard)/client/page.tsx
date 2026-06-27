@@ -243,11 +243,13 @@ export default function ClientTerminal() {
       for (const k in pD) delete pD[k];
       for (const k in pB) delete pB[k];
       for (const k in pS) delete pS[k];
+      // Spread + bids: urgent (no startTransition) so Sprd column updates live like mobile
+      if (bkKeys.length) setLiveBids((bb) => ({ ...bb, ...bd }));
+      if (skKeys.length) setLiveSpreadPips((ss) => ({ ...ss, ...sp }));
+      // Prices + dirs: low-priority transition (visual smoothness)
       startTransition(() => {
         if (pxKeys.length) setPrices((pp) => ({ ...pp, ...px }));
         if (drKeys.length) setDirs((dd) => ({ ...dd, ...dr }));
-        if (bkKeys.length) setLiveBids((bb) => ({ ...bb, ...bd }));
-        if (skKeys.length) setLiveSpreadPips((ss) => ({ ...ss, ...sp }));
       });
     };
     socket.on("tick", ({ symbol, price, bid, real }: any) => {
@@ -268,7 +270,7 @@ export default function ClientTerminal() {
     });
     // Real bid snapshot from Binance/Kraken on connect
     socket.on("bids", (snap: Record<string, number>) => {
-      if (snap && typeof snap === "object") startTransition(() => setLiveBids((b) => ({ ...b, ...snap })));
+      if (snap && typeof snap === "object") setLiveBids((b) => ({ ...b, ...snap }));
     });
     // Initial price snapshot on connect — seeds prices for frozen/closed markets so
     // open positions show their last P&L immediately.
