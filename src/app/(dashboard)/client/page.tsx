@@ -133,7 +133,7 @@ export default function ClientTerminal() {
   const [acctMenu, setAcctMenu] = useState(false);
   const [acctSwitchOpen, setAcctSwitchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [mwW, setMwW] = useState(240);
+  const [mwW, setMwW] = useState(260);
   const [rtW, setRtW] = useState(280);
   const [tbH, setTbH] = useState(200);
   const [dragging, setDragging] = useState(false);
@@ -790,12 +790,12 @@ export default function ClientTerminal() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[1fr_56px_56px_34px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" style={{ color: "var(--muted)" }}>Sprd</span></div>
+          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" style={{ color: "var(--muted)" }}>Sprd</span></div>
             {favs.length > 0 && (
               <div>
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
                 {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const a = p ?? null; const b = p != null ? p - _spreadPx(s.symbol) : null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); return (
-                  <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_56px_56px_34px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
+                  <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
@@ -807,7 +807,7 @@ export default function ClientTerminal() {
               <div key={c}>
                 <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
                 {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const a = p ?? null; const b = p != null ? p - _spreadPx(s.symbol) : null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); return (
-                  <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[1fr_56px_56px_34px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
+                  <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
