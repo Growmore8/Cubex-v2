@@ -83,6 +83,7 @@ export default function AdminDeskPage() {
   const [audit, setAudit] = useState<any[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [liveBids, setLiveBids] = useState<Record<string, number>>({});
+  const [liveAsks, setLiveAsks] = useState<Record<string, number>>({});
   const [selSym, setSelSym] = useState("");
   const [tf, setTf] = useState("1M");
   const [selAcc, setSelAcc] = useState<any>(null);
@@ -370,33 +371,32 @@ export default function AdminDeskPage() {
     const pP: Record<string, number> = {};
     const pD: Record<string, number> = {};
     const pB: Record<string, number> = {};
-    // Mirror the CLIENT's mechanism exactly: accumulate ticks in refs, then flush
-    // on a short interval inside startTransition so the (heavy) desk price update
-    // is NON-blocking/interruptible and stays real-time — matching the client.
+    const pA: Record<string, number> = {};
     const flush = () => {
-      const pxKeys = Object.keys(pP); const drKeys = Object.keys(pD); const bkKeys = Object.keys(pB);
-      if (!pxKeys.length && !drKeys.length && !bkKeys.length) return;
-      const px = { ...pP }; const dr = { ...pD }; const bd = { ...pB };
+      const pxKeys = Object.keys(pP); const drKeys = Object.keys(pD); const bkKeys = Object.keys(pB); const akKeys = Object.keys(pA);
+      if (!pxKeys.length && !drKeys.length && !bkKeys.length && !akKeys.length) return;
+      const px = { ...pP }; const dr = { ...pD }; const bd = { ...pB }; const ak = { ...pA };
       for (const k in pP) delete pP[k];
       for (const k in pD) delete pD[k];
       for (const k in pB) delete pB[k];
+      for (const k in pA) delete pA[k];
       if (bkKeys.length) setLiveBids((bb) => ({ ...bb, ...bd }));
+      if (akKeys.length) setLiveAsks((aa) => ({ ...aa, ...ak }));
       startTransition(() => {
         if (pxKeys.length) setPrices((pp) => ({ ...pp, ...px }));
         if (drKeys.length) setDirs((dd) => ({ ...dd, ...dr }));
       });
     };
     socket.on("prices", (snapshot: Record<string, number>) => {
-      // Initial (and post-seed) bulk snapshot — sets all known prices at once,
-      // including frozen/closed-market symbols that never emit tick events.
       startTransition(() => setPrices((pp) => ({ ...pp, ...snapshot })));
       for (const k in snapshot) prevRef.current[k] = snapshot[k];
     });
-    socket.on("tick", ({ symbol, price, bid }: any) => {
+    socket.on("tick", ({ symbol, price, bid, real }: any) => {
       const prev = prevRef.current[symbol];
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
+      pA[symbol] = (real != null && real > 0) ? real : price;
       if (bid != null) pB[symbol] = bid;
     });
     socket.on("bids", (snap: Record<string, number>) => {
@@ -713,7 +713,7 @@ export default function AdminDeskPage() {
   );
 
   const shown: { sym: string; i: number }[] = layout === 1 ? (openCharts[activeChart] ? [{ sym: openCharts[activeChart], i: activeChart }] : []) : openCharts.slice(0, layout).map((sym, i) => ({ sym, i }));
-  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1)); const isFloat = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING"; const lb = liveBids[sym]; const spPips = adminSymSpreads[sym] || 0; const spPx = spPips * pip; const ask = p != null ? gnum(p, d) : "..."; const bid = p != null ? (isFloat && lb != null && lb > 0 && lb < p ? gnum(lb, d) : gnum(Math.max(0, p - spPx), d)) : "...";
+  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1)); const isFloat = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING"; const lb = liveBids[sym]; const la = liveAsks[sym]; const spPips = adminSymSpreads[sym] || 0; const spPx = spPips * pip; const realBid = (lb != null && lb > 0) ? lb : (p ?? 0); const ask = isFloat ? (la != null && la > 0 ? gnum(la, d) : (p != null ? gnum(p, d) : "...")) : (p != null ? gnum(realBid + spPx, d) : "..."); const bid = isFloat ? (lb != null && lb > 0 ? gnum(lb, d) : (p != null ? gnum(p, d) : "...")) : (p != null ? gnum(realBid, d) : "...");
     if (!showOC) return (
       <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-16 top-12 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
         <i className="fa-solid fa-bolt" /> Trade
