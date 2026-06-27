@@ -1488,8 +1488,8 @@ export default function AdminDeskPage() {
               </div>
               {allSymEdit.type === "FLOATING" ? (
                 <div className="rounded border px-3 py-2.5 text-[11px]" style={{ borderColor: "#22c55e", background: "rgba(34,197,94,0.08)" }}>
-                  <div className="font-semibold mb-1" style={{ color: "#22c55e" }}>Auto spread per category</div>
-                  <div style={{ color: "var(--muted)" }}>Forex: 1.5 · Crypto: 5.0 · Metals: 3.0 · Stocks: 2.0 pips — auto-applied per symbol type.</div>
+                  <div className="font-semibold mb-1 flex items-center gap-1.5" style={{ color: "#22c55e" }}><i className="fa-solid fa-wave-square text-[10px]" />Live Market Spread</div>
+                  <div style={{ color: "var(--muted)" }}>Spread is calculated from real-time Ask − Bid prices from the exchange feed. No fixed pip value is applied.</div>
                 </div>
               ) : (
                 <div>
