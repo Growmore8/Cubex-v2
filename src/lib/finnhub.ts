@@ -30,3 +30,18 @@ export async function listFinnhub(category: string): Promise<any[]> {
   });
   return category === "metals" ? mapped.filter((m: any) => m.category === "metals") : mapped.filter((m: any) => m.category === "forex");
 }
+
+// Fetch real Finnhub market news (forex, crypto, general, merger).
+// Requires FINNHUB_KEY env var. Returns [] gracefully if key is missing or call fails.
+export async function fetchFinnhubNews(category: string): Promise<any[]> {
+  if (!KEY) return [];
+  try {
+    const cat = ["forex", "crypto", "merger"].includes(category) ? category : "general";
+    const items = await fh(`/news?category=${cat}`);
+    if (!Array.isArray(items)) return [];
+    return items.slice(0, 40).map((n: any) => ({
+      id: n.id, headline: n.headline, summary: n.summary, url: n.url,
+      source: n.source, datetime: n.datetime, image: n.image || null,
+    }));
+  } catch { return []; }
+}
