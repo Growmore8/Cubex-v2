@@ -664,11 +664,14 @@ function LWChart({
           bars.push(bar);
           seriesRef.current.update(bar);
         }
-        // MT5: chart draws on BID (= close). Ask line sits above at close + spread.
+        // MT5: chart draws on BID. Ask line appears ABOVE candles at bid + spread.
+        // When spread = 0 hide the line entirely (transparent), never show bid line.
         const spPx = spreadPipsRef.current * Math.pow(10, -(digits - 1));
         try {
-          askLineRef.current?.applyOptions({ price: close + spPx, axisLabelVisible: spPx > 0 });
-          bidLineRef.current?.applyOptions({ price: close, axisLabelVisible: false });
+          askLineRef.current?.applyOptions(spPx > 0
+            ? { price: close + spPx, color: "#26a69a", axisLabelVisible: true }
+            : { price: close, color: "transparent", axisLabelVisible: false });
+          bidLineRef.current?.applyOptions({ price: close, color: "transparent", axisLabelVisible: false });
         } catch {}
         if (!hoveringRef.current) fmtLegRef.current(barsRef.current[barsRef.current.length - 1]);
       } catch { /* out-of-order tick during a reseed — ignore */ }
