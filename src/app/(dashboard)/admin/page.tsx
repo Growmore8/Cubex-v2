@@ -109,9 +109,9 @@ export default function AdminClientsPage() {
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
                     <PresenceDot online={isOnline(c.user?.lastSeenAt)} />
-                    <div>
-                      <div className="flex items-center gap-1.5">{c.name}{c.user?.lastDevice && <DeviceIcon device={c.user.lastDevice} className="text-[11px] text-gray-400" />}</div>
-                      <div className="text-xs text-gray-500">{c.user?.email}</div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 truncate max-w-[180px]">{c.name}{c.user?.lastDevice && <DeviceIcon device={c.user.lastDevice} className="text-[11px] text-gray-400" />}</div>
+                      <div className="truncate max-w-[180px] text-xs text-gray-500" title={c.user?.email || ""}>{c.user?.email}</div>
                       <div className="text-[10px]" style={{ color: isOnline(c.user?.lastSeenAt) ? "#16a34a" : "#94a3b8" }}>{isOnline(c.user?.lastSeenAt) ? "Online" : "last seen " + ago(c.user?.lastSeenAt)}</div>
                     </div>
                   </div>

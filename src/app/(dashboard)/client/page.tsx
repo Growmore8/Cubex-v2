@@ -925,7 +925,7 @@ export default function ClientTerminal() {
           <div className="min-h-0 flex-1 overflow-auto">
           {rightTab === "NEWS" ? (
             <div className="p-2 text-[11px]">
-              {news.length === 0 ? <div className="p-4 text-center text-[var(--muted)]">Loading news...</div> : news.map((n: any) => (
+              {news.length === 0 ? <div className="p-6 text-center text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-1" />Loading news…</div> : news.map((n: any) => (
                 <a key={n.id} href={n.url} target="_blank" rel="noreferrer" className="block border-b border-[var(--border)] px-1 py-2 hover:bg-[var(--soft)]">
                   <div className="font-medium text-[var(--text)]">{n.headline}</div>
                   <div className="mt-0.5 text-[10px] text-[var(--muted)]">{n.source} - {new Date(n.datetime * 1000).toLocaleString()}</div>
@@ -1047,6 +1047,12 @@ export default function ClientTerminal() {
         </aside>
       </div>
 
+      {account && used > 0 && level > 0 && level < 150 && (
+        <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold animate-pulse" style={{ background: level < 100 ? "rgba(239,68,68,0.15)" : "rgba(249,115,22,0.13)", color: level < 100 ? "#ef4444" : "#f97316", borderBottom: `1px solid ${level < 100 ? "#ef444440" : "#f9731640"}` }}>
+          <i className="fa-solid fa-triangle-exclamation" />
+          {level < 100 ? `MARGIN CALL — Level ${level.toFixed(1)}%. Positions may be closed immediately.` : `Low margin warning — Level ${level.toFixed(1)}%. Reduce exposure or add funds.`}
+        </div>
+      )}
       <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "#facc15" }}>
         <span>Balance: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(balance) : "--"}</span></span>
         <span>Equity: <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? "$" + fmt(equity) : "--"}</span></span>

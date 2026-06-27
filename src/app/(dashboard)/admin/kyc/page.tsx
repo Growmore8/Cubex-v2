@@ -19,11 +19,22 @@ export default function AdminKycPage() {
   }
   useEffect(() => { load(); }, []);
 
+  const [busy, setBusy] = useState<string | null>(null);
+  const [flashErr, setFlashErr] = useState("");
+
   async function review(id: string, status: string) {
-    await fetch("/api/admin/kyc/" + id, {
+    const doc = docs.find((d) => d.id === id);
+    const label = doc ? `${doc.account?.login} — ${doc.docType}` : id;
+    const verb = status === "APPROVED" ? "Approve" : "Reject";
+    if (!window.confirm(`${verb} KYC for ${label}?`)) return;
+    setBusy(id + status);
+    const r = await fetch("/api/admin/kyc/" + id, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status, note: note[id] || "" }),
-    });
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
+    setBusy(null);
+    if (!r.ok) { setFlashErr(r.error || "Update failed"); return; }
+    setFlashErr("");
     load();
   }
 
@@ -37,7 +48,7 @@ export default function AdminKycPage() {
     <div className="space-y-4 ui-fade-up">
       <div>
         <h1 className="text-2xl font-bold">KYC Review</h1>
-
+        {flashErr && <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{flashErr}</div>}
       </div>
       <div className="ui-card overflow-x-auto p-0">
         <table className="w-full text-sm">
@@ -53,8 +64,8 @@ export default function AdminKycPage() {
                 <td className="px-3 py-2"><span className={badge(d.status)}>{d.status}</span></td>
                 <td className="px-3 py-2"><input className="ui-input px-2 py-1 text-xs" placeholder="reason" value={note[d.id] || ""} onChange={(e) => setNote({ ...note, [d.id]: e.target.value })} /></td>
                 <td className="px-3 py-2 text-right space-x-2">
-                  <button className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-green-600" onClick={() => review(d.id, "APPROVED")}>Approve</button>
-                  <button className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-red-600" onClick={() => review(d.id, "REJECTED")}>Reject</button>
+                  <button disabled={!!busy} className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-green-600 disabled:opacity-40" onClick={() => review(d.id, "APPROVED")}>{busy === d.id + "APPROVED" ? <i className="fa-solid fa-circle-notch fa-spin" /> : "Approve"}</button>
+                  <button disabled={!!busy} className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-red-600 disabled:opacity-40" onClick={() => review(d.id, "REJECTED")}>{busy === d.id + "REJECTED" ? <i className="fa-solid fa-circle-notch fa-spin" /> : "Reject"}</button>
                 </td>
               </tr>
             ))}
