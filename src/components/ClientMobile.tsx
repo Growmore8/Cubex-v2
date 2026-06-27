@@ -119,7 +119,15 @@ export default function ClientMobile({ t }: { t: any }) {
     const s = _mobSymSpreads()[sym];
     const grpAcc = _mobGrpSpread() + _mobAccMarkup();
     if (!s) return grpAcc;
-    if (s.type === "FIXED" || s.max <= s.min) return (s.min || 0) + grpAcc;
+    if (s.type === "FIXED") return (s.min || 0) + grpAcc;
+    // FLOATING: use real live bid from exchange (min/max may both be 0 for pure ECN)
+    const lb = _liveBids[sym];
+    const p = t.prices[sym];
+    if (lb != null && lb > 0 && p != null && lb < p) {
+      const digits = t.dg(sym);
+      const pip = Math.pow(10, -(digits - 1));
+      return (p - lb) / pip + grpAcc;
+    }
     const h = new Date().getUTCHours(), d = new Date().getUTCDay();
     const isPeak = d >= 1 && d <= 5 && h >= 8 && h < 17;
     return (isPeak ? s.min : s.max) + grpAcc;

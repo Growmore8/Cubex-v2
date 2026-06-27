@@ -526,15 +526,16 @@ export default function ClientTerminal() {
     const s = symbolSpreads[sym];
     const grpAcc = groupSpread + accountSpreadMarkup;
     if (!s) return grpAcc;
-    if (s.type === "FIXED" || s.max <= s.min) return (s.min || 0) + grpAcc;
-    // FLOATING: prefer real live bid from exchange feed
+    // FIXED: always use configured pips
+    if (s.type === "FIXED") return (s.min || 0) + grpAcc;
+    // FLOATING: use real live bid from exchange (true ECN — min/max may both be 0)
     const lb = liveBids[sym];
     const p = prices[sym];
     if (lb != null && lb > 0 && p != null && lb < p) {
       const pip = Math.pow(10, -(dg(sym) - 1));
       return (p - lb) / pip + grpAcc;
     }
-    // Fallback: time-based spread (peak vs off-hours)
+    // Fallback: configured min/max (when live bid not yet available)
     const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
     const isPeak = wd >= 1 && wd <= 5 && h >= 8 && h < 17;
     return (isPeak ? s.min : s.max) + grpAcc;
