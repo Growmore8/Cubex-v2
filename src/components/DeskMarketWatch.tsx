@@ -140,9 +140,9 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                   <PriceCell value={ask} dir={dir} />
                   <span className="flex items-center justify-end pr-1 gap-0.5">
                     {hasLive
-                      ? <span title="Live spread from feed (real bid/ask)" style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />
+                      ? <span title="Live spread from exchange feed" style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />
                       : null}
-                    <span className="tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}</span>
+                    <span className="tabular-nums" title={realSpPips > 0 ? `${realSpPips.toFixed(2)} pips · ${Math.round(realSpPips * 10)} points · price spread ${spPx.toFixed(d > 2 ? 5 : 2)}` : undefined} style={{ color: "var(--muted)", fontSize: 9, cursor: realSpPips > 0 ? "help" : undefined }}>{realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}</span>
                   </span>
                 </div>);
             })}

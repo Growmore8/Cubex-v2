@@ -71,6 +71,7 @@ export default function ClientTerminal() {
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const notifSeen = useRef<Set<string>>(new Set());
   const notifPrimed = useRef(false);
+  const prevLevelRef = useRef<number | null>(null);
   const [cToasts, setCToasts] = useState<any[]>([]);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [topUpAmt, setTopUpAmt] = useState("10000");
@@ -289,6 +290,16 @@ export default function ClientTerminal() {
     });
     return () => { socket.disconnect(); clearInterval(clr); clearInterval(flushIv); };
   }, []);
+
+  // Margin level warning toasts — fire when level drops below key thresholds
+  useEffect(() => {
+    if (!account || !used || used < 0.01) return;
+    const prev = prevLevelRef.current;
+    prevLevelRef.current = level;
+    if (prev == null) return; // skip first load
+    if (prev >= 150 && level < 150) pushToast({ title: "Margin level below 150% — reduce exposure", type: "NOTICE" });
+    else if (prev >= 100 && level < 100) pushToast({ title: "Margin call warning! Level below 100%", type: "NOTICE" });
+  }, [level]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function place(type: "BUY" | "SELL") {
     setErr("");
@@ -958,12 +969,12 @@ export default function ClientTerminal() {
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "#facc15" }}>
-        <span>Balance: <span className="text-[var(--text)]">{account ? fmt(balance) : "--"}</span></span>
-        <span>Flt P/L: <span style={{ color: floating >= 0 ? BUY : SELL }}>{account ? fmt(floating) : "--"}</span></span>
-        <span>Equity: <span className="text-[var(--text)]">{account ? fmt(equity) : "--"}</span></span>
-        <span>Used Margin: <span className="text-[var(--text)]">{account ? fmt(used) : "--"}</span></span>
-        <span>Free Margin: <span className="text-[var(--text)]">{account ? fmt(free) : "--"}</span></span>
-        <span>Margin Level: <span className="text-[var(--text)]">{account && level ? level.toFixed(1) + "%" : "--"}</span></span>
+        <span>Balance: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(balance) : "--"}</span></span>
+        <span>Flt P/L: <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+$" : "-$") + fmt(Math.abs(floating)) : "--"}</span></span>
+        <span>Equity: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(equity) : "--"}</span></span>
+        <span>Used Margin: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(used) : "--"}</span></span>
+        <span>Free Margin: <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? "$" + fmt(free) : "--"}</span></span>
+        <span>Margin Level: <span className="font-mono font-bold" style={{ color: !account || !level ? "var(--muted)" : level >= 200 ? "#22c55e" : level >= 150 ? "#facc15" : level >= 100 ? "#f97316" : SELL }}>{account && level ? level.toFixed(1) + "%" : "--"}</span></span>
       </div>
 
       <div onMouseDown={dragY} className="h-1 cursor-row-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
@@ -1026,8 +1037,8 @@ export default function ClientTerminal() {
                   const d = dg(o.symbol); const trig = Number(o.price); const cur = prices[o.symbol]; const dist = cur != null ? Math.abs(trig - cur) : null;
                   const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : "Stop"); const c = o.side === "BUY" ? "#5aa9ff" : SELL;
                   return (
-                  <tr key={o.id} className="border-t border-[var(--border)]" style={{ background: "rgba(90,169,255,0.05)" }}>
-                    <td className="px-2 py-1"><i className="fa-regular fa-clock mr-1 text-[var(--muted)]" />{o.symbol}</td>
+                  <tr key={o.id} className="border-t border-[var(--border)]" style={{ background: "rgba(90,169,255,0.07)" }}>
+                    <td className="px-2 py-1" style={{ borderLeft: "3px dashed rgba(90,169,255,0.55)" }}><i className="fa-regular fa-clock mr-1" style={{ color: "#5aa9ff" }} />{o.symbol}</td>
                     <td className="px-2 py-1"><span className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: c + "22", color: c }}>{label}</span></td>
                     <td className="px-2 py-1 text-right">{o.lots}</td>
                     <td className="px-2 py-1 text-right font-semibold">{gnum(trig, d)}</td>
