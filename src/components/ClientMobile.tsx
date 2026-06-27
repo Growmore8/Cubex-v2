@@ -794,18 +794,8 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
             {/* Quick trade bar */}
             <div className="border-t border-[var(--border)]" style={{ background: "var(--panel)" }}>
-              {/* Lot quick-select + vol stepper */}
-              <div className="flex items-center gap-1 px-2.5 pt-2 pb-1">
-                <button onClick={() => setChartVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] active:scale-95" style={{ touchAction: "manipulation" }}>−</button>
-                <div className="grid flex-1 grid-cols-5 overflow-hidden rounded-lg border border-[var(--border)]">
-                  {LOTS.map((l) => (
-                    <button key={l} onClick={() => setChartVol(l)} className="py-1 text-[10px] font-semibold border-r border-[var(--border)] last:border-r-0 transition-colors" style={chartVol === l ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }} >{l}</button>
-                  ))}
-                </div>
-                <button onClick={() => setChartVol((v) => +(v + 0.01).toFixed(2))} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] active:scale-95" style={{ touchAction: "manipulation" }}>+</button>
-              </div>
               {/* SELL | − lot + | BUY */}
-              <div className="flex items-stretch gap-1.5 px-2.5 pb-2">
+              <div className="flex items-stretch gap-1.5 px-2.5 py-2">
                 <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", chartVol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, touchAction: "manipulation" }}>
                   <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Sell</div>
                   <div className="text-[13px] font-bold tabular-nums">{bid != null ? gnum(bid, dg(selSym)) : "…"}</div>
