@@ -161,6 +161,11 @@ export default function ClientMobile({ t }: { t: any }) {
     }
   }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
   const [mInd, setMInd] = useState<string[]>([]);
+  const [orderSheet, setOrderSheet] = useState(false);
+  const [mobOrderType, setMobOrderType] = useState<"MARKET" | "LIMIT" | "STOP">("MARKET");
+  const [mobPendingPrice, setMobPendingPrice] = useState("");
+  const [mobTpEnabled, setMobTpEnabled] = useState(false);
+  const [mobSlEnabled, setMobSlEnabled] = useState(false);
   const [histTab, setHistTab] = useState<"trades" | "financial">("trades");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -785,20 +790,126 @@ export default function ClientMobile({ t }: { t: any }) {
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]} />
             </div>
-            <div className="glass flex items-stretch gap-1.5 border-t border-[var(--border)] p-2.5" style={{ background: theme === "dark" ? "rgba(20,24,34,0.6)" : "rgba(255,255,255,0.6)" }}>
-              <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, boxShadow: `0 8px 18px -8px ${SELLBTN}`, touchAction: "manipulation" }}>
-                <div className="text-[10px] font-semibold uppercase tracking-wide opacity-85">Sell</div><div className="text-base font-bold tabular-nums">{price != null ? gnum(bid, dg(selSym)) : "…"}</div>
+            {/* Quick trade bar — tap to open full order sheet */}
+            <div className="flex items-stretch gap-1.5 border-t border-[var(--border)] px-2.5 py-2" style={{ background: "var(--panel)" }}>
+              <button onPointerDown={(e) => { e.preventDefault(); setOrderSheet(true); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, touchAction: "manipulation" }}>
+                <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Sell</div>
+                <div className="text-[13px] font-bold tabular-nums">{bid != null ? gnum(bid, dg(selSym)) : "…"}</div>
               </button>
-              <div className="flex flex-col items-center justify-center gap-0.5 shrink-0">
+              <div className="flex flex-col items-center justify-center gap-0.5 shrink-0 px-1">
                 <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>sprd</span>
-                <span className="text-[10px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_mobSpreadPips(selSym) * 10)}</span>
-                <LotStepper vol={vol} setVol={setVol} small />
+                <span className="text-[9px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_mobSpreadPips(selSym) * 10)}</span>
               </div>
-              <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, boxShadow: `0 8px 18px -8px ${BUYBTN}`, touchAction: "manipulation" }}>
-                <div className="text-[10px] font-semibold uppercase tracking-wide opacity-85">Buy</div><div className="text-base font-bold tabular-nums">{price != null ? gnum(ask, dg(selSym)) : "…"}</div>
+              <button onPointerDown={(e) => { e.preventDefault(); setOrderSheet(true); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, touchAction: "manipulation" }}>
+                <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Buy</div>
+                <div className="text-[13px] font-bold tabular-nums">{ask != null ? gnum(ask, dg(selSym)) : "…"}</div>
               </button>
             </div>
             {err && <div className="bg-[var(--panel)] pb-1 text-center text-[11px]" style={{ color: SELL }}>{err}</div>}
+
+            {/* Full order sheet — slides up from bottom */}
+            {orderSheet && (
+              <>
+                <div className="fixed inset-0 z-[80]" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setOrderSheet(false)} />
+                <div className="fixed inset-x-0 bottom-0 z-[90] rounded-t-2xl" style={{ background: "var(--panel)", paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)", maxHeight: "88vh", overflowY: "auto" }}>
+                  {/* Handle */}
+                  <div className="flex justify-center pt-2 pb-1"><div className="h-1 w-10 rounded-full" style={{ background: "var(--border)" }} /></div>
+                  {/* Symbol header */}
+                  <div className="flex items-center justify-between px-4 pb-2">
+                    <span className="text-[13px] font-bold">{selSym}</span>
+                    <button onClick={() => setOrderSheet(false)} className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-xmark text-[11px]" /></button>
+                  </div>
+
+                  <div className="flex flex-col gap-3 px-4 pb-2">
+                    {/* SELL | SPRD | BUY */}
+                    <div className="flex items-stretch gap-2">
+                      <button onPointerDown={(e) => { e.preventDefault(); if (mobOrderType === "MARKET") { quickTrade(selSym, "SELL", vol); setOrderSheet(false); } else { placePending(selSym, "SELL", mobOrderType, Number(mobPendingPrice), vol, Number(sl)||0, Number(tp)||0); setOrderSheet(false); } }} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-semibold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#ff6b78,#e0394a 70%,#b9293a)", touchAction: "manipulation" }}>
+                        <span className="text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down mr-0.5 text-[8px]" />Sell</span>
+                        <span className="text-[15px] font-bold tabular-nums">{bid != null ? gnum(bid, dg(selSym)) : "…"}</span>
+                      </button>
+                      <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 px-1">
+                        <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>sprd</span>
+                        <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_mobSpreadPips(selSym) * 10)}</span>
+                      </div>
+                      <button onPointerDown={(e) => { e.preventDefault(); if (mobOrderType === "MARKET") { quickTrade(selSym, "BUY", vol); setOrderSheet(false); } else { placePending(selSym, "BUY", mobOrderType, Number(mobPendingPrice), vol, Number(sl)||0, Number(tp)||0); setOrderSheet(false); } }} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-semibold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)", touchAction: "manipulation" }}>
+                        <span className="text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up mr-0.5 text-[8px]" />Buy</span>
+                        <span className="text-[15px] font-bold tabular-nums">{ask != null ? gnum(ask, dg(selSym)) : "…"}</span>
+                      </button>
+                    </div>
+
+                    {/* Order type */}
+                    <div>
+                      <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Order Type</div>
+                      <div className="flex overflow-hidden rounded-xl border border-[var(--border)]">
+                        {(["MARKET","LIMIT","STOP"] as const).map((ot) => (
+                          <button key={ot} onClick={() => { setMobOrderType(ot); if (ot !== "MARKET" && !mobPendingPrice && price != null) setMobPendingPrice(price.toFixed(dg(selSym))); }} className="flex-1 py-2 text-[11px] font-semibold transition-colors" style={mobOrderType === ot ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }}>{ot}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Entry price for LIMIT/STOP */}
+                    {mobOrderType !== "MARKET" && (
+                      <div>
+                        <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Entry Price</div>
+                        <input type="number" value={mobPendingPrice} onChange={(e) => setMobPendingPrice(e.target.value)} placeholder="Target Price" className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[15px] font-semibold tabular-nums text-[var(--text)] outline-none" />
+                      </div>
+                    )}
+
+                    {/* Volume + lot buttons */}
+                    <div className="overflow-hidden rounded-xl border border-[var(--border)]">
+                      <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-1.5">
+                        <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Volume (Lots)</span>
+                        <span className="text-[9px]" style={{ color: "var(--muted)" }}>Step: 0.01</span>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2">
+                        <button onClick={() => setVol((v: number) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-lg text-[var(--muted)] active:scale-95">−</button>
+                        <input type="number" step="0.01" value={vol} onChange={(e) => setVol(Number(e.target.value))} className="h-10 flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[18px] font-bold tabular-nums text-[var(--text)] outline-none" />
+                        <button onClick={() => setVol((v: number) => +(v + 0.01).toFixed(2))} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-lg text-[var(--muted)] active:scale-95">+</button>
+                      </div>
+                      <div className="flex border-t border-[var(--border)]">
+                        {[0.01,0.05,0.1,0.5,1].map((l) => <button key={l} onClick={() => setVol(l)} className="flex-1 py-2 text-[11px] font-semibold border-r border-[var(--border)] last:border-r-0 transition-colors" style={vol === l ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }}>{l}</button>)}
+                      </div>
+                    </div>
+
+                    {/* TP + SL side by side */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="flex cursor-pointer items-center gap-1.5 select-none">
+                          <input type="checkbox" checked={mobTpEnabled} onChange={(e) => { setMobTpEnabled(e.target.checked); if (!e.target.checked) setTp(""); }} className="h-3.5 w-3.5 accent-[var(--accent)]" />
+                          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Take Profit</span>
+                        </label>
+                        {mobTpEnabled && <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="TP price" className="mt-1.5 h-9 w-full rounded-xl border px-2 text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />}
+                      </div>
+                      <div>
+                        <label className="flex cursor-pointer items-center gap-1.5 select-none">
+                          <input type="checkbox" checked={mobSlEnabled} onChange={(e) => { setMobSlEnabled(e.target.checked); if (!e.target.checked) setSl(""); }} className="h-3.5 w-3.5 accent-[var(--accent)]" />
+                          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Stop Loss</span>
+                        </label>
+                        {mobSlEnabled && <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="SL price" className="mt-1.5 h-9 w-full rounded-xl border px-2 text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />}
+                      </div>
+                    </div>
+
+                    {/* Info block */}
+                    <div className="overflow-hidden rounded-xl border border-[var(--border)] text-[11px]">
+                      <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2">
+                        <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Margin Required</span>
+                        <span className="font-semibold tabular-nums">{account ? (() => { const mg = price != null ? ((vol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0; return "$" + fmt(mg); })() : "$0.00"}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2">
+                        <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Free Margin</span>
+                        <span className="font-semibold tabular-nums" style={{ color: "#22c55e" }}>{account ? "$" + fmt(free) : "--"}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-3 py-2">
+                        <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</span>
+                        <span className="font-semibold tabular-nums">{(_mobSpreadPips(selSym) * 10).toFixed(1)} pips</span>
+                      </div>
+                    </div>
+
+                    {err && <div className="text-center text-[11px]" style={{ color: SELL }}>{err}</div>}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}</KeepAlive>
 
