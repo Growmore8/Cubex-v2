@@ -292,16 +292,6 @@ export default function ClientTerminal() {
     return () => { socket.disconnect(); clearInterval(clr); clearInterval(flushIv); };
   }, []);
 
-  // Margin level warning toasts — fire when level drops below key thresholds
-  useEffect(() => {
-    if (!account || !used || used < 0.01) return;
-    const prev = prevLevelRef.current;
-    prevLevelRef.current = level;
-    if (prev == null) return; // skip first load
-    if (prev >= 150 && level < 150) pushToast({ title: "Margin level below 150% — reduce exposure", type: "NOTICE" });
-    else if (prev >= 100 && level < 100) pushToast({ title: "Margin call warning! Level below 100%", type: "NOTICE" });
-  }, [level]); // eslint-disable-line react-hooks/exhaustive-deps
-
   async function place(type: "BUY" | "SELL") {
     setErr("");
     if (account?.locked) { setErr("Your account is read-only (locked). Trading is disabled."); return; }
@@ -516,6 +506,15 @@ export default function ClientTerminal() {
   })() : 0;
   const free = equity - used;
   const level = used > 0 ? (equity / used) * 100 : 0;
+  // Margin level warning — lives here (after level is computed) to satisfy TypeScript TDZ
+  useEffect(() => {
+    if (!account || !used || used < 0.01) return;
+    const prev = prevLevelRef.current;
+    prevLevelRef.current = level;
+    if (prev == null) return;
+    if (prev >= 150 && level < 150) pushToast({ title: "Margin level below 150% — reduce exposure", type: "NOTICE" });
+    else if (prev >= 100 && level < 100) pushToast({ title: "Margin call warning! Level below 100%", type: "NOTICE" });
+  }, [level]); // eslint-disable-line react-hooks/exhaustive-deps
   const price = prices[selSym];
   const d = dg(selSym);
   // Effective spread the client pays — matches MT5 model and server execution exactly.
