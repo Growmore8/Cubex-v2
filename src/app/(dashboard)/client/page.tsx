@@ -466,25 +466,24 @@ export default function ClientTerminal() {
   const _spreadPips = (sym: string) => {
     const s = symbolSpreads[sym];
     const markup = groupSpread + accountSpreadMarkup;
-    if (!s) return markup;
-    // For FLOATING symbols: use the live bid from the exchange feed when available.
-    // spread = (ask - real_bid) / pip_size + markup
-    if (s.type === "FLOATING") {
-      const ask = prices[sym]; const rawBid = liveBids[sym];
-      if (ask != null && rawBid != null && rawBid > 0 && rawBid < ask) {
-        const pipSize = Math.pow(10, -(dg(sym) - 1));
-        const marketSpreadPips = (ask - rawBid) / pipSize;
-        return Math.max(s.min, marketSpreadPips) + markup;
-      }
-      // Fallback: time-based min/max when no live bid yet
-      let base = s.min;
-      if (s.max > s.min) {
-        const h = new Date().getUTCHours(), d = new Date().getUTCDay();
-        if (!(d >= 1 && d <= 5 && h >= 8 && h < 17)) base = s.max;
-      }
-      return base + markup;
+    // FIXED type: admin explicitly locked this spread — always use configured pips
+    if (s?.type === "FIXED") return (s.min || 0) + markup;
+    // FLOATING (or no config): live exchange bid/ask is the real spread
+    const ask = prices[sym]; const rawBid = liveBids[sym];
+    if (ask != null && rawBid != null && rawBid > 0 && rawBid < ask) {
+      const pipSize = Math.pow(10, -(dg(sym) - 1));
+      const marketSpreadPips = (ask - rawBid) / pipSize;
+      const minFloor = s?.min || 0;
+      return Math.max(minFloor, marketSpreadPips) + markup;
     }
-    return s.min + markup;
+    // No live bid yet → fallback to configured min (time-based max for off-hours)
+    if (!s) return markup;
+    let base = s.min;
+    if (s.max > s.min) {
+      const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
+      if (!(wd >= 1 && wd <= 5 && h >= 8 && h < 17)) base = s.max;
+    }
+    return base + markup;
   };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
   const ask = price ?? 0;
