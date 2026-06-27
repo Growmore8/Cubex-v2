@@ -321,7 +321,7 @@ async function loadCatalog() {
     // Finnhub fallback feed (skip derived/calculated symbols)
     const fh = x.feed || (DERIVED_SET.has(x.symbol) ? null : toFinnhub(x.symbol, x.category));
     meta[x.symbol] = { digits: x.digits || 5, contract: contractFor(x.category, x.symbol), feed: fh, td, cat: x.category };
-    state[x.symbol] = { price: null, bid: null, candles: [], bucket: 0 };
+    state[x.symbol] = { price: null, bid: null, ask: null, candles: [], bucket: 0 };
     if (fh) feedToSym[fh] = x.symbol;
     tdToSym[td] = x.symbol;
   }
@@ -366,10 +366,10 @@ function commitPrice(sym, p) {
   st.price = p;
   redis.set("price:" + sym, String(p));
   if (st.bid != null) { redis.set("bid:" + sym, String(st.bid)); realBids[sym] = st.bid; } // real bid for trade execution
-  // `price` is the smooth DISPLAY value (lively market watch); `real` is the true
-  // feed price (the chart builds its candles from this so they match the market,
-  // while the ticker stays smooth). Falls back to the display when no live feed.
-  const real = (st.realAt && Date.now() - st.realAt < REAL_TTL && st.target != null) ? st.target : p;
+  // MT5 model: `price` is the smoothed BID (primary chart price).
+  // `real` carries the exchange ASK so clients can compute the live spread (ask − bid).
+  // Falls back to null when no live feed data within REAL_TTL.
+  const real = (st.realAt && Date.now() - st.realAt < REAL_TTL && st.ask != null) ? st.ask : null;
   if (global.__io) global.__io.emit("tick", { symbol: sym, price: p, bid: st.bid ?? null, real, candle });
   recomputeDerived(sym);
 }
@@ -422,7 +422,8 @@ function connectBinance() {
         const digits = BN_DIGITS[sym] || (meta[sym] ? meta[sym].digits : 2);
         if (meta[sym]) meta[sym].digits = digits;
         state[sym].bid = r(bid, digits);
-        applyPrice(sym, ask, "BN");
+        state[sym].ask = r(ask, digits); // exchange ask stored for spread display
+        applyPrice(sym, bid, "BN");      // MT5: smooth toward BID (primary price)
       }
     } catch (e) {}
   });
@@ -495,7 +496,8 @@ function connectKraken() {
         const bid = parseFloat(m[1][0]), ask = parseFloat(m[1][1]);
         if (bid > 0 && ask > 0 && bid < ask) {
           state[sym].bid = r(bid, meta[sym] ? meta[sym].digits : 5);
-          applyPrice(sym, ask, "KR");
+          state[sym].ask = r(ask, meta[sym] ? meta[sym].digits : 5);
+          applyPrice(sym, bid, "KR"); // MT5: smooth toward BID
         }
       }
     } catch (e) {}
@@ -547,7 +549,8 @@ function connectMassive() {
           const sym = MV_MSG_TO_SYM[m.p];
           if (sym && state[sym]) {
             state[sym].bid = r(parseFloat(m.b), meta[sym] ? meta[sym].digits : 5);
-            applyPrice(sym, parseFloat(m.a), "MV");
+            state[sym].ask = r(parseFloat(m.a), meta[sym] ? meta[sym].digits : 5);
+            applyPrice(sym, parseFloat(m.b), "MV"); // MT5: smooth toward BID
           }
         }
       }
@@ -566,7 +569,7 @@ function connectTD() {
   if (tdWs) { try { tdWs.removeAllListeners(); tdWs.terminate(); } catch (_) {} tdWs = null; }
   tdWs = new WebSocket("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY, { headers: { "Origin": "https://twelvedata.com" } });
   tdWs.on("open", () => { tdWsFail200 = 0; primaryFailCount = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
-  tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits); applyPrice(s, ask, "TD"); recordFeedSuccess("TD"); } } } catch (e) {} });
+  tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); const hasBid = bid > 0 && bid < ask; if (hasBid) { state[s].bid = r(bid, meta[s].digits); state[s].ask = r(ask, meta[s].digits); } applyPrice(s, hasBid ? bid : ask, "TD"); recordFeedSuccess("TD"); } } } catch (e) {} });
   tdWs.on("close", () => {
     // Exponential backoff: 5s → 15s → 30s → 60s → 120s to avoid rate-limit 200 responses
     const delay = tdWsFail200 === 0 ? 5000 : Math.min(120000, 5000 * Math.pow(2, tdWsFail200));
@@ -971,9 +974,10 @@ async function pollChunk(chunk) {
       const ask = parseFloat(entry.ask || entry.close || entry.price || 0);
       const bid = parseFloat(entry.bid || 0);
       if (ask > 0) {
-        if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits);
+        const hasBid = bid > 0 && bid < ask;
+        if (hasBid) { state[s].bid = r(bid, meta[s].digits); state[s].ask = r(ask, meta[s].digits); }
         // do NOT null bid here — Kraken/Binance real bid must be preserved
-        applyPrice(s, ask, "TD");
+        applyPrice(s, hasBid ? bid : ask, "TD"); // MT5: smooth toward BID when available
       }
     };
     if (uniqTd.length === 1) { for (const s of chunk) if (meta[s].td === uniqTd[0]) applyEntry(s, data); return; }

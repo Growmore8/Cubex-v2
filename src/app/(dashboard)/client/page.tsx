@@ -66,8 +66,6 @@ export default function ClientTerminal() {
   const [groupSpread, setGroupSpread] = useState(0);
   const [accountSpreadMarkup, setAccountSpreadMarkup] = useState(0);
   const [prices, setPrices] = useState<Record<string, number>>({});
-  const [liveBids, setLiveBids] = useState<Record<string, number>>({});
-  const [liveAsks, setLiveAsks] = useState<Record<string, number>>({});
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const notifSeen = useRef<Set<string>>(new Set());
@@ -234,44 +232,32 @@ export default function ClientTerminal() {
     const socket: Socket = io({ path: "/socket.io" });
     const pP: Record<string, number> = {};
     const pD: Record<string, number> = {};
-    const pB: Record<string, number> = {};
-    const pA: Record<string, number> = {}; // real exchange ask (not smoothed)
     const pS: Record<string, number> = {};
     const flush = () => {
-      const pxKeys = Object.keys(pP), drKeys = Object.keys(pD), bkKeys = Object.keys(pB), akKeys = Object.keys(pA), skKeys = Object.keys(pS);
-      if (!pxKeys.length && !drKeys.length && !bkKeys.length && !akKeys.length && !skKeys.length) return;
-      const px = { ...pP }, dr = { ...pD }, bd = { ...pB }, ak = { ...pA }, sp = { ...pS };
-      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pB) delete pB[k]; for (const k in pA) delete pA[k]; for (const k in pS) delete pS[k];
-      // Real bid + ask + spread: urgent (no startTransition)
-      if (bkKeys.length) setLiveBids((bb) => ({ ...bb, ...bd }));
-      if (akKeys.length) setLiveAsks((aa) => ({ ...aa, ...ak }));
+      const pxKeys = Object.keys(pP), drKeys = Object.keys(pD), skKeys = Object.keys(pS);
+      if (!pxKeys.length && !drKeys.length && !skKeys.length) return;
+      const px = { ...pP }, dr = { ...pD }, sp = { ...pS };
+      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pS) delete pS[k];
+      // Spread pips: urgent (drives bid/ask display, must not lag)
       if (skKeys.length) setLiveSpreadPips((ss) => ({ ...ss, ...sp }));
-      // Smoothed prices + dirs: low-priority (chart/candle display only)
+      // Smoothed prices + dirs: low-priority (visual animation)
       startTransition(() => {
         if (pxKeys.length) setPrices((pp) => ({ ...pp, ...px }));
         if (drKeys.length) setDirs((dd) => ({ ...dd, ...dr }));
       });
     };
+    // MT5 model: price = smoothed BID (primary). real = exchange ASK (for live spread).
+    // ask = price + spread, bid = price — no separate liveBids/liveAsks needed.
     socket.on("tick", ({ symbol, price, bid, real }: any) => {
       const prev = prevRef.current[symbol];
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
-      // Always update ask so BUY button follows price on every tick
-      const realAsk = (real != null && real > 0) ? real : price;
-      pA[symbol] = realAsk;
-      if (bid != null && bid > 0) {
-        pB[symbol] = bid;
-        if (realAsk > bid) {
-          const d = DIGITS[symbol] ?? 2;
-          const pip = Math.pow(10, -(d - 1));
-          pS[symbol] = (realAsk - bid) / pip;
-        }
+      // Compute live exchange spread from real ask vs exchange bid for FLOATING display
+      if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
+        const d = DIGITS[symbol] ?? 2;
+        pS[symbol] = (real - bid) / Math.pow(10, -(d - 1));
       }
-    });
-    // Real bid snapshot from Binance/Kraken on connect
-    socket.on("bids", (snap: Record<string, number>) => {
-      if (snap && typeof snap === "object") setLiveBids((b) => ({ ...b, ...snap }));
     });
     // Initial price snapshot on connect — seeds prices for frozen/closed markets so
     // open positions show their last P&L immediately.
@@ -548,19 +534,10 @@ export default function ClientTerminal() {
     return grpAcc;
   };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
-  // BUY/SELL button prices — must always animate so they never appear frozen.
-  // FLOATING: smoothed `price` as ask (always interpolates every tick → always live).
-  //   bid = real exchange bid if available, else ask − spread.
-  // FIXED: realBid as base, ask = realBid + configured pips (Fixed 0 → BUY = SELL).
-  const lb2 = liveBids[selSym];
-  const selSpType = (symbolSpreads[selSym] as any)?.type ?? "FLOATING";
-  const realBid = (lb2 != null && lb2 > 0) ? lb2 : (price ?? 0);
-  const ask = selSpType === "FIXED"
-    ? realBid + _spreadPx(selSym)
-    : (price ?? 0);
-  const bid = selSpType === "FIXED"
-    ? realBid
-    : ((lb2 != null && lb2 > 0 && lb2 < ask) ? lb2 : Math.max(0, ask - _spreadPx(selSym)));
+  // MT5 model: price = smoothed BID (primary). ask = price + configured spread.
+  // Works for both FIXED and FLOATING — spread source differs, derivation is identical.
+  const ask = (price ?? 0) + _spreadPx(selSym);
+  const bid = price ?? 0;
   const margin = price != null ? ((vol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0;
   const fmt = (v: number) => gmoney(v);
   const groups: Record<string, any[]> = {};
@@ -879,7 +856,7 @@ export default function ClientTerminal() {
             {favs.length > 0 && (
               <div>
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
-                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const lb = liveBids[s.symbol]; const spPx = _spreadPx(s.symbol); const spType = (symbolSpreads[s.symbol] as any)?.type ?? "FLOATING"; const rawAsk = spType === "FIXED" ? ((lb != null && lb > 0) ? lb : (p ?? 0)) + spPx : (p ?? 0); const rawBid = (lb != null && lb > 0 && lb < rawAsk) ? lb : Math.max(0, rawAsk - spPx); const a = p != null ? rawAsk : null; const b = p != null ? rawBid : null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); return (
+                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); return (
                   <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
@@ -891,7 +868,7 @@ export default function ClientTerminal() {
             {orderedGroups.map(([c, list]) => (
               <div key={c}>
                 <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
-                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const lb = liveBids[s.symbol]; const spPx = _spreadPx(s.symbol); const spType = (symbolSpreads[s.symbol] as any)?.type ?? "FLOATING"; const rawAsk = spType === "FIXED" ? ((lb != null && lb > 0) ? lb : (p ?? 0)) + spPx : (p ?? 0); const rawBid = (lb != null && lb > 0 && lb < rawAsk) ? lb : Math.max(0, rawAsk - spPx); const a = p != null ? rawAsk : null; const b = p != null ? rawBid : null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); return (
+                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); return (
                   <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />

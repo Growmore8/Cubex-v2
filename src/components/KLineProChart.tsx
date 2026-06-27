@@ -424,15 +424,13 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
 
     const sock: any = io({ path: "/socket.io" });
     const symRef = { current: symbol };
-    let lastRealBid: number | null = null;
-    const updateLines = async (ask: number, tickBid?: number | null) => {
+    // MT5: price = BID (chart primary). Ask overlay = price + spread (above chart).
+    const updateLines = async (bidPrice: number) => {
       const core = await getCore();
       if (!core || typeof core.createOverlay !== "function") return;
-      // Prefer: real bid from LP (Binance/Kraken), then admin-spread calc, then no gap
-      if (tickBid != null && tickBid > 0 && tickBid < ask) lastRealBid = tickBid;
       const spPips = spreadPipsRef.current;
       const spPx = spPips * Math.pow(10, -(digits - 1));
-      const bid = lastRealBid != null && spPips === 0 ? lastRealBid : ask - spPx;
+      const ask = bidPrice + spPx;
       let ts: number | undefined;
       try { const dl = core.getDataList?.() || []; if (dl.length) ts = dl[dl.length - 1].timestamp; } catch {}
       const upsert = (ref: "bid" | "ask", price: number, color: string, label: string) => {
@@ -440,9 +438,8 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         if (id) {
           try {
             core.overrideOverlay({ id, points: [{ timestamp: ts, value: price }], extendData: { color, text: label } });
-            return; // updated in place — done
+            return;
           } catch {
-            // stale ID — remove the ghost overlay then fall through to create fresh
             try { core.removeOverlay(id); } catch {}
             bidAskIds.current[ref] = null;
           }
@@ -452,16 +449,18 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
           if (typeof newId === "string") bidAskIds.current[ref] = newId;
         } catch {}
       };
-      upsert("ask", ask, "#26a69a", `Ask ${ask.toFixed(digits)}`);
-      // Only show bid label when there is a real spread; hide when bid = ask (zero spread)
-      if (Math.abs(bid - ask) > Math.pow(10, -digits) * 0.5) {
-        upsert("bid", bid, "#ef5350", `Bid ${bid.toFixed(digits)}`);
+      // Show ask line above the chart when spread > 0; hide when zero spread
+      if (spPx > Math.pow(10, -(digits)) * 0.5) {
+        upsert("ask", ask, "#26a69a", `Ask ${ask.toFixed(digits)}`);
       } else {
-        const bidId = bidAskIds.current.bid;
-        if (bidId) { try { core.removeOverlay(bidId); } catch {} bidAskIds.current.bid = null; }
+        const askId = bidAskIds.current.ask;
+        if (askId) { try { core.removeOverlay(askId); } catch {} bidAskIds.current.ask = null; }
       }
+      // Bid = chart itself — remove redundant bid overlay
+      const bidId = bidAskIds.current.bid;
+      if (bidId) { try { core.removeOverlay(bidId); } catch {} bidAskIds.current.bid = null; }
     };
-    sock.on("tick", ({ symbol: sym, price, bid }: any) => { if (sym === symRef.current && price != null) updateLines(price, bid); });
+    sock.on("tick", ({ symbol: sym, price }: any) => { if (sym === symRef.current && price != null) updateLines(price); });
     return () => { sock.disconnect(); };
   }, [symbol, digits, getCore]);
 

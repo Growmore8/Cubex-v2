@@ -22,7 +22,6 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
   groupSpread?: number;
 }) {
   const [prices, setPrices] = useState<Record<string, number>>({});
-  const [realBids, setRealBids] = useState<Record<string, number>>({});
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
   const [spreadDirs, setSpreadDirs] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
@@ -40,41 +39,34 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
-    const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const pB: Record<string, number> = {}; const pS: Record<string, number> = {}; const pSD: Record<string, number> = {}; const prev: Record<string, number> = {}; const prevSp: Record<string, number> = {};
+    const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const pS: Record<string, number> = {}; const pSD: Record<string, number> = {}; const prev: Record<string, number> = {}; const prevSp: Record<string, number> = {};
     const flush = () => {
-      const pk = Object.keys(pP), dk = Object.keys(pD), bk = Object.keys(pB), sk = Object.keys(pS), sdk = Object.keys(pSD);
-      if (!pk.length && !dk.length && !bk.length && !sk.length && !sdk.length) return;
-      const px = { ...pP }; const dr = { ...pD }; const bd = { ...pB }; const sp = { ...pS }; const sd = { ...pSD };
-      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pB) delete pB[k]; for (const k in pS) delete pS[k]; for (const k in pSD) delete pSD[k];
-      // Bids + spread: urgent — must never be deferred or spread appears frozen
-      if (bk.length) setRealBids((bb) => ({ ...bb, ...bd }));
+      const pk = Object.keys(pP), dk = Object.keys(pD), sk = Object.keys(pS), sdk = Object.keys(pSD);
+      if (!pk.length && !dk.length && !sk.length && !sdk.length) return;
+      const px = { ...pP }; const dr = { ...pD }; const sp = { ...pS }; const sd = { ...pSD };
+      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pS) delete pS[k]; for (const k in pSD) delete pSD[k];
+      // Spread: urgent — drives live spread column, must not lag
       if (sk.length) setLiveSpreadPips((ss) => ({ ...ss, ...sp }));
       if (sdk.length) setSpreadDirs((sd2) => ({ ...sd2, ...sd }));
-      // Price + direction: low-priority (visual smoothness only)
+      // Price + direction: low-priority (visual animation)
       startTransition(() => {
         if (pk.length) setPrices((pp) => ({ ...pp, ...px }));
         if (dk.length) setDirs((dd) => ({ ...dd, ...dr }));
       });
     };
     socket.on("prices", (snap: Record<string, number>) => { startTransition(() => setPrices((pp) => ({ ...pp, ...snap }))); for (const k in snap) prev[k] = snap[k]; });
-    socket.on("bids", (snap: Record<string, number>) => { setRealBids((bb) => ({ ...bb, ...snap })); });
+    // MT5 model: price = smoothed BID. real = exchange ASK (for live spread computation).
     socket.on("tick", ({ symbol, price, bid, real }: any) => {
       const pv = prev[symbol];
       if (pv != null && pv !== price) pD[symbol] = price > pv ? 1 : -1;
       prev[symbol] = price; pP[symbol] = price;
-      if (bid != null) pB[symbol] = bid;
-      // Compute spread from coherent real-ask + bid from the same tick (most accurate)
-      if (bid != null && bid > 0) {
-        const realAsk = (real != null && real > 0) ? real : price;
-        if (realAsk > bid) {
-          const d = digitsRef.current[symbol] ?? 2;
-          const pip = Math.pow(10, -(d - 1));
-          const sp = (realAsk - bid) / pip;
-          const prev2 = prevSp[symbol];
-          if (prev2 != null && sp !== prev2) pSD[symbol] = sp > prev2 ? 1 : -1;
-          prevSp[symbol] = sp;
-          pS[symbol] = sp;
-        }
+      // Live spread = real ask − exchange bid (both from same LP tick)
+      if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
+        const d = digitsRef.current[symbol] ?? 2;
+        const sp = (real - bid) / Math.pow(10, -(d - 1));
+        const prev2 = prevSp[symbol];
+        if (prev2 != null && sp !== prev2) pSD[symbol] = sp > prev2 ? 1 : -1;
+        prevSp[symbol] = sp; pS[symbol] = sp;
       }
     });
     const fv = setInterval(flush, 120);
@@ -121,31 +113,16 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
             {!collapsed[cat] && list.map((s) => {
               const p = prices[s.symbol]; const d = dgFor(s);
               const pip = Math.pow(10, -(d - 1));
-              const lpBid = realBids[s.symbol];
               const liveSp2 = liveSpreadPips[s.symbol];
               const hasLive = liveSp2 != null && liveSp2 > 0;
               const rawSp = symbolSpreads && symbolSpreads[s.symbol];
               const cfgSpPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
               const isFixed = (symbolTypes as any)?.[s.symbol] === "FIXED";
-              // Spread for the spread column
-              const realSpPips = isFixed ? cfgSpPips : (hasLive ? liveSp2 : 0);
-              // Bid/Ask columns — must always move pip-by-pip (same source as BUY/SELL buttons)
-              // FLOATING: ask = smoothed price (always animates every tick, never frozen)
-              //           bid = real exchange bid if valid, else ask − live exchange spread
-              // FIXED:    bid = real exchange bid (reference), ask = bid + configured pips
-              let ask: string, bid: string;
-              if (isFixed) {
-                const refBid = (lpBid != null && lpBid > 0) ? lpBid : (p ?? 0);
-                ask = p != null ? gnum(refBid + cfgSpPips * pip, d) : "—";
-                bid = p != null ? gnum(refBid, d) : "—";
-              } else {
-                const floatAsk = p ?? 0;
-                const floatBid = (lpBid != null && lpBid > 0 && lpBid < floatAsk)
-                  ? lpBid
-                  : (hasLive ? Math.max(0, floatAsk - liveSp2! * pip) : floatAsk);
-                ask = p != null ? gnum(floatAsk, d) : "—";
-                bid = p != null ? gnum(floatBid, d) : "—";
-              }
+              // MT5 model: bid = price (primary), ask = price + spread. No inversion possible.
+              const spPips = isFixed ? cfgSpPips : (hasLive ? liveSp2! : 0);
+              const realSpPips = spPips; // spread column uses same value
+              const ask = p != null ? gnum(p + spPips * pip, d) : "—";
+              const bid = p != null ? gnum(p, d) : "—";
               const dir = dirs[s.symbol] || 0;
               const spDir = spreadDirs[s.symbol] || 0;
               const isOff = !!(disabledSyms && disabledSyms.includes(s.symbol));
