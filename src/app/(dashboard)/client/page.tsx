@@ -881,9 +881,8 @@ export default function ClientTerminal() {
 
               {/* Volume + quick-lot buttons in one bordered block */}
               <div className="overflow-hidden rounded-lg border border-[var(--border)]">
-                <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1">
+                <div className="border-b border-[var(--border)] px-2 py-1">
                   <span className="text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Volume (Lots)</span>
-                  <span className="text-[8px]" style={{ color: "var(--muted)" }}>Step: 0.01</span>
                 </div>
                 <div className="flex items-center gap-1 px-1.5 py-1.5">
                   <button onClick={() => setVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] transition-colors hover:bg-[var(--soft)] hover:text-[var(--text)] active:scale-95">−</button>
@@ -899,11 +898,11 @@ export default function ClientTerminal() {
               <div className="grid grid-cols-2 gap-1.5">
                 <div>
                   <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "#10b981" }}>Take Profit</div>
-                  <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="0 = off" className="h-7 w-full rounded-lg border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)] text-center" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
+                  <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="" className="h-7 w-full rounded-lg border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)] text-center" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
                 </div>
                 <div>
                   <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "#e0394a" }}>Stop Loss</div>
-                  <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="0 = off" className="h-7 w-full rounded-lg border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)] text-center" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
+                  <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="" className="h-7 w-full rounded-lg border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)] text-center" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
                 </div>
               </div>
 

@@ -870,11 +870,11 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#10b981" }}>Take Profit</div>
-                        <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="0 = off" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
+                        <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
                       </div>
                       <div>
                         <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#e0394a" }}>Stop Loss</div>
-                        <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="0 = off" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
+                        <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
                       </div>
                     </div>
 
@@ -1373,11 +1373,11 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#10b981" }}>Take Profit</div>
-                    <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="0 = off" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
+                    <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
                   </div>
                   <div>
                     <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#e0394a" }}>Stop Loss</div>
-                    <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="0 = off" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
+                    <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
                   </div>
                 </div>
 
