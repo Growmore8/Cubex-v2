@@ -961,8 +961,9 @@ async function pollChunk(chunk) {
       const ask = parseFloat(entry.ask || entry.close || entry.price || 0);
       const bid = parseFloat(entry.bid || 0);
       if (ask > 0) {
-        if (bid > 0 && bid < ask) { state[s].bid = r(bid, meta[s].digits); applyPrice(s, ask, "TD"); }
-        else { state[s].bid = null; applyPrice(s, ask, "TD"); }
+        if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits);
+        // do NOT null bid here — Kraken/Binance real bid must be preserved
+        applyPrice(s, ask, "TD");
       }
     };
     if (uniqTd.length === 1) { for (const s of chunk) if (meta[s].td === uniqTd[0]) applyEntry(s, data); return; }
