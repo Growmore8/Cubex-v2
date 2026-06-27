@@ -122,24 +122,30 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const p = prices[s.symbol]; const d = dgFor(s);
               const pip = Math.pow(10, -(d - 1));
               const lpBid = realBids[s.symbol];
-              // Use real exchange ask (same tick as bid) — not smoothed display price
               const liveSp2 = liveSpreadPips[s.symbol];
-              const realAskPx = (lpBid != null && lpBid > 0 && liveSp2 != null && liveSp2 > 0)
-                ? lpBid + liveSp2 * pip
-                : p;
-              const ask = realAskPx != null ? gnum(realAskPx, d) : "—";
-              const liveSp = liveSp2;
-              const hasLive = liveSp != null && liveSp > 0;
-              // Configured spread (FIXED uses this; FLOATING uses live exchange spread)
+              const hasLive = liveSp2 != null && liveSp2 > 0;
               const rawSp = symbolSpreads && symbolSpreads[s.symbol];
               const cfgSpPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
               const isFixed = (symbolTypes as any)?.[s.symbol] === "FIXED";
-              // FIXED: always show configured pips (even 0). FLOATING: show live exchange spread.
-              const realSpPips = isFixed ? cfgSpPips : (hasLive ? liveSp! : 0);
-              const spPx = realSpPips * pip;
-              const safeSpPx = p != null ? Math.min(spPx, p * 0.02) : spPx;
-              const validRealBid = lpBid != null && lpBid > 0 && (realAskPx == null || lpBid < realAskPx);
-              const bid = validRealBid ? gnum(lpBid!, d) : (p != null ? gnum(Math.max(0, p - safeSpPx), d) : "—");
+              // Spread for the spread column
+              const realSpPips = isFixed ? cfgSpPips : (hasLive ? liveSp2 : 0);
+              // Bid/Ask columns — must always move pip-by-pip (same source as BUY/SELL buttons)
+              // FLOATING: ask = smoothed price (always animates every tick, never frozen)
+              //           bid = real exchange bid if valid, else ask − live exchange spread
+              // FIXED:    bid = real exchange bid (reference), ask = bid + configured pips
+              let ask: string, bid: string;
+              if (isFixed) {
+                const refBid = (lpBid != null && lpBid > 0) ? lpBid : (p ?? 0);
+                ask = p != null ? gnum(refBid + cfgSpPips * pip, d) : "—";
+                bid = p != null ? gnum(refBid, d) : "—";
+              } else {
+                const floatAsk = p ?? 0;
+                const floatBid = (lpBid != null && lpBid > 0 && lpBid < floatAsk)
+                  ? lpBid
+                  : (hasLive ? Math.max(0, floatAsk - liveSp2! * pip) : floatAsk);
+                ask = p != null ? gnum(floatAsk, d) : "—";
+                bid = p != null ? gnum(floatBid, d) : "—";
+              }
               const dir = dirs[s.symbol] || 0;
               const spDir = spreadDirs[s.symbol] || 0;
               const isOff = !!(disabledSyms && disabledSyms.includes(s.symbol));
