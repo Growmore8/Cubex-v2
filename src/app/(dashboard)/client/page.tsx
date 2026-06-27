@@ -539,20 +539,12 @@ export default function ClientTerminal() {
     if (!s) return grpAcc;
     // FIXED: always use configured pips
     if (s.type === "FIXED") return (s.min || 0) + grpAcc;
-    // FLOATING: use pre-computed live spread (raw ask − raw bid, same tick = exact market spread)
+    // FLOATING: use real spread from exchange tick (raw ask − raw bid, same tick)
     const liveSp = liveSpreadPips[sym];
     if (liveSp != null && liveSp > 0) return liveSp + grpAcc;
-    // Fallback: compute from stale liveBids when liveSpreadPips not yet available
-    const lb = liveBids[sym];
-    const p = prices[sym];
-    if (lb != null && lb > 0 && p != null && lb < p) {
-      const pip = Math.pow(10, -(dg(sym) - 1));
-      return (p - lb) / pip + grpAcc;
-    }
-    // Fallback: configured min/max (when live bid not yet available)
-    const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
-    const isPeak = wd >= 1 && wd <= 5 && h >= 8 && h < 17;
-    return (isPeak ? s.min : s.max) + grpAcc;
+    // No live data yet — show 0 (— in spread column) rather than using stale
+    // smoothed-price vs real-bid which produces wrong values like 326/5/4
+    return grpAcc;
   };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
   // Use real exchange ask/bid for BUY/SELL buttons — not smoothed display price.

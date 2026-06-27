@@ -149,17 +149,14 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                   <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} /><span className="truncate">{s.symbol}</span>{isOff && <span className="text-[8px] rounded px-1" style={{ background: "rgba(224,82,96,0.18)", color: "#ef5350" }}>OFF</span>}</span>
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
-                  <span className="flex items-center justify-end pr-1 gap-0.5">
-                    {hasLive
-                      ? <span title="Live spread from exchange feed" style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />
-                      : null}
-                    <span className="tabular-nums" title={realSpPips > 0 ? `${realSpPips.toFixed(2)} pips · ${Math.round(realSpPips * 10)} points · price spread ${spPx.toFixed(d > 2 ? 5 : 2)}` : undefined}
+                  <span className="flex items-center justify-end pr-1">
+                    <span className="tabular-nums" title={realSpPips > 0 ? `${realSpPips.toFixed(2)} pips · ${Math.round(realSpPips * 10)} points` : undefined}
                       style={{
-                        fontSize: 9,
+                        fontSize: 10,
+                        fontWeight: spDir !== 0 ? 700 : 500,
                         cursor: realSpPips > 0 ? "help" : undefined,
-                        color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)",
+                        color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : (hasLive ? "#c8d0e0" : "var(--muted)"),
                         transition: "color 0.55s ease-out",
-                        fontWeight: spDir !== 0 ? 700 : 400,
                       }}>
                       {realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}
                     </span>

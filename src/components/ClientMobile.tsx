@@ -120,20 +120,10 @@ export default function ClientMobile({ t }: { t: any }) {
     const grpAcc = _mobGrpSpread() + _mobAccMarkup();
     if (!s) return grpAcc;
     if (s.type === "FIXED") return (s.min || 0) + grpAcc;
-    // FLOATING: use pre-computed live spread (raw ask − raw bid, exact market spread)
+    // FLOATING: use real spread from exchange tick (raw ask − raw bid)
     const liveSp = t.liveSpreadPips[sym];
     if (liveSp != null && liveSp > 0) return liveSp + grpAcc;
-    // Fallback: compute from stale liveBids
-    const lb = _liveBids[sym];
-    const p = t.prices[sym];
-    if (lb != null && lb > 0 && p != null && lb < p) {
-      const digits = t.dg(sym);
-      const pip = Math.pow(10, -(digits - 1));
-      return (p - lb) / pip + grpAcc;
-    }
-    const h = new Date().getUTCHours(), d = new Date().getUTCDay();
-    const isPeak = d >= 1 && d <= 5 && h >= 8 && h < 17;
-    return (isPeak ? s.min : s.max) + grpAcc;
+    return grpAcc; // no live data yet — don't use stale smoothed-price vs real-bid
   };
 
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "profile">("dashboard");
