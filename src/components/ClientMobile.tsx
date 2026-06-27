@@ -119,16 +119,10 @@ export default function ClientMobile({ t }: { t: any }) {
     const s = _mobSymSpreads()[sym];
     const grp = _mobGrpSpread();
     const markup = _mobAccMarkup();
-    const dig = dg(sym);
-    const pip = Math.pow(10, -(dig - 1));
-    const px = (t as any).prices?.[sym] ?? price;
-    const realBid = _liveBids[sym];
-    // Live spread = ask − bid from feed (floating, no admin config needed)
-    if (realBid != null && realBid > 0 && px != null && realBid < px) {
-      const liveSpread = (px - realBid) / pip;
-      return liveSpread + grp + markup; // add group markup + account markup on top of live
-    }
-    // No real bid → fall back to admin configured spread
+    // Use parent's coherently-computed live spread (bid+ask from same tick) — same source as desktop
+    const parentLive = (t as any).liveSpreadPips?.[sym];
+    if (parentLive != null && parentLive > 0) return parentLive + grp + markup;
+    // No live data → fall back to configured spread
     if (!s) return grp + markup;
     let base = s.min;
     if (s.type === "FLOATING" && s.max > s.min) {
