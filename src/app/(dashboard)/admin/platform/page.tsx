@@ -82,6 +82,7 @@ export default function AdminDeskPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
   const [selSym, setSelSym] = useState("");
   const [tf, setTf] = useState("1M");
   const [selAcc, setSelAcc] = useState<any>(null);
@@ -368,12 +369,13 @@ export default function AdminDeskPage() {
     // animation frame so 57 symbols can't trigger hundreds of re-renders/sec.
     const pP: Record<string, number> = {};
     const pD: Record<string, number> = {};
+    const pS: Record<string, number> = {};
     const flush = () => {
-      const pxKeys = Object.keys(pP); const drKeys = Object.keys(pD);
-      if (!pxKeys.length && !drKeys.length) return;
-      const px = { ...pP }; const dr = { ...pD };
-      for (const k in pP) delete pP[k];
-      for (const k in pD) delete pD[k];
+      const pxKeys = Object.keys(pP); const drKeys = Object.keys(pD); const skKeys = Object.keys(pS);
+      if (!pxKeys.length && !drKeys.length && !skKeys.length) return;
+      const px = { ...pP }; const dr = { ...pD }; const sp = { ...pS };
+      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pS) delete pS[k];
+      if (skKeys.length) setLiveSpreadPips((ss) => ({ ...ss, ...sp }));
       startTransition(() => {
         if (pxKeys.length) setPrices((pp) => ({ ...pp, ...px }));
         if (drKeys.length) setDirs((dd) => ({ ...dd, ...dr }));
@@ -383,12 +385,15 @@ export default function AdminDeskPage() {
       startTransition(() => setPrices((pp) => ({ ...pp, ...snapshot })));
       for (const k in snapshot) prevRef.current[k] = snapshot[k];
     });
-    // MT5 model: price = smoothed BID. ask = price + spread. No separate bid/ask state needed.
-    socket.on("tick", ({ symbol, price }: any) => {
+    socket.on("tick", ({ symbol, price, bid, real }: any) => {
       const prev = prevRef.current[symbol];
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
+      if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
+        const d = dg(symbol);
+        pS[symbol] = (real - bid) / Math.pow(10, -(d - 1));
+      }
     });
     const flushIv = setInterval(flush, 150);
     // Single timer clears the up/down flash for all symbols (cheap vs per-symbol timers)
@@ -701,8 +706,8 @@ export default function AdminDeskPage() {
   );
 
   const shown: { sym: string; i: number }[] = layout === 1 ? (openCharts[activeChart] ? [{ sym: openCharts[activeChart], i: activeChart }] : []) : openCharts.slice(0, layout).map((sym, i) => ({ sym, i }));
-  // MT5 model: price = BID (primary). ask = price + spread. Works for FIXED and FLOATING.
-  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1)); const spPips = adminSymSpreads[sym] || 0; const spPx = spPips * pip; const ask = p != null ? gnum(p + spPx, d) : "..."; const bid = p != null ? gnum(p, d) : "...";
+  // MT5 model: price = BID. ask = price + spread. FLOATING uses live exchange spread.
+  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1)); const isFloat = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING"; const cfgPips = adminSymSpreads[sym] || 0; const liveSp = liveSpreadPips[sym]; const spPips = isFloat ? (liveSp != null && liveSp > 0 ? liveSp : cfgPips) : cfgPips; const spPx = spPips * pip; const ask = p != null ? gnum(p + spPx, d) : "..."; const bid = p != null ? gnum(p, d) : "...";
     if (!showOC) return (
       <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-16 top-12 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
         <i className="fa-solid fa-bolt" /> Trade
