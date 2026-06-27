@@ -5,15 +5,16 @@ export function pipForDigits(digits: number): number {
   return Math.pow(10, -(digits - 1));
 }
 
-// Symbol layer FLOATING = stored pip value IS the base spread (off-hours widening is separate).
-// Group/Account layer FLOATING = 0 extra markup (client sees raw symbol spread, no markup added).
+// Group/Account FLOATING = 0 extra markup. FIXED = add configured pips on top.
+// Symbol layer always contributes its stored spread (FLOATING = base markup, FIXED = total spread).
 function resolveMarkup(pips: number, type: string): number {
   return type === "FLOATING" ? 0 : pips;
 }
 
-// Total spread in pips: symbol base + group markup + account markup.
-// Symbol layer always uses its stored spread regardless of FLOATING/FIXED.
-// Group and account FLOATING layers contribute 0 (no extra markup).
+// Total spread in pips for execution:
+//   FIXED symbol  → sym.spread is the total spread (bid = ask − totalPips; realBid ignored in trade.service)
+//   FLOATING symbol → sym.spread is a markup added on top of the live exchange bid
+// Group and account FLOATING contribute 0; FIXED adds their configured pips.
 export async function getSpreadPips(
   tenantId: string,
   symbol: string,

@@ -117,19 +117,20 @@ export default function ClientMobile({ t }: { t: any }) {
   }, []);
   const _mobSpreadPips = (sym: string) => {
     const s = _mobSymSpreads()[sym];
-    const grp = _mobGrpSpread();
-    const markup = _mobAccMarkup();
-    // Use parent's coherently-computed live spread (bid+ask from same tick) — same source as desktop
+    const grpAcc = _mobGrpSpread() + _mobAccMarkup();
+    if (s?.type === "FIXED") return (s.min || 0) + grpAcc; // constant, no live
+    // FLOATING: live exchange spread + symbol markup + group/account markups
+    const symMarkup = s?.min ?? 0;
     const parentLive = (t as any).liveSpreadPips?.[sym];
-    if (parentLive != null && parentLive > 0) return parentLive + grp + markup;
-    // No live data → fall back to configured spread
-    if (!s) return grp + markup;
+    if (parentLive != null && parentLive > 0) return parentLive + symMarkup + grpAcc;
+    // No live data → time-adjusted configured spread
+    if (!s) return symMarkup + grpAcc;
     let base = s.min;
-    if (s.type === "FLOATING" && s.max > s.min) {
+    if (s.max > s.min) {
       const h = new Date().getUTCHours(), d = new Date().getUTCDay();
       if (!(d >= 1 && d <= 5 && h >= 8 && h < 17)) base = s.max;
     }
-    return base + grp + markup;
+    return base + grpAcc;
   };
 
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "profile">("dashboard");

@@ -476,23 +476,25 @@ export default function ClientTerminal() {
   const level = used > 0 ? (equity / used) * 100 : 0;
   const price = prices[selSym];
   const d = dg(selSym);
-  // Real spread: symbol pips + group markup → bid = ask − spread
+  // Effective spread the client pays: matches server execution exactly.
+  // FIXED: sym.min pips always (constant, ignores live exchange spread).
+  // FLOATING: live exchange spread + sym.min markup + group/account markups.
   const _spreadPips = (sym: string) => {
     const s = symbolSpreads[sym];
-    const markup = groupSpread + accountSpreadMarkup;
-    // Always prefer live exchange spread when available (same as admin market watch).
-    // FIXED type affects trade execution server-side; display always shows live market spread.
+    const grpAcc = groupSpread + accountSpreadMarkup; // group + account FIXED markups
+    if (s?.type === "FIXED") return (s.min || 0) + grpAcc; // always constant, no live
+    // FLOATING: live exchange spread + symbol markup + group/account markups
+    const symMarkup = s?.min ?? 0;
     const live = liveSpreadPips[sym];
-    if (live != null && live > 0) return live + markup;
-    // No live bid yet → fall back to configured pip floor
-    if (!s) return markup;
-    if (s.type === "FIXED") return (s.min || 0) + markup;
+    if (live != null && live > 0) return live + symMarkup + grpAcc;
+    // No live data: use time-adjusted configured spread as fallback
+    if (!s) return symMarkup + grpAcc;
     let base = s.min;
     if (s.max > s.min) {
       const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
       if (!(wd >= 1 && wd <= 5 && h >= 8 && h < 17)) base = s.max;
     }
-    return base + markup;
+    return base + grpAcc;
   };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
   const ask = price ?? 0;
