@@ -148,9 +148,10 @@ export default function ClientTerminal() {
   const Sth = ({ tbl, k, label, align, cls }: { tbl: string; k: string; label: any; align?: "right"; cls?: string }) => { const cfg = sortBy[tbl]; const active = !!cfg && cfg.k === k; return (<th className={(cls || "px-2 py-1 font-normal") + (align === "right" ? " text-right" : " text-left") + " cursor-pointer select-none"} onClick={() => toggleSort(tbl, k)}><span className={"inline-flex items-center gap-1 " + (align === "right" ? "flex-row-reverse" : "")}>{label}<i className={"fa-solid text-[8px] " + (active ? (cfg!.d === 1 ? "fa-arrow-up-long" : "fa-arrow-down-long") : "fa-sort")} style={{ opacity: active ? 1 : 0.3 }} /></span></th>); };
   useEffect(() => { if (rightTab === "NEWS" && news.length === 0) { fetch("/api/client/news?category=forex").then((r) => r.json()).then((dd) => { if (dd.ok) setNews(dd.items || []); }).catch(() => {}); } }, [rightTab]);
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { fetch("/api/client/avatar").then((r) => r.json()).then((d) => { if (d.ok) setAvatarUrl(d.avatarUrl || ""); }).catch(() => {}); }, []);
-  async function uploadAvatar(e: any) { const file = e.target.files && e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append("file", file); const r = await fetch("/api/client/avatar", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok && r.avatarUrl) setAvatarUrl(r.avatarUrl); else setErr(r.error || "Avatar upload failed"); }
+  async function uploadAvatar(e: any) { const file = e.target.files && e.target.files[0]; if (!file) return; setAvatarUploading(true); const fd = new FormData(); fd.append("file", file); const r = await fetch("/api/client/avatar", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); setAvatarUploading(false); if (r.ok && r.avatarUrl) setAvatarUrl(r.avatarUrl); else setErr(r.error || "Avatar upload failed"); }
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: "", phone: "", country: "" });
@@ -305,6 +306,21 @@ export default function ClientTerminal() {
     setErr("");
     if (account?.locked) { setErr("Your account is read-only (locked). Trading is disabled."); return; }
     if (needKyc) { setErr("Verify your KYC to trade on a live account."); setWalletModal("kyc"); return; }
+    // Client-side SL/TP sanity check before sending to server
+    const curAsk = prices[selSym];
+    if (curAsk && orderType === "MARKET") {
+      const spPx = _spreadPips(selSym) * Math.pow(10, -(dg(selSym) - 1));
+      const curBid = curAsk - spPx; const dd = dg(selSym);
+      const slv = Number(sl) || 0; const tpv = Number(tp) || 0;
+      if (slv > 0) {
+        if (type === "BUY" && slv >= curAsk) { setErr(`SL must be below ask ${gnum(curAsk, dd)}`); return; }
+        if (type === "SELL" && slv <= curBid) { setErr(`SL must be above bid ${gnum(curBid, dd)}`); return; }
+      }
+      if (tpv > 0) {
+        if (type === "BUY" && tpv <= curAsk) { setErr(`TP must be above ask ${gnum(curAsk, dd)}`); return; }
+        if (type === "SELL" && tpv >= curBid) { setErr(`TP must be below bid ${gnum(curBid, dd)}`); return; }
+      }
+    }
     if (orderType === "LIMIT" || orderType === "STOP") {
       const trig = Number(pendingPrice); if (!trig) { setErr("Enter an entry price"); return; }
       const kind = orderType;
@@ -408,6 +424,21 @@ export default function ClientTerminal() {
   async function saveTpSl() {
     if (!tpSlEdit) return;
     const val = parseFloat(tpSlEdit.val);
+    // Validate SL/TP direction before sending
+    if (!isNaN(val) && val > 0) {
+      const pos = positions.find((p: any) => p.id === tpSlEdit.id);
+      if (pos) {
+        const curPx = prices[pos.symbol] ?? Number(pos.openPrice);
+        const dd = dg(pos.symbol);
+        if (tpSlEdit.field === "sl") {
+          if (pos.type === "BUY" && val >= curPx) { setErr(`SL must be below current price ${gnum(curPx, dd)}`); setTpSlEdit(null); return; }
+          if (pos.type === "SELL" && val <= curPx) { setErr(`SL must be above current price ${gnum(curPx, dd)}`); setTpSlEdit(null); return; }
+        } else {
+          if (pos.type === "BUY" && val <= curPx) { setErr(`TP must be above current price ${gnum(curPx, dd)}`); setTpSlEdit(null); return; }
+          if (pos.type === "SELL" && val >= curPx) { setErr(`TP must be below current price ${gnum(curPx, dd)}`); setTpSlEdit(null); return; }
+        }
+      }
+    }
     const body: any = { [tpSlEdit.field]: isNaN(val) ? 0 : val };
     const r = await fetch("/api/client/orders/" + tpSlEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json();
@@ -519,7 +550,7 @@ export default function ClientTerminal() {
   // and the 3s branding minimum has passed, then the app mounts.
   if (!splashGone) return <ClientSplash brand={splashBrand || brand} theme={theme} hiding={booted} />;
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, accountSpreadMarkup, prices, liveSpreadPips, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, accountSpreadMarkup, prices, liveSpreadPips, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, avatarUploading, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
   if (tenantSuspended) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 text-center px-6" style={{ background: "#0f172a", color: "#94a3b8" }}>
@@ -1052,8 +1083,9 @@ export default function ClientTerminal() {
             </table>
           )}
           {botTab === "history" && (
-            <div className="flex gap-1 px-2 py-1 text-[9px]">
+            <div className="flex items-center gap-1 px-2 py-1 text-[9px]">
               {(["all", "today", "week", "month"] as const).map((r) => <button key={r} onClick={() => setHistRange(r)} className="rounded px-2 py-0.5" style={histRange === r ? { background: BUY, color: "#04140e" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{r === "all" ? "All" : r === "today" ? "Today" : r === "week" ? "Week" : "Month"}</button>)}
+              <a href={"/api/client/statement?accountId=" + accId} target="_blank" rel="noreferrer" className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-white" style={{ background: "#ef4444", textDecoration: "none", fontSize: 9 }} title="Download PDF statement"><i className="fa-solid fa-file-pdf text-[8px]" /> PDF</a>
             </div>
           )}
           {botTab === "history" && (

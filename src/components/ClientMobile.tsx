@@ -99,7 +99,7 @@ export default function ClientMobile({ t }: { t: any }) {
     balance, equity, floating, free, used, level, price, bid, ask, tf, TFS,
     setSelSym, setVol, setSl, setTp, setTf,
     place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr,
-    toggleTheme, enablePush, disablePush, addPasskey, openPin, favs, toggleFav, avatarUrl, uploadAvatar,
+    toggleTheme, enablePush, disablePush, addPasskey, openPin, favs, toggleFav, avatarUrl, avatarUploading, uploadAvatar,
     fmt, csz, pnlOf, dg, markAllNotifsRead, logout, pin,
     acctReqModal, setAcctReqModal,
   } = t;
@@ -1084,7 +1084,7 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <Avatar size={64} />
-                  <button onClick={() => avatarRef.current?.click()} className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full text-white" style={{ background: BUY, border: "2px solid var(--card)" }}><i className="fa-solid fa-pencil text-[10px]" /></button>
+                  <button onClick={() => !avatarUploading && avatarRef.current?.click()} disabled={avatarUploading} className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full text-white" style={{ background: BUY, border: "2px solid var(--card)", opacity: avatarUploading ? 0.7 : 1 }}><i className={avatarUploading ? "fa-solid fa-spinner fa-spin text-[10px]" : "fa-solid fa-pencil text-[10px]"} /></button>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 text-base font-bold">{account?.ownerName || account?.name} <i className="fa-solid fa-circle-check text-[13px]" style={{ color: BLUE }} /></div>
