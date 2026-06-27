@@ -282,10 +282,10 @@ export default function ClientTerminal() {
     if (account?.locked) { setErr("Your account is read-only (locked). Trading is disabled."); return; }
     if (needKyc) { setErr("Verify your KYC to trade on a live account."); setWalletModal("kyc"); return; }
     // Client-side SL/TP sanity check before sending to server
-    const curAsk = prices[selSym];
-    if (curAsk && orderType === "MARKET") {
+    const curBid = prices[selSym]; // prices = smoothed BID (MT5 model)
+    if (curBid && orderType === "MARKET") {
       const spPx = _spreadPips(selSym) * Math.pow(10, -(dg(selSym) - 1));
-      const curBid = curAsk - spPx; const dd = dg(selSym);
+      const curAsk = curBid + spPx; const dd = dg(selSym);
       const slv = Number(sl) || 0; const tpv = Number(tp) || 0;
       if (slv > 0) {
         if (type === "BUY" && slv >= curAsk) { setErr(`SL must be below ask ${gnum(curAsk, dd)}`); return; }
