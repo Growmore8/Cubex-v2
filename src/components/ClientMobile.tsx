@@ -117,7 +117,9 @@ export default function ClientMobile({ t }: { t: any }) {
     return grpAcc; // no live data yet — don't use stale smoothed-price vs real-bid
   };
 
-  const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "profile">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "news" | "profile">("dashboard");
+  const [mobNews, setMobNews] = useState<any[]>([]);
+  const [mobNewsLoading, setMobNewsLoading] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: "", phone: "", country: "" });
   const [profileSaving, setProfileSaving] = useState(false);
@@ -187,6 +189,7 @@ export default function ClientMobile({ t }: { t: any }) {
   useEffect(() => { if (tab === "profile" && !myReqsLoaded) loadMyReqs(); }, [tab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const loadMobAlerts = () => { if (!accId) return; fetch(`/api/client/alerts?accountId=${accId}`).then((r) => r.json()).then((r) => { if (r.ok) setMobAlerts(r.alerts || []); }).catch(() => {}); };
   useEffect(() => { loadMobAlerts(); }, [accId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tab === "news" && mobNews.length === 0 && !mobNewsLoading) { setMobNewsLoading(true); fetch("/api/client/news?category=forex").then((r) => r.json()).then((d) => { if (d.ok) setMobNews(d.items || []); }).catch(() => {}).finally(() => setMobNewsLoading(false)); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   const reqRow = (req: any) => {
     const isAcc = req.kind === "ACCOUNT";
     const ic = isAcc ? "fa-circle-plus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";
@@ -331,7 +334,7 @@ export default function ClientMobile({ t }: { t: any }) {
     ? [["profile", "fa-user", "Profile"]]
     : [
         ["dashboard", "fa-house", "Dashboard"], ["quotes", "fa-chart-simple", "Quotes"], ["chart", "fa-chart-line", "Chart"],
-        ["trades", "fa-right-left", "Trades"], ["history", "fa-clock-rotate-left", "History"], ["profile", "fa-user", "Profile"],
+        ["trades", "fa-right-left", "Trades"], ["history", "fa-clock-rotate-left", "History"], ["news", "fa-newspaper", "News"], ["profile", "fa-user", "Profile"],
       ];
   useEffect(() => { if (needKyc) setTab("profile"); }, [needKyc]);
   // If a tenant has no Crypto category, fall back to the first available tab.
@@ -1068,6 +1071,7 @@ export default function ClientMobile({ t }: { t: any }) {
             <div className="mb-3 flex gap-2">
               <button onClick={() => setHistTab("trades")} className="flex-1 rounded-lg py-2 text-[12px] font-semibold" style={{ background: histTab === "trades" ? BLUE : "var(--soft)", color: histTab === "trades" ? "#fff" : "var(--muted)" }}>Trades</button>
               <button onClick={() => setHistTab("financial")} className="flex-1 rounded-lg py-2 text-[12px] font-semibold" style={{ background: histTab === "financial" ? BLUE : "var(--soft)", color: histTab === "financial" ? "#fff" : "var(--muted)" }}>Financial</button>
+              <a href={`/api/client/statement?accountId=${accId}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg px-3 py-2 text-[12px] font-semibold text-white" style={{ background: "#ef4444", textDecoration: "none" }} title="Download PDF statement"><i className="fa-solid fa-file-pdf text-[10px]" /> PDF</a>
             </div>
             {histTab === "trades" ? (
               <div className="space-y-2.5">
@@ -1127,6 +1131,31 @@ export default function ClientMobile({ t }: { t: any }) {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ───────── NEWS ───────── */}
+        {tab === "news" && (
+          <div className="p-3">
+            <div className="mb-3 text-[13px] font-bold" style={{ color: "var(--text)" }}><i className="fa-solid fa-newspaper mr-1.5" style={{ color: GOLD }} />Market News</div>
+            {mobNewsLoading ? (
+              <div className="py-10 text-center text-[12px] text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-1" />Loading news…</div>
+            ) : mobNews.length === 0 ? (
+              <div className="py-10 text-center text-[12px] text-[var(--muted)]">No news available.</div>
+            ) : (
+              <div className="space-y-0 divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+                {mobNews.map((n: any) => (
+                  <a key={n.id} href={n.url} target="_blank" rel="noreferrer" className="block px-3 py-3 hover:bg-[var(--soft)] active:bg-[var(--soft)]" style={{ textDecoration: "none" }}>
+                    <div className="text-[12px] font-medium leading-tight text-[var(--text)]">{n.headline}</div>
+                    <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--muted)]">
+                      <span>{n.source}</span>
+                      <span>·</span>
+                      <span>{new Date(n.datetime * 1000).toLocaleString()}</span>
+                    </div>
+                  </a>
+                ))}
               </div>
             )}
           </div>
