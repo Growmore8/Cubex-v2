@@ -996,9 +996,7 @@ export default function ClientTerminal() {
                   <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down text-[8px]" />Sell</span>
                   <span className="text-[14px] tabular-nums">{bid != null ? gnum(bid, d) : "…"}</span>
                 </button>
-                <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 px-1">
-                  <span className="text-[10px] font-bold tabular-nums" style={{ color: "var(--muted)" }}>{Math.round(_spreadPips(selSym) * 10)}</span>
-                </div>
+
                 <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)" }}>
                   <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up text-[8px]" />Buy</span>
                   <span className="text-[14px] tabular-nums">{ask != null ? gnum(ask, d) : "…"}</span>
