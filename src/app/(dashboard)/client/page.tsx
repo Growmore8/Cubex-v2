@@ -1123,7 +1123,7 @@ export default function ClientTerminal() {
                     {(() => { const net = pl + Number(p.swap) - Number(p.commission); return <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+$" : "-$") + fmt(Math.abs(net))}</td>; })()}
                     <td className="px-2 py-1 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button title="Partial close" style={{ color: "var(--muted)" }} onClick={() => setPartialClose({ id: p.id, sym: p.symbol, lots: Number(p.lots), closeLots: "" })} className="text-[9px] px-1">½</button>
+                        {Number(p.lots) > 0.01 ? <button title="Partial close" style={{ color: "var(--muted)" }} onClick={() => setPartialClose({ id: p.id, sym: p.symbol, lots: Number(p.lots), closeLots: "" })} className="text-[9px] px-1">½</button> : <span title="Min lot — cannot partial close" className="text-[9px] px-1 opacity-20 cursor-not-allowed">½</span>}
                         <button style={{ color: SELL }} onClick={() => close(p.id)}>X</button>
                       </div>
                     </td>
@@ -1413,19 +1413,30 @@ export default function ClientTerminal() {
       {dragging && <div className="fixed inset-0 z-[60]" />}
 
       {/* Partial Close Modal */}
-      {partialClose && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setPartialClose(null)}>
-          <div className="w-72 rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 text-[13px] font-bold">Partial Close — {partialClose.sym}</div>
-            <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Open lots: {partialClose.lots} — enter lots to close</div>
-            <input type="number" min="0.01" max={partialClose.lots - 0.01} step="0.01" value={partialClose.closeLots} onChange={(e) => setPartialClose((s) => s ? { ...s, closeLots: e.target.value } : s)} placeholder="Lots" className="mb-3 h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[14px] font-bold tabular-nums outline-none focus:border-[var(--accent)]" style={{ color: "var(--text)" }} autoFocus />
-            <div className="flex gap-2">
-              <button onClick={() => setPartialClose(null)} className="flex-1 rounded-lg border border-[var(--border)] py-2 text-[11px]">Cancel</button>
-              <button onClick={async () => { const lots = Number(partialClose.closeLots); if (!lots || lots <= 0 || lots >= partialClose.lots) { setErr("Enter a valid partial lot size (less than total)"); setPartialClose(null); return; } await close(partialClose.id, lots); setPartialClose(null); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: SELL }}>Close {partialClose.closeLots || "?"} Lots</button>
+      {partialClose && (() => {
+        const closeL = Number(partialClose.closeLots);
+        const remainL = partialClose.closeLots ? parseFloat((partialClose.lots - closeL).toFixed(2)) : 0;
+        const pcErr = partialClose.closeLots
+          ? closeL <= 0 ? "Enter a valid lot amount"
+          : closeL >= partialClose.lots ? `Must be less than ${partialClose.lots}`
+          : remainL < 0.01 ? `Remaining (${remainL}) below min 0.01`
+          : null : null;
+        return (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setPartialClose(null)}>
+            <div className="w-72 rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+              <div className="mb-1 text-[13px] font-bold">Partial Close — {partialClose.sym}</div>
+              <div className="mb-3 text-[10px]" style={{ color: "var(--muted)" }}>Position: <strong>{partialClose.lots} lots</strong> · Enter lots to close</div>
+              <input type="number" min="0.01" max={partialClose.lots - 0.01} step="0.01" value={partialClose.closeLots} onChange={(e) => setPartialClose((s) => s ? { ...s, closeLots: e.target.value } : s)} placeholder="e.g. 0.50" className="mb-1 h-9 w-full rounded-lg border bg-[var(--bg)] px-3 text-center text-[14px] font-bold tabular-nums outline-none" style={{ color: "var(--text)", borderColor: pcErr ? SELL : "var(--border)" }} autoFocus />
+              {partialClose.closeLots && !pcErr && <div className="mb-2 text-center text-[10px]" style={{ color: "var(--muted)" }}>Closing <span style={{ color: SELL }}>{closeL}L</span> · Remaining <span style={{ color: BUY }}>{remainL}L</span></div>}
+              {pcErr && <div className="mb-2 text-center text-[10px] font-semibold" style={{ color: SELL }}>{pcErr}</div>}
+              <div className="flex gap-2">
+                <button onClick={() => setPartialClose(null)} className="flex-1 rounded-lg border border-[var(--border)] py-2 text-[11px]">Cancel</button>
+                <button disabled={!!pcErr || !partialClose.closeLots} onClick={async () => { await close(partialClose.id, closeL); setPartialClose(null); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white disabled:opacity-40" style={{ background: SELL }}>Close {partialClose.closeLots ? closeL + "L" : "—"}</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Price Alerts Modal */}
       {alertModal && (

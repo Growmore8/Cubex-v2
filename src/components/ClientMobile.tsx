@@ -1014,7 +1014,11 @@ export default function ClientMobile({ t }: { t: any }) {
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2">
                         <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); setMTrail(p.trailingStop > 0 ? String(p.trailingStop) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-pen mr-1" />Modify</button>
-                        <button onClick={() => { setMobPartial({id: p.id, lots: Number(p.lots), sym: p.symbol}); setMobPartialLots(""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-scissors mr-1" />Partial</button>
+                        {Number(p.lots) > 0.01 ? (
+                          <button onClick={() => { setMobPartial({id: p.id, lots: Number(p.lots), sym: p.symbol}); setMobPartialLots(""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-scissors mr-1" />Partial</button>
+                        ) : (
+                          <button disabled className="rounded-lg border border-[var(--border)] py-2 text-[11px] font-semibold opacity-30" title="Minimum lot size — cannot partially close"><i className="fa-solid fa-scissors mr-1" />Partial</button>
+                        )}
                         <button onClick={() => close(p.id)} className="rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: SELL }}><i className="fa-solid fa-xmark mr-1" />Close</button>
                       </div>
                       {modifyId === p.id && (
@@ -1721,23 +1725,38 @@ export default function ClientMobile({ t }: { t: any }) {
       )}
 
       {/* PARTIAL CLOSE MODAL */}
-      {mobPartial && (
+      {mobPartial && (() => {
+        const closeL = Number(mobPartialLots);
+        const remainL = mobPartialLots ? parseFloat((mobPartial.lots - closeL).toFixed(2)) : 0;
+        const partialErr = mobPartialLots
+          ? closeL <= 0 ? "Enter a valid lot amount"
+          : closeL >= mobPartial.lots ? `Must be less than ${mobPartial.lots} lots`
+          : remainL < 0.01 ? `Remaining lots (${remainL}) would be below minimum 0.01`
+          : null
+          : null;
+        return (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setMobPartial(null)}>
           <div className="glass-card w-full max-w-[320px] rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 text-[14px] font-bold">Partial Close — {mobPartial.sym}</div>
-            <div className="mb-1 text-[10px] text-[var(--muted)]">Total lots: {mobPartial.lots} · Enter lots to close (leave blank = close all)</div>
-            <input type="number" inputMode="decimal" step="0.01" min="0.01" max={mobPartial.lots} value={mobPartialLots} onChange={(e) => setMobPartialLots(e.target.value)} placeholder={String(mobPartial.lots)} className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[15px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" autoFocus />
+            <div className="mb-1 text-[14px] font-bold">Partial Close — {mobPartial.sym}</div>
+            <div className="mb-3 text-[10px] text-[var(--muted)]">Position size: <span className="font-semibold text-[var(--text)]">{mobPartial.lots} lots</span> · Enter how many lots to close</div>
+            <input type="number" inputMode="decimal" step="0.01" min="0.01" max={mobPartial.lots - 0.01} value={mobPartialLots} onChange={(e) => setMobPartialLots(e.target.value)} placeholder="e.g. 0.50" className="h-11 w-full rounded-xl border bg-[var(--bg)] px-3 text-center text-[15px] font-semibold tabular-nums text-[var(--text)] outline-none" style={{ borderColor: partialErr ? SELL : "var(--border)" }} autoFocus />
+            {mobPartialLots && !partialErr && (
+              <div className="mt-1.5 text-center text-[10px]" style={{ color: "var(--muted)" }}>
+                Closing <span className="font-semibold" style={{ color: SELL }}>{closeL} lots</span> · Remaining <span className="font-semibold" style={{ color: BUY }}>{remainL} lots</span>
+              </div>
+            )}
+            {partialErr && <div className="mt-1.5 text-center text-[10px] font-semibold" style={{ color: SELL }}>{partialErr}</div>}
             <div className="mt-3 flex gap-2">
               <button onClick={() => setMobPartial(null)} className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Cancel</button>
-              <button onClick={async () => {
-                const lots = Number(mobPartialLots) || undefined;
-                const r = await fetch(`/api/client/orders/${mobPartial.id}/close`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ lots, accountId: accId }) }).then((x) => x.json()).catch(() => ({ok:false}));
+              <button disabled={!!partialErr || !mobPartialLots} onClick={async () => {
+                const r = await fetch(`/api/client/orders/${mobPartial.id}/close`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ lots: closeL, accountId: accId }) }).then((x) => x.json()).catch(() => ({ok:false}));
                 if (r.ok) { setMobPartial(null); (t as any).load?.(); }
-              }} className="flex-1 rounded-xl py-2.5 text-[12px] font-semibold text-white" style={{ background: SELL }}>Close {mobPartialLots ? mobPartialLots + " lots" : "All"}</button>
+              }} className="flex-1 rounded-xl py-2.5 text-[12px] font-semibold text-white disabled:opacity-40" style={{ background: SELL }}>Close {mobPartialLots ? closeL + " lots" : "—"}</button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* PRICE ALERTS MODAL */}
       {mobAlertOpen && (
