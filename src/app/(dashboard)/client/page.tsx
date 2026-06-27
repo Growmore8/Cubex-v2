@@ -480,22 +480,19 @@ export default function ClientTerminal() {
   const _spreadPips = (sym: string) => {
     const s = symbolSpreads[sym];
     const markup = groupSpread + accountSpreadMarkup;
-    // FLOATING: show raw live exchange spread (like admin market watch does).
-    // The configured min is a trade-execution floor only, not a display value.
-    if (s?.type !== "FIXED") {
-      const live = liveSpreadPips[sym];
-      if (live != null && live > 0) return live + markup;
-      // No live bid yet → fall back to configured pip value
-      if (!s) return markup;
-      let base = s.min;
-      if (s.max > s.min) {
-        const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
-        if (!(wd >= 1 && wd <= 5 && h >= 8 && h < 17)) base = s.max;
-      }
-      return base + markup;
+    // Always prefer live exchange spread when available (same as admin market watch).
+    // FIXED type affects trade execution server-side; display always shows live market spread.
+    const live = liveSpreadPips[sym];
+    if (live != null && live > 0) return live + markup;
+    // No live bid yet → fall back to configured pip floor
+    if (!s) return markup;
+    if (s.type === "FIXED") return (s.min || 0) + markup;
+    let base = s.min;
+    if (s.max > s.min) {
+      const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
+      if (!(wd >= 1 && wd <= 5 && h >= 8 && h < 17)) base = s.max;
     }
-    // FIXED: admin explicitly locked this spread
-    return (s.min || 0) + markup;
+    return base + markup;
   };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
   const ask = price ?? 0;
