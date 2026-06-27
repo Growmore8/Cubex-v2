@@ -128,7 +128,9 @@ export default function ClientTerminal() {
   const [pinErr, setPinErr] = useState("");
   const [notis, setNotis] = useState<any[]>([]);
   const [pendingPrice, setPendingPrice] = useState("");
+  const [gtdExpiry, setGtdExpiry] = useState("");
   const [pending, setPending] = useState<any[]>([]);
+  const [pendEdit, setPendEdit] = useState<{ id: string; price: string; sl: string; tp: string } | null>(null);
   const [notiOpen, setNotiOpen] = useState(false);
   const [acctSwitchOpen, setAcctSwitchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -335,18 +337,31 @@ export default function ClientTerminal() {
     pushToast({ title: `${side} ${sym} ${Number(lots ?? vol)}L opened`, type: "TRADE" }); load(); return true;
   }
   // Mobile/explicit pending order: kind = LIMIT | STOP
-  async function placePending(sym: string, side: "BUY" | "SELL", kind: "LIMIT" | "STOP", trigger: number, lots: number, slv = 0, tpv = 0) {
+  async function placePending(sym: string, side: "BUY" | "SELL", kind: "LIMIT" | "STOP", trigger: number, lots: number, slv = 0, tpv = 0, expiresAt?: string) {
     setErr("");
     if (account?.locked) { setErr("Account is read-only."); return false; }
     if (needKyc) { setErr("Verify your KYC to trade on a live account."); setWalletModal("kyc"); return false; }
     if (!trigger || trigger <= 0) { setErr("Enter a trigger price"); return false; }
+    const curAsk = prices[sym] ?? 0;
+    if (curAsk > 0) {
+      if (side === "BUY"  && kind === "LIMIT" && trigger >= curAsk) { setErr("Buy Limit must be below current price " + gnum(curAsk, dg(sym))); return false; }
+      if (side === "BUY"  && kind === "STOP"  && trigger <= curAsk) { setErr("Buy Stop must be above current price " + gnum(curAsk, dg(sym))); return false; }
+      if (side === "SELL" && kind === "LIMIT" && trigger <= curAsk) { setErr("Sell Limit must be above current price " + gnum(curAsk, dg(sym))); return false; }
+      if (side === "SELL" && kind === "STOP"  && trigger >= curAsk) { setErr("Sell Stop must be below current price " + gnum(curAsk, dg(sym))); return false; }
+    }
     const r = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol: sym, side, kind, lots: Number(lots), price: trigger, sl: slv, tp: tpv, accountId: accIdRef.current }) });
+      body: JSON.stringify({ symbol: sym, side, kind, lots: Number(lots), price: trigger, sl: slv, tp: tpv, accountId: accIdRef.current, currentAsk: curAsk, expiresAt: expiresAt ?? null }) });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Pending failed"); return false; }
     pushToast({ title: `Pending ${side} ${sym} placed`, type: "TRADE" }); load(); return true;
   }
   async function cancelPending(id: string) { await fetch("/api/client/pending/" + id, { method: "DELETE" }); pushToast({ title: "Pending order cancelled", type: "TRADE" }); load(); }
+  async function editPending(id: string, price: number, sl: number, tp: number) {
+    const r = await fetch("/api/client/pending/" + id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ price, sl, tp }) });
+    const d = await r.json();
+    if (!d.ok) { pushToast({ title: d.error || "Edit failed", type: "NOTICE" }); return; }
+    pushToast({ title: "Pending order updated", type: "TRADE" }); load();
+  }
   function urlB64ToUint8Array(base64String: string) { const padding = "=".repeat((4 - (base64String.length % 4)) % 4); const b = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/"); const raw = atob(b); const arr = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i); return arr; }
   async function enablePush() {
     const fail = (m: string) => { setErr(m); pushToast({ title: m, type: "NOTICE" }); };
@@ -489,7 +504,7 @@ export default function ClientTerminal() {
   const ordPending = ordKind !== "MARKET";
   async function submitTicket() {
     if (ordKind === "MARKET") { setOrderType("MARKET"); await place(ordSide); }
-    else await placePending(selSym, ordSide, ordKind as "LIMIT" | "STOP", Number(pendingPrice), Number(vol), Number(sl) || 0, Number(tp) || 0);
+    else await placePending(selSym, ordSide, ordKind as "LIMIT" | "STOP", Number(pendingPrice), Number(vol), Number(sl) || 0, Number(tp) || 0, gtdExpiry ? new Date(gtdExpiry).toISOString() : undefined);
   }
   const catMap: Record<string, string> = Object.fromEntries(symbols.map((s) => [s.symbol, s.category || "forex"]));
   function csz(sym: string) { return contractFor(catMap[sym] || "forex", sym); }
@@ -933,9 +948,15 @@ export default function ClientTerminal() {
 
               {/* Entry price — Limit / Stop only */}
               {orderType !== "MARKET" && (
-                <div>
-                  <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Entry Price</div>
-                  <input type="number" value={pendingPrice} onChange={(e) => setPendingPrice(e.target.value)} placeholder="Target Price" className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[12px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                <div className="flex flex-col gap-1.5">
+                  <div>
+                    <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Entry Price</div>
+                    <input type="number" value={pendingPrice} onChange={(e) => setPendingPrice(e.target.value)} placeholder="Target Price" className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[12px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                  </div>
+                  <div>
+                    <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Expiry (GTD — leave blank for GTC)</div>
+                    <input type="datetime-local" value={gtdExpiry} onChange={(e) => setGtdExpiry(e.target.value)} className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[10px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                  </div>
                 </div>
               )}
 
@@ -1075,17 +1096,35 @@ export default function ClientTerminal() {
                 {pending.map((o: any) => {
                   const d = dg(o.symbol); const trig = Number(o.price); const cur = prices[o.symbol]; const dist = cur != null ? Math.abs(trig - cur) : null;
                   const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : "Stop"); const c = o.side === "BUY" ? "#5aa9ff" : SELL;
+                  const isEditing = pendEdit?.id === o.id;
+                  if (isEditing) return (
+                  <tr key={o.id} className="border-t border-[var(--border)]" style={{ background: "rgba(90,169,255,0.13)" }}>
+                    <td className="px-2 py-1" style={{ borderLeft: "3px solid #5aa9ff" }}><i className="fa-solid fa-pen mr-1" style={{ color: "#5aa9ff" }} />{o.symbol}</td>
+                    <td className="px-2 py-1"><span className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: c + "22", color: c }}>{label}</span></td>
+                    <td className="px-2 py-1 text-right">{o.lots}</td>
+                    <td className="px-2 py-1"><input type="number" step="any" value={pendEdit!.price} onChange={(e) => setPendEdit((p) => p && ({ ...p, price: e.target.value }))} className="w-20 rounded border border-[#5aa9ff] bg-[var(--soft)] px-1 text-right text-[10px] tabular-nums outline-none" /></td>
+                    <td className="px-2 py-1 text-right text-[var(--muted)]">{cur != null ? gnum(cur, d) : "…"}</td>
+                    <td className="px-2 py-1"><input type="number" step="any" placeholder="SL" value={pendEdit!.sl} onChange={(e) => setPendEdit((p) => p && ({ ...p, sl: e.target.value }))} className="w-16 rounded border border-[var(--border)] bg-[var(--soft)] px-1 text-right text-[10px] tabular-nums outline-none" /></td>
+                    <td className="px-2 py-1"><input type="number" step="any" placeholder="TP" value={pendEdit!.tp} onChange={(e) => setPendEdit((p) => p && ({ ...p, tp: e.target.value }))} className="w-16 rounded border border-[var(--border)] bg-[var(--soft)] px-1 text-right text-[10px] tabular-nums outline-none" /></td>
+                    <td className="px-2 py-1 text-right flex items-center gap-1 justify-end">
+                      <button title="Save" style={{ color: "#16c784" }} onClick={async () => { await editPending(o.id, Number(pendEdit!.price), Number(pendEdit!.sl) || 0, Number(pendEdit!.tp) || 0); setPendEdit(null); }}><i className="fa-solid fa-check" /></button>
+                      <button title="Cancel edit" style={{ color: "var(--muted)" }} onClick={() => setPendEdit(null)}><i className="fa-solid fa-xmark" /></button>
+                    </td>
+                  </tr>);
                   return (
                   <tr key={o.id} className="border-t border-[var(--border)]" style={{ background: "rgba(90,169,255,0.07)" }}>
                     <td className="px-2 py-1" style={{ borderLeft: "3px dashed rgba(90,169,255,0.55)" }}><i className="fa-regular fa-clock mr-1" style={{ color: "#5aa9ff" }} />{o.symbol}</td>
                     <td className="px-2 py-1"><span className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: c + "22", color: c }}>{label}</span></td>
                     <td className="px-2 py-1 text-right">{o.lots}</td>
-                    <td className="px-2 py-1 text-right font-semibold">{gnum(trig, d)}</td>
+                    <td className="px-2 py-1 text-right font-semibold tabular-nums">{gnum(trig, d)}</td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">{cur != null ? gnum(cur, d) : "…"}</td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">{dist != null ? gnum(dist, d) : "—"}</td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">{o.sl ? gnum(o.sl, d) : "-"}</td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">{o.tp ? gnum(o.tp, d) : "-"}</td>
-                    <td className="px-2 py-1 text-right"><button title="Cancel order" style={{ color: SELL }} onClick={() => cancelPending(o.id)}><i className="fa-solid fa-xmark" /></button></td>
+                    <td className="px-2 py-1 text-right flex items-center gap-1.5 justify-end">
+                      <button title="Edit order" style={{ color: "#5aa9ff" }} onClick={() => setPendEdit({ id: o.id, price: String(trig), sl: o.sl ? String(Number(o.sl)) : "", tp: o.tp ? String(Number(o.tp)) : "" })}><i className="fa-solid fa-pen text-[9px]" /></button>
+                      <button title="Cancel order" style={{ color: SELL }} onClick={() => cancelPending(o.id)}><i className="fa-solid fa-xmark" /></button>
+                    </td>
                   </tr>); })}
               </tbody>
             </table>

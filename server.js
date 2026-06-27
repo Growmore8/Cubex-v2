@@ -917,7 +917,17 @@ async function monitor(io) {
 async function checkPending(io) {
   try {
     const pend = await prisma.pendingOrder.findMany({ include: { account: true } });
+    const now = new Date();
     for (const o of pend) {
+      // GTD expiry: auto-cancel when expiresAt has passed
+      if (o.expiresAt && now > o.expiresAt) {
+        await prisma.pendingOrder.delete({ where: { id: o.id } });
+        const expBody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + Number(o.price) + " expired (GTD)";
+        if (o.account?.userId) { await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order expired", body: expBody, type: "TRADE" } }).catch(() => {}); pushToUser(o.account.userId, { title: "Pending order expired", body: expBody }); }
+        await prisma.auditLog.create({ data: { tenantId: o.account.tenantId, action: "order.expired", detail: (o.account.login || "") + " " + expBody, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
+        if (global.__io) global.__io.emit("refresh", {});
+        continue;
+      }
       const st = state[o.symbol];
       if (!st || st.price == null) continue;
       const ask = st.price;

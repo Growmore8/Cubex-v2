@@ -364,18 +364,19 @@ model WithdrawalMethod {
   @@index([userId])
 }
 model PendingOrder {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   tenantId  String
   accountId String
-  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account   Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
   symbol    String
   side      Side
   kind      String
-  lots      Decimal  @default(0) @db.Decimal(18, 2)
-  price     Decimal  @default(0) @db.Decimal(18, 8)
-  sl        Decimal  @default(0) @db.Decimal(18, 8)
-  tp        Decimal  @default(0) @db.Decimal(18, 8)
-  createdAt DateTime @default(now())
+  lots      Decimal   @default(0) @db.Decimal(18, 2)
+  price     Decimal   @default(0) @db.Decimal(18, 8)
+  sl        Decimal   @default(0) @db.Decimal(18, 8)
+  tp        Decimal   @default(0) @db.Decimal(18, 8)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
   @@index([accountId])
 }
 model PaymentRequest {

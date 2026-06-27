@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const a = await acc(s, url.searchParams.get("accountId") || undefined); if (!a) return NextResponse.json({ ok: true, pending: [] });
   const pending = await prisma.pendingOrder.findMany({ where: { accountId: a.id }, orderBy: { createdAt: "desc" } });
-  return NextResponse.json({ ok: true, pending: pending.map((o) => ({ id: o.id, symbol: o.symbol, side: o.side, kind: o.kind, lots: Number(o.lots), price: Number(o.price), sl: Number(o.sl), tp: Number(o.tp) })) });
+  return NextResponse.json({ ok: true, pending: pending.map((o) => ({ id: o.id, symbol: o.symbol, side: o.side, kind: o.kind, lots: Number(o.lots), price: Number(o.price), sl: Number(o.sl), tp: Number(o.tp), expiresAt: o.expiresAt?.toISOString() ?? null })) });
 }
 export async function POST(req: Request) {
   const s = await requireClient(); if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
@@ -33,7 +33,16 @@ export async function POST(req: Request) {
     if (!price || price <= 0) throw new Error("Invalid trigger price");
     const side = b.side === "SELL" ? "SELL" : "BUY";
     const kind = b.kind === "STOP" ? "STOP" : "LIMIT";
-    await prisma.pendingOrder.create({ data: { tenantId: a.tenantId, accountId: a.id, symbol: b.symbol, side: side as any, kind, lots, price, sl: Number(b.sl) || 0, tp: Number(b.tp) || 0 } });
+    // Validate trigger price direction against current market price
+    const curAsk = Number(b.currentAsk) || 0;
+    if (curAsk > 0) {
+      if (side === "BUY"  && kind === "LIMIT" && price >= curAsk) throw new Error("Buy Limit must be below current price (" + curAsk + ")");
+      if (side === "BUY"  && kind === "STOP"  && price <= curAsk) throw new Error("Buy Stop must be above current price (" + curAsk + ")");
+      if (side === "SELL" && kind === "LIMIT" && price <= curAsk) throw new Error("Sell Limit must be above current price (" + curAsk + ")");
+      if (side === "SELL" && kind === "STOP"  && price >= curAsk) throw new Error("Sell Stop must be below current price (" + curAsk + ")");
+    }
+    const expiresAt = b.expiresAt ? new Date(b.expiresAt) : null;
+    await prisma.pendingOrder.create({ data: { tenantId: a.tenantId, accountId: a.id, symbol: b.symbol, side: side as any, kind, lots, price, sl: Number(b.sl) || 0, tp: Number(b.tp) || 0, expiresAt } });
     const label = `${a.login} placed ${kind} ${side} ${b.symbol} ${lots}L @ ${price}${Number(b.sl) ? " SL:" + b.sl : ""}${Number(b.tp) ? " TP:" + b.tp : ""}`;
     audit(a.tenantId, "trade.pending_placed", label, a.login, "CLIENT");
     notifyStaff(a.tenantId, { type: "TRADE", title: "Pending order placed", body: label }, a.managerId).catch(() => {});
