@@ -24,6 +24,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [realBids, setRealBids] = useState<Record<string, number>>({});
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
+  const [spreadDirs, setSpreadDirs] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -39,15 +40,16 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
-    const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const pB: Record<string, number> = {}; const pS: Record<string, number> = {}; const prev: Record<string, number> = {};
+    const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const pB: Record<string, number> = {}; const pS: Record<string, number> = {}; const pSD: Record<string, number> = {}; const prev: Record<string, number> = {}; const prevSp: Record<string, number> = {};
     const flush = () => {
-      const pk = Object.keys(pP), dk = Object.keys(pD), bk = Object.keys(pB), sk = Object.keys(pS);
-      if (!pk.length && !dk.length && !bk.length && !sk.length) return;
-      const px = { ...pP }; const dr = { ...pD }; const bd = { ...pB }; const sp = { ...pS };
-      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pB) delete pB[k]; for (const k in pS) delete pS[k];
+      const pk = Object.keys(pP), dk = Object.keys(pD), bk = Object.keys(pB), sk = Object.keys(pS), sdk = Object.keys(pSD);
+      if (!pk.length && !dk.length && !bk.length && !sk.length && !sdk.length) return;
+      const px = { ...pP }; const dr = { ...pD }; const bd = { ...pB }; const sp = { ...pS }; const sd = { ...pSD };
+      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pB) delete pB[k]; for (const k in pS) delete pS[k]; for (const k in pSD) delete pSD[k];
       // Bids + spread: urgent — must never be deferred or spread appears frozen
       if (bk.length) setRealBids((bb) => ({ ...bb, ...bd }));
       if (sk.length) setLiveSpreadPips((ss) => ({ ...ss, ...sp }));
+      if (sdk.length) setSpreadDirs((sd2) => ({ ...sd2, ...sd }));
       // Price + direction: low-priority (visual smoothness only)
       startTransition(() => {
         if (pk.length) setPrices((pp) => ({ ...pp, ...px }));
@@ -67,12 +69,19 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
         if (realAsk > bid) {
           const d = digitsRef.current[symbol] ?? 2;
           const pip = Math.pow(10, -(d - 1));
-          pS[symbol] = (realAsk - bid) / pip;
+          const sp = (realAsk - bid) / pip;
+          const prev2 = prevSp[symbol];
+          if (prev2 != null && sp !== prev2) pSD[symbol] = sp > prev2 ? 1 : -1;
+          prevSp[symbol] = sp;
+          pS[symbol] = sp;
         }
       }
     });
     const fv = setInterval(flush, 120);
-    const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
+    const clr = setInterval(() => {
+      setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; });
+      setSpreadDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; });
+    }, 650);
     return () => { socket.disconnect(); clearInterval(clr); clearInterval(fv); };
   }, []);
 
@@ -129,6 +138,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                 ? (validRealBid ? gnum(lpBid!, d) : gnum(Math.max(0, p - safeSpPx), d))
                 : "—";
               const dir = dirs[s.symbol] || 0;
+              const spDir = spreadDirs[s.symbol] || 0;
               const isOff = !!(disabledSyms && disabledSyms.includes(s.symbol));
               return (
                 <div key={s.symbol} onClick={() => onPick(s.symbol)} onDoubleClick={() => onPick(s.symbol)}
@@ -142,7 +152,16 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                     {hasLive
                       ? <span title="Live spread from exchange feed" style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />
                       : null}
-                    <span className="tabular-nums" title={realSpPips > 0 ? `${realSpPips.toFixed(2)} pips · ${Math.round(realSpPips * 10)} points · price spread ${spPx.toFixed(d > 2 ? 5 : 2)}` : undefined} style={{ color: "var(--muted)", fontSize: 9, cursor: realSpPips > 0 ? "help" : undefined }}>{realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}</span>
+                    <span className="tabular-nums" title={realSpPips > 0 ? `${realSpPips.toFixed(2)} pips · ${Math.round(realSpPips * 10)} points · price spread ${spPx.toFixed(d > 2 ? 5 : 2)}` : undefined}
+                      style={{
+                        fontSize: 9,
+                        cursor: realSpPips > 0 ? "help" : undefined,
+                        color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)",
+                        transition: "color 0.55s ease-out",
+                        fontWeight: spDir !== 0 ? 700 : 400,
+                      }}>
+                      {realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}
+                    </span>
                   </span>
                 </div>);
             })}
