@@ -554,10 +554,14 @@ export default function ClientTerminal() {
   const la = liveAsks[selSym]; const lb2 = liveBids[selSym];
   const selSpType = (symbolSpreads[selSym] as any)?.type ?? "FLOATING";
   const realBid = (lb2 != null && lb2 > 0) ? lb2 : (price ?? 0);
+  // FIXED: bid = realBid, ask = realBid + fixed_pips (Fixed 0 → BUY = SELL = same price)
+  // FLOATING: bid/ask = real exchange bid/ask from LP feed
   const ask = selSpType === "FIXED"
-    ? realBid + _spreadPx(selSym)         // FIXED: ask = bid + fixed pips (0 pips → ask = bid)
-    : ((la != null && la > 0) ? la : (price ?? 0));  // FLOATING: real exchange ask
-  const bid = (lb2 != null && lb2 > 0 && lb2 < ask) ? lb2 : (price != null ? price - _spreadPx(selSym) : 0);
+    ? realBid + _spreadPx(selSym)
+    : ((la != null && la > 0) ? la : (price ?? 0));
+  const bid = selSpType === "FIXED"
+    ? realBid
+    : ((lb2 != null && lb2 > 0 && lb2 < ask) ? lb2 : (price != null ? price - _spreadPx(selSym) : 0));
   const margin = price != null ? ((vol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0;
   const fmt = (v: number) => gmoney(v);
   const groups: Record<string, any[]> = {};
