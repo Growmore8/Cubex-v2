@@ -226,6 +226,9 @@ export default function AdminDeskPage() {
       loadAll();
     } else setErr(d.error || "Failed to update symbol");
   }
+  const [accAlerts, setAccAlerts] = useState<any[]>([]);
+  async function loadAccAlerts(accId: string) { try { const d = await fetch("/api/admin/clients/" + accId + "/alerts").then((r) => r.json()); if (d.ok) setAccAlerts(d.alerts || []); } catch {} }
+  useEffect(() => { if (selAcc?.id) loadAccAlerts(selAcc.id); else setAccAlerts([]); }, [selAcc?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   async function loadPending() { try { const d = await fetch("/api/desk/pending").then((r) => r.json()); if (d.ok) setPendingOrders(d.pending || []); } catch {} }
   useEffect(() => { loadPending(); const t = setInterval(loadPending, 6000); return () => clearInterval(t); }, []);
@@ -1208,6 +1211,21 @@ export default function AdminDeskPage() {
                 </table>
               );
             })()}
+            {tab === "trade" && selAcc && accAlerts.length > 0 && (
+              <div className="border-t border-[var(--border)] px-3 py-2">
+                <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#f59e0b" }}><i className="fa-solid fa-bell mr-1" />Price Alerts ({accAlerts.filter((a) => !a.triggered).length} active, {accAlerts.filter((a) => a.triggered).length} triggered)</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {accAlerts.map((al) => (
+                    <div key={al.id} className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px]" style={{ background: al.triggered ? "rgba(100,100,100,0.12)" : "rgba(245,158,11,0.12)", border: al.triggered ? "1px solid rgba(100,100,100,0.2)" : "1px solid rgba(245,158,11,0.3)", color: al.triggered ? "var(--muted)" : "#f59e0b" }}>
+                      <span>{al.symbol} {al.condition === "ABOVE" ? "↑" : "↓"} {al.price}</span>
+                      {al.note && <span className="text-[var(--muted)]">· {al.note}</span>}
+                      {al.triggered && <span className="text-[8px]">(triggered)</span>}
+                      <button onClick={async () => { await fetch(`/api/admin/clients/${selAcc.id}/alerts?alertId=${al.id}`, { method: "DELETE" }); loadAccAlerts(selAcc.id); }} className="ml-0.5 opacity-60 hover:opacity-100"><i className="fa-solid fa-xmark text-[8px]" /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {tab === "history" && (() => {
               if (!selAcc) return <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>Please select an account first.</div>;
               const thc = "px-2 py-1.5 text-left font-semibold text-[var(--text)]";

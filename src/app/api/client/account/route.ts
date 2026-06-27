@@ -133,7 +133,7 @@ export async function GET(req: Request) {
       id: t.id.toString(), ticket: t.ticket.toString(), symbol: t.symbol, type: t.type,
       lots: Number(t.lots), openPrice: Number(t.openPrice), sl: Number(t.sl), tp: Number(t.tp),
       commission: Number((t as any).commission ?? 0), swap: Number((t as any).swap ?? 0),
-      comment: (t as any).comment || null, openedAt: t.openedAt,
+      comment: (t as any).comment || null, trailingStop: Number((t as any).trailingStop ?? 0), openedAt: t.openedAt,
     })) : [],
     history: account ? account.history.map((h) => ({
       id: h.id.toString(), symbol: h.symbol, side: h.side, lots: Number(h.lots),

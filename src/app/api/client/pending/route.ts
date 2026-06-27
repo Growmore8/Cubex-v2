@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const a = await acc(s, url.searchParams.get("accountId") || undefined); if (!a) return NextResponse.json({ ok: true, pending: [] });
   const pending = await prisma.pendingOrder.findMany({ where: { accountId: a.id }, orderBy: { createdAt: "desc" } });
-  return NextResponse.json({ ok: true, pending: pending.map((o) => ({ id: o.id, symbol: o.symbol, side: o.side, kind: o.kind, lots: Number(o.lots), price: Number(o.price), sl: Number(o.sl), tp: Number(o.tp), expiresAt: o.expiresAt?.toISOString() ?? null })) });
+  return NextResponse.json({ ok: true, pending: pending.map((o) => ({ id: o.id, symbol: o.symbol, side: o.side, kind: o.kind, lots: Number(o.lots), price: Number(o.price), sl: Number(o.sl), tp: Number(o.tp), stopLimit: Number((o as any).stopLimit ?? 0), comment: (o as any).comment || null, expiresAt: o.expiresAt?.toISOString() ?? null })) });
 }
 export async function POST(req: Request) {
   const s = await requireClient(); if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });

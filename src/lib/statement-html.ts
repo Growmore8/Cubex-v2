@@ -66,6 +66,13 @@ export function statementHtml(input: StatementHtmlInput): string {
 
   // Closed trades — desk adds Opened + Reason columns
   const histRows = account.history.map((h: any) => {
+    const gross = Number(h.pnl ?? 0);
+    const swap = Number(h.swap ?? 0);
+    const comm = Number(h.commission ?? 0);
+    const net = gross + swap - comm;
+    const swapCell = swap !== 0 ? `<td class="r ${swap >= 0 ? "pos" : "neg"}">${money(swap)}</td>` : `<td class="r" style="color:#9ca3af">—</td>`;
+    const commCell = comm !== 0 ? `<td class="r neg">${money(comm)}</td>` : `<td class="r" style="color:#9ca3af">—</td>`;
+    const netCell = `<td class="r ${net >= 0 ? "pos" : "neg"}">${money(net)}</td>`;
     if (isDesk) return `<tr>
       <td>${esc(h.ticket.toString())}</td><td>${esc(h.symbol)}</td>
       <td style="color:${sideColor(h.side)}">${esc(h.side)}</td>
@@ -73,12 +80,14 @@ export function statementHtml(input: StatementHtmlInput): string {
       <td class="r">${h.openedAt ? dt(h.openedAt) : "—"}</td>
       <td class="r">${px(h.openPrice)}</td><td class="r">${px(h.closePrice)}</td>
       <td><span style="color:${reasonColor(h.closeReason || "")};font-weight:600">${esc(h.closeReason || "MANUAL")}</span></td>
-      <td class="r ${Number(h.pnl) >= 0 ? "pos" : "neg"}">${money(Number(h.pnl))}</td>
+      <td class="r ${gross >= 0 ? "pos" : "neg"}">${money(gross)}</td>
+      ${swapCell}${commCell}${netCell}
       <td>${dt(h.closedAt)}</td></tr>`;
     return `<tr>
       <td>${esc(h.ticket.toString())}</td><td>${esc(h.symbol)}</td><td>${esc(h.side)}</td>
       <td class="r">${Number(h.lots).toFixed(2)}</td><td class="r">${px(h.openPrice)}</td><td class="r">${px(h.closePrice)}</td>
-      <td class="r ${Number(h.pnl) >= 0 ? "pos" : "neg"}">${money(Number(h.pnl))}</td>
+      <td class="r ${gross >= 0 ? "pos" : "neg"}">${money(gross)}</td>
+      ${swapCell}${commCell}${netCell}
       <td>${dt(h.closedAt)}</td></tr>`;
   }).join("");
 
@@ -101,9 +110,9 @@ export function statementHtml(input: StatementHtmlInput): string {
     ? `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open Price</th><th class="r">Current</th><th class="r">S/L</th><th class="r">T/P</th><th class="r">P/L</th><th>Opened</th>`
     : `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open</th><th class="r">Current</th><th class="r">SL</th><th class="r">TP</th><th class="r">P/L</th><th>Opened</th>`;
   const histHead = isDesk
-    ? `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th>Opened</th><th class="r">Open Price</th><th class="r">Close Price</th><th>Reason</th><th class="r">P/L</th><th>Closed</th>`
-    : `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open</th><th class="r">Close</th><th class="r">P/L</th><th>Closed</th>`;
-  const histCols = isDesk ? 10 : 8;
+    ? `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th>Opened</th><th class="r">Open Price</th><th class="r">Close Price</th><th>Reason</th><th class="r">Gross P/L</th><th class="r">Swap</th><th class="r">Comm</th><th class="r">Net P/L</th><th>Closed</th>`
+    : `<th>Ticket</th><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Open</th><th class="r">Close</th><th class="r">Gross P/L</th><th class="r">Swap</th><th class="r">Comm</th><th class="r">Net P/L</th><th>Closed</th>`;
+  const histCols = isDesk ? 13 : 11;
 
   const clientSections = isDesk ? "" : `
   <h2>Pending Orders</h2>

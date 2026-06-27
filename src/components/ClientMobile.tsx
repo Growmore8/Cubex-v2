@@ -974,10 +974,11 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div>
                       <div className="text-sm font-bold">{p.symbol} <span className="text-[12px] font-semibold" style={{ color: p.type === "BUY" ? BLUE : SELL }}>{p.type} {p.lots}</span></div>
                       <div className="text-[10px] text-[var(--muted)]">{gnum(Number(p.openPrice), dd)} → {gnum(cur, dd)}</div>
-                      {(p.sl > 0 || p.tp > 0) && (
+                      {(p.sl > 0 || p.tp > 0 || p.trailingStop > 0) && (
                         <div className="mt-0.5 flex gap-2 text-[9px] font-semibold tabular-nums">
-                          {p.sl > 0 && <span style={{ color: "#f43f5e" }}>SL {gnum(Number(p.sl), dd)}</span>}
+                          {p.sl > 0 && <span style={{ color: "#f43f5e" }}>{p.trailingStop > 0 ? "TSL" : "SL"} {gnum(Number(p.sl), dd)}</span>}
                           {p.tp > 0 && <span style={{ color: "#10b981" }}>TP {gnum(Number(p.tp), dd)}</span>}
+                          {p.trailingStop > 0 && !p.sl && <span style={{ color: "#f59e0b" }}>TSL active</span>}
                         </div>
                       )}
                     </div>
@@ -1025,7 +1026,7 @@ export default function ClientMobile({ t }: { t: any }) {
             <div className="mt-3 text-[11px] font-semibold" style={{ color: BLUE }}><i className="fa-regular fa-clock mr-1" />Pending Orders ({pending.length})</div>
             {(pending || []).map((o: any) => {
               const dd = dg(o.symbol); const trig = Number(o.price); const cur = prices[o.symbol]; const dist = cur != null ? Math.abs(trig - cur) : null;
-              const c = o.side === "BUY" ? BLUE : SELL; const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : "Stop");
+              const c = o.side === "BUY" ? BLUE : SELL; const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : o.kind === "STOP_LIMIT" ? "Stop Limit" : "Stop");
               return (
                 <div key={o.id} className="rounded-xl border bg-[var(--card)] p-3" style={{ borderStyle: "dashed", borderColor: c, borderLeftWidth: 4, borderLeftStyle: "solid" }}>
                   <div className="flex items-center justify-between">
@@ -1039,11 +1040,14 @@ export default function ClientMobile({ t }: { t: any }) {
                     <button onClick={() => cancelPending(o.id)} className="flex h-7 w-7 items-center justify-center rounded-full border" style={{ borderColor: SELL, color: SELL }}><i className="fa-solid fa-xmark" /></button>
                   </div>
                   <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
-                    <div><div className="text-[var(--muted)]">TRIGGER</div><div className="font-semibold">{gnum(trig, dd)}</div></div>
+                    <div><div className="text-[var(--muted)]">{o.kind === "STOP_LIMIT" ? "STOP" : "TRIGGER"}</div><div className="font-semibold">{gnum(trig, dd)}</div></div>
                     <div><div className="text-[var(--muted)]">CURRENT</div><div className="font-semibold">{cur != null ? gnum(cur, dd) : "…"}</div></div>
-                    <div><div className="text-[var(--muted)]">DISTANCE</div><div className="font-semibold">{dist != null ? gnum(dist, dd) : "—"}</div></div>
+                    {o.kind === "STOP_LIMIT"
+                      ? <div><div className="text-[var(--muted)]">LIMIT AT</div><div className="font-semibold">{o.stopLimit ? gnum(Number(o.stopLimit), dd) : "—"}</div></div>
+                      : <div><div className="text-[var(--muted)]">DISTANCE</div><div className="font-semibold">{dist != null ? gnum(dist, dd) : "—"}</div></div>}
                     <div><div className="text-[var(--muted)]">S/L</div><div className="font-semibold">{o.sl ? gnum(Number(o.sl), dd) : "—"}</div></div>
                     <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{o.tp ? gnum(Number(o.tp), dd) : "—"}</div></div>
+                    {o.comment && <div className="col-span-3 truncate"><div className="text-[var(--muted)]">NOTE</div><div className="font-semibold text-[10px] truncate">{o.comment}</div></div>}
                   </div>
                 </div>
               );

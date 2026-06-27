@@ -1069,7 +1069,9 @@ async function checkPriceAlerts(io) {
 async function swapCronTick() {
   try {
     const now = new Date();
-    const isWed = now.getUTCDay() === 3; // Wednesday UTC
+    const day = now.getUTCDay(); // 0=Sun, 6=Sat
+    if (day === 0 || day === 6) { console.log("[swap] weekend — skipping"); return; }
+    const isWed = day === 3; // Wednesday UTC
     const multiplier = isWed ? 3 : 1;
     // Only process tenants where swap is enabled
     const tenants = await prisma.tenant.findMany({ where: { swapEnabled: true }, select: { id: true } });
