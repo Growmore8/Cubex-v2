@@ -257,10 +257,11 @@ export default function ClientTerminal() {
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
+      // Always update ask so BUY button follows price on every tick
+      const realAsk = (real != null && real > 0) ? real : price;
+      pA[symbol] = realAsk;
       if (bid != null && bid > 0) {
         pB[symbol] = bid;
-        const realAsk = (real != null && real > 0) ? real : price;
-        pA[symbol] = realAsk; // real exchange ask — used for BUY button & market watch Ask
         if (realAsk > bid) {
           const d = DIGITS[symbol] ?? 2;
           const pip = Math.pow(10, -(d - 1));
@@ -280,7 +281,7 @@ export default function ClientTerminal() {
         startTransition(() => setPrices((pp) => ({ ...snap, ...pp })));
       }
     });
-    const flushIv = setInterval(flush, 200);
+    const flushIv = setInterval(flush, 80);
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
     socket.on("refresh", (p: any) => { if (p && p.kind === "notification") loadNotifs(); else load(); });
     // Real-time spread updates: admin changes spread → server pushes to tenant room → update instantly
