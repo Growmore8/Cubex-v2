@@ -548,10 +548,15 @@ export default function ClientTerminal() {
     return grpAcc;
   };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
-  // Use real exchange ask/bid for BUY/SELL buttons — not smoothed display price.
-  // Smoothed price lags during fast moves causing artificially wide displayed spread.
+  // BUY/SELL button prices.
+  // FLOATING: use real exchange ask/bid from LP (Binance/Kraken) — exact market prices.
+  // FIXED: bid = real exchange bid (reference), ask = bid + configured_pips — broker charges fixed spread.
   const la = liveAsks[selSym]; const lb2 = liveBids[selSym];
-  const ask = (la != null && la > 0) ? la : (price ?? 0);
+  const selSpType = (symbolSpreads[selSym] as any)?.type ?? "FLOATING";
+  const realBid = (lb2 != null && lb2 > 0) ? lb2 : (price ?? 0);
+  const ask = selSpType === "FIXED"
+    ? realBid + _spreadPx(selSym)         // FIXED: ask = bid + fixed pips (0 pips → ask = bid)
+    : ((la != null && la > 0) ? la : (price ?? 0));  // FLOATING: real exchange ask
   const bid = (lb2 != null && lb2 > 0 && lb2 < ask) ? lb2 : (price != null ? price - _spreadPx(selSym) : 0);
   const margin = price != null ? ((vol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0;
   const fmt = (v: number) => gmoney(v);
