@@ -82,6 +82,7 @@ export default function AdminDeskPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [liveBids, setLiveBids] = useState<Record<string, number>>({});
   const [selSym, setSelSym] = useState("");
   const [tf, setTf] = useState("1M");
   const [selAcc, setSelAcc] = useState<any>(null);
@@ -368,15 +369,18 @@ export default function AdminDeskPage() {
     // animation frame so 57 symbols can't trigger hundreds of re-renders/sec.
     const pP: Record<string, number> = {};
     const pD: Record<string, number> = {};
+    const pB: Record<string, number> = {};
     // Mirror the CLIENT's mechanism exactly: accumulate ticks in refs, then flush
     // on a short interval inside startTransition so the (heavy) desk price update
     // is NON-blocking/interruptible and stays real-time — matching the client.
     const flush = () => {
-      const pxKeys = Object.keys(pP); const drKeys = Object.keys(pD);
-      if (!pxKeys.length && !drKeys.length) return;
-      const px = { ...pP }; const dr = { ...pD };
+      const pxKeys = Object.keys(pP); const drKeys = Object.keys(pD); const bkKeys = Object.keys(pB);
+      if (!pxKeys.length && !drKeys.length && !bkKeys.length) return;
+      const px = { ...pP }; const dr = { ...pD }; const bd = { ...pB };
       for (const k in pP) delete pP[k];
       for (const k in pD) delete pD[k];
+      for (const k in pB) delete pB[k];
+      if (bkKeys.length) setLiveBids((bb) => ({ ...bb, ...bd }));
       startTransition(() => {
         if (pxKeys.length) setPrices((pp) => ({ ...pp, ...px }));
         if (drKeys.length) setDirs((dd) => ({ ...dd, ...dr }));
@@ -388,11 +392,15 @@ export default function AdminDeskPage() {
       startTransition(() => setPrices((pp) => ({ ...pp, ...snapshot })));
       for (const k in snapshot) prevRef.current[k] = snapshot[k];
     });
-    socket.on("tick", ({ symbol, price }: any) => {
+    socket.on("tick", ({ symbol, price, bid }: any) => {
       const prev = prevRef.current[symbol];
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
+      if (bid != null) pB[symbol] = bid;
+    });
+    socket.on("bids", (snap: Record<string, number>) => {
+      if (snap && typeof snap === "object") setLiveBids((b) => ({ ...b, ...snap }));
     });
     const flushIv = setInterval(flush, 150);
     // Single timer clears the up/down flash for all symbols (cheap vs per-symbol timers)
@@ -705,7 +713,7 @@ export default function AdminDeskPage() {
   );
 
   const shown: { sym: string; i: number }[] = layout === 1 ? (openCharts[activeChart] ? [{ sym: openCharts[activeChart], i: activeChart }] : []) : openCharts.slice(0, layout).map((sym, i) => ({ sym, i }));
-  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const spPips = adminSymSpreads[sym] || 0; const spPx = spPips * Math.pow(10, -(d - 1)); const ask = p != null ? gnum(p, d) : "..."; const bid = p != null ? gnum(p - spPx, d) : "...";
+  const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1)); const isFloat = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING"; const lb = liveBids[sym]; const spPips = adminSymSpreads[sym] || 0; const spPx = spPips * pip; const ask = p != null ? gnum(p, d) : "..."; const bid = p != null ? (isFloat && lb != null && lb > 0 && lb < p ? gnum(lb, d) : gnum(Math.max(0, p - spPx), d)) : "...";
     if (!showOC) return (
       <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-16 top-12 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
         <i className="fa-solid fa-bolt" /> Trade
