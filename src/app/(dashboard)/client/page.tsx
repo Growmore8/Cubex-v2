@@ -66,6 +66,7 @@ export default function ClientTerminal() {
   const [groupSpread, setGroupSpread] = useState(0);
   const [accountSpreadMarkup, setAccountSpreadMarkup] = useState(0);
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [liveBids, setLiveBids] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const notifSeen = useRef<Set<string>>(new Set());
   const notifPrimed = useRef(false);
@@ -246,11 +247,16 @@ export default function ClientTerminal() {
         if (drKeys.length) setDirs((dd) => ({ ...dd, ...dr }));
       });
     };
-    socket.on("tick", ({ symbol, price }: any) => {
+    socket.on("tick", ({ symbol, price, bid }: any) => {
       const prev = prevRef.current[symbol];
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
+      if (bid != null) startTransition(() => setLiveBids((b) => ({ ...b, [symbol]: bid })));
+    });
+    // Real bid snapshot from Binance/Kraken on connect
+    socket.on("bids", (snap: Record<string, number>) => {
+      if (snap && typeof snap === "object") startTransition(() => setLiveBids((b) => ({ ...b, ...snap })));
     });
     // Initial price snapshot on connect — seeds prices for frozen/closed markets so
     // open positions show their last P&L immediately.
@@ -460,14 +466,26 @@ export default function ClientTerminal() {
   // Real spread: symbol pips + group markup → bid = ask − spread
   const _spreadPips = (sym: string) => {
     const s = symbolSpreads[sym];
-    if (!s) return groupSpread + accountSpreadMarkup;
-    let base = s.min;
-    if (s.type === "FLOATING" && s.max > s.min) {
-      const h = new Date().getUTCHours(), d = new Date().getUTCDay();
-      const isPeak = d >= 1 && d <= 5 && h >= 8 && h < 17;
-      if (!isPeak) base = s.max;
+    const markup = groupSpread + accountSpreadMarkup;
+    if (!s) return markup;
+    // For FLOATING symbols: use the live bid from the exchange feed when available.
+    // spread = (ask - real_bid) / pip_size + markup
+    if (s.type === "FLOATING") {
+      const ask = prices[sym]; const rawBid = liveBids[sym];
+      if (ask != null && rawBid != null && rawBid > 0 && rawBid < ask) {
+        const pipSize = Math.pow(10, -(dg(sym) - 1));
+        const marketSpreadPips = (ask - rawBid) / pipSize;
+        return Math.max(s.min, marketSpreadPips) + markup;
+      }
+      // Fallback: time-based min/max when no live bid yet
+      let base = s.min;
+      if (s.max > s.min) {
+        const h = new Date().getUTCHours(), d = new Date().getUTCDay();
+        if (!(d >= 1 && d <= 5 && h >= 8 && h < 17)) base = s.max;
+      }
+      return base + markup;
     }
-    return base + groupSpread + accountSpreadMarkup;
+    return s.min + markup;
   };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
   const ask = price ?? 0;
