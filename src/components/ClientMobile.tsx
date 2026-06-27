@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, startTransition } from "react";
-import { io } from "socket.io-client";
 import dynamic from "next/dynamic";
 import WalletPanel from "@/components/WalletPanel";
 import WorldMapBg from "@/components/ui/WorldMapBg";
@@ -107,14 +106,6 @@ export default function ClientMobile({ t }: { t: any }) {
   const _mobSymSpreads = (): Record<string, { min: number; max: number; type: string }> => (t as any).symbolSpreads || {};
   const _mobGrpSpread = (): number => (t as any).groupSpread || 0;
   const _mobAccMarkup = (): number => (t as any).accountSpreadMarkup || 0;
-  // Live bids from tick events — used to compute real floating spread
-  const [_liveBids, _setLiveBids] = useState<Record<string, number>>({});
-  useEffect(() => {
-    const s = io({ path: "/socket.io" });
-    s.on("tick", ({ symbol: sym, bid }: any) => { if (bid != null && bid > 0) _setLiveBids((p) => ({ ...p, [sym]: bid })); });
-    s.on("bids", (snap: Record<string, number>) => { _setLiveBids((p) => ({ ...p, ...snap })); });
-    return () => { s.disconnect(); };
-  }, []);
   const _mobSpreadPips = (sym: string) => {
     const s = _mobSymSpreads()[sym];
     const grpAcc = _mobGrpSpread() + _mobAccMarkup();
