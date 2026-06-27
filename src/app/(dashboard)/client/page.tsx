@@ -83,8 +83,6 @@ export default function ClientTerminal() {
   const [tf, setTf] = useState("1M");
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP">("MARKET");
   const [ordIdx, setOrdIdx] = useState(0); // selected order kind (app-style grid)
-  const [tpEnabled, setTpEnabled] = useState(false);
-  const [slEnabled, setSlEnabled] = useState(false);
   const [walletModal, setWalletModal] = useState<null | "deposit" | "withdraw" | "kyc">(null);
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false, psar: false, cdl: false, stoch: false, atr: false, adx: false, sig: false, ribbon: false });
   const [chartCfg, setChartCfg] = useState<any>({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 });
@@ -847,6 +845,7 @@ export default function ClientTerminal() {
               {price != null && <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{gnum(price, d)}</span>}
             </div>
           </div>
+          {/* Scrollable form area */}
           <div className="min-h-0 flex-1 overflow-auto">
           {rightTab === "NEWS" ? (
             <div className="p-2 text-[11px]">
@@ -860,7 +859,7 @@ export default function ClientTerminal() {
           ) : rightTab !== "TRADE" ? (
             <div className="p-6 text-center text-[11px] text-[var(--muted)]">{rightTab} panel - coming soon</div>
           ) : (
-            <div className="flex min-h-full flex-col gap-2 p-2">
+            <div className="flex flex-col gap-2 p-2">
 
               {/* Order type: MARKET | LIMIT | STOP */}
               <div>
@@ -896,24 +895,16 @@ export default function ClientTerminal() {
                 </div>
               </div>
 
-              {/* TP + SL — compact single row; inputs appear inline below when checked */}
-              <div className="overflow-hidden rounded-lg border border-[var(--border)]">
-                <div className="grid grid-cols-2 divide-x divide-[var(--border)]">
-                  <label className="flex cursor-pointer items-center gap-1.5 px-2 py-1.5 select-none hover:bg-[var(--soft)]">
-                    <input type="checkbox" checked={tpEnabled} onChange={(e) => { setTpEnabled(e.target.checked); if (!e.target.checked) setTp(""); }} className="accent-[var(--accent)] h-3 w-3 shrink-0" />
-                    <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: tpEnabled ? "#10b981" : "var(--muted)" }}>Take Profit</span>
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-1.5 px-2 py-1.5 select-none hover:bg-[var(--soft)]">
-                    <input type="checkbox" checked={slEnabled} onChange={(e) => { setSlEnabled(e.target.checked); if (!e.target.checked) setSl(""); }} className="accent-[var(--accent)] h-3 w-3 shrink-0" />
-                    <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: slEnabled ? "#e0394a" : "var(--muted)" }}>Stop Loss</span>
-                  </label>
+              {/* TP + SL — always visible inputs */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <div>
+                  <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "#10b981" }}>Take Profit</div>
+                  <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="0 = off" className="h-7 w-full rounded-lg border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)] text-center" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
                 </div>
-                {(tpEnabled || slEnabled) && (
-                  <div className="grid grid-cols-2 gap-1.5 border-t border-[var(--border)] p-1.5">
-                    {tpEnabled && <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="TP price" className="h-7 w-full rounded border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />}
-                    {slEnabled && <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="SL price" className={`h-7 w-full rounded border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]${!tpEnabled ? " col-start-2" : ""}`} style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />}
-                  </div>
-                )}
+                <div>
+                  <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "#e0394a" }}>Stop Loss</div>
+                  <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="0 = off" className="h-7 w-full rounded-lg border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)] text-center" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
+                </div>
               </div>
 
               {/* Info block: Margin / Free Margin / Spread */}
@@ -932,13 +923,15 @@ export default function ClientTerminal() {
                 </div>
               </div>
 
-              {/* spacer pushes SELL/BUY to panel bottom */}
-              <div className="flex-1" />
-
               {!account && <div className="text-center text-[10px]" style={{ color: SELL }}>No account selected</div>}
               {err && <div className="text-center text-[10px]" style={{ color: SELL }}>{err}</div>}
+            </div>
+          )}
+          </div>
 
-              {/* SELL | SPRD | BUY — anchored at bottom */}
+          {/* SELL | SPRD | BUY — always visible, outside scroll area */}
+          {rightTab === "TRADE" && (
+            <div className="shrink-0 border-t border-[var(--border)] p-2">
               <div className="flex items-stretch gap-1.5">
                 <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#ff6b78,#e0394a 70%,#b9293a)" }}>
                   <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down text-[8px]" />Sell</span>
@@ -955,7 +948,6 @@ export default function ClientTerminal() {
               </div>
             </div>
           )}
-          </div>
         </aside>
       </div>
 
