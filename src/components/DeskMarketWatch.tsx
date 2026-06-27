@@ -1,5 +1,5 @@
 "use client";
-import { memo, useEffect, useState, startTransition } from "react";
+import { memo, useEffect, useRef, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
 import PriceCell from "./PriceCell";
 import { gnum } from "@/lib/format";
@@ -22,33 +22,54 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
   groupSpread?: number;
 }) {
   const [prices, setPrices] = useState<Record<string, number>>({});
-  const [realBids, setRealBids] = useState<Record<string, number | null>>({});
+  const [realBids, setRealBids] = useState<Record<string, number>>({});
+  const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [catCtx, setCatCtx] = useState<{ x: number; y: number; cat: string; syms: string[] } | null>(null);
 
+  // digits lookup built from symbols prop — used inside tick handler to compute pips
+  const digitsRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    const map: Record<string, number> = {};
+    symbols.forEach((s) => { if (s.digits != null) map[s.symbol] = s.digits; });
+    digitsRef.current = map;
+  }, [symbols]);
+
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
-    const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const pB: Record<string, number | null> = {}; const prev: Record<string, number> = {};
+    const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const pB: Record<string, number> = {}; const pS: Record<string, number> = {}; const prev: Record<string, number> = {};
     const flush = () => {
-      const pk = Object.keys(pP), dk = Object.keys(pD), bk = Object.keys(pB);
-      if (!pk.length && !dk.length && !bk.length) return;
-      const px = { ...pP }; const dr = { ...pD }; const bd = { ...pB };
-      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pB) delete pB[k];
+      const pk = Object.keys(pP), dk = Object.keys(pD), bk = Object.keys(pB), sk = Object.keys(pS);
+      if (!pk.length && !dk.length && !bk.length && !sk.length) return;
+      const px = { ...pP }; const dr = { ...pD }; const bd = { ...pB }; const sp = { ...pS };
+      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pB) delete pB[k]; for (const k in pS) delete pS[k];
+      // Bids + spread: urgent — must never be deferred or spread appears frozen
+      if (bk.length) setRealBids((bb) => ({ ...bb, ...bd }));
+      if (sk.length) setLiveSpreadPips((ss) => ({ ...ss, ...sp }));
+      // Price + direction: low-priority (visual smoothness only)
       startTransition(() => {
         if (pk.length) setPrices((pp) => ({ ...pp, ...px }));
         if (dk.length) setDirs((dd) => ({ ...dd, ...dr }));
-        if (bk.length) setRealBids((bb) => ({ ...bb, ...bd }));
       });
     };
     socket.on("prices", (snap: Record<string, number>) => { startTransition(() => setPrices((pp) => ({ ...pp, ...snap }))); for (const k in snap) prev[k] = snap[k]; });
-    socket.on("bids", (snap: Record<string, number>) => { startTransition(() => setRealBids((bb) => ({ ...bb, ...snap }))); });
-    socket.on("tick", ({ symbol, price, bid }: any) => {
+    socket.on("bids", (snap: Record<string, number>) => { setRealBids((bb) => ({ ...bb, ...snap })); });
+    socket.on("tick", ({ symbol, price, bid, real }: any) => {
       const pv = prev[symbol];
       if (pv != null && pv !== price) pD[symbol] = price > pv ? 1 : -1;
       prev[symbol] = price; pP[symbol] = price;
-      if (bid !== undefined) pB[symbol] = bid;
+      if (bid != null) pB[symbol] = bid;
+      // Compute spread from coherent real-ask + bid from the same tick (most accurate)
+      if (bid != null && bid > 0) {
+        const realAsk = (real != null && real > 0) ? real : price;
+        if (realAsk > bid) {
+          const d = digitsRef.current[symbol] ?? 2;
+          const pip = Math.pow(10, -(d - 1));
+          pS[symbol] = (realAsk - bid) / pip;
+        }
+      }
     });
     const fv = setInterval(flush, 120);
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
@@ -90,23 +111,23 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
             </div>
             {!collapsed[cat] && list.map((s) => {
               const p = prices[s.symbol]; const d = dgFor(s);
-              const rawSp = symbolSpreads && symbolSpreads[s.symbol];
-              const spPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
-              const spPx = spPips * Math.pow(10, -(d - 1));
+              const pip = Math.pow(10, -(d - 1));
               const ask = p != null ? gnum(p, d) : "—";
               const lpBid = realBids[s.symbol];
-              const pip = Math.pow(10, -(d - 1));
-              // Cap admin spread at 2% of price to prevent negative bid on low-price assets (e.g. DOGE)
+              // Prefer live spread from feed (real ask – real bid, same tick, most accurate)
+              const liveSp = liveSpreadPips[s.symbol];
+              const hasLive = liveSp != null && liveSp > 0;
+              // Configured spread as fallback only (FIXED or FLOATING min from admin settings)
+              const rawSp = symbolSpreads && symbolSpreads[s.symbol];
+              const cfgSpPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
+              const realSpPips = hasLive ? liveSp : cfgSpPips;
+              const spPx = realSpPips * pip;
               const safeSpPx = p != null ? Math.min(spPx, p * 0.02) : spPx;
-              // Use real bid only when strictly less than ask (bid >= ask = stale/inverted → fall back)
-              const validRealBid = p != null && lpBid != null && lpBid > 0 && lpBid < p;
+              // Bid: use real feed bid if valid, else compute from spread
+              const validRealBid = lpBid != null && lpBid > 0 && p != null && lpBid < p;
               const bid = p != null
                 ? (validRealBid ? gnum(lpBid!, d) : gnum(Math.max(0, p - safeSpPx), d))
                 : "—";
-              // Live spread pips: from real bid/ask when valid, else from admin spread setting
-              const realSpPips = validRealBid
-                ? (p! - lpBid!) / pip
-                : safeSpPx / pip;
               const dir = dirs[s.symbol] || 0;
               const isOff = !!(disabledSyms && disabledSyms.includes(s.symbol));
               return (
@@ -118,8 +139,8 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
                   <span className="flex items-center justify-end pr-1 gap-0.5">
-                    {validRealBid
-                      ? <span title="Live spread from real bid/ask" style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />
+                    {hasLive
+                      ? <span title="Live spread from feed (real bid/ask)" style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />
                       : null}
                     <span className="tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}</span>
                   </span>
