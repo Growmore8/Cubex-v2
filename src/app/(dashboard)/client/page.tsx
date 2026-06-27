@@ -480,14 +480,12 @@ export default function ClientTerminal() {
   const _spreadPips = (sym: string) => {
     const s = symbolSpreads[sym];
     const markup = groupSpread + accountSpreadMarkup;
-    // FLOATING: use live spread computed directly from the tick's coherent bid/ask
+    // FLOATING: show raw live exchange spread (like admin market watch does).
+    // The configured min is a trade-execution floor only, not a display value.
     if (s?.type !== "FIXED") {
       const live = liveSpreadPips[sym];
-      if (live != null && live > 0) {
-        const minFloor = s?.min || 0;
-        return Math.max(minFloor, live) + markup;
-      }
-      // No live data yet → fallback to configured floor
+      if (live != null && live > 0) return live + markup;
+      // No live bid yet → fall back to configured pip value
       if (!s) return markup;
       let base = s.min;
       if (s.max > s.min) {
