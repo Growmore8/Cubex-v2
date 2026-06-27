@@ -130,10 +130,12 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const ask = realAskPx != null ? gnum(realAskPx, d) : "—";
               const liveSp = liveSp2;
               const hasLive = liveSp != null && liveSp > 0;
-              // Configured spread as fallback only (FIXED or FLOATING min from admin settings)
+              // Configured spread (FIXED uses this; FLOATING uses live exchange spread)
               const rawSp = symbolSpreads && symbolSpreads[s.symbol];
               const cfgSpPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
-              const realSpPips = hasLive ? liveSp : cfgSpPips;
+              const isFixed = (symbolTypes as any)?.[s.symbol] === "FIXED";
+              // FIXED: always show configured pips (even 0). FLOATING: show live exchange spread.
+              const realSpPips = isFixed ? cfgSpPips : (hasLive ? liveSp! : 0);
               const spPx = realSpPips * pip;
               const safeSpPx = p != null ? Math.min(spPx, p * 0.02) : spPx;
               const validRealBid = lpBid != null && lpBid > 0 && (realAskPx == null || lpBid < realAskPx);
@@ -158,7 +160,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                         color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : (hasLive ? "#c8d0e0" : "var(--muted)"),
                         transition: "color 0.55s ease-out",
                       }}>
-                      {realSpPips > 0 ? Math.round(realSpPips * 10) : "—"}
+                      {(isFixed || hasLive) ? Math.round(realSpPips * 10) : "—"}
                     </span>
                   </span>
                 </div>);

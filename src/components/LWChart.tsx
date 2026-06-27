@@ -664,9 +664,12 @@ function LWChart({
           bars.push(bar);
           seriesRef.current.update(bar);
         }
-        // Update bid/ask lines on each tick
+        // Update bid/ask lines on each tick; hide bid when spread = 0 (bid = ask)
         const spPx = spreadPipsRef.current * Math.pow(10, -(digits - 1));
-        try { askLineRef.current?.applyOptions({ price: close }); bidLineRef.current?.applyOptions({ price: close - spPx }); } catch {}
+        try {
+          askLineRef.current?.applyOptions({ price: close });
+          bidLineRef.current?.applyOptions({ price: close - spPx, axisLabelVisible: spPx > 0 });
+        } catch {}
         if (!hoveringRef.current) fmtLegRef.current(barsRef.current[barsRef.current.length - 1]);
       } catch { /* out-of-order tick during a reseed — ignore */ }
     };

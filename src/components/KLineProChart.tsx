@@ -453,7 +453,13 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         } catch {}
       };
       upsert("ask", ask, "#26a69a", `Ask ${ask.toFixed(digits)}`);
-      upsert("bid", bid, "#ef5350", `Bid ${bid.toFixed(digits)}`);
+      // Only show bid label when there is a real spread; hide when bid = ask (zero spread)
+      if (Math.abs(bid - ask) > Math.pow(10, -digits) * 0.5) {
+        upsert("bid", bid, "#ef5350", `Bid ${bid.toFixed(digits)}`);
+      } else {
+        const bidId = bidAskIds.current.bid;
+        if (bidId) { try { core.removeOverlay(bidId); } catch {} bidAskIds.current.bid = null; }
+      }
     };
     sock.on("tick", ({ symbol: sym, price, bid }: any) => { if (sym === symRef.current && price != null) updateLines(price, bid); });
     return () => { sock.disconnect(); };

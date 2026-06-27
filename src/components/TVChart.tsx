@@ -332,7 +332,7 @@ export default function TVChart({symbol,tf,theme,digits=5,positions,spreadPips,s
       else{const open=lb?lb.close:price;lb={time:t,open,high:Math.max(open,price,real),low:Math.min(open,price,real),close:price,volume:0};lastBarRef.current[key]=lb;}
       serRef.current?.update({time:lb.time,open:lb.open,high:lb.high,low:lb.low,close:lb.close});
       volRef.current?.update({time:lb.time,value:lb.volume,color:lb.close>=lb.open?"rgba(38,166,154,0.3)":"rgba(239,83,80,0.3)"});
-      if(spRef.current>0){const p=pip(digRef.current),ask=price,bid=Math.max(0,ask-spRef.current*p);askLineRef.current?.applyOptions({price:ask,title:`Ask ${ask.toFixed(digRef.current)}`});bidLineRef.current?.applyOptions({price:bid,title:`Bid ${bid.toFixed(digRef.current)}`});}
+      {const p=pip(digRef.current),ask=price;if(spRef.current>0){const bid=Math.max(0,ask-spRef.current*p);askLineRef.current?.applyOptions({price:ask,title:`Ask ${ask.toFixed(digRef.current)}`});bidLineRef.current?.applyOptions({price:bid,axisLabelVisible:true,title:`Bid ${bid.toFixed(digRef.current)}`});}else{askLineRef.current?.applyOptions({price:ask,title:`Ask ${ask.toFixed(digRef.current)}`});bidLineRef.current?.applyOptions({price:ask,axisLabelVisible:false});}}
     });
     return()=>{ alive=false; sock.disconnect(); };
   },[symbol,activeTf]);// eslint-disable-line react-hooks/exhaustive-deps

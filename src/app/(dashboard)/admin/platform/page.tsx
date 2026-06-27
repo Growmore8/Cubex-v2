@@ -1052,7 +1052,7 @@ export default function AdminDeskPage() {
         <span>{selAcc ? selAcc.login + " - " + titleCaseName(selAcc.name) : "No account selected"}</span>
         <span style={{ color: "var(--muted)" }}>|</span>
         <span>Off: <span style={{ color: symDisabledCount > 0 ? SELL : "var(--muted)" }}>{symDisabledCount} sym</span></span>
-        <span>Spread set: <span style={{ color: "var(--text)" }}>{Object.values(adminSymSpreads).filter((v) => v > 0).length}/{symbols.length}</span></span>
+        <span>Spread set: <span style={{ color: "var(--text)" }}>{Object.keys(adminSymTypes).filter((k) => adminSymTypes[k] === "FIXED").length}/{symbols.length}</span></span>
       </div>
       {err && !act && !modal && !ticket && <div className="px-3 py-1 text-[11px]" style={{ color: SELL }}>{err}</div>}
 
@@ -2437,16 +2437,20 @@ export default function AdminDeskPage() {
                       Set spread
                     </button>
                   </div>
-                  {Object.entries(cats).map(([cat, syms]) => (
+                  {Object.entries(cats).map(([cat, syms]) => {
+                    const fixedCnt = syms.filter((s) => (adminSymTypes[s] ?? "FLOATING") === "FIXED").length;
+                    return (
                     <div key={cat} className="flex items-center gap-2 py-1 border-b border-[var(--border)] last:border-0">
                       <span className="capitalize text-[10px] font-semibold w-20 shrink-0">{cat}</span>
                       <span className="text-[9px] shrink-0" style={{ color: "var(--muted)" }}>{syms.length} sym</span>
+                      <span className="text-[9px] shrink-0 font-semibold tabular-nums" style={{ color: fixedCnt > 0 ? "var(--accent)" : "var(--muted)" }}>{fixedCnt}/{syms.length}</span>
                       <button onClick={() => setCatEdit({ cat, syms, spread: adminSymSpreads[syms[0]] ?? 0, spreadType: adminSymTypes[syms[0]] ?? "FLOATING", spreadMax: adminSymMax[syms[0]] ?? 0 })}
                         className="ml-auto rounded px-2 py-0.5 text-[9px] font-semibold" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)" }}>
                         Set spread
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               );
             })()}
