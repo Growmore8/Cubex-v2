@@ -365,7 +365,7 @@ function commitPrice(sym, p) {
   } else { candle.high = Math.max(candle.high, p); candle.low = Math.min(candle.low, p); candle.close = p; }
   st.price = p;
   redis.set("price:" + sym, String(p));
-  if (st.bid != null) redis.set("bid:" + sym, String(st.bid)); // real bid for trade execution
+  if (st.bid != null) { redis.set("bid:" + sym, String(st.bid)); realBids[sym] = st.bid; } // real bid for trade execution
   // `price` is the smooth DISPLAY value (lively market watch); `real` is the true
   // feed price (the chart builds its candles from this so they match the market,
   // while the ticker stays smooth). Falls back to the display when no live feed.
@@ -566,7 +566,7 @@ function connectTD() {
   if (tdWs) { try { tdWs.removeAllListeners(); tdWs.terminate(); } catch (_) {} tdWs = null; }
   tdWs = new WebSocket("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY, { headers: { "Origin": "https://twelvedata.com" } });
   tdWs.on("open", () => { tdWsFail200 = 0; primaryFailCount = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
-  tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits); else state[s].bid = null; applyPrice(s, ask, "TD"); recordFeedSuccess("TD"); } } } catch (e) {} });
+  tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); if (bid > 0 && bid < ask) state[s].bid = r(bid, meta[s].digits); applyPrice(s, ask, "TD"); recordFeedSuccess("TD"); } } } catch (e) {} });
   tdWs.on("close", () => {
     // Exponential backoff: 5s → 15s → 30s → 60s → 120s to avoid rate-limit 200 responses
     const delay = tdWsFail200 === 0 ? 5000 : Math.min(120000, 5000 * Math.pow(2, tdWsFail200));
@@ -696,9 +696,11 @@ function microTick() {
 // symSpreads: "tenantId:symbol" → { min, max, type }
 // grpSpreads: groupId → pips
 // accMarkups: accountId → pips
+// realBids: symbol → latest real bid from exchange (Kraken/Binance), updated every tick
 const symSpreads = {};
 const grpSpreads = {};
 const accMarkups = {};
+const realBids = {};
 async function loadSpreads() {
   try {
     const syms = await prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true, spreadType: true, spreadMax: true } });
@@ -735,6 +737,21 @@ function getSpreadPrice(tenantId, symbol, groupId, accountId) {
   return pips * Math.pow(10, -(digits - 1));
 }
 function getBid(tenantId, symbol, groupId, accountId, ask) {
+  const s = symSpreads[tenantId + ":" + symbol];
+  if (s && s.type === "FLOATING") {
+    const rb = realBids[symbol];
+    if (rb != null && rb > 0 && rb < ask) {
+      // ECN model: bid = real exchange bid − group/account markup pips
+      const grpPips = grpSpreads[groupId] || 0;
+      const accPips = accMarkups[accountId] || 0;
+      const digits = (meta[symbol] && meta[symbol].digits) || 5;
+      const pip = Math.pow(10, -(digits - 1));
+      return Math.max(0, rb - (grpPips + accPips) * pip);
+    }
+    // No real bid yet (feed not connected) — zero spread fallback
+    return ask;
+  }
+  // FIXED: configured pips
   return ask - getSpreadPrice(tenantId, symbol, groupId, accountId);
 }
 

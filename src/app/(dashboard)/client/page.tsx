@@ -527,7 +527,14 @@ export default function ClientTerminal() {
     const grpAcc = groupSpread + accountSpreadMarkup;
     if (!s) return grpAcc;
     if (s.type === "FIXED" || s.max <= s.min) return (s.min || 0) + grpAcc;
-    // FLOATING with off-hours widening
+    // FLOATING: prefer real live bid from exchange feed
+    const lb = liveBids[sym];
+    const p = prices[sym];
+    if (lb != null && lb > 0 && p != null && lb < p) {
+      const pip = Math.pow(10, -(dg(sym) - 1));
+      return (p - lb) / pip + grpAcc;
+    }
+    // Fallback: time-based spread (peak vs off-hours)
     const h = new Date().getUTCHours(), wd = new Date().getUTCDay();
     const isPeak = wd >= 1 && wd <= 5 && h >= 8 && h < 17;
     return (isPeak ? s.min : s.max) + grpAcc;
