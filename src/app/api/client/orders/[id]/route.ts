@@ -25,6 +25,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const data: any = {};
     if (body.sl !== undefined) data.sl = new Prisma.Decimal(newSl);
     if (body.tp !== undefined) data.tp = new Prisma.Decimal(newTp);
+    if (body.trailingStop !== undefined) data.trailingStop = new Prisma.Decimal(Math.max(0, Number(body.trailingStop) || 0));
     await prisma.trade.update({ where: { id: trade.id }, data });
     const label = `${trade.account.login} modified ${trade.symbol} ${trade.type} #${trade.ticket} — SL: ${newSl || "off"} TP: ${newTp || "off"}`;
     audit(s.tenantId!, "trade.modify_sl_tp", label, trade.account.login, "CLIENT");

@@ -412,14 +412,16 @@ export default function AdminDeskPage() {
 
   async function place(symbol: string, type: "BUY" | "SELL", opts?: any) {
     setErr(""); if (!selAcc) { setErr("Select an account in the navigator first"); return; }
-    const body = { accountId: selAcc.id, symbol, type, lots: Number(opts && opts.lots != null ? opts.lots : lot), sl: Number(opts && opts.sl != null ? opts.sl : sl), tp: Number(opts && opts.tp != null ? opts.tp : tp) };
+    const body: any = { accountId: selAcc.id, symbol, type, lots: Number(opts && opts.lots != null ? opts.lots : lot), sl: Number(opts && opts.sl != null ? opts.sl : sl), tp: Number(opts && opts.tp != null ? opts.tp : tp) };
+    if (opts?.trailingStop) body.trailingStop = Number(opts.trailingStop);
+    if (opts?.comment) body.comment = opts.comment;
     const r = await fetch("/api/desk/manual-trade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Failed"); return; }
     setTicket(null); loadAll();
   }
   async function placeTicket(btnSide: "BUY" | "SELL") {
     if (!ticket) return;
-    if (tform.type === "Market") { place(ticket, btnSide, { lots: tform.vol, sl: tform.sl, tp: tform.tp }); return; }
+    if (tform.type === "Market") { place(ticket, btnSide, { lots: tform.vol, sl: tform.sl, tp: tform.tp, trailingStop: Number(tform.trail) || 0, comment: tform.comment || undefined }); return; }
     setErr("");
     if (!selAcc) { setErr("Select an account first"); return; }
     const trig = Number(tform.price); if (!trig) { setErr("Enter a trigger price"); return; }
@@ -1150,7 +1152,8 @@ export default function AdminDeskPage() {
                           <td className="px-2 py-1 text-right">
                             {isEditing ? <input type="number" step="0.00001" className={tInp} value={ei("openPrice", pxRaw(p.symbol, p.openPrice))} onChange={(e) => setIe("openPrice", e.target.value)} /> : pxFmt(p.symbol, p.openPrice)}
                           </td>
-                          <td className="px-2 py-1 text-right">
+                          <td className="px-2 py-1 text-right" title={Number(p.trailingStop ?? 0) > 0 ? "Trailing Stop active" : undefined}>
+                            {!isEditing && Number(p.trailingStop ?? 0) > 0 && <span className="mr-0.5 rounded px-0.5 text-[8px] font-bold" style={{ background: "#f59e0b22", color: "#f59e0b" }}>TSL</span>}
                             <input type="number" step="0.00001" className={tInp} placeholder="0" value={ei("sl", p.sl ? Number(p.sl).toFixed(dg(p.symbol)) : "")} onChange={(e) => { setIe("sl", e.target.value); }} />
                           </td>
                           <td className="px-2 py-1 text-right">
@@ -1974,6 +1977,8 @@ export default function AdminDeskPage() {
               <div><div className={lab}>T/P</div><input type="number" className={inp} value={tform.tp} onChange={(e) => setTform({ ...tform, tp: Number(e.target.value) })} /></div>
             </div>
             {tform.type !== "Market" && (<div className="mt-2"><div className={lab}>Trigger price</div><input type="number" className={inp} value={tform.price} onChange={(e) => setTform({ ...tform, price: Number(e.target.value) })} /></div>)}
+            {tform.type === "Market" && (<div className="mt-2"><div className={lab}>Trailing Stop (pips, 0=off)</div><input type="number" min="0" step="1" className={inp} value={tform.trail || ""} placeholder="0" onChange={(e) => setTform({ ...tform, trail: e.target.value })} /></div>)}
+            <div className="mt-2"><div className={lab}>Comment (optional)</div><input type="text" maxLength={128} className={inp} value={tform.comment || ""} placeholder="" onChange={(e) => setTform({ ...tform, comment: e.target.value })} /></div>
             <div className="mt-2 text-center text-[10px] text-[var(--muted)]">{prices[ticket] != null ? gpx(ticket, prices[ticket]) : "..."}</div>
             <div className="mt-3 flex gap-2">
               <button onClick={() => placeTicket("SELL")} className="flex-1 rounded py-2 text-xs" style={{ background: "rgba(224,82,96,0.16)", color: SELL, border: "0.5px solid rgba(224,82,96,0.4)" }}>Sell {prices[ticket] != null ? gnum(prices[ticket] * 0.9999, dg(ticket)) : ""}</button>

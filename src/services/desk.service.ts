@@ -104,6 +104,8 @@ export async function manualTrade(s: any, input: any) {
     data: { ticket, accountId: acc.id, symbol: input.symbol, type: input.type,
       lots: new Prisma.Decimal(input.lots), openPrice: new Prisma.Decimal(openPrice),
       sl: new Prisma.Decimal(input.sl || 0), tp: new Prisma.Decimal(input.tp || 0),
+      ...(input.trailingStop ? { trailingStop: new Prisma.Decimal(Number(input.trailingStop)) } : {}),
+      ...(input.comment ? { comment: input.comment } : {}),
       ...(openedAt ? { openedAt } : {}) },
   });
   const label = `${acc.login} ${input.type} ${input.symbol} ${input.lots}L @ ${openPrice} (manual)`;

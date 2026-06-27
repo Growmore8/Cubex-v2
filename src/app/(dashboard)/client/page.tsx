@@ -126,7 +126,7 @@ export default function ClientTerminal() {
     setMyReqsLoaded(true);
   });
   useEffect(() => { if (botTab === "requests" && !myReqsLoaded) loadMyReqs(); }, [botTab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [tpSlEdit, setTpSlEdit] = useState<{ id: string; field: "tp" | "sl"; val: string } | null>(null);
+  const [tpSlEdit, setTpSlEdit] = useState<{ id: string; field: "tp" | "sl" | "trailingStop"; val: string } | null>(null);
   const [err, setErr] = useState("");
   const [pinLock, setPinLock] = useState(false);
   const [pinHasPin, setPinHasPin] = useState(false);
@@ -1075,9 +1075,9 @@ export default function ClientTerminal() {
           )}
           {botTab === "positions" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right">Commission</th><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /><Sth tbl="pos" k="pnl" label="Net P/L" align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right" title="Trailing Stop (pips)">Trail</th><th className="px-2 py-1 font-normal text-right">Commission</th><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /><Sth tbl="pos" k="pnl" label="Net P/L" align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
               <tbody>
-                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={13}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
+                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={14}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
                   <tr key={p.id} className="border-t border-[var(--border)]" title={p.comment || undefined}>
                     <td className="px-2 py-1 text-[var(--muted)] tabular-nums">{p.ticket ? String(p.ticket) : "—"}</td>
                     <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span></td>
@@ -1091,11 +1091,22 @@ export default function ClientTerminal() {
                         <span style={{ color: p.tp ? "#10b981" : "var(--muted)" }}>{p.tp ? gnum(p.tp, dg(p.symbol)) : <span className="text-[9px]">+ TP</span>}</span>
                       )}
                     </td>
-                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "sl", val: p.sl ? String(p.sl) : "" }); }} title="Click to edit SL" style={{ cursor: "pointer" }}>
+                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "sl", val: p.sl ? String(p.sl) : "" }); }} title={p.trailingStop > 0 ? "Trailing Stop active — SL auto-adjusts" : "Click to edit SL"} style={{ cursor: "pointer" }}>
                       {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "sl" ? (
                         <input type="text" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "sl", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-20 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#f43f5e", color: "#f43f5e" }} onClick={(e) => e.stopPropagation()} />
                       ) : (
-                        <span style={{ color: p.sl ? "#f43f5e" : "var(--muted)" }}>{p.sl ? gnum(p.sl, dg(p.symbol)) : <span className="text-[9px]">+ SL</span>}</span>
+                        <span style={{ color: p.sl ? "#f43f5e" : "var(--muted)" }}>
+                          {p.trailingStop > 0 && <span className="mr-0.5 rounded px-0.5 text-[8px] font-bold" style={{ background: "#f59e0b22", color: "#f59e0b" }}>TSL</span>}
+                          {p.sl ? gnum(p.sl, dg(p.symbol)) : <span className="text-[9px]">+ SL</span>}
+                        </span>
+                      )}
+                    </td>
+                    {/* Trailing stop inline edit */}
+                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "trailingStop", val: p.trailingStop ? String(p.trailingStop) : "" }); }} title="Trailing stop (pips). Click to edit. 0 = off." style={{ cursor: "pointer" }}>
+                      {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "trailingStop" ? (
+                        <input type="number" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "trailingStop", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-16 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#f59e0b", color: "#f59e0b" }} onClick={(e) => e.stopPropagation()} />
+                      ) : (
+                        <span style={{ color: p.trailingStop > 0 ? "#f59e0b" : "var(--muted)" }}>{p.trailingStop > 0 ? p.trailingStop + "p" : <span className="text-[9px]">off</span>}</span>
                       )}
                     </td>
                     {/* Commission and Swap — always negative charges */}
@@ -1165,14 +1176,15 @@ export default function ClientTerminal() {
           )}
           {botTab === "history" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><Sth tbl="chist" k="name" label="Name" /><Sth tbl="chist" k="opened" label="Opened" /><Sth tbl="chist" k="closed" label="Closed" /><Sth tbl="chist" k="qty" label="Qty" align="right" /><Sth tbl="chist" k="open" label="Open" align="right" /><Sth tbl="chist" k="close" label="Close" align="right" /><Sth tbl="chist" k="sl" label="SL" align="right" /><Sth tbl="chist" k="tp" label="TP" align="right" /><Sth tbl="chist" k="reason" label="Reason" /><Sth tbl="chist" k="swap" label="Swap" align="right" /><Sth tbl="chist" k="comm" label="Comm" align="right" /><Sth tbl="chist" k="pnl" label="Net P/L" align="right" /></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="chist" k="name" label="Name" /><Sth tbl="chist" k="opened" label="Opened" /><Sth tbl="chist" k="closed" label="Closed" /><Sth tbl="chist" k="qty" label="Qty" align="right" /><Sth tbl="chist" k="open" label="Open" align="right" /><Sth tbl="chist" k="close" label="Close" align="right" /><Sth tbl="chist" k="sl" label="SL" align="right" /><Sth tbl="chist" k="tp" label="TP" align="right" /><Sth tbl="chist" k="reason" label="Reason" /><Sth tbl="chist" k="swap" label="Swap" align="right" /><Sth tbl="chist" k="comm" label="Comm" align="right" /><Sth tbl="chist" k="pnl" label="Net P/L" align="right" /></tr></thead>
               <tbody>
-                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No history.</td></tr> : sortRows("chist", histShown, { name: (h) => h.symbol, opened: (h) => h.openedAt ? new Date(h.openedAt).getTime() : null, closed: (h) => h.closedAt ? new Date(h.closedAt).getTime() : null, qty: (h) => Number(h.lots), open: (h) => Number(h.openPrice), close: (h) => Number(h.closePrice), sl: (h) => Number(h.sl), tp: (h) => Number(h.tp), reason: (h) => h.closeReason || "MANUAL", swap: (h) => Number(h.swap), comm: (h) => Number(h.commission), pnl: (h) => Number(h.pnl) + Number(h.swap) - Number(h.commission) }).map((h) => {
+                {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={13}>No history.</td></tr> : sortRows("chist", histShown, { name: (h) => h.symbol, opened: (h) => h.openedAt ? new Date(h.openedAt).getTime() : null, closed: (h) => h.closedAt ? new Date(h.closedAt).getTime() : null, qty: (h) => Number(h.lots), open: (h) => Number(h.openPrice), close: (h) => Number(h.closePrice), sl: (h) => Number(h.sl), tp: (h) => Number(h.tp), reason: (h) => h.closeReason || "MANUAL", swap: (h) => Number(h.swap), comm: (h) => Number(h.commission), pnl: (h) => Number(h.pnl) + Number(h.swap) - Number(h.commission) }).map((h) => {
                   const r = h.closeReason || "MANUAL";
                   const rc = r === "TP" ? "#10b981" : r === "SL" ? "#f43f5e" : r === "MC" ? "#f59e0b" : "var(--muted)";
                   const net = Number(h.pnl) + Number(h.swap || 0) - Number(h.commission || 0);
                   return (
                   <tr key={h.id} className="border-t border-[var(--border)]" title={h.comment || undefined}>
+                    <td className="px-2 py-1 text-[var(--muted)] tabular-nums">{h.ticket || "—"}</td>
                     <td className="px-2 py-1">{h.symbol} <span style={{ color: h.side === "BUY" ? BUY : SELL }}>{h.side}</span></td>
                     <td className="px-2 py-1 text-[var(--muted)]">{h.openedAt ? new Date(h.openedAt).toLocaleString() : "—"}</td>
                     <td className="px-2 py-1 text-[var(--muted)]">{h.closedAt ? new Date(h.closedAt).toLocaleString() : "—"}</td>

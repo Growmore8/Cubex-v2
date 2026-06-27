@@ -136,7 +136,7 @@ export async function GET(req: Request) {
       comment: (t as any).comment || null, trailingStop: Number((t as any).trailingStop ?? 0), openedAt: t.openedAt,
     })) : [],
     history: account ? account.history.map((h) => ({
-      id: h.id.toString(), symbol: h.symbol, side: h.side, lots: Number(h.lots),
+      id: h.id.toString(), ticket: h.ticket.toString(), symbol: h.symbol, side: h.side, lots: Number(h.lots),
       openPrice: Number(h.openPrice), closePrice: Number(h.closePrice), pnl: Number(h.pnl),
       sl: Number(h.sl), tp: Number(h.tp),
       commission: Number((h as any).commission ?? 0), swap: Number((h as any).swap ?? 0),
