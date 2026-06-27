@@ -620,10 +620,9 @@ function ensureSeeded() {
   }
   // Broadcast a full snapshot so clients connected before seeding pick up all prices at once.
   if (global.__io) {
-    const px = {}; const bids = {};
-    for (const s of symbols) { const st = state[s]; if (st && st.price != null) { px[s] = st.price; if (st.bid != null) bids[s] = st.bid; } }
+    const px = {};
+    for (const s of symbols) { const st = state[s]; if (st && st.price != null) px[s] = st.price; }
     global.__io.emit("prices", px);
-    if (Object.keys(bids).length) global.__io.emit("bids", bids);
   }
 }
 
@@ -949,7 +948,7 @@ async function checkPending(io) {
       const ticket = await nextTicket(o.account.tenantId);
       await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: openPx, sl: o.sl, tp: o.tp } });
       await prisma.pendingOrder.delete({ where: { id: o.id } });
-      const pbody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + px;
+      const pbody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + openPx;
       if (o.account && o.account.userId) { await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: pbody, type: "TRADE" } }).catch(() => {}); pushToUser(o.account.userId, { title: "Pending order filled", body: pbody }); }
       await notifyStaffRaw(o.account.tenantId, { title: "Pending filled — " + (o.account.login || ""), body: pbody, type: "TRADE" }, o.account.managerId);
       await prisma.auditLog.create({ data: { tenantId: o.account.tenantId, action: "order.filled", detail: (o.account.login || "") + " " + pbody, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});

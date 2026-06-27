@@ -289,7 +289,7 @@ export default function ClientTerminal() {
       const slv = Number(sl) || 0; const tpv = Number(tp) || 0;
       if (slv > 0) {
         if (type === "BUY" && slv >= curAsk) { setErr(`SL must be below ask ${gnum(curAsk, dd)}`); return; }
-        if (type === "SELL" && slv <= curBid) { setErr(`SL must be above bid ${gnum(curBid, dd)}`); return; }
+        if (type === "SELL" && slv <= curAsk) { setErr(`SL must be above ask ${gnum(curAsk, dd)}`); return; }
       }
       if (tpv > 0) {
         if (type === "BUY" && tpv <= curAsk) { setErr(`TP must be above ask ${gnum(curAsk, dd)}`); return; }
@@ -325,15 +325,18 @@ export default function ClientTerminal() {
     if (account?.locked) { setErr("Account is read-only."); return false; }
     if (needKyc) { setErr("Verify your KYC to trade on a live account."); setWalletModal("kyc"); return false; }
     if (!trigger || trigger <= 0) { setErr("Enter a trigger price"); return false; }
-    const curAsk = prices[sym] ?? 0;
-    if (curAsk > 0) {
-      if (side === "BUY"  && kind === "LIMIT" && trigger >= curAsk) { setErr("Buy Limit must be below current price " + gnum(curAsk, dg(sym))); return false; }
-      if (side === "BUY"  && kind === "STOP"  && trigger <= curAsk) { setErr("Buy Stop must be above current price " + gnum(curAsk, dg(sym))); return false; }
-      if (side === "SELL" && kind === "LIMIT" && trigger <= curAsk) { setErr("Sell Limit must be above current price " + gnum(curAsk, dg(sym))); return false; }
-      if (side === "SELL" && kind === "STOP"  && trigger >= curAsk) { setErr("Sell Stop must be below current price " + gnum(curAsk, dg(sym))); return false; }
+    const pBid = prices[sym] ?? 0;
+    const pAsk = pBid > 0 ? pBid + _spreadPx(sym) : 0;
+    if (pBid > 0) {
+      // BUY pending: server triggers at ask — compare trigger vs ask
+      // SELL pending: server triggers at bid — compare trigger vs bid
+      if (side === "BUY"  && kind === "LIMIT" && trigger >= pAsk) { setErr("Buy Limit must be below ask " + gnum(pAsk, dg(sym))); return false; }
+      if (side === "BUY"  && kind === "STOP"  && trigger <= pAsk) { setErr("Buy Stop must be above ask " + gnum(pAsk, dg(sym))); return false; }
+      if (side === "SELL" && kind === "LIMIT" && trigger <= pBid) { setErr("Sell Limit must be above bid " + gnum(pBid, dg(sym))); return false; }
+      if (side === "SELL" && kind === "STOP"  && trigger >= pBid) { setErr("Sell Stop must be below bid " + gnum(pBid, dg(sym))); return false; }
     }
     const r = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol: sym, side, kind, lots: Number(lots), price: trigger, sl: slv, tp: tpv, accountId: accIdRef.current, currentAsk: curAsk, expiresAt: expiresAt ?? null }) });
+      body: JSON.stringify({ symbol: sym, side, kind, lots: Number(lots), price: trigger, sl: slv, tp: tpv, accountId: accIdRef.current, currentAsk: pAsk, expiresAt: expiresAt ?? null }) });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Pending failed"); return false; }
     pushToast({ title: `Pending ${side} ${sym} placed`, type: "TRADE" }); load(); return true;
