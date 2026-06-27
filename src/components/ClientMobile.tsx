@@ -117,7 +117,8 @@ export default function ClientMobile({ t }: { t: any }) {
     return grpAcc; // no live data yet — don't use stale smoothed-price vs real-bid
   };
 
-  const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "history" | "news" | "profile">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "account">("dashboard");
+  const [acctTab, setAcctTab] = useState<"overview" | "history" | "news">("overview");
   const [mobNews, setMobNews] = useState<any[]>([]);
   const [mobNewsLoading, setMobNewsLoading] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
@@ -186,10 +187,10 @@ export default function ClientMobile({ t }: { t: any }) {
     setMyReqs([...acc, ...pay].sort((x: any, y: any) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime()));
     setMyReqsLoaded(true);
   });
-  useEffect(() => { if (tab === "profile" && !myReqsLoaded) loadMyReqs(); }, [tab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tab === "account" && !myReqsLoaded) loadMyReqs(); }, [tab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const loadMobAlerts = () => { if (!accId) return; fetch(`/api/client/alerts?accountId=${accId}`).then((r) => r.json()).then((r) => { if (r.ok) setMobAlerts(r.alerts || []); }).catch(() => {}); };
   useEffect(() => { loadMobAlerts(); }, [accId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (tab === "news" && mobNews.length === 0 && !mobNewsLoading) { setMobNewsLoading(true); fetch("/api/client/news?category=forex").then((r) => r.json()).then((d) => { if (d.ok) setMobNews(d.items || []); }).catch(() => {}).finally(() => setMobNewsLoading(false)); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (acctTab === "news" && mobNews.length === 0 && !mobNewsLoading) { setMobNewsLoading(true); fetch("/api/client/news?category=forex").then((r) => r.json()).then((d) => { if (d.ok) setMobNews(d.items || []); }).catch(() => {}).finally(() => setMobNewsLoading(false)); } }, [acctTab]); // eslint-disable-line react-hooks/exhaustive-deps
   const reqRow = (req: any) => {
     const isAcc = req.kind === "ACCOUNT";
     const ic = isAcc ? "fa-circle-plus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";
@@ -331,12 +332,12 @@ export default function ClientMobile({ t }: { t: any }) {
   // Until the live account is KYC-verified, the client is restricted to the profile
   // area only (demo accounts are exempt — switching to one lifts the restriction).
   const navItems: [string, string, string][] = needKyc
-    ? [["profile", "fa-user", "Profile"]]
+    ? [["account", "fa-user", "Account"]]
     : [
-        ["dashboard", "fa-house", "Dashboard"], ["quotes", "fa-chart-simple", "Quotes"], ["chart", "fa-chart-line", "Chart"],
-        ["trades", "fa-right-left", "Trades"], ["history", "fa-clock-rotate-left", "History"], ["news", "fa-newspaper", "News"], ["profile", "fa-user", "Profile"],
+        ["dashboard", "fa-house", "Home"], ["quotes", "fa-chart-simple", "Quotes"], ["chart", "fa-chart-line", "Chart"],
+        ["trades", "fa-right-left", "Trade"], ["account", "fa-user", "Account"],
       ];
-  useEffect(() => { if (needKyc) setTab("profile"); }, [needKyc]);
+  useEffect(() => { if (needKyc) setTab("account"); }, [needKyc]);
   // If a tenant has no Crypto category, fall back to the first available tab.
   const catsKey = cats.join(",");
   const didCatInit = useRef(false);
@@ -1065,8 +1066,17 @@ export default function ClientMobile({ t }: { t: any }) {
           </div>
         )}
 
-        {/* ───────── HISTORY ───────── */}
-        {tab === "history" && (
+        {/* ───────── ACCOUNT (sub-tabs: Overview | History | News) ───────── */}
+        {tab === "account" && (
+          <div>
+            {/* Sub-tab bar */}
+            <div className="sticky top-0 z-10 flex gap-1 border-b border-[var(--border)] bg-[var(--bg)] px-3 pt-2 pb-0">
+              {(["overview", "history", "news"] as const).map((st) => (
+                <button key={st} onClick={() => setAcctTab(st)} className="flex-1 pb-2 text-[12px] font-semibold capitalize transition-colors" style={{ color: acctTab === st ? "var(--accent)" : "var(--muted)", borderBottom: acctTab === st ? "2px solid var(--accent)" : "2px solid transparent" }}>{st === "overview" ? "Account" : st === "history" ? "History" : "News"}</button>
+              ))}
+            </div>
+            {/* ── HISTORY sub-tab ── */}
+            {acctTab === "history" && (
           <div className="p-3">
             <div className="mb-3 flex gap-2">
               <button onClick={() => setHistTab("trades")} className="flex-1 rounded-lg py-2 text-[12px] font-semibold" style={{ background: histTab === "trades" ? BLUE : "var(--soft)", color: histTab === "trades" ? "#fff" : "var(--muted)" }}>Trades</button>
@@ -1136,33 +1146,28 @@ export default function ClientMobile({ t }: { t: any }) {
           </div>
         )}
 
-        {/* ───────── NEWS ───────── */}
-        {tab === "news" && (
-          <div className="p-3">
-            <div className="mb-3 text-[13px] font-bold" style={{ color: "var(--text)" }}><i className="fa-solid fa-newspaper mr-1.5" style={{ color: GOLD }} />Market News</div>
-            {mobNewsLoading ? (
-              <div className="py-10 text-center text-[12px] text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-1" />Loading news…</div>
-            ) : mobNews.length === 0 ? (
-              <div className="py-10 text-center text-[12px] text-[var(--muted)]">No news available.</div>
-            ) : (
-              <div className="space-y-0 divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
-                {mobNews.map((n: any) => (
-                  <a key={n.id} href={n.url} target="_blank" rel="noreferrer" className="block px-3 py-3 hover:bg-[var(--soft)] active:bg-[var(--soft)]" style={{ textDecoration: "none" }}>
-                    <div className="text-[12px] font-medium leading-tight text-[var(--text)]">{n.headline}</div>
-                    <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--muted)]">
-                      <span>{n.source}</span>
-                      <span>·</span>
-                      <span>{new Date(n.datetime * 1000).toLocaleString()}</span>
-                    </div>
-                  </a>
-                ))}
+            {/* ── NEWS sub-tab ── */}
+            {acctTab === "news" && (
+              <div className="p-3">
+                {mobNewsLoading ? (
+                  <div className="py-10 text-center text-[12px] text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-1" />Loading news…</div>
+                ) : mobNews.length === 0 ? (
+                  <div className="py-10 text-center text-[12px] text-[var(--muted)]">No news available.</div>
+                ) : (
+                  <div className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+                    {mobNews.map((n: any) => (
+                      <a key={n.id} href={n.url} target="_blank" rel="noreferrer" className="block px-3 py-3 active:bg-[var(--soft)]" style={{ textDecoration: "none" }}>
+                        <div className="text-[12px] font-medium leading-tight text-[var(--text)]">{n.headline}</div>
+                        <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--muted)]"><span>{n.source}</span><span>·</span><span>{new Date(n.datetime * 1000).toLocaleString()}</span></div>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* ───────── PROFILE ───────── */}
-        {tab === "profile" && (
+            {/* ── OVERVIEW (Account/Profile) sub-tab ── */}
+            {acctTab === "overview" && (
           <div className="space-y-4 p-3">
             {needKyc && (
               <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(240,180,41,0.5)", background: "rgba(240,180,41,0.1)" }}>
@@ -1368,6 +1373,8 @@ export default function ClientMobile({ t }: { t: any }) {
             {/* logout */}
             <button onClick={logout} className="w-full rounded-xl py-3 text-sm font-semibold text-white" style={{ background: SELL }}><i className="fa-solid fa-right-from-bracket mr-1.5" /> Logout</button>
           </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -1380,7 +1387,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
             <div className="text-[15px] font-bold">Request Sent</div>
             <div className="mt-1.5 text-[12px] leading-relaxed text-[var(--muted)]">Your new live account request has been sent for approval. You'll be notified once it's reviewed. Track its status under <span className="font-semibold text-[var(--text)]">Profile → My Requests</span>.</div>
-            <button onClick={() => { setAcctReqModal && setAcctReqModal(false); setTab("profile"); }} className="mt-4 w-full rounded-xl py-2.5 text-[13px] font-semibold text-white" style={{ background: BLUE }}>View My Requests</button>
+            <button onClick={() => { setAcctReqModal && setAcctReqModal(false); setTab("account"); setAcctTab("overview"); }} className="mt-4 w-full rounded-xl py-2.5 text-[13px] font-semibold text-white" style={{ background: BLUE }}>View My Requests</button>
             <button onClick={() => setAcctReqModal && setAcctReqModal(false)} className="mt-2 w-full rounded-xl py-2 text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Close</button>
           </div>
         </div>
