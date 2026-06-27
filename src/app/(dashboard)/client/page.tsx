@@ -66,6 +66,7 @@ export default function ClientTerminal() {
   const [groupSpread, setGroupSpread] = useState(0);
   const [accountSpreadMarkup, setAccountSpreadMarkup] = useState(0);
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [realPrices, setRealPrices] = useState<Record<string, number>>({});
   const [liveBids, setLiveBids] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
   const notifSeen = useRef<Set<string>>(new Set());
@@ -228,28 +229,32 @@ export default function ClientTerminal() {
     const socket: Socket = io({ path: "/socket.io" });
     const pP: Record<string, number> = {};
     const pD: Record<string, number> = {};
+    const rP: Record<string, number> = {};
     // Coalesce all incoming ticks and apply them on a fixed ~12fps cadence. Without
     // this the entire (monolithic) desk re-rendered on every animation frame, which
     // caused the slow/glitchy feel. The chart and the Buy/Sell buttons both read this
     // same `prices` state, so they now update in lockstep at the same speed.
     const flush = () => {
-      const pxKeys = Object.keys(pP), drKeys = Object.keys(pD);
-      if (!pxKeys.length && !drKeys.length) return;
-      const px = { ...pP }, dr = { ...pD };           // snapshot then clear the buffers
+      const pxKeys = Object.keys(pP), drKeys = Object.keys(pD), rpKeys = Object.keys(rP);
+      if (!pxKeys.length && !drKeys.length && !rpKeys.length) return;
+      const px = { ...pP }, dr = { ...pD }, rp = { ...rP };
       for (const k in pP) delete pP[k];
       for (const k in pD) delete pD[k];
+      for (const k in rP) delete rP[k];
       // Low-priority: lets urgent updates (a nav tap) interrupt the price re-render,
       // so switching tabs feels instant instead of waiting on the price churn.
       startTransition(() => {
         if (pxKeys.length) setPrices((pp) => ({ ...pp, ...px }));
         if (drKeys.length) setDirs((dd) => ({ ...dd, ...dr }));
+        if (rpKeys.length) setRealPrices((pp) => ({ ...pp, ...rp }));
       });
     };
-    socket.on("tick", ({ symbol, price, bid }: any) => {
+    socket.on("tick", ({ symbol, price, bid, real }: any) => {
       const prev = prevRef.current[symbol];
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
+      if (real != null && real > 0) rP[symbol] = real;
       if (bid != null) startTransition(() => setLiveBids((b) => ({ ...b, [symbol]: bid })));
     });
     // Real bid snapshot from Binance/Kraken on connect
@@ -466,8 +471,10 @@ export default function ClientTerminal() {
     const markup = groupSpread + accountSpreadMarkup;
     // FIXED type: admin explicitly locked this spread — always use configured pips
     if (s?.type === "FIXED") return (s.min || 0) + markup;
-    // FLOATING (or no config): live exchange bid/ask is the real spread
-    const ask = prices[sym]; const rawBid = liveBids[sym];
+    // FLOATING (or no config): live exchange bid/ask is the real spread.
+    // Use realPrices (true Binance ask) not simulated display price — avoids
+    // the display animation drift inflating the computed spread.
+    const ask = realPrices[sym] ?? prices[sym]; const rawBid = liveBids[sym];
     if (ask != null && rawBid != null && rawBid > 0 && rawBid < ask) {
       const pipSize = Math.pow(10, -(dg(sym) - 1));
       const marketSpreadPips = (ask - rawBid) / pipSize;
@@ -809,7 +816,7 @@ export default function ClientTerminal() {
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
-                    <span className="text-right pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{sp > 0 ? (sp * 10).toFixed(1) : "\u2014"}</span>
+                    <span className="text-right pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{sp > 0 ? Math.round(sp * 10) : "\u2014"}</span>
                   </div>); })}
               </div>
             )}
@@ -821,7 +828,7 @@ export default function ClientTerminal() {
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
-                    <span className="text-right pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{sp > 0 ? (sp * 10).toFixed(1) : "\u2014"}</span>
+                    <span className="text-right pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{sp > 0 ? Math.round(sp * 10) : "\u2014"}</span>
                   </div>); })}
               </div>
             ))}
@@ -918,7 +925,7 @@ export default function ClientTerminal() {
                 </div>
                 <div className="flex items-center justify-between px-2.5 py-1">
                   <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{(_spreadPips(selSym) * 10).toFixed(1)} pips</span>
+                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_spreadPips(selSym) * 10)} pips</span>
                 </div>
               </div>
 
@@ -938,7 +945,7 @@ export default function ClientTerminal() {
                 </button>
                 <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 px-1">
                   <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>sprd</span>
-                  <span className="text-[10px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{(_spreadPips(selSym) * 10).toFixed(1)}</span>
+                  <span className="text-[10px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_spreadPips(selSym) * 10)}</span>
                 </div>
                 <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)" }}>
                   <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up text-[8px]" />Buy</span>
