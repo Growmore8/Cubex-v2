@@ -790,20 +790,34 @@ export default function ClientMobile({ t }: { t: any }) {
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]} />
             </div>
-            {/* Quick trade bar — tap to open full order sheet */}
-            <div className="flex items-stretch gap-1.5 border-t border-[var(--border)] px-2.5 py-2" style={{ background: "var(--panel)" }}>
-              <button onPointerDown={(e) => { e.preventDefault(); setOrderSheet(true); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, touchAction: "manipulation" }}>
-                <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Sell</div>
-                <div className="text-[13px] font-bold tabular-nums">{bid != null ? gnum(bid, dg(selSym)) : "…"}</div>
-              </button>
-              <div className="flex flex-col items-center justify-center gap-0.5 shrink-0 px-1">
-                <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>sprd</span>
-                <span className="text-[9px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_mobSpreadPips(selSym) * 10)}</span>
+            {/* Quick trade bar */}
+            <div className="border-t border-[var(--border)]" style={{ background: "var(--panel)" }}>
+              {/* Lot quick-select + vol stepper */}
+              <div className="flex items-center gap-1 px-2.5 pt-2 pb-1">
+                <button onClick={() => setVol((v: number) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] active:scale-95" style={{ touchAction: "manipulation" }}>−</button>
+                <div className="grid flex-1 grid-cols-5 overflow-hidden rounded-lg border border-[var(--border)]">
+                  {LOTS.map((l) => (
+                    <button key={l} onClick={() => setVol(l)} className="py-1 text-[10px] font-semibold border-r border-[var(--border)] last:border-r-0 transition-colors" style={vol === l ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }} >{l}</button>
+                  ))}
+                </div>
+                <button onClick={() => setVol((v: number) => +(v + 0.01).toFixed(2))} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] active:scale-95" style={{ touchAction: "manipulation" }}>+</button>
               </div>
-              <button onPointerDown={(e) => { e.preventDefault(); setOrderSheet(true); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, touchAction: "manipulation" }}>
-                <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Buy</div>
-                <div className="text-[13px] font-bold tabular-nums">{ask != null ? gnum(ask, dg(selSym)) : "…"}</div>
-              </button>
+              {/* SELL | vol+sprd | BUY */}
+              <div className="flex items-stretch gap-1.5 px-2.5 pb-2">
+                <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, touchAction: "manipulation" }}>
+                  <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Sell</div>
+                  <div className="text-[13px] font-bold tabular-nums">{bid != null ? gnum(bid, dg(selSym)) : "…"}</div>
+                </button>
+                <button onPointerDown={(e) => { e.preventDefault(); setOrderSheet(true); }} className="flex shrink-0 flex-col items-center justify-center gap-0 rounded-xl border border-[var(--border)] px-3 py-1.5" style={{ background: "var(--soft)", touchAction: "manipulation" }}>
+                  <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>lots</span>
+                  <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{vol}</span>
+                  <span className="text-[7px] tabular-nums" style={{ color: "var(--muted)" }}>{Math.round(_mobSpreadPips(selSym) * 10)} sprd</span>
+                </button>
+                <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", vol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, touchAction: "manipulation" }}>
+                  <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Buy</div>
+                  <div className="text-[13px] font-bold tabular-nums">{ask != null ? gnum(ask, dg(selSym)) : "…"}</div>
+                </button>
+              </div>
             </div>
             {err && <div className="bg-[var(--panel)] pb-1 text-center text-[11px]" style={{ color: SELL }}>{err}</div>}
 
