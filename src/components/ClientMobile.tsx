@@ -418,7 +418,11 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {brand?.name && <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "color-mix(in srgb, var(--soft) 80%, transparent)", color: "var(--text)", border: "1px solid var(--border)" }}>{brand?.logoUrl ? <img src={brand.logoUrl} alt="" className="h-3.5 w-3.5 rounded object-contain" /> : <i className="fa-solid fa-cube" style={{ color: hPrimary }} />} {brand.name}</span>}
+            {account && positions && positions.length > 0 && (
+              <span className="rounded-full px-2.5 py-1 text-[10px] font-bold tabular-nums" style={{ background: floating >= 0 ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)", color: floating >= 0 ? BUY : SELL, border: `1px solid ${floating >= 0 ? "rgba(22,163,74,0.3)" : "rgba(220,38,38,0.3)"}` }}>
+                {floating >= 0 ? "+" : ""}${fmt(Math.abs(floating))}
+              </span>
+            )}
             <button onClick={() => { setNotisOpen((o) => !o); if (!notisOpen && unread > 0) fetch("/api/client/notifications", { method: "POST" }).then(() => {}).catch(() => {}); }} className="relative flex h-9 w-9 items-center justify-center rounded-full transition-transform active:scale-90" style={{ background: "var(--soft)", border: "1px solid var(--border)" }}>
               <i className="fa-solid fa-bell text-[13px]" style={{ color: unread > 0 ? GOLD : "var(--muted)" }} />
               {unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: SELL, border: "1.5px solid var(--bg)", boxShadow: `0 0 8px ${SELL}99` }}>{unread > 9 ? "9+" : unread}</span>}
@@ -1069,11 +1073,13 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── ACCOUNT (sub-tabs: Overview | History | News) ───────── */}
         {tab === "account" && (
           <div>
-            {/* Sub-tab bar */}
-            <div className="sticky top-0 z-10 flex gap-1 border-b border-[var(--border)] bg-[var(--bg)] px-3 pt-2 pb-0">
+            {/* Sub-tab bar — pill segment control */}
+            <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--bg)] px-3 py-2">
+              <div className="flex rounded-xl p-0.5" style={{ background: "var(--soft)" }}>
               {(["overview", "history", "news"] as const).map((st) => (
-                <button key={st} onClick={() => setAcctTab(st)} className="flex-1 pb-2 text-[12px] font-semibold capitalize transition-colors" style={{ color: acctTab === st ? "var(--accent)" : "var(--muted)", borderBottom: acctTab === st ? "2px solid var(--accent)" : "2px solid transparent" }}>{st === "overview" ? "Account" : st === "history" ? "History" : "News"}</button>
+                <button key={st} onClick={() => setAcctTab(st)} className="flex-1 rounded-[10px] py-1.5 text-[11px] font-semibold transition-all duration-200" style={{ background: acctTab === st ? "var(--panel)" : "transparent", color: acctTab === st ? "var(--text)" : "var(--muted)", boxShadow: acctTab === st ? "0 1px 3px rgba(0,0,0,0.15)" : "none" }}>{st === "overview" ? "Account" : st === "history" ? "History" : "News"}</button>
               ))}
+              </div>
             </div>
             {/* ── HISTORY sub-tab ── */}
             {acctTab === "history" && (
@@ -1548,18 +1554,23 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
       )}
 
-      {/* BOTTOM NAV — clean professional tab bar (icon + label, accent active) */}
-      <div style={{ background: "var(--panel)", borderTop: "1px solid var(--border)", paddingBottom: "max(0.45rem, env(safe-area-inset-bottom))" }} className="px-1 pt-1">
+      {/* BOTTOM NAV */}
+      <div style={{ background: "var(--panel)", borderTop: "1px solid var(--border)", paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }} className="px-2 pt-1.5">
         <div className="flex items-stretch justify-around">
           {navItems.map(([k, icon, label]) => {
             const active = tab === k;
             const col = active ? A1 : "var(--muted)";
+            const badge = k === "trades" && (positions || []).length > 0 ? (positions || []).length : k === "account" && needKyc ? "!" : null;
             return (
               <button key={k} onClick={() => startTransition(() => setTab(k as any))} aria-label={label}
-                className="relative flex flex-1 flex-col items-center gap-1 py-1.5 active:opacity-70">
-                <span className="absolute top-0 h-[3px] rounded-full transition-all duration-300" style={{ width: active ? 24 : 0, background: A1, opacity: active ? 1 : 0 }} />
-                <i className={`fa-solid ${icon}`} style={{ fontSize: 17, color: col, transition: "color .22s ease, transform .3s cubic-bezier(.34,1.56,.64,1)", transform: active ? "translateY(-1px) scale(1.06)" : "none" }} />
-                <span className="text-[9.5px] font-semibold tracking-tight" style={{ color: col, transition: "color .22s ease" }}>{label}</span>
+                className="relative flex flex-1 flex-col items-center gap-0.5 py-1 active:opacity-70">
+                {/* pill background on active */}
+                <span className="absolute inset-x-1 top-0.5 bottom-0.5 rounded-2xl transition-all duration-300" style={{ background: active ? `${A1}18` : "transparent" }} />
+                <span className="relative flex items-center justify-center">
+                  <i className={`fa-solid ${icon}`} style={{ fontSize: 18, color: col, transition: "color .2s, transform .25s cubic-bezier(.34,1.56,.64,1)", transform: active ? "scale(1.12)" : "scale(1)" }} />
+                  {badge && <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: badge === "!" ? "#f59e0b" : A1, border: "1.5px solid var(--panel)" }}>{badge}</span>}
+                </span>
+                <span className="relative text-[9px] font-bold tracking-wide" style={{ color: col, transition: "color .2s" }}>{label}</span>
               </button>
             );
           })}
