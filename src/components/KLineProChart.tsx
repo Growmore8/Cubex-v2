@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { io, type Socket } from "socket.io-client";
 import type { ChartPosition } from "./LWChart";
 import "@klinecharts/pro/dist/klinecharts-pro.css";
@@ -79,7 +79,6 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
   const coreRef = useRef<any>(null); // the REAL core klinecharts chart (reached via re-init)
   const bidAskIds = useRef<{ bid: string | null; ask: string | null }>({ bid: null, ask: null });
   const spreadPipsRef = useRef(spreadPips ?? 0); spreadPipsRef.current = spreadPips ?? 0;
-  const [spreadLabel, setSpreadLabel] = useState<{ pts: number } | null>(null);
 
   // build once
   useEffect(() => {
@@ -455,10 +454,6 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
       };
       upsert("ask", ask, "#26a69a", `Ask ${ask.toFixed(digits)}`);
       upsert("bid", bid, "#ef5350", `Bid ${bid.toFixed(digits)}`);
-      // Spread label: (ask − bid) in points (= pips × 10 for 5-digit)
-      const pip = Math.pow(10, -(digits - 1));
-      const rawSpPts = Math.round((ask - bid) / pip * 10) / 10;
-      if (rawSpPts > 0) setSpreadLabel({ pts: rawSpPts });
     };
     sock.on("tick", ({ symbol: sym, price, bid }: any) => { if (sym === symRef.current && price != null) updateLines(price, bid); });
     return () => { sock.disconnect(); };
@@ -487,13 +482,6 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         .klinecharts-pro-indicator-bar { justify-content: flex-start !important; padding-top: 4px !important; }
       `}</style>
       <div ref={elRef} className={`kline-chart-pro-wrap${bare ? " kline-bare" : ""}`} style={{ position: "absolute", inset: 0, overflow: "hidden", touchAction: "none" }} />
-      {/* MT5-style spread label — floats over the chart in the top-left corner */}
-      {spreadLabel && (
-        <div style={{ position: "absolute", top: bare ? 6 : 40, left: 8, pointerEvents: "none", zIndex: 20, display: "flex", alignItems: "center", gap: 4, background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "2px 7px", backdropFilter: "blur(2px)" }}>
-          <span style={{ fontSize: 10, color: "#aaa", letterSpacing: "0.04em" }}>Spread</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#f0b90b", fontVariantNumeric: "tabular-nums" }}>{Number.isInteger(spreadLabel.pts) ? spreadLabel.pts : spreadLabel.pts.toFixed(1)}</span>
-        </div>
-      )}
     </>
   );
 }
