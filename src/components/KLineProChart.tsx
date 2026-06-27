@@ -478,6 +478,8 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         .kline-chart-pro-wrap, .kline-chart-pro-wrap *,
         .klinecharts-pro, .klinecharts-pro *,
         [k-line-chart-id], [k-line-chart-id] * { touch-action: none !important; }
+        /* Push drawing-tool sidebar to the top of the chart area */
+        .klinecharts-pro-indicator-bar { justify-content: flex-start !important; padding-top: 4px !important; }
       `}</style>
       <div ref={elRef} className={`kline-chart-pro-wrap${bare ? " kline-bare" : ""}`} style={{ position: "absolute", inset: 0, overflow: "hidden", touchAction: "none" }} />
     </>
