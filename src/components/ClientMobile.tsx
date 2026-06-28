@@ -136,9 +136,12 @@ export default function ClientMobile({ t }: { t: any }) {
     if (!r.ok) { setProfileErr(r.error || "Update failed"); return; }
     setProfileModal(false);
   }
-  // Sync color-scheme on <html> so iOS shows dark keyboard when in dark mode
+  // Sync html/body with app theme so iOS keyboard and viewport edges match
   useEffect(() => {
-    document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
+    const isDark = theme === "dark";
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+    document.body.style.background = isDark ? "#0a0d12" : "#dfe5ee";
+    document.body.style.colorScheme = isDark ? "dark" : "light";
   }, [theme]);
 
   useEffect(() => {
