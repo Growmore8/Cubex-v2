@@ -803,7 +803,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   {([["ma", "MA period"], ["rsi", "RSI period"], ["bb", "Bollinger period"], ["macdF", "MACD fast"], ["macdS", "MACD slow"], ["macdSig", "MACD signal"]] as const).map(([k, lbl]) => (
                     <div key={k} className="mb-2.5 flex items-center justify-between gap-3">
                       <span className="text-[13px] text-[var(--muted)]">{lbl}</span>
-                      <input type="number" min={1} value={t.chartCfg?.[k] ?? ""} onChange={(e) => t.setChartCfg && t.setChartCfg((c: any) => ({ ...c, [k]: Math.max(1, Number(e.target.value) || 1) }))} className="w-20 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-right text-[15px] text-[var(--text)]" />
+                      <input type="number" inputMode="numeric" min={1} value={t.chartCfg?.[k] ?? ""} onChange={(e) => t.setChartCfg && t.setChartCfg((c: any) => ({ ...c, [k]: Math.max(1, Number(e.target.value) || 1) }))} className="w-20 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-right text-[15px] text-[var(--text)]" />
                     </div>
                   ))}
                   <button onClick={() => t.setChartCfg && t.setChartCfg({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 })} className="mt-1 w-full rounded-xl border border-[var(--border)] py-2.5 text-[12px] text-[var(--muted)]">Reset to defaults</button>
@@ -1057,9 +1057,9 @@ export default function ClientMobile({ t }: { t: any }) {
                         <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--soft)] p-3">
                           <div className="mb-2 text-[11px] font-semibold">Modify SL / TP / Trail</div>
                           <div className="grid grid-cols-2 gap-2">
-                            <input value={mSl} onChange={(e) => setMSl(e.target.value)} placeholder="Stop loss" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
-                            <input value={mTp} onChange={(e) => setMTp(e.target.value)} placeholder="Take profit" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
-                            <input value={mTrail} onChange={(e) => setMTrail(e.target.value)} type="number" min="0" placeholder="Trail pips (0=off)" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)] col-span-2" style={{ borderColor: mTrail ? "#f59e0b" : undefined }} />
+                            <input type="number" inputMode="decimal" value={mSl} onChange={(e) => setMSl(e.target.value)} placeholder="Stop loss" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
+                            <input type="number" inputMode="decimal" value={mTp} onChange={(e) => setMTp(e.target.value)} placeholder="Take profit" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
+                            <input type="number" inputMode="decimal" min="0" value={mTrail} onChange={(e) => setMTrail(e.target.value)} placeholder="Trail pips (0=off)" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)] col-span-2" style={{ borderColor: mTrail ? "#f59e0b" : undefined }} />
                           </div>
                           <div className="mt-2 flex gap-2">
                             <button onClick={() => setModifyId(null)} className="flex-1 rounded-lg border border-[var(--border)] py-2 text-[12px]">Cancel</button>
