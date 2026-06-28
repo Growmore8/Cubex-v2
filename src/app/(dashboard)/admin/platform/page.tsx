@@ -1336,45 +1336,77 @@ export default function AdminDeskPage() {
                         <SortTh tbl="cli" k="ip" label="Last IP" cls={thc} /><SortTh tbl="cli" k="status" label="Status" cls={thc} /><th className={thc + " text-right"}>Actions</th>
                       </tr></thead>
                       <tbody>
-                        {cliRows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No clients.</td></tr> : sortRows("cli", cliRows, {
-                          login: (c) => c.login, name: (c) => c.name, email: (c) => c.user?.email || c.email,
-                          phone: (c) => c.phone, country: (c) => c.country, manager: (c) => c.manager?.name,
-                          type: (c) => c.type, balance: (c) => balOf(c), online: (c) => (presenceOnline(c.user?.lastSeenAt) ? 1 : 0),
-                          ip: (c) => c.user?.lastLoginIp, status: (c) => (c.deactivated ? "Inactive" : c.locked ? "Locked" : "Active"),
-                        }).map((c: any) => {
-                          const email = c.user?.email || c.email || "-";
-                          const lastIp = c.user?.lastLoginIp || "-";
-                          const bal = balOf(c);
-                          const statusLabel = c.deactivated ? "Inactive" : c.locked ? "Locked" : "Active";
-                          const statusCol = c.deactivated ? GOLD : c.locked ? SELL : BUY;
-                          return (
-                            <tr key={c.id} className="border-b border-[var(--border)] hover:bg-[var(--soft)]" onContextMenu={(e) => { e.preventDefault(); setSelAcc(c); setMenu({ x: e.clientX, y: e.clientY, acc: c }); }}>
-                              <td className="px-2 py-1 font-medium" style={{ color: GOLD }}>
-                                <button onClick={() => setSelAcc(c)} title="Select account">{c.login}</button>
-                                {c.isPool && <span className="ml-1 text-[9px] rounded px-0.5" style={{ background: GOLD + "22", color: GOLD }}>POOL</span>}
-                              </td>
-                              <td className="px-2 py-1">{titleCaseName(c.name)}</td>
-                              <td className="px-2 py-1 text-[var(--muted)]">{email}</td>
-                              <td className="px-2 py-1 text-[var(--muted)]">{c.phone || "-"}</td>
-                              <td className="px-2 py-1 text-[var(--muted)]">{c.country || "-"}</td>
-                              <td className="px-2 py-1 text-[var(--muted)]">{c.manager?.name || "-"}</td>
-                              <td className="px-2 py-1">{c.type}</td>
-                              <td className="px-2 py-1 text-right" style={{ color: bal >= 0 ? BUY : SELL }}>{bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="px-2 py-1 text-center">{(() => { const on = presenceOnline(c.user?.lastSeenAt); const ls = c.user?.lastSeenAt ? new Date(c.user.lastSeenAt).toLocaleString() : "never"; return <span title={on ? "Online" : "Last seen " + ls} className={"inline-block h-2 w-2 rounded-full " + (on ? "bg-green-400" : "bg-gray-600")} style={on ? { boxShadow: "0 0 5px #4ade80" } : undefined} />; })()}</td>
-                              <td className="px-2 py-1 text-[var(--muted)]">{lastIp}</td>
-                              <td className="px-2 py-1" style={{ color: statusCol }}>{statusLabel}</td>
-                              <td className="px-2 py-1 text-right whitespace-nowrap">
-                                <button title="Edit" onClick={() => openAct("rename", c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen-to-square" /></button>
-                                <button title={c.locked ? "Unlock" : "Lock"} onClick={() => doStatus(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: c.locked ? BUY : SELL }}><i className={"fa-solid " + (c.locked ? "fa-lock-open" : "fa-lock")} /></button>
-                                <button title={c.deactivated ? "Activate" : "Deactivate"} onClick={() => doDeactivate(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: GOLD }}><i className={"fa-solid " + (c.deactivated ? "fa-circle-check" : "fa-ban")} /></button>
-                                <button title={c.isPool ? "Demote from Pool" : "Promote to Pool"} onClick={() => doPool(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "#a78bfa" }}><i className={"fa-solid " + (c.isPool ? "fa-circle-minus" : "fa-circle-plus")} /></button>
-                                <button title="Change ID" onClick={() => openAct("accountid", c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--muted)" }}><i className="fa-solid fa-id-card" /></button>
-                                <button title="Upload KYC" onClick={() => { setKycUploadFor(c); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); }} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "#38bdf8" }}><i className="fa-solid fa-id-card-clip" /></button>
-                                {can("deleteClients") && <button title="Delete" onClick={() => delClient(c)} className="rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {cliRows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No clients.</td></tr> : (() => {
+                          // Group same-user LIVE + DEMO accounts together
+                          const byUser = new Map<string, any[]>();
+                          const noUser: any[] = [];
+                          for (const c of cliRows) {
+                            if (!c.userId) { noUser.push(c); continue; }
+                            if (!byUser.has(c.userId)) byUser.set(c.userId, []);
+                            byUser.get(c.userId)!.push(c);
+                          }
+                          for (const accs of byUser.values()) {
+                            accs.sort((a: any, b: any) => (b.type === "LIVE" ? 1 : 0) - (a.type === "LIVE" ? 1 : 0));
+                          }
+                          const primaries = [...byUser.values()].map((g) => g[0]);
+                          const sortDef = { login: (c: any) => c.login, name: (c: any) => c.name, email: (c: any) => c.user?.email || c.email, phone: (c: any) => c.phone, country: (c: any) => c.country, manager: (c: any) => c.manager?.name, type: (c: any) => c.type, balance: (c: any) => balOf(c), online: (c: any) => (presenceOnline(c.user?.lastSeenAt) ? 1 : 0), ip: (c: any) => c.user?.lastLoginIp, status: (c: any) => (c.deactivated ? "Inactive" : c.locked ? "Locked" : "Active") };
+                          const allPrimaries = sortRows("cli", [...primaries, ...noUser], sortDef);
+                          const flatRows: { acc: any; isDemoSub: boolean }[] = [];
+                          const done = new Set<string>();
+                          for (const p of allPrimaries) {
+                            if (p.userId && byUser.has(p.userId) && !done.has(p.userId)) {
+                              done.add(p.userId);
+                              byUser.get(p.userId)!.forEach((acc: any, i: number) => flatRows.push({ acc, isDemoSub: i > 0 }));
+                            } else if (!p.userId) {
+                              flatRows.push({ acc: p, isDemoSub: false });
+                            }
+                          }
+                          return flatRows.map(({ acc: c, isDemoSub }) => {
+                            const email = c.user?.email || c.email || "-";
+                            const lastIp = c.user?.lastLoginIp || "-";
+                            const bal = balOf(c);
+                            const statusLabel = c.deactivated ? "Inactive" : c.locked ? "Locked" : "Active";
+                            const statusCol = c.deactivated ? GOLD : c.locked ? SELL : BUY;
+                            const kycApproved = c.type === "LIVE" && c.kycStatus === "APPROVED";
+                            const kycPending = c.type === "LIVE" && c.kycStatus === "PENDING";
+                            const kycRejected = c.type === "LIVE" && c.kycStatus === "REJECTED";
+                            return (
+                              <tr key={c.id} className="border-b border-[var(--border)] hover:bg-[var(--soft)]"
+                                style={isDemoSub ? { background: "rgba(99,102,241,0.04)", borderLeft: "2px solid rgba(99,102,241,0.25)" } : undefined}
+                                onContextMenu={(e) => { e.preventDefault(); setSelAcc(c); setMenu({ x: e.clientX, y: e.clientY, acc: c }); }}>
+                                <td className="px-2 py-1 font-medium" style={{ color: isDemoSub ? "#818cf8" : GOLD }}>
+                                  {isDemoSub && <span className="mr-0.5 text-[9px]" style={{ color: "rgba(99,102,241,0.4)" }}>└</span>}
+                                  <button onClick={() => setSelAcc(c)} title="Select account">{c.login}</button>
+                                  {c.isPool && <span className="ml-1 text-[9px] rounded px-0.5" style={{ background: GOLD + "22", color: GOLD }}>POOL</span>}
+                                </td>
+                                <td className="px-2 py-1">{titleCaseName(c.name)}</td>
+                                <td className="px-2 py-1 text-[var(--muted)]">{isDemoSub ? <span style={{ color: "rgba(99,102,241,0.5)" }}>↑</span> : email}</td>
+                                <td className="px-2 py-1 text-[var(--muted)]">{isDemoSub ? "" : (c.phone || "-")}</td>
+                                <td className="px-2 py-1 text-[var(--muted)]">{isDemoSub ? "" : (c.country || "-")}</td>
+                                <td className="px-2 py-1 text-[var(--muted)]">{c.manager?.name || "-"}</td>
+                                <td className="px-2 py-1">
+                                  <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: c.type === "LIVE" ? BUY + "22" : "#6366f122", color: c.type === "LIVE" ? BUY : "#818cf8" }}>{c.type}</span>
+                                  {kycApproved && <span className="ml-1 rounded px-1 py-0.5 text-[8px] font-bold" style={{ background: BUY + "22", color: BUY }} title="KYC Verified"><i className="fa-solid fa-shield-halved mr-0.5" />KYC</span>}
+                                  {kycPending && <span className="ml-1 rounded px-1 py-0.5 text-[8px] font-bold" style={{ background: GOLD + "22", color: GOLD }} title="KYC Pending"><i className="fa-solid fa-clock mr-0.5" />KYC</span>}
+                                  {kycRejected && <span className="ml-1 rounded px-1 py-0.5 text-[8px] font-bold" style={{ background: SELL + "22", color: SELL }} title="KYC Rejected"><i className="fa-solid fa-xmark mr-0.5" />KYC</span>}
+                                </td>
+                                <td className="px-2 py-1 text-right" style={{ color: bal >= 0 ? BUY : SELL }}>{bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="px-2 py-1 text-center">{(() => { const on = presenceOnline(c.user?.lastSeenAt); const ls = c.user?.lastSeenAt ? new Date(c.user.lastSeenAt).toLocaleString() : "never"; return <span title={on ? "Online" : "Last seen " + ls} className={"inline-block h-2 w-2 rounded-full " + (on ? "bg-green-400" : "bg-gray-600")} style={on ? { boxShadow: "0 0 5px #4ade80" } : undefined} />; })()}</td>
+                                <td className="px-2 py-1 text-[var(--muted)]">{lastIp}</td>
+                                <td className="px-2 py-1" style={{ color: statusCol }}>{statusLabel}</td>
+                                <td className="px-2 py-1 text-right whitespace-nowrap">
+                                  <button title="Edit" onClick={() => openAct("rename", c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen-to-square" /></button>
+                                  <button title={c.locked ? "Unlock" : "Lock"} onClick={() => doStatus(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: c.locked ? BUY : SELL }}><i className={"fa-solid " + (c.locked ? "fa-lock-open" : "fa-lock")} /></button>
+                                  <button title={c.deactivated ? "Activate" : "Deactivate"} onClick={() => doDeactivate(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: GOLD }}><i className={"fa-solid " + (c.deactivated ? "fa-circle-check" : "fa-ban")} /></button>
+                                  <button title={c.isPool ? "Demote from Pool" : "Promote to Pool"} onClick={() => doPool(c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "#a78bfa" }}><i className={"fa-solid " + (c.isPool ? "fa-circle-minus" : "fa-circle-plus")} /></button>
+                                  <button title="Change ID" onClick={() => openAct("accountid", c)} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--muted)" }}><i className="fa-solid fa-id-card" /></button>
+                                  <button title="Upload KYC" onClick={() => { setKycUploadFor(c); setKycUploadType("PASSPORT"); setKycUploadFile(null); setKycUpMsg(""); }} className="mr-0.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: kycApproved ? BUY : "#38bdf8" }}><i className={"fa-solid " + (kycApproved ? "fa-shield-halved" : "fa-id-card-clip")} /></button>
+                                  {can("deleteClients") && <button title="Delete" onClick={() => delClient(c)} className="rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>}
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
