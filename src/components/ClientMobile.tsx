@@ -52,8 +52,10 @@ function LotStepper({ vol, setVol, small }: { vol: number; setVol: (v: number) =
       <div className="flex items-center gap-1.5">
         <button onPointerDown={(e) => { e.preventDefault(); stepDown(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>−</button>
         <input
-          type="text"
+          type="number"
           inputMode="decimal"
+          step="0.01"
+          min="0.01"
           value={inp}
           onChange={e => setInp(e.target.value)}
           onFocus={e => e.target.select()}
