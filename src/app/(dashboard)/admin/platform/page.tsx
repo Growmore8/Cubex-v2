@@ -2512,18 +2512,14 @@ export default function AdminDeskPage() {
                       </button>
                     </div>
                     <div className="flex items-center gap-2">
-                      <select value={adminSymTypes[s.symbol] || "FLOATING"} onChange={(e) => { const v = e.target.value; setAdminSymTypes((m) => ({ ...m, [s.symbol]: v })); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spreadType: v }) }).catch(() => {}); }} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[9px]" style={{ color: "var(--text)" }}>
-                        <option value="FLOATING">Float</option><option value="FIXED">Fixed</option>
-                      </select>
-                      {(adminSymTypes[s.symbol] || "FLOATING") === "FIXED" ? (<>
-                        <span style={{ color: "var(--muted)", fontSize: 9 }}>Pips</span>
-                        <input type="number" min="0" step="0.1" value={adminSymSpreads[s.symbol] ?? 0} onChange={(e) => setAdminSymSpreads((m) => ({ ...m, [s.symbol]: Number(e.target.value) }))}
-                          onBlur={(e) => { const v = Math.max(0, Number(e.target.value)); const sid = adminSymIds[s.symbol]; if (sid) fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: v, spreadMax: 0 }) }).catch(() => {}); setAdminSymSpreads((m) => ({ ...m, [s.symbol]: v })); }}
-                          className="w-12 rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-center text-[10px]" style={{ color: "var(--text)" }} />
-                      </>) : (
-                        <span className="text-[9px] rounded px-1.5 py-0.5" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>Auto spread</span>
+                      {(adminSymTypes[s.symbol] || "FLOATING") === "FIXED" ? (
+                        <span className="text-[9px] rounded px-1.5 py-0.5 font-semibold" style={{ background: "rgba(59,130,246,0.12)", color: "#3b82f6" }}>
+                          Fixed · {adminSymSpreads[s.symbol] ?? 0} pips
+                        </span>
+                      ) : (
+                        <span className="text-[9px] rounded px-1.5 py-0.5 font-semibold" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>Auto spread</span>
                       )}
-                      <button title="Swap & commission settings" onClick={() => { const sid = adminSymIds[s.symbol]; if (sid) setSymEdit({ sym: s.symbol, id: sid, spread: adminSymSpreads[s.symbol] ?? 0, spreadType: adminSymTypes[s.symbol] ?? "FLOATING", spreadMax: adminSymMax[s.symbol] ?? 0, swapLong: Number(s.swapLong ?? 0), swapShort: Number(s.swapShort ?? 0), commissionPerLot: Number(s.commissionPerLot ?? 0) }); }} className="ml-auto rounded p-1 text-[10px]" style={{ color: "var(--muted)" }}>
+                      <button title="Spread, swap & commission settings" onClick={() => { const sid = adminSymIds[s.symbol]; if (sid) setSymEdit({ sym: s.symbol, id: sid, spread: adminSymSpreads[s.symbol] ?? 0, spreadType: adminSymTypes[s.symbol] ?? "FLOATING", spreadMax: adminSymMax[s.symbol] ?? 0, swapLong: Number(s.swapLong ?? 0), swapShort: Number(s.swapShort ?? 0), commissionPerLot: Number(s.commissionPerLot ?? 0) }); }} className="ml-auto rounded p-1 text-[10px]" style={{ color: "var(--muted)" }}>
                         <i className="fa-solid fa-gear" />
                       </button>
                     </div>
