@@ -118,7 +118,7 @@ export default function ClientMobile({ t }: { t: any }) {
   };
 
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "account">("dashboard");
-  const [acctTab, setAcctTab] = useState<"overview" | "history" | "news">("overview");
+  const [acctTab, setAcctTab] = useState<"overview" | "history">("overview");
   const [mobNews, setMobNews] = useState<any[]>([]);
   const [mobNewsLoading, setMobNewsLoading] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
@@ -190,7 +190,7 @@ export default function ClientMobile({ t }: { t: any }) {
   useEffect(() => { if (tab === "account" && !myReqsLoaded) loadMyReqs(); }, [tab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const loadMobAlerts = () => { if (!accId) return; fetch(`/api/client/alerts?accountId=${accId}`).then((r) => r.json()).then((r) => { if (r.ok) setMobAlerts(r.alerts || []); }).catch(() => {}); };
   useEffect(() => { loadMobAlerts(); }, [accId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (acctTab === "news" && mobNews.length === 0 && !mobNewsLoading) { setMobNewsLoading(true); fetch("/api/client/news?category=forex").then((r) => r.json()).then((d) => { if (d.ok) setMobNews(d.items || []); }).catch(() => {}).finally(() => setMobNewsLoading(false)); } }, [acctTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tab === "dashboard" && mobNews.length === 0 && !mobNewsLoading) { setMobNewsLoading(true); fetch("/api/client/news?category=forex").then((r) => r.json()).then((d) => { if (d.ok) setMobNews(d.items || []); }).catch(() => {}).finally(() => setMobNewsLoading(false)); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   const reqRow = (req: any) => {
     const isAcc = req.kind === "ACCOUNT";
     const ic = isAcc ? "fa-circle-plus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";
@@ -678,6 +678,29 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               )}
             </div>
+
+            {/* news below market movers */}
+            <div className="glass-card p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-[11px] font-bold tracking-wide"><i className="fa-solid fa-newspaper mr-1.5" style={{ color: "var(--accent)" }} />LATEST NEWS</div>
+                {mobNewsLoading && <i className="fa-solid fa-circle-notch fa-spin text-[10px] text-[var(--muted)]" />}
+              </div>
+              {!mobNewsLoading && mobNews.length === 0 ? (
+                <div className="py-3 text-center text-[11px] text-[var(--muted)]">No news available</div>
+              ) : (
+                <div className="space-y-3">
+                  {mobNews.slice(0, 5).map((n: any) => (
+                    <a key={n.id} href={n.url} target="_blank" rel="noreferrer" className="block rounded-xl active:opacity-70">
+                      <div className="text-[12px] font-semibold leading-snug text-[var(--text)] line-clamp-2">{n.headline}</div>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-[var(--muted)]">
+                        <span>{n.source}</span><span>·</span>
+                        <span>{n.datetime ? new Date(n.datetime * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}</span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}</KeepAlive>
 
@@ -1074,14 +1097,14 @@ export default function ClientMobile({ t }: { t: any }) {
           </div>
         )}
 
-        {/* ───────── ACCOUNT (sub-tabs: Overview | History | News) ───────── */}
+        {/* ───────── ACCOUNT (sub-tabs: Account | History) ───────── */}
         {tab === "account" && (
           <div>
             {/* Sub-tab bar — pill segment control */}
             <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--bg)] px-3 py-2">
               <div className="flex rounded-xl p-0.5" style={{ background: "var(--soft)" }}>
-              {(["overview", "history", "news"] as const).map((st) => (
-                <button key={st} onClick={() => setAcctTab(st)} className="flex-1 rounded-[10px] py-1.5 text-[11px] font-semibold transition-all duration-200" style={{ background: acctTab === st ? "var(--panel)" : "transparent", color: acctTab === st ? "var(--text)" : "var(--muted)", boxShadow: acctTab === st ? "0 1px 3px rgba(0,0,0,0.15)" : "none" }}>{st === "overview" ? "Account" : st === "history" ? "History" : "News"}</button>
+              {(["overview", "history"] as const).map((st) => (
+                <button key={st} onClick={() => setAcctTab(st)} className="flex-1 rounded-[10px] py-1.5 text-[11px] font-semibold transition-all duration-200" style={{ background: acctTab === st ? "var(--panel)" : "transparent", color: acctTab === st ? "var(--text)" : "var(--muted)", boxShadow: acctTab === st ? "0 1px 3px rgba(0,0,0,0.15)" : "none" }}>{st === "overview" ? "Account" : "History"}</button>
               ))}
               </div>
             </div>
@@ -1091,7 +1114,6 @@ export default function ClientMobile({ t }: { t: any }) {
             <div className="mb-3 flex gap-2">
               <button onClick={() => setHistTab("trades")} className="flex-1 rounded-lg py-2 text-[12px] font-semibold" style={{ background: histTab === "trades" ? BLUE : "var(--soft)", color: histTab === "trades" ? "#fff" : "var(--muted)" }}>Trades</button>
               <button onClick={() => setHistTab("financial")} className="flex-1 rounded-lg py-2 text-[12px] font-semibold" style={{ background: histTab === "financial" ? BLUE : "var(--soft)", color: histTab === "financial" ? "#fff" : "var(--muted)" }}>Financial</button>
-              <a href={`/api/client/statement?accountId=${accId}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg px-3 py-2 text-[12px] font-semibold text-white" style={{ background: "#ef4444", textDecoration: "none" }} title="Download PDF statement"><i className="fa-solid fa-file-pdf text-[10px]" /> PDF</a>
             </div>
             {histTab === "trades" ? (
               <div className="space-y-2.5">
@@ -1157,24 +1179,6 @@ export default function ClientMobile({ t }: { t: any }) {
         )}
 
             {/* ── NEWS sub-tab ── */}
-            {acctTab === "news" && (
-              <div className="p-3">
-                {mobNewsLoading ? (
-                  <div className="py-10 text-center text-[12px] text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-1" />Loading news…</div>
-                ) : mobNews.length === 0 ? (
-                  <div className="py-10 text-center text-[12px] text-[var(--muted)]">No news available.</div>
-                ) : (
-                  <div className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
-                    {mobNews.map((n: any) => (
-                      <a key={n.id} href={n.url} target="_blank" rel="noreferrer" className="block px-3 py-3 active:bg-[var(--soft)]" style={{ textDecoration: "none" }}>
-                        <div className="text-[12px] font-medium leading-tight text-[var(--text)]">{n.headline}</div>
-                        <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--muted)]"><span>{n.source}</span><span>·</span><span>{new Date(n.datetime * 1000).toLocaleString()}</span></div>
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* ── OVERVIEW (Account/Profile) sub-tab ── */}
             {acctTab === "overview" && (
