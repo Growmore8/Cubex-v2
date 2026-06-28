@@ -197,6 +197,7 @@ export default function AdminDeskPage() {
   const [perms, setPerms] = useState<Record<string, boolean>>({});
   const [brand, setBrand] = useState<{ name: string; logoUrl: string | null }>({ name: "", logoUrl: null });
   const [trial, setTrial] = useState<{ active: boolean; daysLeft: number } | null>(null);
+  const [swapEnabled, setSwapEnabled] = useState(true);
   const can = (k: string) => perms[k] !== false; // default allow until /me resolves
   const [fundPnlOnly, setFundPnlOnly] = useState(false);
   useEffect(() => { fetch("/api/admin/fund-settings").then((r) => r.json()).then((d) => { if (d.ok) setFundPnlOnly(!!d.pnlOnly); }).catch(() => {}); }, []);
@@ -306,7 +307,7 @@ export default function AdminDeskPage() {
   }
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((d) => {
-      if (d.ok && d.user) { roleRef.current = d.user.role; setRole(d.user.role); setPerms(d.perms || {}); if (d.brand) setBrand(d.brand); setTrial(d.trial || null); }
+      if (d.ok && d.user) { roleRef.current = d.user.role; setRole(d.user.role); setPerms(d.perms || {}); if (d.brand) setBrand(d.brand); setTrial(d.trial || null); setSwapEnabled(d.swapEnabled !== false); }
     }).catch(() => {}).finally(() => loadAll());
   }, []);
   const notifSeen = useRef<Set<string>>(new Set());
@@ -1114,7 +1115,7 @@ export default function AdminDeskPage() {
                     <th className={thc}><input type="checkbox" checked={tAllOn} onChange={tToggleAll} /></th>
                     <SortTh tbl="trade" k="date" label="Date Time" cls={thc} /><SortTh tbl="trade" k="oid" label="Order ID" cls={thc} /><SortTh tbl="trade" k="symbol" label="Symbol" cls={thc} /><SortTh tbl="trade" k="type" label="Type" cls={thc} />
                     <SortTh tbl="trade" k="lots" label="Lots" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="openPrice" label="Open Price" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="sl" label="S/L" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="tp" label="T/P" align="right" cls={thc + " text-right"} />
-                    <SortTh tbl="trade" k="current" label="Current" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="pnl" label="PnL" align="right" cls={thc + " text-right"} /><th className={thc + " text-right"}>Swap</th><th className={thc + " text-right"}>Comm</th><th className={thc + " text-right"}>Action</th>
+                    <SortTh tbl="trade" k="current" label="Current" align="right" cls={thc + " text-right"} /><SortTh tbl="trade" k="pnl" label="PnL" align="right" cls={thc + " text-right"} />{swapEnabled && <><th className={thc + " text-right"}>Swap</th><th className={thc + " text-right"}>Comm</th></>}<th className={thc + " text-right"}>Action</th>
                   </tr></thead>
                   <tbody>
                     {tSelIds.length > 0 && (<tr><td colSpan={14} className="px-2 py-1 space-x-1">
@@ -1161,8 +1162,8 @@ export default function AdminDeskPage() {
                           </td>
                           <td className="px-2 py-1 text-right">{pxFmt(p.symbol, cur)}</td>
                           <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{gnum(pl, 2)}</td>
-                          <td className="px-2 py-1 text-right" style={{ color: Number(p.swap ?? 0) >= 0 ? BUY : SELL }} title="Accumulated swap">{Number(p.swap ?? 0) !== 0 ? gnum(Number(p.swap), 2) : "—"}</td>
-                          <td className="px-2 py-1 text-right" style={{ color: SELL }} title="Commission charged">{Number(p.commission ?? 0) !== 0 ? gnum(Number(p.commission), 2) : "—"}</td>
+                          {swapEnabled && <><td className="px-2 py-1 text-right" style={{ color: Number(p.swap ?? 0) >= 0 ? BUY : SELL }} title="Accumulated swap">{Number(p.swap ?? 0) !== 0 ? gnum(Number(p.swap), 2) : "—"}</td>
+                          <td className="px-2 py-1 text-right" style={{ color: SELL }} title="Commission charged">{Number(p.commission ?? 0) !== 0 ? gnum(Number(p.commission), 2) : "—"}</td></>}
                           <td className="px-2 py-1 text-right whitespace-nowrap">
                             {isEditing ? (<>
                               <button onClick={() => modifyTrade(p.id, { sl: ie.sl !== undefined ? Number(ie.sl) : Number(p.sl) || 0, tp: ie.tp !== undefined ? Number(ie.tp) : Number(p.tp) || 0, ...(ie.lots ? { lots: ie.lots } : {}), ...(ie.openPrice ? { openPrice: ie.openPrice } : {}), ...(ie.type ? { type: ie.type } : {}), ...(ie.openedAt ? { openedAt: ie.openedAt } : {}) })} className="mr-1 rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: BUY, color: "#fff" }}>Save</button>
@@ -1263,7 +1264,7 @@ export default function AdminDeskPage() {
                         <th className={thc}><input type="checkbox" checked={hAllOn} onChange={hToggleAll} /></th>
                         <SortTh tbl="hist" k="date" label="Date/Time" cls={thc} /><SortTh tbl="hist" k="ref" label="Order/Ref" cls={thc} /><SortTh tbl="hist" k="type" label="Type" cls={thc} /><SortTh tbl="hist" k="symbol" label="Symbol" cls={thc} /><SortTh tbl="hist" k="desc" label="Desc" cls={thc} />
                         <SortTh tbl="hist" k="openPx" label="Open Px" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="closePx" label="Close Px" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="sl" label="S/L" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="tp" label="T/P" align="right" cls={thc + " text-right"} />
-                        <SortTh tbl="hist" k="closeTime" label="Close Time" cls={thc} /><SortTh tbl="hist" k="pnl" label="Gross P&L" align="right" cls={thc + " text-right"} /><th className={thc + " text-right"}>Swap</th><th className={thc + " text-right"}>Comm</th><th className={thc + " text-right"}>Net P&L</th><th className={thc + " text-right"}>Edit</th>
+                        <SortTh tbl="hist" k="closeTime" label="Close Time" cls={thc} /><SortTh tbl="hist" k="pnl" label="Gross P&L" align="right" cls={thc + " text-right"} />{swapEnabled && <><th className={thc + " text-right"}>Swap</th><th className={thc + " text-right"}>Comm</th></>}<th className={thc + " text-right"}>{swapEnabled ? "Net P&L" : "P&L"}</th><th className={thc + " text-right"}>Edit</th>
                       </tr></thead>
                       <tbody>
                         {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={16}>No history.</td></tr> : sortRows("hist", rows, {
@@ -1286,9 +1287,9 @@ export default function AdminDeskPage() {
                             <td className="px-2 py-1 text-right">{h.tp ? pxFmt(h.symbol, h.tp) : "-"}</td>
                             <td className="px-2 py-1 text-[var(--muted)]">{hdt(h) ? new Date(hdt(h)).toLocaleString() : "-"}</td>
                             <td className="px-2 py-1 text-right" style={{ color: (h.pnl ?? 0) >= 0 ? BUY : SELL }}>{h.pnl != null ? gnum(h.pnl, 2) : "-"}</td>
-                            <td className="px-2 py-1 text-right" style={{ color: Number(h.swap ?? 0) >= 0 ? BUY : SELL }}>{h.kind === "TRADE" && Number(h.swap ?? 0) !== 0 ? gnum(Number(h.swap), 2) : "—"}</td>
-                            <td className="px-2 py-1 text-right" style={{ color: SELL }}>{h.kind === "TRADE" && Number(h.commission ?? 0) !== 0 ? gnum(Number(h.commission), 2) : "—"}</td>
-                            {(() => { const net = Number(h.pnl ?? 0) + Number(h.swap ?? 0) - Number(h.commission ?? 0); return <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{h.kind === "TRADE" ? gnum(net, 2) : "—"}</td>; })()}
+                            {swapEnabled && <><td className="px-2 py-1 text-right" style={{ color: Number(h.swap ?? 0) >= 0 ? BUY : SELL }}>{h.kind === "TRADE" && Number(h.swap ?? 0) !== 0 ? gnum(Number(h.swap), 2) : "—"}</td>
+                            <td className="px-2 py-1 text-right" style={{ color: SELL }}>{h.kind === "TRADE" && Number(h.commission ?? 0) !== 0 ? gnum(Number(h.commission), 2) : "—"}</td></>}
+                            {(() => { const net = Number(h.pnl ?? 0) + (swapEnabled ? Number(h.swap ?? 0) : 0) - (swapEnabled ? Number(h.commission ?? 0) : 0); return <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{h.kind === "TRADE" ? gnum(net, 2) : "—"}</td>; })()}
                             <td className="px-2 py-1 text-right whitespace-nowrap" title={h.comment || ""}>{h.comment && <i className="fa-solid fa-comment mr-1 text-[8px] text-[var(--muted)]" title={h.comment} />}<button title="Edit" onClick={() => openHEdit(h)} className="mr-1.5 rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: "var(--accent)" }}><i className="fa-solid fa-pen" /></button><button title="Delete" onClick={() => delHist(h)} className="rounded px-1.5 py-0.5 hover:bg-[var(--soft)]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button></td>
                           </tr>
                         ))}

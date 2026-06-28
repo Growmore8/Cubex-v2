@@ -12,8 +12,8 @@ export async function GET() {
   let trial: { active: boolean; daysLeft: number; endsAt: string | null } | null = null;
   if (s.tenantId) {
     try {
-      const t = await prisma.tenant.findUnique({ where: { id: s.tenantId }, select: { name: true, brandName: true, logoUrl: true } });
-      if (t) brand = { name: t.brandName || t.name, logoUrl: t.logoUrl };
+      const t = await prisma.tenant.findUnique({ where: { id: s.tenantId }, select: { name: true, brandName: true, logoUrl: true, swapEnabled: true } });
+      if (t) { brand = { name: t.brandName || t.name, logoUrl: t.logoUrl }; (brand as any).swapEnabled = !!(t as any).swapEnabled; }
       const sub = await prisma.subscription.findUnique({ where: { tenantId: s.tenantId }, select: { status: true, endsAt: true } });
       if (sub && sub.status === "TRIALING" && sub.endsAt) {
         const msLeft = new Date(sub.endsAt).getTime() - Date.now();
@@ -27,5 +27,6 @@ export async function GET() {
     perms,
     brand,
     trial,
+    swapEnabled: (brand as any).swapEnabled ?? true,
   });
 }

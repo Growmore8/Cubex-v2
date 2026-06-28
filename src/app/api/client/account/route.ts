@@ -103,8 +103,8 @@ export async function GET(req: Request) {
   // tenant branding for the app header (never "CubeX")
   let brand: { name: string; logoUrl: string | null; primaryColor: string | null; accentColor: string | null } = { name: "", logoUrl: null, primaryColor: null, accentColor: null };
   try {
-    const t = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { name: true, brandName: true, logoUrl: true, primaryColor: true, accentColor: true } });
-    if (t) brand = { name: t.brandName || t.name, logoUrl: t.logoUrl, primaryColor: (t as any).primaryColor || null, accentColor: (t as any).accentColor || null };
+    const t = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { name: true, brandName: true, logoUrl: true, primaryColor: true, accentColor: true, swapEnabled: true } });
+    if (t) { brand = { name: t.brandName || t.name, logoUrl: t.logoUrl, primaryColor: (t as any).primaryColor || null, accentColor: (t as any).accentColor || null }; (brand as any).swapEnabled = !!(t as any).swapEnabled; }
   } catch {}
 
   // Withdraw/transfer cap for THIS (selected) account, per tenant pnl-only setting.
@@ -115,6 +115,7 @@ export async function GET(req: Request) {
     ok: true,
     kycVerified,
     brand,
+    swapEnabled: !!(brand as any).swapEnabled,
     pnlOnly,
     withdrawable,
     account: account ? {

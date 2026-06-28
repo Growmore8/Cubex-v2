@@ -95,7 +95,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [noForm, setNoForm] = useState<any>({ idx: 0, lots: 0.01, trigger: "", sl: "", tp: "" });
   const [balOpen, setBalOpen] = useState(false);
   const {
-    theme, brand, account, accts, accId, pnlOnly, readOnly, isTrial, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
+    theme, brand, account, accts, accId, pnlOnly, swapEnabled, readOnly, isTrial, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
     selSym, vol, sl, tp, err,
     balance, equity, floating, free, used, level, price, bid, ask, tf, TFS,
     setSelSym, setVol, setSl, setTp, setTf,
@@ -1047,8 +1047,8 @@ export default function ClientMobile({ t }: { t: any }) {
                         <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{p.tp ? gnum(Number(p.tp), dd) : "—"}</div></div>
                         <div><div className="text-[var(--muted)]">TYPE</div><div className="font-semibold">{p.type}</div></div>
                         {Number(p.trailingStop ?? 0) > 0 && <div><div className="text-[var(--muted)]">TRAIL</div><div className="font-semibold" style={{ color: "#f59e0b" }}>{Number(p.trailingStop)}p</div></div>}
-                        {Number(p.commission ?? 0) !== 0 && <div><div className="text-[var(--muted)]">COMM</div><div className="font-semibold" style={{ color: SELL }}>-{fmt(Math.abs(Number(p.commission)))}</div></div>}
-                        {Number(p.swap ?? 0) !== 0 && <div><div className="text-[var(--muted)]">SWAP</div><div className="font-semibold" style={{ color: Number(p.swap) >= 0 ? BUY : SELL }}>{Number(p.swap) >= 0 ? "+" : ""}{fmt(Number(p.swap))}</div></div>}
+                        {swapEnabled && Number(p.commission ?? 0) !== 0 && <div><div className="text-[var(--muted)]">COMM</div><div className="font-semibold" style={{ color: SELL }}>-{fmt(Math.abs(Number(p.commission)))}</div></div>}
+                        {swapEnabled && Number(p.swap ?? 0) !== 0 && <div><div className="text-[var(--muted)]">SWAP</div><div className="font-semibold" style={{ color: Number(p.swap) >= 0 ? BUY : SELL }}>{Number(p.swap) >= 0 ? "+" : ""}{fmt(Number(p.swap))}</div></div>}
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2">
                         <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); setMTrail(p.trailingStop > 0 ? String(p.trailingStop) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-pen mr-1" />Modify</button>
@@ -1148,7 +1148,7 @@ export default function ClientMobile({ t }: { t: any }) {
                         </div>
                       </div>
                       <div className="mt-1 flex gap-2 text-[10px] text-[var(--muted)]"><span className="tabular-nums">#{h.ticket || "—"}</span><span>{gnum(Number(h.openPrice), dd)} → {gnum(Number(h.closePrice), dd)}</span></div>
-                      {(Number(h.swap ?? 0) !== 0 || Number(h.commission ?? 0) !== 0) && (() => { const net = Number(h.pnl) + Number(h.swap ?? 0) - Number(h.commission ?? 0); return (
+                      {swapEnabled && (Number(h.swap ?? 0) !== 0 || Number(h.commission ?? 0) !== 0) && (() => { const net = Number(h.pnl) + Number(h.swap ?? 0) - Number(h.commission ?? 0); return (
                         <div className="mt-1 flex gap-3 text-[9px]">
                           {Number(h.swap ?? 0) !== 0 && <span style={{ color: Number(h.swap) >= 0 ? BUY : SELL }}>Swap {Number(h.swap) >= 0 ? "+" : ""}{fmt(Number(h.swap))}</span>}
                           {Number(h.commission ?? 0) !== 0 && <span style={{ color: SELL }}>Comm -{fmt(Number(h.commission))}</span>}
