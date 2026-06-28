@@ -107,7 +107,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         const toBar = (b: any) => ({ timestamp: b.time * 1000, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume ?? 0 });
 
         // localStorage cache — 15-minute TTL, skip empty entries
-        const CACHE_TTL = 15 * 60 * 1000;
+        const CACHE_TTL = 60 * 60 * 1000; // 1 hour — 5000 bars takes time to fetch
         let cached: any[] | null = null;
         try {
           const c = JSON.parse(localStorage.getItem(ck) || "null");
@@ -118,7 +118,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         // Initial fetch — 500 bars (fast). Server caches by symbol+tf+limit.
         if (!cached) {
           try {
-            const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}&limit=500`, { cache: "no-store" }).then((x) => x.json());
+            const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}&limit=5000`, { cache: "no-store" }).then((x) => x.json());
             if (r?.ok && r.candles?.length) {
               const fresh: any[] = r.candles.map(toBar);
               cached = fresh;
@@ -134,7 +134,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         if (oldest && from > 0 && from < oldest) {
           try {
             const beforeSec = Math.floor(oldest / 1000);
-            const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}&before=${beforeSec}&limit=2000`, { cache: "no-store" }).then((x) => x.json());
+            const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}&before=${beforeSec}&limit=5000`, { cache: "no-store" }).then((x) => x.json());
             if (r?.ok && r.candles?.length) {
               const earlier = r.candles.map(toBar);
               const seen = new Set<number>();
