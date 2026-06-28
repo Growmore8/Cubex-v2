@@ -69,6 +69,7 @@ export default function ClientTerminal() {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
+  const [spreadDirs, setSpreadDirs] = useState<Record<string, number>>({});
   const notifSeen = useRef<Set<string>>(new Set());
   const notifPrimed = useRef(false);
   const prevLevelRef = useRef<number | null>(null);
@@ -243,13 +244,16 @@ export default function ClientTerminal() {
     const pP: Record<string, number> = {};
     const pD: Record<string, number> = {};
     const pS: Record<string, number> = {};
+    const pSD: Record<string, number> = {};
+    const prevSp: Record<string, number> = {};
     const flush = () => {
-      const pxKeys = Object.keys(pP), drKeys = Object.keys(pD), skKeys = Object.keys(pS);
-      if (!pxKeys.length && !drKeys.length && !skKeys.length) return;
-      const px = { ...pP }, dr = { ...pD }, sp = { ...pS };
-      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pS) delete pS[k];
+      const pxKeys = Object.keys(pP), drKeys = Object.keys(pD), skKeys = Object.keys(pS), sdKeys = Object.keys(pSD);
+      if (!pxKeys.length && !drKeys.length && !skKeys.length && !sdKeys.length) return;
+      const px = { ...pP }, dr = { ...pD }, sp = { ...pS }, sd = { ...pSD };
+      for (const k in pP) delete pP[k]; for (const k in pD) delete pD[k]; for (const k in pS) delete pS[k]; for (const k in pSD) delete pSD[k];
       // Spread pips: urgent (drives bid/ask display, must not lag)
       if (skKeys.length) setLiveSpreadPips((ss) => ({ ...ss, ...sp }));
+      if (sdKeys.length) setSpreadDirs((sd2) => ({ ...sd2, ...sd }));
       // Smoothed prices + dirs: low-priority (visual animation)
       startTransition(() => {
         if (pxKeys.length) setPrices((pp) => ({ ...pp, ...px }));
@@ -266,7 +270,11 @@ export default function ClientTerminal() {
       // Compute live exchange spread from real ask vs exchange bid for FLOATING display
       if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
         const d = DIGITS[symbol] ?? 2;
-        pS[symbol] = (real - bid) / Math.pow(10, -(d - 1));
+        const sp2 = (real - bid) / Math.pow(10, -(d - 1));
+        const pv2 = prevSp[symbol];
+        if (pv2 != null && sp2 !== pv2) pSD[symbol] = sp2 > pv2 ? 1 : -1;
+        prevSp[symbol] = sp2;
+        pS[symbol] = sp2;
       }
     });
     // Initial price snapshot on connect — seeds prices for frozen/closed markets so
@@ -278,7 +286,10 @@ export default function ClientTerminal() {
       }
     });
     const flushIv = setInterval(flush, 80);
-    const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
+    const clr = setInterval(() => {
+      setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; });
+      setSpreadDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; });
+    }, 650);
     socket.on("refresh", (p: any) => { if (p && p.kind === "notification") loadNotifs(); else load(); });
     // Real-time spread updates: admin changes spread → server pushes to tenant room → update instantly
     socket.on("sym-spreads", (spreads: Record<string, { min: number; max: number; type: string }>) => {
@@ -878,24 +889,24 @@ export default function ClientTerminal() {
             {favs.length > 0 && (
               <div>
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
-                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); return (
+                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; return (
                   <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
-                    <span className="text-right pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{sp > 0 ? Math.round(sp * 10) : "\u2014"}</span>
+                    <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: spDir !== 0 ? 700 : 500, color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)", transition: "color 0.55s ease-out" }}>{sp > 0 ? Math.round(sp * 10) : "\u2014"}</span>
                   </div>); })}
               </div>
             )}
             {orderedGroups.map(([c, list]) => (
               <div key={c}>
                 <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
-                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); return (
+                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; return (
                   <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
-                    <span className="text-right pr-1 tabular-nums" style={{ color: "var(--muted)", fontSize: 9 }}>{sp > 0 ? Math.round(sp * 10) : "\u2014"}</span>
+                    <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: spDir !== 0 ? 700 : 500, color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)", transition: "color 0.55s ease-out" }}>{sp > 0 ? Math.round(sp * 10) : "\u2014"}</span>
                   </div>); })}
               </div>
             ))}
