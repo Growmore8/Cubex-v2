@@ -110,6 +110,7 @@ export default function SATenantsPage() {
       smtpEmail: t.smtpEmail || "", smtpPassword: "", smtpHost: t.smtpHost || "",
       contactName: t.contactName || "", contactPhone: t.contactPhone || "",
       allowRegistration: t.allowRegistration !== false,
+      swapEnabled: !!t.swapEnabled,
     });
     setSmtpTest("");
     setEditFor(t);
