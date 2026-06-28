@@ -49,6 +49,8 @@ export async function GET() {
       seatsLeft: Math.max(0, seatsLimit - liveCnt),
       subscription: t.subscription,
       createdAt: t.createdAt,
+      allowRegistration: t.allowRegistration,
+      swapEnabled: !!t.swapEnabled,
     };
   }));
 
