@@ -2538,33 +2538,43 @@ export default function AdminDeskPage() {
           <div className="ui-pop desk-modal w-[420px] rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 text-sm font-semibold">Upload KYC Document</div>
             <div className="mb-3 text-[10px]" style={{ color: "var(--muted)" }}>{kycUploadFor.login} — {kycUploadFor.name}</div>
-            <div className="space-y-2">
-              <div>
-                <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Document Type</div>
-                <select className="w-full rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} value={kycUploadType} onChange={(e) => setKycUploadType(e.target.value)}>
-                  <option value="PASSPORT">Passport</option>
-                  <option value="ID">National ID</option>
-                  <option value="DRIVING_LICENSE">Driving License</option>
-                  <option value="UTILITY_BILL">Utility Bill</option>
-                  <option value="BANK_STATEMENT">Bank Statement</option>
-                  <option value="OTHER">Other</option>
-                </select>
+            {kycUploadFor.kycStatus === "APPROVED" ? (
+              <div className="rounded-xl px-4 py-5 text-center" style={{ background: "rgba(22,163,74,0.1)", border: "1px solid rgba(22,163,74,0.3)" }}>
+                <i className="fa-solid fa-circle-check text-2xl mb-2" style={{ color: BUY }} />
+                <div className="text-sm font-semibold" style={{ color: BUY }}>Already Verified</div>
+                <div className="mt-1 text-[11px]" style={{ color: "var(--muted)" }}>This client's identity has been verified. No further documents are required.</div>
               </div>
-              <div>
-                <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Front side <span style={{ color: SELL }}>*</span></div>
-                <input type="file" accept="image/*,.pdf" onChange={(e) => setKycUploadFile(e.target.files?.[0] || null)} className="w-full text-[10px]" style={{ color: "var(--text)" }} />
+            ) : (
+              <div className="space-y-2">
+                <div>
+                  <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Document Type</div>
+                  <select className="w-full rounded border px-2 py-1.5 text-[11px]" style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }} value={kycUploadType} onChange={(e) => setKycUploadType(e.target.value)}>
+                    <option value="PASSPORT">Passport</option>
+                    <option value="ID">National ID</option>
+                    <option value="DRIVING_LICENSE">Driving License</option>
+                    <option value="UTILITY_BILL">Utility Bill</option>
+                    <option value="BANK_STATEMENT">Bank Statement</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Front side <span style={{ color: SELL }}>*</span></div>
+                  <input type="file" accept="image/*,.pdf" onChange={(e) => setKycUploadFile(e.target.files?.[0] || null)} className="w-full text-[10px]" style={{ color: "var(--text)" }} />
+                </div>
+                <div>
+                  <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Back side <span style={{ color: SELL }}>*</span></div>
+                  <input type="file" accept="image/*,.pdf" onChange={(e) => setKycBackFile(e.target.files?.[0] || null)} className="w-full text-[10px]" style={{ color: "var(--text)" }} />
+                </div>
+                <div className="text-[9px]" style={{ color: "var(--muted)" }}>Both sides required — documents without a back side cannot be verified.</div>
               </div>
-              <div>
-                <div className="mb-1 text-[10px]" style={{ color: "var(--muted)" }}>Back side <span style={{ color: SELL }}>*</span></div>
-                <input type="file" accept="image/*,.pdf" onChange={(e) => setKycBackFile(e.target.files?.[0] || null)} className="w-full text-[10px]" style={{ color: "var(--text)" }} />
-              </div>
-              <div className="text-[9px]" style={{ color: "var(--muted)" }}>Both sides required — documents without a back side cannot be verified.</div>
-            </div>
+            )}
             {err && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{err}</div>}
             {kycUpMsg && <div className="mt-2 text-[10px]" style={{ color: BUY }}>{kycUpMsg}</div>}
             <div className="mt-4 flex gap-2">
-              <button onClick={() => setKycUploadFor(null)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
-              <button onClick={uploadKyc} className="flex-1 rounded py-2 text-[11px] font-semibold" style={{ background: BUY, color: "#04140e" }}>Upload</button>
+              <button onClick={() => setKycUploadFor(null)} className="flex-1 rounded border py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Close</button>
+              {kycUploadFor.kycStatus !== "APPROVED" && (
+                <button onClick={uploadKyc} className="flex-1 rounded py-2 text-[11px] font-semibold" style={{ background: BUY, color: "#04140e" }}>Upload</button>
+              )}
             </div>
           </div>
         </div>

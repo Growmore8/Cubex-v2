@@ -24,6 +24,7 @@ export async function POST(req: Request) {
       ? await prisma.account.findFirst({ where: { login, tenantId: s.tenantId! } })
       : null;
     if (!account) throw new Error("Client account not found");
+    if ((account as any).kycStatus === "APPROVED") throw new Error("This client is already KYC verified. No further documents are required.");
     const key = await saveUpload(file, "kyc/" + account.id);
     const backKey = await saveUpload(back, "kyc/" + account.id);
     // Staff (admin/manager) upload is trusted -> auto-approve, no separate verify step.
