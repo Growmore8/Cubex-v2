@@ -1164,8 +1164,8 @@ export default function ClientMobile({ t }: { t: any }) {
                 ) : (financials || []).map((f: any) => {
                   const credit = ["DEPOSIT", "CREDIT_IN", "BONUS", "TRANSFER_IN", "INSURANCE"].includes(f.type) || (f.type === "PNL_ADJUST" && Number(f.amount) >= 0);
                   const typeMap: Record<string, { icon: string; label: string; color: string; bg: string }> = {
-                    DEPOSIT:     { icon: "fa-arrow-down-to-line", label: "Deposit",     color: "#16a34a", bg: "rgba(22,163,74,0.12)" },
-                    WITHDRAWAL:  { icon: "fa-arrow-up-from-line", label: "Withdrawal",  color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
+                    DEPOSIT:     { icon: "fa-download",           label: "Deposit",     color: "#16a34a", bg: "rgba(22,163,74,0.12)" },
+                    WITHDRAWAL:  { icon: "fa-upload",             label: "Withdrawal",  color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
                     CREDIT_IN:   { icon: "fa-circle-plus",        label: "Credit In",   color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
                     CREDIT_OUT:  { icon: "fa-circle-minus",       label: "Credit Out",  color: "#f97316", bg: "rgba(249,115,22,0.12)" },
                     BONUS:       { icon: "fa-gift",               label: "Bonus",       color: "#a855f7", bg: "rgba(168,85,247,0.12)" },
