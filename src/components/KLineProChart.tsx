@@ -106,16 +106,19 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
         const ck = "cubex-kl:" + key;
         const toBar = (b: any) => ({ timestamp: b.time * 1000, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume ?? 0 });
 
-        // localStorage cache — 15-minute TTL, skip empty entries
-        const CACHE_TTL = 60 * 60 * 1000; // 1 hour — 5000 bars takes time to fetch
+        // localStorage cache TTL per timeframe — short TFs must stay fresh to avoid flat-line gaps
+        const TF_TTL: Record<string, number> = { "1m": 0, "5m": 2 * 60 * 1000, "15m": 5 * 60 * 1000, "1H": 15 * 60 * 1000, "4H": 30 * 60 * 1000, "1D": 2 * 60 * 60 * 1000 };
+        const CACHE_TTL = TF_TTL[period.text] ?? 5 * 60 * 1000;
         let cached: any[] | null = null;
-        try {
-          const c = JSON.parse(localStorage.getItem(ck) || "null");
-          if (c && Array.isArray(c.d) && c.d.length > 0 && Date.now() - c.t < CACHE_TTL) cached = c.d;
-          else if (c) localStorage.removeItem(ck);
-        } catch {}
+        if (CACHE_TTL > 0) {
+          try {
+            const c = JSON.parse(localStorage.getItem(ck) || "null");
+            if (c && Array.isArray(c.d) && c.d.length > 0 && Date.now() - c.t < CACHE_TTL) cached = c.d;
+            else if (c) localStorage.removeItem(ck);
+          } catch {}
+        }
 
-        // Initial fetch — 500 bars (fast). Server caches by symbol+tf+limit.
+        // Always fetch fresh for 1m (no cache), otherwise use cache above
         if (!cached) {
           try {
             const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym.ticker)}&tf=${periodTf(period)}&limit=5000`, { cache: "no-store" }).then((x) => x.json());
@@ -123,7 +126,7 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
               const fresh: any[] = r.candles.map(toBar);
               cached = fresh;
               lastBar[key] = fresh[fresh.length - 1];
-              try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), d: fresh })); } catch {}
+              if (CACHE_TTL > 0) { try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), d: fresh })); } catch {} }
             }
           } catch {}
         }
@@ -169,12 +172,15 @@ export default function KLineProChart({ symbol, tf, theme, digits = 2, symbols, 
           const t = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
           if (last && last.timestamp === t) { last.high = Math.max(last.high, price, real); last.low = Math.min(last.low, price, real); last.close = price; }
           else {
-            // Gap-fill any skipped buckets (e.g. the seam between delayed history
-            // and live, or a brief stall) with flat bars so the chart never has
-            // missing minutes / merged tall candles. Capped to avoid huge loops.
+            // Gap-fill only small gaps (≤10 bars) — e.g. brief stalls, illiquid periods.
+            // Large gaps mean stale history data; skip fill so chart doesn't show a long
+            // flat line. The missing bars simply won't render (blank space is better).
             if (last && t > last.timestamp + sec * 1000) {
-              let ft = last.timestamp + sec * 1000; const c = last.close; let n = 0;
-              while (ft < t && n < 400) { const flat = { timestamp: ft, open: c, high: c, low: c, close: c, volume: 0 }; callback(flat); last = flat; ft += sec * 1000; n++; }
+              const gapBars = Math.round((t - last.timestamp) / (sec * 1000));
+              if (gapBars <= 10) {
+                let ft = last.timestamp + sec * 1000; const c = last.close; let n = 0;
+                while (ft < t && n < 10) { const flat = { timestamp: ft, open: c, high: c, low: c, close: c, volume: 0 }; callback(flat); last = flat; ft += sec * 1000; n++; }
+              }
             }
             // Continuous candles (forex/MT5/TradingView style): a new bar opens at
             // the previous bar's close, so colour reflects the real move, not the
