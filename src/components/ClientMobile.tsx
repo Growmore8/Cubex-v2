@@ -1071,14 +1071,6 @@ export default function ClientMobile({ t }: { t: any }) {
               );
             })}
 
-            {/* price alerts shortcut */}
-            <button onClick={() => { setMobAlertForm({ symbol: selSym || (symbols?.[0]?.symbol ?? ""), condition: "ABOVE", price: price != null ? price.toFixed(dg(selSym)) : "", note: "" }); setMobAlertErr(""); setMobAlertOpen(true); }} className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
-              <div className="flex items-center gap-2 text-[12px] font-semibold"><i className="fa-solid fa-tag text-[var(--muted)]" /> Price Alerts</div>
-              <div className="flex items-center gap-1.5 text-[11px]" style={{ color: mobAlerts.filter((a: any) => !a.triggered).length > 0 ? "#f59e0b" : "var(--muted)" }}>
-                {mobAlerts.filter((a: any) => !a.triggered).length > 0 && <span className="font-semibold">{mobAlerts.filter((a: any) => !a.triggered).length} active</span>}
-                <i className="fa-solid fa-chevron-right text-[10px]" />
-              </div>
-            </button>
 
             {(pending || []).length > 0 && (<>
             <div className="mt-1 text-[11px] font-semibold" style={{ color: BLUE }}><i className="fa-regular fa-clock mr-1" />Pending Orders ({pending.length})</div>
