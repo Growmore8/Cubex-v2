@@ -1159,16 +1159,40 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
             ) : (
               <div className="space-y-2.5">
-                {(financials || []).length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No financial records.</div> : (financials || []).map((f: any) => {
+                {(financials || []).length === 0 ? (
+                  <div className="py-10 text-center text-[12px] text-[var(--muted)]">No financial records.</div>
+                ) : (financials || []).map((f: any) => {
                   const credit = ["DEPOSIT", "CREDIT_IN", "BONUS", "TRANSFER_IN", "INSURANCE"].includes(f.type) || (f.type === "PNL_ADJUST" && Number(f.amount) >= 0);
+                  const typeMap: Record<string, { icon: string; label: string; color: string; bg: string }> = {
+                    DEPOSIT:     { icon: "fa-arrow-down-to-line", label: "Deposit",     color: "#16a34a", bg: "rgba(22,163,74,0.12)" },
+                    WITHDRAWAL:  { icon: "fa-arrow-up-from-line", label: "Withdrawal",  color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
+                    CREDIT_IN:   { icon: "fa-circle-plus",        label: "Credit In",   color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
+                    CREDIT_OUT:  { icon: "fa-circle-minus",       label: "Credit Out",  color: "#f97316", bg: "rgba(249,115,22,0.12)" },
+                    BONUS:       { icon: "fa-gift",               label: "Bonus",       color: "#a855f7", bg: "rgba(168,85,247,0.12)" },
+                    INSURANCE:   { icon: "fa-shield-halved",      label: "Insurance",   color: "#06b6d4", bg: "rgba(6,182,212,0.12)" },
+                    TRANSFER_IN: { icon: "fa-right-to-bracket",   label: "Transfer In", color: "#16a34a", bg: "rgba(22,163,74,0.12)" },
+                    TRANSFER_OUT:{ icon: "fa-right-from-bracket", label: "Transfer Out",color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
+                    PNL_ADJUST:  { icon: "fa-chart-line",         label: "P&L Adjust",  color: credit ? "#16a34a" : "#ef4444", bg: credit ? "rgba(22,163,74,0.12)" : "rgba(239,68,68,0.12)" },
+                  };
+                  const meta = typeMap[f.type] || { icon: "fa-circle-dot", label: String(f.type).replace(/_/g, " "), color: "var(--muted)", bg: "var(--soft)" };
+                  const amt = Math.abs(Number(f.amount));
+                  const sign = credit ? "+" : "-";
                   return (
-                    <div key={f.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
-                      <div>
-                        <span className="rounded px-1.5 py-0.5 text-[9px] font-bold" style={{ background: "var(--soft)", color: "var(--muted)" }}>{String(f.type).replace(/_/g, " ")}</span>
-                        <div className="mt-1 text-[12px] font-medium">{f.description || "—"}</div>
-                        <div className="text-[10px] text-[var(--muted)]">{f.appliedAt ? new Date(f.appliedAt).toLocaleString() : "—"}</div>
+                    <div key={f.id} className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-3">
+                      {/* icon bubble */}
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ background: meta.bg }}>
+                        <i className={`fa-solid ${meta.icon} text-[15px]`} style={{ color: meta.color }} />
                       </div>
-                      <div className="text-sm font-bold" style={{ color: credit ? BUY : SELL }}>{(credit ? "+" : "-") + "$" + fmt(Math.abs(Number(f.amount)))}</div>
+                      {/* label + date */}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13px] font-semibold text-[var(--text)]">{meta.label}</div>
+                        {f.description && <div className="truncate text-[11px] text-[var(--muted)]">{f.description}</div>}
+                        <div className="text-[10px] text-[var(--muted)]">{f.appliedAt ? new Date(f.appliedAt).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</div>
+                      </div>
+                      {/* amount */}
+                      <div className="shrink-0 text-right">
+                        <div className="text-[15px] font-bold tabular-nums" style={{ color: meta.color }}>{sign}${fmt(amt)}</div>
+                      </div>
                     </div>
                   );
                 })}
