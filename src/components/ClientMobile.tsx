@@ -118,7 +118,7 @@ export default function ClientMobile({ t }: { t: any }) {
   };
 
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "account">("dashboard");
-  const [acctTab, setAcctTab] = useState<"overview" | "history">("overview");
+  const [tradeView, setTradeView] = useState<"positions" | "history">("positions");
   const [mobNews, setMobNews] = useState<any[]>([]);
   const [mobNewsLoading, setMobNewsLoading] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
@@ -989,15 +989,22 @@ export default function ClientMobile({ t }: { t: any }) {
 
         {/* ───────── TRADES ───────── */}
         {tab === "trades" && (
-          <div className="space-y-3 p-3">
-            <button onClick={() => { setNoForm({ idx: 0, lots: vol || 0.01, trigger: "", sl: "", tp: "" }); setNoOpen(true); }} className="w-full rounded-xl py-3 text-sm font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus mr-1.5" /> New Order / Pending</button>
-
-            <div className="flex items-center justify-between">
-              <div className="text-[11px] font-semibold text-[var(--muted)]">Open Positions {(positions || []).length ? "(" + positions.length + ")" : ""}</div>
-              <button onClick={() => { setMobAlertForm({ symbol: selSym || (symbols?.[0]?.symbol ?? ""), condition: "ABOVE", price: price != null ? price.toFixed(dg(selSym)) : "", note: "" }); setMobAlertErr(""); setMobAlertOpen(true); }} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: mobAlerts.filter((a: any) => !a.triggered).length > 0 ? "rgba(245,158,11,0.18)" : "var(--soft)", color: mobAlerts.filter((a: any) => !a.triggered).length > 0 ? "#f59e0b" : "var(--muted)" }} title="Price Alerts">
-                <i className="fa-solid fa-bell text-[10px]" />{mobAlerts.filter((a: any) => !a.triggered).length > 0 && <span>{mobAlerts.filter((a: any) => !a.triggered).length}</span>}
-              </button>
+          <div>
+            {/* Binance-style toggle: Positions | History */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)] px-3 py-2">
+              <div className="flex gap-4">
+                <button onClick={() => setTradeView("positions")} className="pb-1 text-[13px] font-bold transition-colors" style={{ color: tradeView === "positions" ? "var(--text)" : "var(--muted)", borderBottom: tradeView === "positions" ? "2px solid var(--accent)" : "2px solid transparent" }}>
+                  Positions {(positions || []).length > 0 ? <span className="ml-1 rounded-full px-1.5 py-0.5 text-[10px]" style={{ background: "var(--soft)", color: "var(--muted)" }}>{positions.length}</span> : null}
+                </button>
+                <button onClick={() => setTradeView("history")} className="pb-1 text-[13px] font-bold transition-colors" style={{ color: tradeView === "history" ? "var(--text)" : "var(--muted)", borderBottom: tradeView === "history" ? "2px solid var(--accent)" : "2px solid transparent" }}>
+                  History
+                </button>
+              </div>
+              <button onClick={() => { setNoForm({ idx: 0, lots: vol || 0.01, trigger: "", sl: "", tp: "" }); setNoOpen(true); }} className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus text-[10px]" /> New</button>
             </div>
+
+          {tradeView === "positions" && (
+          <div className="space-y-3 p-3">
             {(positions || []).length === 0 ? <div className="py-4 text-center text-[12px] text-[var(--muted)]">No open positions.</div> : (positions || []).map((p: any) => {
               const cur = prices[p.symbol] ?? p.openPrice; const plv = pnlOf(p, cur, csz(p.symbol)); const dd = dg(p.symbol);
               const open = expanded === p.id;
@@ -1064,8 +1071,17 @@ export default function ClientMobile({ t }: { t: any }) {
               );
             })}
 
+            {/* price alerts shortcut */}
+            <button onClick={() => { setMobAlertForm({ symbol: selSym || (symbols?.[0]?.symbol ?? ""), condition: "ABOVE", price: price != null ? price.toFixed(dg(selSym)) : "", note: "" }); setMobAlertErr(""); setMobAlertOpen(true); }} className="flex w-full items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
+              <div className="flex items-center gap-2 text-[12px] font-semibold"><i className="fa-solid fa-tag text-[var(--muted)]" /> Price Alerts</div>
+              <div className="flex items-center gap-1.5 text-[11px]" style={{ color: mobAlerts.filter((a: any) => !a.triggered).length > 0 ? "#f59e0b" : "var(--muted)" }}>
+                {mobAlerts.filter((a: any) => !a.triggered).length > 0 && <span className="font-semibold">{mobAlerts.filter((a: any) => !a.triggered).length} active</span>}
+                <i className="fa-solid fa-chevron-right text-[10px]" />
+              </div>
+            </button>
+
             {(pending || []).length > 0 && (<>
-            <div className="mt-3 text-[11px] font-semibold" style={{ color: BLUE }}><i className="fa-regular fa-clock mr-1" />Pending Orders ({pending.length})</div>
+            <div className="mt-1 text-[11px] font-semibold" style={{ color: BLUE }}><i className="fa-regular fa-clock mr-1" />Pending Orders ({pending.length})</div>
             {(pending || []).map((o: any) => {
               const dd = dg(o.symbol); const trig = Number(o.price); const cur = prices[o.symbol]; const dist = cur != null ? Math.abs(trig - cur) : null;
               const c = o.side === "BUY" ? BLUE : SELL; const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : o.kind === "STOP_LIMIT" ? "Stop Limit" : "Stop");
@@ -1095,21 +1111,10 @@ export default function ClientMobile({ t }: { t: any }) {
               );
             })}</>)}
           </div>
-        )}
+          )}
 
-        {/* ───────── ACCOUNT (sub-tabs: Account | History) ───────── */}
-        {tab === "account" && (
-          <div>
-            {/* Sub-tab bar — pill segment control */}
-            <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--bg)] px-3 py-2">
-              <div className="flex rounded-xl p-0.5" style={{ background: "var(--soft)" }}>
-              {(["overview", "history"] as const).map((st) => (
-                <button key={st} onClick={() => setAcctTab(st)} className="flex-1 rounded-[10px] py-1.5 text-[11px] font-semibold transition-all duration-200" style={{ background: acctTab === st ? "var(--panel)" : "transparent", color: acctTab === st ? "var(--text)" : "var(--muted)", boxShadow: acctTab === st ? "0 1px 3px rgba(0,0,0,0.15)" : "none" }}>{st === "overview" ? "Account" : "History"}</button>
-              ))}
-              </div>
-            </div>
-            {/* ── HISTORY sub-tab ── */}
-            {acctTab === "history" && (
+          {/* ── HISTORY view inside Trade tab ── */}
+          {tradeView === "history" && (
           <div className="p-3">
             <div className="mb-3 flex gap-2">
               <button onClick={() => setHistTab("trades")} className="flex-1 rounded-lg py-2 text-[12px] font-semibold" style={{ background: histTab === "trades" ? BLUE : "var(--soft)", color: histTab === "trades" ? "#fff" : "var(--muted)" }}>Trades</button>
@@ -1131,7 +1136,7 @@ export default function ClientMobile({ t }: { t: any }) {
                             const isTP = cr === "TP" || cr.includes("TAKE");
                             const isSL = cr === "SL" || cr.includes("STOP LOSS");
                             const isMC = cr === "MC" || cr.includes("MARGIN") || cr.includes("STOP OUT") || cr.includes("LIQUID");
-                            if (!isTP && !isSL && !isMC) return null; // hide "Manual" on the client side
+                            if (!isTP && !isSL && !isMC) return null;
                             const lbl = isTP ? "TP" : isSL ? "SL" : "MC";
                             const col = isTP ? BUY : SELL;
                             return <span className="rounded px-1.5 py-0.5 text-[9px] font-bold" style={{ background: col, color: "#fff" }} title={"Closed: " + lbl}>{lbl}</span>;
@@ -1176,13 +1181,14 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
             )}
           </div>
+          )}
+          </div>
         )}
 
-            {/* ── NEWS sub-tab ── */}
-
-            {/* ── OVERVIEW (Account/Profile) sub-tab ── */}
-            {acctTab === "overview" && (
-          <div className="space-y-4 p-3">
+        {/* ───────── ACCOUNT ───────── */}
+        {tab === "account" && (
+          <div>
+            <div className="space-y-4 p-3">
             {needKyc && (
               <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(240,180,41,0.5)", background: "rgba(240,180,41,0.1)" }}>
                 <div className="flex items-center gap-2 text-[13px] font-bold" style={{ color: "#f0b829" }}><i className="fa-solid fa-id-card" /> Verify your identity</div>
@@ -1387,7 +1393,6 @@ export default function ClientMobile({ t }: { t: any }) {
             {/* logout */}
             <button onClick={logout} className="w-full rounded-xl py-3 text-sm font-semibold text-white" style={{ background: SELL }}><i className="fa-solid fa-right-from-bracket mr-1.5" /> Logout</button>
           </div>
-            )}
           </div>
         )}
       </div>
@@ -1401,7 +1406,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
             <div className="text-[15px] font-bold">Request Sent</div>
             <div className="mt-1.5 text-[12px] leading-relaxed text-[var(--muted)]">Your new live account request has been sent for approval. You'll be notified once it's reviewed. Track its status under <span className="font-semibold text-[var(--text)]">Profile → My Requests</span>.</div>
-            <button onClick={() => { setAcctReqModal && setAcctReqModal(false); setTab("account"); setAcctTab("overview"); }} className="mt-4 w-full rounded-xl py-2.5 text-[13px] font-semibold text-white" style={{ background: BLUE }}>View My Requests</button>
+            <button onClick={() => { setAcctReqModal && setAcctReqModal(false); setTab("account"); }} className="mt-4 w-full rounded-xl py-2.5 text-[13px] font-semibold text-white" style={{ background: BLUE }}>View My Requests</button>
             <button onClick={() => setAcctReqModal && setAcctReqModal(false)} className="mt-2 w-full rounded-xl py-2 text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Close</button>
           </div>
         </div>
