@@ -833,7 +833,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 </button>
                 <div className="flex shrink-0 items-center gap-0.5">
                   <button onClick={() => setChartVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] active:scale-95 min-[380px]:h-9 min-[380px]:w-8" style={{ background: "var(--soft)", touchAction: "manipulation" }}>−</button>
-                  <input type="number" inputMode="decimal" step="0.01" value={chartVol} onChange={(e) => setChartVol(Number(e.target.value))} className="h-8 w-12 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[11px] font-bold tabular-nums text-[var(--text)] outline-none min-[380px]:h-9 min-[380px]:w-14 min-[380px]:text-[12px]" style={{ touchAction: "manipulation" }} />
+                  <input type="number" inputMode="decimal" step="0.01" autoComplete="off" value={chartVol} onChange={(e) => setChartVol(Number(e.target.value))} className="h-8 w-12 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[11px] font-bold tabular-nums text-[var(--text)] outline-none min-[380px]:h-9 min-[380px]:w-14 min-[380px]:text-[12px]" style={{ touchAction: "manipulation" }} />
                   <button onClick={() => setChartVol((v) => +(v + 0.01).toFixed(2))} className="flex h-8 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] active:scale-95 min-[380px]:h-9 min-[380px]:w-8" style={{ background: "var(--soft)", touchAction: "manipulation" }}>+</button>
                 </div>
                 <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", chartVol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, touchAction: "manipulation" }}>
@@ -890,17 +890,17 @@ export default function ClientMobile({ t }: { t: any }) {
 
                     {/* Entry price (LIMIT/STOP/STOP_LIMIT only) */}
                     {mobOrderType !== "MARKET" && (
-                      <input type="number" inputMode="decimal" value={mobPendingPrice} onChange={(e) => setMobPendingPrice(e.target.value)} placeholder={mobOrderType === "STOP_LIMIT" ? "Stop Price (trigger)" : "Entry Price"} className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[14px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                      <input type="number" inputMode="decimal" autoComplete="off" value={mobPendingPrice} onChange={(e) => setMobPendingPrice(e.target.value)} placeholder={mobOrderType === "STOP_LIMIT" ? "Stop Price (trigger)" : "Entry Price"} className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[14px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                     )}
                     {mobOrderType === "STOP_LIMIT" && (
-                      <input type="number" inputMode="decimal" value={mobStopLimitEntry} onChange={(e) => setMobStopLimitEntry(e.target.value)} placeholder="Limit Price (fill at)" className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[14px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                      <input type="number" inputMode="decimal" autoComplete="off" value={mobStopLimitEntry} onChange={(e) => setMobStopLimitEntry(e.target.value)} placeholder="Limit Price (fill at)" className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[14px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                     )}
 
                     {/* Volume stepper + quick lots */}
                     <div className="overflow-hidden rounded-xl border border-[var(--border)]">
                       <div className="flex items-center gap-2 px-3 py-2">
                         <button onClick={() => setChartVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-base text-[var(--muted)] active:scale-95">−</button>
-                        <input type="number" inputMode="decimal" step="0.01" value={chartVol} onChange={(e) => setChartVol(Number(e.target.value))} className="h-9 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[16px] font-bold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                        <input type="number" inputMode="decimal" autoComplete="off" step="0.01" value={chartVol} onChange={(e) => setChartVol(Number(e.target.value))} className="h-9 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[16px] font-bold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                         <button onClick={() => setChartVol((v) => +(v + 0.01).toFixed(2))} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-base text-[var(--muted)] active:scale-95">+</button>
                       </div>
                       <div className="grid grid-cols-5 border-t border-[var(--border)]">
@@ -912,11 +912,11 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#10b981" }}>Take Profit</div>
-                        <input type="number" inputMode="decimal" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
+                        <input type="number" inputMode="decimal" autoComplete="off" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
                       </div>
                       <div>
                         <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#e0394a" }}>Stop Loss</div>
-                        <input type="number" inputMode="decimal" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
+                        <input type="number" inputMode="decimal" autoComplete="off" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
                       </div>
                     </div>
 
@@ -940,7 +940,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     {mobOrderType === "MARKET" && (
                       <div>
                         <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Trailing Stop (pips, 0=off)</div>
-                        <input type="number" inputMode="decimal" min="0" step="1" value={mobTrail} onChange={(e) => setMobTrail(e.target.value)} placeholder="0" className="h-9 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[12px] tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                        <input type="number" inputMode="decimal" autoComplete="off" min="0" step="1" value={mobTrail} onChange={(e) => setMobTrail(e.target.value)} placeholder="0" className="h-9 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[12px] tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                       </div>
                     )}
                     {/* Comment */}
@@ -1062,8 +1062,8 @@ export default function ClientMobile({ t }: { t: any }) {
                         <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--soft)] p-3">
                           <div className="mb-2 text-[11px] font-semibold">Modify SL / TP / Trail</div>
                           <div className="grid grid-cols-2 gap-2">
-                            <input type="number" inputMode="decimal" value={mSl} onChange={(e) => setMSl(e.target.value)} placeholder="Stop loss" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
-                            <input type="number" inputMode="decimal" value={mTp} onChange={(e) => setMTp(e.target.value)} placeholder="Take profit" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
+                            <input type="number" inputMode="decimal" autoComplete="off" value={mSl} onChange={(e) => setMSl(e.target.value)} placeholder="Stop loss" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
+                            <input type="number" inputMode="decimal" autoComplete="off" value={mTp} onChange={(e) => setMTp(e.target.value)} placeholder="Take profit" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
                             <input type="number" inputMode="decimal" min="0" value={mTrail} onChange={(e) => setMTrail(e.target.value)} placeholder="Trail pips (0=off)" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)] col-span-2" style={{ borderColor: mTrail ? "#f59e0b" : undefined }} />
                           </div>
                           <div className="mt-2 flex gap-2">
@@ -1483,13 +1483,13 @@ export default function ClientMobile({ t }: { t: any }) {
                 {mobOrderType !== "MARKET" && (
                   <div>
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{mobOrderType === "STOP_LIMIT" ? "Stop Price (trigger)" : "Entry Price"}</div>
-                    <input type="number" inputMode="decimal" value={mobPendingPrice} onChange={(e) => setMobPendingPrice(e.target.value)} placeholder="Target Price" className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[15px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                    <input type="number" inputMode="decimal" autoComplete="off" value={mobPendingPrice} onChange={(e) => setMobPendingPrice(e.target.value)} placeholder="Target Price" className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[15px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                   </div>
                 )}
                 {mobOrderType === "STOP_LIMIT" && (
                   <div>
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Limit Price (fill at)</div>
-                    <input type="number" inputMode="decimal" value={mobStopLimitEntry} onChange={(e) => setMobStopLimitEntry(e.target.value)} placeholder="Limit Price" className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[15px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                    <input type="number" inputMode="decimal" autoComplete="off" value={mobStopLimitEntry} onChange={(e) => setMobStopLimitEntry(e.target.value)} placeholder="Limit Price" className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[15px] font-semibold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                   </div>
                 )}
 
@@ -1500,7 +1500,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   </div>
                   <div className="flex items-center gap-2 px-3 py-2">
                     <button onClick={() => setNoOpenVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-lg text-[var(--muted)] active:scale-95">−</button>
-                    <input type="number" inputMode="decimal" step="0.01" value={noOpenVol} onChange={(e) => setNoOpenVol(Number(e.target.value))} className="h-10 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[18px] font-bold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                    <input type="number" inputMode="decimal" autoComplete="off" step="0.01" value={noOpenVol} onChange={(e) => setNoOpenVol(Number(e.target.value))} className="h-10 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[18px] font-bold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                     <button onClick={() => setNoOpenVol((v) => +(v + 0.01).toFixed(2))} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-lg text-[var(--muted)] active:scale-95">+</button>
                   </div>
                   <div className="grid grid-cols-5 border-t border-[var(--border)]">
@@ -1512,11 +1512,11 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#10b981" }}>Take Profit</div>
-                    <input type="number" inputMode="decimal" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
+                    <input type="number" inputMode="decimal" autoComplete="off" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
                   </div>
                   <div>
                     <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#e0394a" }}>Stop Loss</div>
-                    <input type="number" inputMode="decimal" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
+                    <input type="number" inputMode="decimal" autoComplete="off" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="" className="h-9 w-full rounded-xl border px-2 text-center text-[12px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)]" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
                   </div>
                 </div>
 
@@ -1540,7 +1540,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 {mobOrderType === "MARKET" && (
                   <div>
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Trailing Stop (pips, 0=off)</div>
-                    <input type="number" inputMode="decimal" min="0" step="1" value={mobTrail} onChange={(e) => setMobTrail(e.target.value)} placeholder="0" className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[13px] tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                    <input type="number" inputMode="decimal" autoComplete="off" min="0" step="1" value={mobTrail} onChange={(e) => setMobTrail(e.target.value)} placeholder="0" className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[13px] tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                   </div>
                 )}
                 <div>

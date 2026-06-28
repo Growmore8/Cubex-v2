@@ -274,6 +274,28 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   html {
     @apply font-sans;
   }
+
+  /* iOS WebKit autofill override — prevents white flash on autofilled inputs */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px var(--bg, #0a0d12) inset !important;
+    -webkit-text-fill-color: var(--text, #e7ecf3) !important;
+    caret-color: var(--text, #e7ecf3) !important;
+    transition: background-color 9999s ease-in-out 0s !important;
+  }
+
+  /* Remove iOS default input chrome (prevents native white background on number inputs) */
+  input[type="number"],
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="search"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
 }
 
 /* =====================================================================
