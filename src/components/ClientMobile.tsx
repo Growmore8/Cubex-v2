@@ -136,6 +136,11 @@ export default function ClientMobile({ t }: { t: any }) {
     if (!r.ok) { setProfileErr(r.error || "Update failed"); return; }
     setProfileModal(false);
   }
+  // Sync color-scheme on <html> so iOS shows dark keyboard when in dark mode
+  useEffect(() => {
+    document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
+  }, [theme]);
+
   useEffect(() => {
     if (account && !profilePrompted && (!account.phone || !account.country)) {
       setProfilePrompted(true);
