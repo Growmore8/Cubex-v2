@@ -152,11 +152,11 @@ function recordFeedFailure(feed) {
 }
 
 // Determine which category a symbol belongs to (for per-category feed routing)
-const CRYPTO_SYM_SET = new Set(["BTCUSD","ETHUSD","BNBUSD","SOLUSD","DOGEUSD","XRPUSD","ADAUSD","AVAXUSD","LINKUSD","LTCUSD","DOTUSD"]);
+// Uses catalog meta first (accurate for any symbol), falls back to heuristics.
 const INDEX_SYM_SET  = new Set(["US500","US30","US100","GER40","UK100","JP225","HK50","FRA40"]);
 const ENERGY_SYM_SET = new Set(["USOIL","UKOIL","NATGAS"]);
 function getSymCategory(sym) {
-  if (CRYPTO_SYM_SET.has(sym)) return "crypto";
+  if (meta[sym] && meta[sym].cat) return meta[sym].cat; // catalog is authoritative
   if (INDEX_SYM_SET.has(sym))  return "indices";
   if (ENERGY_SYM_SET.has(sym)) return "commodities";
   if (/^(XAU|XAG|XPT|XPD|GAU|XAGG)/.test(sym)) return "commodities";
@@ -398,15 +398,27 @@ async function pollFinnhubQuotes() {
 }
 
 // ── Binance WebSocket — free real bid/ask for crypto (no API key needed) ──
-const BN_SYM = {
-  BTCUSD: "btcusdt", ETHUSD: "ethusdt", BNBUSD: "bnbusdt", SOLUSD: "solusdt", DOGEUSD: "dogeusdt",
-  XRPUSD: "xrpusdt", ADAUSD: "adausdt", AVAXUSD: "avaxusdt", LINKUSD: "linkusdt", LTCUSD: "ltcusdt", DOTUSD: "dotusdt",
-};
-const BN_TO_SYM = Object.fromEntries(Object.entries(BN_SYM).map(([k, v]) => [v.toUpperCase(), k]));
-// Digit overrides for assets where default digits cause pip > price or loss of precision
-const BN_DIGITS = { DOGEUSD: 5, SOLUSD: 3, XRPUSD: 4, ADAUSD: 4, DOTUSD: 3, LINKUSD: 3, AVAXUSD: 2, LTCUSD: 2 };
+// Built dynamically from the catalog so any crypto symbol added in SuperAdmin
+// is automatically subscribed — no server.js edit required.
+let BN_SYM = {};    // BTCUSD → "btcusdt"
+let BN_TO_SYM = {}; // "BTCUSDT" → "BTCUSD"
+function buildBinanceMaps() {
+  BN_SYM = {}; BN_TO_SYM = {};
+  for (const sym of symbols) {
+    if (!meta[sym] || meta[sym].cat !== "crypto") continue;
+    // BTCUSD → btcusdt  |  BTCUSDT → btcusdt (pass-through)
+    let ticker = null;
+    if (sym.endsWith("USDT")) ticker = sym.toLowerCase();
+    else if (sym.endsWith("USD")) ticker = sym.slice(0, -3).toLowerCase() + "usdt";
+    if (!ticker) continue;
+    BN_SYM[sym] = ticker;
+    BN_TO_SYM[ticker.toUpperCase()] = sym;
+  }
+}
 let bnWs = null;
 function connectBinance() {
+  buildBinanceMaps();
+  if (Object.keys(BN_SYM).length === 0) { console.log("[BN] no crypto symbols in catalog"); return; }
   const streams = Object.values(BN_SYM).map((s) => s + "@bookTicker").join("/");
   bnWs = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams);
   bnWs.on("open", () => console.log("[BN] connected, book ticker:", Object.keys(BN_SYM).join(",")));
@@ -419,8 +431,7 @@ function connectBinance() {
       if (!sym || !state[sym]) return;
       const bid = parseFloat(d.b), ask = parseFloat(d.a);
       if (bid > 0 && ask > 0 && ask > bid) {
-        const digits = BN_DIGITS[sym] || (meta[sym] ? meta[sym].digits : 2);
-        if (meta[sym]) meta[sym].digits = digits;
+        const digits = meta[sym] ? meta[sym].digits : 2;
         state[sym].bid = r(bid, digits);
         state[sym].ask = r(ask, digits); // exchange ask stored for spread display
         applyPrice(sym, bid, "BN");      // MT5: smooth toward BID (primary price)
