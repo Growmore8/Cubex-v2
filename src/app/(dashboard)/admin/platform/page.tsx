@@ -1480,23 +1480,27 @@ export default function AdminDeskPage() {
                 <input type="number" min="0" step="0.1" value={symEdit.spread} onChange={(e) => setSymEdit((s) => s ? { ...s, spread: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
                 {symEdit.spreadType === "FLOATING" && <div className="mt-1 text-[9px]" style={{ color: "#22c55e" }}>Floating: spread may widen automatically during off-market hours</div>}
               </div>
-              <div className="border-t border-[var(--border)] pt-3">
-                <div className="mb-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Swap rates (pips/night)</div>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <div className="mb-0.5 text-[9px]" style={{ color: "var(--muted)" }}>Long (BUY)</div>
-                    <input type="number" step="0.01" value={symEdit.swapLong} onChange={(e) => setSymEdit((s) => s ? { ...s, swapLong: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="mb-0.5 text-[9px]" style={{ color: "var(--muted)" }}>Short (SELL)</div>
-                    <input type="number" step="0.01" value={symEdit.swapShort} onChange={(e) => setSymEdit((s) => s ? { ...s, swapShort: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+              {swapEnabled && (
+                <div className="border-t border-[var(--border)] pt-3">
+                  <div className="mb-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Swap rates (pips/night)</div>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <div className="mb-0.5 text-[9px]" style={{ color: "var(--muted)" }}>Long (BUY)</div>
+                      <input type="number" step="0.01" value={symEdit.swapLong} onChange={(e) => setSymEdit((s) => s ? { ...s, swapLong: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="mb-0.5 text-[9px]" style={{ color: "var(--muted)" }}>Short (SELL)</div>
+                      <input type="number" step="0.01" value={symEdit.swapShort} onChange={(e) => setSymEdit((s) => s ? { ...s, swapShort: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div>
-                <div className="mb-1 text-[10px] text-[var(--muted)]">Commission per lot ($)</div>
-                <input type="number" min="0" step="0.01" value={symEdit.commissionPerLot} onChange={(e) => setSymEdit((s) => s ? { ...s, commissionPerLot: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
-              </div>
+              )}
+              {swapEnabled && (
+                <div>
+                  <div className="mb-1 text-[10px] text-[var(--muted)]">Commission per lot ($)</div>
+                  <input type="number" min="0" step="0.01" value={symEdit.commissionPerLot} onChange={(e) => setSymEdit((s) => s ? { ...s, commissionPerLot: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                </div>
+              )}
             </div>
             <div className="mt-4 flex gap-2">
               <button onClick={async () => { const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: symEdit.spread, spreadType: symEdit.spreadType, spreadMax: 0, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: symEdit.spread })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setOk(symEdit.sym + " saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>

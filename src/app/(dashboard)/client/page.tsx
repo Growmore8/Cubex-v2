@@ -1082,7 +1082,7 @@ export default function ClientTerminal() {
           )}
           {botTab === "positions" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right" title="Trailing Stop (pips)">Trail</th><th className="px-2 py-1 font-normal text-right">Commission</th><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /><Sth tbl="pos" k="pnl" label="Net P/L" align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right" title="Trailing Stop (pips)">Trail</th>{swapEnabled && <><th className="px-2 py-1 font-normal text-right">Commission</th><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /></>}<Sth tbl="pos" k="pnl" label={swapEnabled ? "Net P/L" : "P/L"} align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
               <tbody>
                 {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={14}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
                   <tr key={p.id} className="border-t border-[var(--border)]" title={p.comment || undefined}>
@@ -1116,12 +1116,14 @@ export default function ClientTerminal() {
                         <span style={{ color: p.trailingStop > 0 ? "#f59e0b" : "var(--muted)" }}>{p.trailingStop > 0 ? p.trailingStop + "p" : <span className="text-[9px]">off</span>}</span>
                       )}
                     </td>
-                    {/* Commission and Swap — always negative charges */}
-                    <td className="px-2 py-1 text-right" style={{ color: Number(p.commission) !== 0 ? SELL : "var(--muted)" }}>{Number(p.commission) !== 0 ? "-$" + fmt(Math.abs(Number(p.commission))) : "0.00"}</td>
-                    <td className="px-2 py-1 text-right" style={{ color: Number(p.swap) !== 0 ? SELL : "var(--muted)" }}>{Number(p.swap) !== 0 ? (Number(p.swap) >= 0 ? "+$" : "-$") + fmt(Math.abs(Number(p.swap))) : "0.00"}</td>
-                    <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
-                    {/* Net P/L = gross + swap - commission */}
-                    {(() => { const net = pl + Number(p.swap) - Number(p.commission); return <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+$" : "-$") + fmt(Math.abs(net))}</td>; })()}
+                    {/* Commission, Swap and Gross P/L — shown only when swap enabled */}
+                    {swapEnabled && <>
+                      <td className="px-2 py-1 text-right" style={{ color: Number(p.commission) !== 0 ? SELL : "var(--muted)" }}>{Number(p.commission) !== 0 ? "-$" + fmt(Math.abs(Number(p.commission))) : "0.00"}</td>
+                      <td className="px-2 py-1 text-right" style={{ color: Number(p.swap) !== 0 ? SELL : "var(--muted)" }}>{Number(p.swap) !== 0 ? (Number(p.swap) >= 0 ? "+$" : "-$") + fmt(Math.abs(Number(p.swap))) : "0.00"}</td>
+                      <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
+                    </>}
+                    {/* Net P/L = gross + swap - commission (or just gross when swap disabled) */}
+                    {(() => { const net = swapEnabled ? pl + Number(p.swap) - Number(p.commission) : pl; return <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+$" : "-$") + fmt(Math.abs(net))}</td>; })()}
                     <td className="px-2 py-1 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {Number(p.lots) > 0.01 ? <button title="Partial close" style={{ color: "var(--muted)" }} onClick={() => setPartialClose({ id: p.id, sym: p.symbol, lots: Number(p.lots), closeLots: "" })} className="text-[9px] px-1">½</button> : <span title="Min lot — cannot partial close" className="text-[9px] px-1 opacity-20 cursor-not-allowed">½</span>}
@@ -1183,12 +1185,12 @@ export default function ClientTerminal() {
           )}
           {botTab === "history" && (
             <table className="w-full text-[10px]">
-              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="chist" k="name" label="Name" /><Sth tbl="chist" k="opened" label="Opened" /><Sth tbl="chist" k="closed" label="Closed" /><Sth tbl="chist" k="qty" label="Qty" align="right" /><Sth tbl="chist" k="open" label="Open" align="right" /><Sth tbl="chist" k="close" label="Close" align="right" /><Sth tbl="chist" k="sl" label="SL" align="right" /><Sth tbl="chist" k="tp" label="TP" align="right" /><Sth tbl="chist" k="reason" label="Reason" /><Sth tbl="chist" k="swap" label="Swap" align="right" /><Sth tbl="chist" k="comm" label="Comm" align="right" /><Sth tbl="chist" k="pnl" label="Net P/L" align="right" /></tr></thead>
+              <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="chist" k="name" label="Name" /><Sth tbl="chist" k="opened" label="Opened" /><Sth tbl="chist" k="closed" label="Closed" /><Sth tbl="chist" k="qty" label="Qty" align="right" /><Sth tbl="chist" k="open" label="Open" align="right" /><Sth tbl="chist" k="close" label="Close" align="right" /><Sth tbl="chist" k="sl" label="SL" align="right" /><Sth tbl="chist" k="tp" label="TP" align="right" /><Sth tbl="chist" k="reason" label="Reason" />{swapEnabled && <><Sth tbl="chist" k="swap" label="Swap" align="right" /><Sth tbl="chist" k="comm" label="Comm" align="right" /></>}<Sth tbl="chist" k="pnl" label={swapEnabled ? "Net P/L" : "P/L"} align="right" /></tr></thead>
               <tbody>
                 {histShown.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={13}>No history.</td></tr> : sortRows("chist", histShown, { name: (h) => h.symbol, opened: (h) => h.openedAt ? new Date(h.openedAt).getTime() : null, closed: (h) => h.closedAt ? new Date(h.closedAt).getTime() : null, qty: (h) => Number(h.lots), open: (h) => Number(h.openPrice), close: (h) => Number(h.closePrice), sl: (h) => Number(h.sl), tp: (h) => Number(h.tp), reason: (h) => h.closeReason || "MANUAL", swap: (h) => Number(h.swap), comm: (h) => Number(h.commission), pnl: (h) => Number(h.pnl) + Number(h.swap) - Number(h.commission) }).map((h) => {
                   const r = h.closeReason || "MANUAL";
                   const rc = r === "TP" ? "#10b981" : r === "SL" ? "#f43f5e" : r === "MC" ? "#f59e0b" : "var(--muted)";
-                  const net = Number(h.pnl) + Number(h.swap || 0) - Number(h.commission || 0);
+                  const net = swapEnabled ? Number(h.pnl) + Number(h.swap || 0) - Number(h.commission || 0) : Number(h.pnl);
                   return (
                   <tr key={h.id} className="border-t border-[var(--border)]" title={h.comment || undefined}>
                     <td className="px-2 py-1 text-[var(--muted)] tabular-nums">{h.ticket || "—"}</td>
@@ -1201,8 +1203,10 @@ export default function ClientTerminal() {
                     <td className="px-2 py-1 text-right" style={{ color: h.sl ? "#f43f5e" : "var(--muted)" }}>{h.sl ? gnum(h.sl, dg(h.symbol)) : "—"}</td>
                     <td className="px-2 py-1 text-right" style={{ color: h.tp ? "#10b981" : "var(--muted)" }}>{h.tp ? gnum(h.tp, dg(h.symbol)) : "—"}</td>
                     <td className="px-2 py-1"><span style={{ color: rc, fontWeight: r !== "MANUAL" ? 600 : "normal" }}>{r === "MANUAL" ? "—" : r}</span></td>
-                    <td className="px-2 py-1 text-right" style={{ color: Number(h.swap) !== 0 ? (Number(h.swap) >= 0 ? BUY : SELL) : "var(--muted)" }}>{Number(h.swap) !== 0 ? (Number(h.swap) >= 0 ? "+" : "") + fmt(Number(h.swap)) : "—"}</td>
-                    <td className="px-2 py-1 text-right" style={{ color: Number(h.commission) > 0 ? SELL : "var(--muted)" }}>{Number(h.commission) > 0 ? "-$" + fmt(Number(h.commission)) : "—"}</td>
+                    {swapEnabled && <>
+                      <td className="px-2 py-1 text-right" style={{ color: Number(h.swap) !== 0 ? (Number(h.swap) >= 0 ? BUY : SELL) : "var(--muted)" }}>{Number(h.swap) !== 0 ? (Number(h.swap) >= 0 ? "+" : "") + fmt(Number(h.swap)) : "—"}</td>
+                      <td className="px-2 py-1 text-right" style={{ color: Number(h.commission) > 0 ? SELL : "var(--muted)" }}>{Number(h.commission) > 0 ? "-$" + fmt(Number(h.commission)) : "—"}</td>
+                    </>}
                     <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+$" : "-$") + fmt(Math.abs(net))}</td>
                   </tr>); })}
               </tbody>
