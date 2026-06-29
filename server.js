@@ -386,9 +386,13 @@ function commitPrice(sym, p) {
   // MT5 model: `price` is the smoothed BID (primary chart price).
   // `real` carries the exchange ASK so clients can compute the live spread (ask − bid).
   // Falls back to null when no live feed data within REAL_TTL.
-  const real = (st.realAt && Date.now() - st.realAt < REAL_TTL && st.ask != null) ? st.ask : null;
   // For derived symbols st.bid is never set by a feed — in MT5 model price IS bid, so fall back to p.
   const emitBid = st.bid ?? p;
+  // real = exchange ASK. Only emit when within TTL and spread is positive vs the actual bid
+  // (not vs the smoothed display price p, which can wander slightly above the real bid
+  // and make real - p negative, falsely suppressing the spread).
+  const rawReal = (st.realAt && Date.now() - st.realAt < REAL_TTL && st.ask != null) ? st.ask : null;
+  const real = (rawReal != null && rawReal > emitBid) ? rawReal : null;
   if (global.__io) global.__io.emit("tick", { symbol: sym, price: p, bid: emitBid, real, candle });
   recomputeDerived(sym);
 }
@@ -524,11 +528,18 @@ function connectKraken() {
         if (!sym || !state[sym]) return;
         const bid = parseFloat(m[1][0]), ask = parseFloat(m[1][1]);
         if (bid > 0 && ask > 0 && bid < ask) {
+          // Sanity-check: Kraken's forex/metals book is often thin. Reject spreads
+          // wider than 0.5% of mid — those are stale limit orders, not real quotes.
+          // JPY pairs (USD/JPY 3.8 JPY wide, etc.) are the main offenders.
+          const pctSpread = (ask - bid) / bid;
+          const spreadOk = pctSpread < 0.005;
           state[sym].bid = r(bid, meta[sym] ? meta[sym].digits : 5);
-          state[sym].ask = r(ask, meta[sym] ? meta[sym].digits : 5);
-          // Always mark realAt so commitPrice emits real=ask (live spread for clients).
-          // applyPrice's preferred-feed guard prevents KR from overriding TD/MV prices.
-          state[sym].realAt = Date.now();
+          if (spreadOk) {
+            state[sym].ask = r(ask, meta[sym] ? meta[sym].digits : 5);
+            // Always mark realAt so commitPrice emits real=ask (live spread for clients).
+            // applyPrice's preferred-feed guard prevents KR from overriding TD/MV prices.
+            state[sym].realAt = Date.now();
+          }
           applyPrice(sym, bid, "KR");
         }
       }
