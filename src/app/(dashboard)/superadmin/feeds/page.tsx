@@ -23,6 +23,10 @@ const CAT_FEEDS: Record<string, { key: string; name: string; free: boolean; hasB
     { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "All major indices · key required" },
     { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "Major indices · key required" },
   ],
+  stocks: [
+    { key: "TD", name: "TwelveData",   free: false, hasBidAsk: true,  info: "NYSE/NASDAQ + NSE/BSE · key required" },
+    { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "US stocks only · demo/limited" },
+  ],
 };
 
 const CATEGORIES: { key: string; catName: string; label: string; icon: string; color: string }[] = [
