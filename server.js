@@ -468,21 +468,21 @@ const KR_CRYPTO_PAIRS = ["XBT/USD","ETH/USD","SOL/USD","XRP/USD","ADA/USD","DOT/
 let krWs = null;
 let krPingTimer = null;
 function connectKraken() {
-  // Only connect if at least one category uses Kraken
-  if (!["KR"].some(k => [CRYPTO_FEED, FOREX_FEED, COMM_FEED].includes(k))) return;
   if (krWs) { try { krWs.removeAllListeners(); krWs.terminate(); } catch (_) {} krWs = null; }
   if (krPingTimer) { clearInterval(krPingTimer); krPingTimer = null; }
   krWs = new WebSocket("wss://ws.kraken.com");
   krWs.on("open", () => {
+    // Always subscribe forex + metals for real bid/ask spread data.
+    // Even when TD is the primary price feed, Kraken provides the live spread
+    // so that clients see a real ask != bid in the market watch.
+    // Only subscribe crypto when KR is the configured crypto feed.
     const pairs = [
-      ...(FOREX_FEED === "KR" ? KR_FOREX_PAIRS : []),
-      ...(COMM_FEED  === "KR" ? KR_METAL_PAIRS : []),
-      ...(CRYPTO_FEED=== "KR" ? KR_CRYPTO_PAIRS : []),
+      ...KR_FOREX_PAIRS,
+      ...KR_METAL_PAIRS,
+      ...(CRYPTO_FEED === "KR" ? KR_CRYPTO_PAIRS : []),
     ];
-    if (!pairs.length) return;
     krWs.send(JSON.stringify({ event: "subscribe", pair: pairs, subscription: { name: "spread" } }));
-    console.log("[KR] connected, subscribed spread for", pairs.length, "pairs");
-    // Kraken requires a ping every 30s to keep the connection alive
+    console.log("[KR] connected, subscribed spread for", pairs.length, "pairs (spread-only for non-KR feeds)");
     krPingTimer = setInterval(() => {
       if (krWs && krWs.readyState === 1) krWs.send(JSON.stringify({ event: "ping" }));
     }, 25000);
@@ -490,7 +490,6 @@ function connectKraken() {
   krWs.on("message", (data) => {
     try {
       const m = JSON.parse(data);
-      // Log subscription status so we can see which pairs Kraken accepts/rejects
       if (m.event === "subscriptionStatus") {
         if (m.status === "error") {
           console.warn(`[KR] subscription rejected for ${m.pair}: ${m.errorMessage}`);
@@ -508,7 +507,10 @@ function connectKraken() {
         if (bid > 0 && ask > 0 && bid < ask) {
           state[sym].bid = r(bid, meta[sym] ? meta[sym].digits : 5);
           state[sym].ask = r(ask, meta[sym] ? meta[sym].digits : 5);
-          applyPrice(sym, bid, "KR"); // MT5: smooth toward BID
+          // Always mark realAt so commitPrice emits real=ask (live spread for clients).
+          // applyPrice's preferred-feed guard prevents KR from overriding TD/MV prices.
+          state[sym].realAt = Date.now();
+          applyPrice(sym, bid, "KR");
         }
       }
     } catch (e) {}
