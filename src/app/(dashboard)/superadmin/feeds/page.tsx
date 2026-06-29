@@ -7,17 +7,19 @@ import PasswordInput from "@/components/ui/PasswordInput";
 const CAT_FEEDS: Record<string, { key: string; name: string; free: boolean; hasBidAsk: boolean; info: string }[]> = {
   crypto: [
     { key: "BN", name: "Binance",      free: true,  hasBidAsk: true,  info: "Real bid/ask · no key needed" },
+    { key: "MV", name: "Massive.com",  free: false, hasBidAsk: true,  info: "Real bid/ask · $49/mo plan required" },
     { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · no key needed" },
-    { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Price only · crypto + forex · key required" },
+    { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Price only · key required" },
     { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "Price only · Finnhub key required" },
   ],
   forex: [
-    { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · 30+ pairs · no key" },
-    { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Price only · key required" },
     { key: "MV", name: "Massive.com",  free: false, hasBidAsk: true,  info: "Real bid/ask · $49/mo plan required" },
+    { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · major pairs · no key" },
+    { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Price only · key required" },
     { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "Price only · key required" },
   ],
   commodities: [
+    { key: "MV", name: "Massive.com",  free: false, hasBidAsk: true,  info: "Real bid/ask · metals as forex pairs" },
     { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · gold & silver only" },
     { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Metals + energy · key required" },
   ],

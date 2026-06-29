@@ -87,9 +87,9 @@ let TD_KEY = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env
 let MASSIVE_KEY = process.env.MASSIVE_KEY || "";
 // ── Per-category feed selection ──
 // Each asset class can use a different WebSocket provider independently.
-let CRYPTO_FEED = "BN";   // BN | KR | TD | FH
+let CRYPTO_FEED = "BN";   // BN | KR | TD | FH | MV
 let FOREX_FEED  = "TD";   // KR | TD | MV | FH
-let COMM_FEED   = "TD";   // KR | TD  (commodities = metals + energy)
+let COMM_FEED   = "TD";   // KR | TD | MV  (commodities = metals + energy)
 let IDX_FEED    = "TD";   // TD | FH  (indices)
 // TD is always the intended primary. FH/MV are secondary fallbacks only.
 // When TD fails → switch to FH. Background probe tests TD every 2 min → auto-return when TD recovers.
@@ -186,9 +186,9 @@ async function loadFeedConfig() {
     if (typeof v.tdKey === "string" && v.tdKey.trim()) TD_KEY = v.tdKey.trim();
     if (typeof v.finnhubKey === "string" && v.finnhubKey.trim()) FINNHUB_KEY = v.finnhubKey.trim();
     if (typeof v.massiveKey === "string" && v.massiveKey.trim()) MASSIVE_KEY = v.massiveKey.trim();
-    if (["BN","KR","TD","FH"].includes(v.cryptoFeed))  CRYPTO_FEED = v.cryptoFeed;
-    if (["KR","TD","MV","FH"].includes(v.forexFeed))   FOREX_FEED  = v.forexFeed;
-    if (["KR","TD"].includes(v.commFeed))               COMM_FEED   = v.commFeed;
+    if (["BN","KR","TD","FH","MV"].includes(v.cryptoFeed)) CRYPTO_FEED = v.cryptoFeed;
+    if (["KR","TD","MV","FH"].includes(v.forexFeed))       FOREX_FEED  = v.forexFeed;
+    if (["KR","TD","MV"].includes(v.commFeed))              COMM_FEED   = v.commFeed;
     if (["TD","FH"].includes(v.idxFeed))                IDX_FEED    = v.idxFeed;
     // Manual primary override (saved by SuperAdmin) or auto-pick best available
     if (["TD","FH","MV","BN","KR"].includes(v.manualPrimary)) {
@@ -206,15 +206,15 @@ async function loadFeedConfig() {
 }
 // Tear down and re-open all feed sockets with current keys (after a config change).
 function reconnectFeeds() {
-  for (const [ws, name] of [[tdWs,"TD"],[fhWs,"FH"],[mvWs,"MV"],[bnWs,"BN"],[krWs,"KR"]]) {
+  for (const ws of [tdWs, fhWs, mvWs, mvCryptoWs, bnWs, krWs]) {
     try { if (ws) { ws.removeAllListeners(); ws.close(); } } catch (e) {}
   }
-  tdWs = null; fhWs = null; mvWs = null; bnWs = null; krWs = null;
+  tdWs = null; fhWs = null; mvWs = null; mvCryptoWs = null; bnWs = null; krWs = null;
   connectFinnhub();
   connectTD();
   connectBinance();
   connectKraken();
-  if (MASSIVE_KEY) connectMassive();
+  if (MASSIVE_KEY) { connectMassive(); connectMassiveCrypto(); }
 }
 
 const CANDLE_MS = 5000, HISTORY = 300, MONITOR_MS = 2000;
@@ -565,13 +565,16 @@ function connectKraken() {
 // Message:   {"ev":"C","p":"EURUSD","b":1.0856,"a":1.0858,"t":...}  — p = pair code (no slash)
 let mvWs = null;
 let MV_BASE_URL = process.env.MASSIVE_WS_URL || "wss://socket.massive.com"; // override via env if different
-// Set of symbols we cover via Massive (pair code = our internal symbol name)
+// Set of symbols delivered via Massive forex feed (C.* channel) — pair code = internal symbol name
+// Metals (XAU/USD etc.) are treated as forex pairs by Massive and included in C.*
 const MV_SYMBOLS = new Set([
   "EURUSD","GBPUSD","AUDUSD","NZDUSD","USDCAD","USDCHF","USDJPY",
   "EURGBP","EURJPY","EURCAD","EURCHF","GBPJPY","GBPCHF","AUDJPY",
   "AUDNZD","AUDCAD","NZDJPY","USDHKD","USDSGD","USDTRY","USDIDR",
   "USDMXN","USDZAR","GBPAUD","GBPCAD","GBPNZD","EURNZD","EURAUD","CADCHF",
   "CADJPY","CHFJPY","NZDCAD","NZDCHF",
+  // Metals — included as forex pairs in C.*
+  "XAUUSD","XAGUSD","XPTUSD","XPDUSD",
 ]);
 
 function connectMassive() {
@@ -611,6 +614,50 @@ function connectMassive() {
   });
   mvWs.on("close", () => { console.log("[MV] closed"); recordFeedFailure("MV"); setTimeout(() => { if (MASSIVE_KEY) connectMassive(); }, 5000); });
   mvWs.on("error", (e) => { console.error("[MV]", e.message); recordFeedFailure("MV"); });
+}
+
+// ── Massive.com WebSocket — crypto real bid/ask (separate /crypto feed) ──
+// Subscribe: {"action":"subscribe","params":"XQ.*"}  (XQ = eXchange Quotes, bid/ask)
+// Message:   {"ev":"XQ","p":"BTCUSD","b":65000.00,"a":65001.00,...}
+let mvCryptoWs = null;
+function connectMassiveCrypto() {
+  if (!MASSIVE_KEY || CRYPTO_FEED !== "MV") return;
+  if (mvCryptoWs) { try { mvCryptoWs.removeAllListeners(); mvCryptoWs.terminate(); } catch (_) {} mvCryptoWs = null; }
+  mvCryptoWs = new WebSocket(`${MV_BASE_URL}/crypto`);
+  mvCryptoWs.on("open", () => {
+    console.log("[MV-C] connected, authenticating...");
+    mvCryptoWs.send(JSON.stringify({ action: "auth", params: MASSIVE_KEY }));
+  });
+  mvCryptoWs.on("message", (data) => {
+    try {
+      const msgs = JSON.parse(data);
+      for (const m of (Array.isArray(msgs) ? msgs : [msgs])) {
+        if (m.ev === "status") {
+          if (m.status === "auth_success" || m.message === "authenticated") {
+            console.log("[MV-C] authenticated, subscribing to XQ.*");
+            mvCryptoWs.send(JSON.stringify({ action: "subscribe", params: "XQ.*" }));
+            recordFeedSuccess("MV");
+          } else if (m.status === "auth_failed") {
+            console.error("[MV-C] auth failed:", m.message);
+            recordFeedFailure("MV");
+          }
+        } else if ((m.ev === "XQ" || m.ev === "XA") && m.b != null && m.a != null) {
+          // m.p = pair code e.g. "BTCUSD" — try direct match then USDT variant
+          const raw = m.p ? m.p.replace("/", "") : null;
+          const sym = raw && state[raw] ? raw : (raw && state[raw + "T"] ? raw + "T" : null);
+          if (sym && state[sym]) {
+            const digits = meta[sym] ? meta[sym].digits : 2;
+            state[sym].bid = r(parseFloat(m.b), digits);
+            state[sym].ask = r(parseFloat(m.a), digits);
+            state[sym].realAt = Date.now();
+            applyPrice(sym, parseFloat(m.b), "MV");
+          }
+        }
+      }
+    } catch (e) {}
+  });
+  mvCryptoWs.on("close", () => { console.log("[MV-C] closed"); recordFeedFailure("MV"); setTimeout(() => { if (MASSIVE_KEY && CRYPTO_FEED === "MV") connectMassiveCrypto(); }, 5000); });
+  mvCryptoWs.on("error", (e) => { console.error("[MV-C]", e.message); recordFeedFailure("MV"); });
 }
 
 let tdWs = null;
@@ -1246,7 +1293,7 @@ app.prepare().then(async () => {
   connectKraken();     // forex + metals real bid/ask — free, no key
   connectFinnhub();
   connectTD();
-  if (MASSIVE_KEY) connectMassive();
+  if (MASSIVE_KEY) { connectMassive(); connectMassiveCrypto(); }
   // Delay initial REST poll so WS can connect and subscribe first (avoids rate-limit spike on boot)
   setTimeout(pollPrices, 15000);
   setTimeout(pollFinnhubQuotes, 10000);

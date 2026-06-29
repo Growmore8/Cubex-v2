@@ -35,9 +35,9 @@ export async function POST(req: Request) {
       tdKey:      String(b.tdKey      ?? existing.tdKey      ?? "").trim(),
       finnhubKey: String(b.finnhubKey ?? existing.finnhubKey ?? "").trim(),
       massiveKey: String(b.massiveKey ?? existing.massiveKey ?? "").trim(),
-      cryptoFeed: ["BN","KR","TD","FH"].includes(b.cryptoFeed) ? b.cryptoFeed : (existing.cryptoFeed || "BN"),
-      forexFeed:  ["KR","TD","MV","FH"].includes(b.forexFeed)  ? b.forexFeed  : (existing.forexFeed  || "TD"),
-      commFeed:   ["KR","TD"].includes(b.commFeed)   ? b.commFeed : (existing.commFeed || "KR"),
+      cryptoFeed: ["BN","KR","TD","FH","MV"].includes(b.cryptoFeed) ? b.cryptoFeed : (existing.cryptoFeed || "BN"),
+      forexFeed:  ["KR","TD","MV","FH"].includes(b.forexFeed)       ? b.forexFeed  : (existing.forexFeed  || "TD"),
+      commFeed:   ["KR","TD","MV"].includes(b.commFeed)              ? b.commFeed   : (existing.commFeed   || "KR"),
       idxFeed:    ["TD","FH"].includes(b.idxFeed)    ? b.idxFeed  : (existing.idxFeed  || "TD"),
       manualPrimary: ["TD","FH","MV","BN","KR"].includes(b.manualPrimary) ? b.manualPrimary : (existing.manualPrimary || null),
     };
