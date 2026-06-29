@@ -287,12 +287,15 @@ function recomputeDerived(base) {
     const def = DERIVED[ds];
     if (def.d.some((dep) => g[dep] == null)) continue;
     try {
-      applyDerived(ds, def.f(g));
+      const bidPrice = def.f(g);
+      applyDerived(ds, bidPrice);
+      const digs = (meta[ds] && meta[ds].digits) || 2;
+      // In MT5 model price = bid. Set state.bid so trade execution and Redis have it.
+      state[ds].bid = r(bidPrice, digs);
       // Propagate ask to derived symbol so commitPrice emits real=ask for live spread.
       if (def.d.every((dep) => gAsk[dep] != null)) {
         const da = def.f(gAsk);
         if (da && isFinite(da) && da > 0) {
-          const digs = (meta[ds] && meta[ds].digits) || 2;
           state[ds].ask = r(da, digs);
           state[ds].realAt = Date.now();
         }
@@ -384,7 +387,9 @@ function commitPrice(sym, p) {
   // `real` carries the exchange ASK so clients can compute the live spread (ask − bid).
   // Falls back to null when no live feed data within REAL_TTL.
   const real = (st.realAt && Date.now() - st.realAt < REAL_TTL && st.ask != null) ? st.ask : null;
-  if (global.__io) global.__io.emit("tick", { symbol: sym, price: p, bid: st.bid ?? null, real, candle });
+  // For derived symbols st.bid is never set by a feed — in MT5 model price IS bid, so fall back to p.
+  const emitBid = st.bid ?? p;
+  if (global.__io) global.__io.emit("tick", { symbol: sym, price: p, bid: emitBid, real, candle });
   recomputeDerived(sym);
 }
 
