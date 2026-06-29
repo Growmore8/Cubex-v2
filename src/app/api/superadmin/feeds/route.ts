@@ -19,6 +19,7 @@ export async function GET() {
       forexFeed:    v.forexFeed  || "TD",
       commFeed:     v.commFeed   || "KR",
       idxFeed:      v.idxFeed    || "TD",
+      stockFeed:    v.stockFeed  || "TD",
       manualPrimary: v.manualPrimary || null,
       currentPrimary: runtimePrimary,
     },
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
       forexFeed:  ["KR","TD","MV","FH"].includes(b.forexFeed)       ? b.forexFeed  : (existing.forexFeed  || "TD"),
       commFeed:   ["KR","TD","MV"].includes(b.commFeed)              ? b.commFeed   : (existing.commFeed   || "KR"),
       idxFeed:    ["TD","FH"].includes(b.idxFeed)    ? b.idxFeed  : (existing.idxFeed  || "TD"),
-      stockFeed:  ["FH","TD"].includes(b.stockFeed)  ? b.stockFeed : (existing.stockFeed || "FH"),
+      stockFeed:  ["FH","TD"].includes(b.stockFeed)  ? b.stockFeed : (existing.stockFeed || "TD"),
       manualPrimary: ["TD","FH","MV","BN","KR"].includes(b.manualPrimary) ? b.manualPrimary : (existing.manualPrimary || null),
     };
     await prisma.setting.upsert({ where: { key: "feeds" }, create: { key: "feeds", value }, update: { value } });

@@ -91,7 +91,7 @@ let CRYPTO_FEED = "BN";   // BN | KR | TD | FH | MV
 let FOREX_FEED  = "TD";   // KR | TD | MV | FH
 let COMM_FEED   = "TD";   // KR | TD | MV  (commodities = metals + energy)
 let IDX_FEED    = "TD";   // TD | FH  (indices)
-let STOCK_FEED  = "FH";   // FH | TD  (US stocks)
+let STOCK_FEED  = "TD";   // TD | FH  (US + Indian stocks via TwelveData paid)
 // TD is always the intended primary. FH/MV are secondary fallbacks only.
 // When TD fails → switch to FH. Background probe tests TD every 2 min → auto-return when TD recovers.
 let PRIMARY = "TD";
@@ -337,9 +337,17 @@ async function loadCatalog() {
   const rows = await prisma.globalSymbol.findMany({ where: { enabled: true } });
   symbols = rows.map((x) => x.symbol);
   for (const x of rows) {
-    const td = toTD(x.symbol, x.category);
-    // Finnhub fallback feed (skip derived/calculated symbols)
+    // Finnhub feed — use stored override (e.g. "NSE:RELIANCE") or auto-derive
     const fh = x.feed || (DERIVED_SET.has(x.symbol) ? null : toFinnhub(x.symbol, x.category));
+    // TwelveData feed — if Finnhub feed has BSE:/NSE: prefix, convert for TD:
+    //   "NSE:RELIANCE" → "RELIANCE:NSE"  |  "BSE:TCS" → "TCS:BSE"
+    let td;
+    if (x.feed && /^(NSE|BSE):/.test(x.feed)) {
+      const [exch, sym] = x.feed.split(":");
+      td = sym + ":" + exch;
+    } else {
+      td = toTD(x.symbol, x.category);
+    }
     meta[x.symbol] = { digits: x.digits || 5, contract: contractFor(x.category, x.symbol), feed: fh, td, cat: x.category };
     state[x.symbol] = { price: null, bid: null, ask: null, candles: [], bucket: 0 };
     if (fh) feedToSym[fh] = x.symbol;
