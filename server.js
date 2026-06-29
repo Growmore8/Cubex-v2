@@ -491,23 +491,20 @@ const KR_CRYPTO_PAIRS = ["XBT/USD","ETH/USD","SOL/USD","XRP/USD","ADA/USD","DOT/
 let krWs = null;
 let krPingTimer = null;
 function connectKraken() {
+  // Don't open a socket unless at least one asset class is assigned to KR
+  if (FOREX_FEED !== "KR" && COMM_FEED !== "KR" && CRYPTO_FEED !== "KR") {
+    console.log("[KR] not needed — no asset class assigned to KR, skipping");
+    return;
+  }
   if (krWs) { try { krWs.removeAllListeners(); krWs.terminate(); } catch (_) {} krWs = null; }
   if (krPingTimer) { clearInterval(krPingTimer); krPingTimer = null; }
   krWs = new WebSocket("wss://ws.kraken.com");
   krWs.on("open", () => {
-    // Only subscribe asset classes where KR is actually the selected feed.
-    // Massive provides real bid/ask for forex/metals/crypto so KR is only
-    // needed when explicitly chosen for that class.
     const pairs = [
       ...(FOREX_FEED === "KR" ? KR_FOREX_PAIRS : []),
       ...(COMM_FEED  === "KR" ? KR_METAL_PAIRS : []),
       ...(CRYPTO_FEED === "KR" ? KR_CRYPTO_PAIRS : []),
     ];
-    if (!pairs.length) {
-      console.log("[KR] connected but no classes assigned to KR — closing");
-      krWs.close();
-      return;
-    }
     krWs.send(JSON.stringify({ event: "subscribe", pair: pairs, subscription: { name: "spread" } }));
     console.log("[KR] connected, subscribed spread for", pairs.length, "pairs");
     krPingTimer = setInterval(() => {
