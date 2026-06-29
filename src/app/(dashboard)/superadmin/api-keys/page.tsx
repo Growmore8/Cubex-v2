@@ -9,11 +9,17 @@ type UsageData = { hourly: UsagePt[]; daily: UsagePt[]; monthly: UsagePt[] };
 function MiniBarChart({ data, color = "#16c784" }: { data: UsagePt[]; color?: string }) {
   const max = Math.max(...data.map((d) => d.value), 1);
   const total = data.reduce((s, d) => s + d.value, 0);
-  if (total === 0) return <div className="flex items-center justify-center h-[80px] text-xs" style={{ color: "var(--text3)" }}>No requests yet</div>;
+  if (total === 0) return (
+    <div className="flex flex-col items-center justify-center gap-1" style={{ height: 160 }}>
+      <i className="fa-solid fa-chart-simple text-2xl" style={{ color: "var(--border)" }} />
+      <span className="text-xs" style={{ color: "var(--text3)" }}>No requests yet</span>
+    </div>
+  );
   return (
-    <div className="flex items-end gap-[2px] h-[80px] w-full">
+    <div className="flex items-end gap-[3px] w-full" style={{ height: 160 }}>
       {data.map((d, i) => (
-        <div key={i} title={`${d.label}: ${d.value}`} className="flex-1 rounded-sm transition-all" style={{ height: `${Math.max(2, (d.value / max) * 100)}%`, background: d.value > 0 ? color : "var(--border)", opacity: d.value > 0 ? 1 : 0.3 }} />
+        <div key={i} title={`${d.label}: ${d.value}`} className="flex-1 rounded-t-sm cursor-default transition-all hover:opacity-80"
+          style={{ height: `${Math.max(2, (d.value / max) * 100)}%`, background: d.value > 0 ? color : "var(--border)", opacity: d.value > 0 ? 1 : 0.25 }} />
       ))}
     </div>
   );
@@ -35,24 +41,58 @@ function UsagePanel({ keyId, keyLabel }: { keyId: string; keyLabel: string }) {
 
   const chart = data ? (tab === "hour" ? data.hourly : tab === "day" ? data.daily : data.monthly) : [];
   const total = chart.reduce((s, d) => s + d.value, 0);
-  const tabBtn = (t: typeof tab, label: string) => (
-    <button onClick={() => setTab(t)} className="px-2 py-0.5 rounded text-[10px]"
-      style={{ background: tab === t ? "var(--accent)" : "transparent", color: tab === t ? "#fff" : "var(--text2)", fontWeight: tab === t ? 700 : 400 }}>
-      {label}
-    </button>
-  );
+  const peak = Math.max(...chart.map((d) => d.value), 0);
+  const avgDay = data ? Math.round(data.daily.reduce((s, d) => s + d.value, 0) / 30) : 0;
+
+  const tabs: { key: typeof tab; label: string; sublabel: string }[] = [
+    { key: "hour", label: "24h", sublabel: "Hourly" },
+    { key: "day",  label: "30d", sublabel: "Daily" },
+    { key: "month",label: "12m", sublabel: "Monthly" },
+  ];
 
   return (
-    <div className="rounded-xl border p-3 space-y-2" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
-      <div className="flex items-center justify-between">
-        <div className="text-xs font-semibold truncate" style={{ color: "var(--text)" }}>{keyLabel}</div>
-        <div className="flex gap-1">{tabBtn("hour", "24h")}{tabBtn("day", "30d")}{tabBtn("month", "12m")}</div>
+    <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+      {/* Header */}
+      <div>
+        <div className="text-sm font-bold truncate" style={{ color: "var(--text)" }}>{keyLabel}</div>
+        <div className="text-xs mt-0.5" style={{ color: "var(--text3)" }}>API key usage analytics</div>
       </div>
-      {loading ? <div className="h-[80px] flex items-center justify-center text-xs" style={{ color: "var(--text2)" }}>Loading…</div>
-        : <MiniBarChart data={chart} color="#16c784" />}
-      <div className="flex justify-between text-[10px]" style={{ color: "var(--text3)" }}>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Total", value: total.toLocaleString() },
+          { label: "Peak", value: peak.toLocaleString() },
+          { label: "Avg/day", value: avgDay.toLocaleString() },
+        ].map(({ label, value }) => (
+          <div key={label} className="rounded-lg p-2 text-center" style={{ background: "var(--bg2)" }}>
+            <div className="text-base font-bold" style={{ color: "#16c784" }}>{value}</div>
+            <div className="text-[10px] mt-0.5" style={{ color: "var(--text3)" }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tab selector */}
+      <div className="flex gap-1 rounded-lg p-1" style={{ background: "var(--bg2)" }}>
+        {tabs.map(({ key, label, sublabel }) => (
+          <button key={key} onClick={() => setTab(key)} className="flex-1 rounded-md py-1.5 text-xs font-semibold transition-all"
+            style={{ background: tab === key ? "var(--accent)" : "transparent", color: tab === key ? "#fff" : "var(--text2)" }}>
+            {label}
+            <span className="block text-[9px] font-normal opacity-70">{sublabel}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Chart */}
+      {loading
+        ? <div className="flex items-center justify-center" style={{ height: 160 }}><span className="text-sm" style={{ color: "var(--text2)" }}>Loading…</span></div>
+        : <MiniBarChart data={chart} color="#16c784" />
+      }
+
+      {/* Footer */}
+      <div className="flex justify-between items-center text-[10px] pt-1 border-t" style={{ color: "var(--text3)", borderColor: "var(--border)" }}>
         <span>{tab === "hour" ? "Last 24 hours" : tab === "day" ? "Last 30 days" : "Last 12 months"}</span>
-        <span className="font-semibold" style={{ color: "var(--text)" }}>{total.toLocaleString()} reqs</span>
+        <span className="font-semibold" style={{ color: "var(--text2)" }}>{total.toLocaleString()} requests</span>
       </div>
     </div>
   );
@@ -100,7 +140,7 @@ export default function SAApiKeys() {
   const activeKeys = keys.filter((k) => k.active);
 
   return (
-    <div className="ui-fade-up" style={{ maxWidth: 1100 }}>
+    <div className="ui-fade-up" style={{ maxWidth: 1400 }}>
       <div className="mb-4">
         <h1 className="text-2xl font-bold" style={{ color: "var(--text)" }}>API Keys</h1>
         <p className="text-sm mt-1" style={{ color: "var(--text2)" }}>Server-to-server keys for external integrations — account P&amp;L and live market prices (NYSE, BSE/NSE, Forex, Crypto, Metals).</p>
@@ -212,11 +252,11 @@ export default function SAApiKeys() {
         </div>
 
         {/* RIGHT — usage analytics */}
-        <div className="w-64 shrink-0 space-y-3">
-          <div className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--text2)" }}>
-            <i className="fa-solid fa-chart-bar mr-1" />API Usage
+        <div className="shrink-0 space-y-3" style={{ width: 360 }}>
+          <div className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text2)" }}>
+            <i className="fa-solid fa-chart-bar mr-1.5" />API Usage
           </div>
-          {activeKeys.length === 0 && <div className="text-xs" style={{ color: "var(--text3)" }}>No active keys.</div>}
+          {activeKeys.length === 0 && <div className="text-sm" style={{ color: "var(--text3)" }}>No active keys.</div>}
           {activeKeys.map((k) => (
             <UsagePanel key={k.id} keyId={k.id} keyLabel={`${k.label} · ${k.tenantName}`} />
           ))}
