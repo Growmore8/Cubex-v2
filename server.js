@@ -117,7 +117,7 @@ function startTdRecoveryProbe() {
   console.log("[TD] starting recovery probe every 2min...");
   tdRecoveryTimer = setInterval(() => {
     if (PRIMARY === "TD") { clearInterval(tdRecoveryTimer); tdRecoveryTimer = null; return; } // already recovered
-    const ws = new (require("ws"))("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY, { headers: { "Origin": "https://twelvedata.com" } });
+    const ws = new (require("ws"))("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY);
     let resolved = false;
     const done = (ok) => { if (resolved) return; resolved = true; try { ws.removeAllListeners(); ws.terminate(); } catch {} if (ok) {
       console.log("[TD] recovery probe succeeded → restoring TD as primary");
@@ -687,8 +687,19 @@ function connectTD() {
   if (tdWsFail200 >= 5) return; // give up after 5 failed attempts — REST poller covers prices
   // Close previous connection before creating a new one to avoid exhausting the 3-connection limit
   if (tdWs) { try { tdWs.removeAllListeners(); tdWs.terminate(); } catch (_) {} tdWs = null; }
-  tdWs = new WebSocket("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY, { headers: { "Origin": "https://twelvedata.com" } });
-  tdWs.on("open", () => { tdWsFail200 = 0; primaryFailCount = 0; try { const subs = symbols.filter((s) => !DERIVED_SET.has(s)).map((s) => meta[s].td); tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } })); } catch (e) {} console.log("[TD] connected, subscribing", symbols.filter((s) => !DERIVED_SET.has(s)).length); });
+  // No Origin header — TD docs don't require it and spoofing their domain can trigger rejection
+  tdWs = new WebSocket("wss://ws.twelvedata.com/v1/quotes/price?apikey=" + TD_KEY);
+  tdWs.on("open", () => {
+    tdWsFail200 = 0; primaryFailCount = 0;
+    try {
+      // Only subscribe symbols whose feed category uses TD — avoids sending 350+ symbols
+      // when Massive/BN covers forex/crypto and TD is only needed for stocks/indices
+      const tdSyms = symbols.filter((s) => !DERIVED_SET.has(s) && getCatFeed(meta[s]?.cat) === "TD");
+      const subs = tdSyms.map((s) => meta[s].td).filter(Boolean);
+      if (subs.length) tdWs.send(JSON.stringify({ action: "subscribe", params: { symbols: subs.join(",") } }));
+      console.log("[TD] connected, subscribing", subs.length, "symbols (TD-assigned categories only)");
+    } catch (e) {}
+  });
   tdWs.on("message", (data) => { try { const m = JSON.parse(data); if (m.event === "price" && m.price) { const s = tdToSym[m.symbol]; if (s) { const ask = parseFloat(m.ask || m.price); const bid = parseFloat(m.bid || 0); const hasBid = bid > 0 && bid < ask; if (hasBid) { state[s].bid = r(bid, meta[s].digits); state[s].ask = r(ask, meta[s].digits); } applyPrice(s, hasBid ? bid : ask, "TD"); recordFeedSuccess("TD"); } } } catch (e) {} });
   tdWs.on("close", () => {
     // Exponential backoff: 5s → 15s → 30s → 60s → 120s to avoid rate-limit 200 responses

@@ -53,7 +53,6 @@ export async function POST(req: Request) {
         `wss://ws.twelvedata.com/v1/quotes/price?apikey=${apiKey}`,
         (ws) => ws.send(JSON.stringify({ action: "subscribe", params: { symbols: "EUR/USD" } })),
         (data) => { try { const m = JSON.parse(data); return m.status === "ok" || m.event === "heartbeat" || m.event === "price"; } catch { return false; } },
-        { headers: { Origin: "https://twelvedata.com" } }
       );
       return NextResponse.json(result);
     }
