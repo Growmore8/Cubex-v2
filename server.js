@@ -528,11 +528,13 @@ function connectKraken() {
         if (!sym || !state[sym]) return;
         const bid = parseFloat(m[1][0]), ask = parseFloat(m[1][1]);
         if (bid > 0 && ask > 0 && bid < ask) {
-          // Sanity-check: Kraken's forex/metals book is often thin. Reject spreads
-          // wider than 0.5% of mid — those are stale limit orders, not real quotes.
-          // JPY pairs (USD/JPY 3.8 JPY wide, etc.) are the main offenders.
+          // Sanity-check: Kraken's book is often thin. Reject spreads that are
+          // clearly stale limit orders rather than real market quotes.
+          // Metals (XAU/XAG) can have ~1% natural spread on Kraken; forex should be
+          // tight. Cap: metals 2%, forex/crypto 0.5%.
           const pctSpread = (ask - bid) / bid;
-          const spreadOk = pctSpread < 0.005;
+          const isMetal = /^(XAU|XAG|XPT|XPD)/.test(sym);
+          const spreadOk = pctSpread < (isMetal ? 0.02 : 0.005);
           state[sym].bid = r(bid, meta[sym] ? meta[sym].digits : 5);
           if (spreadOk) {
             state[sym].ask = r(ask, meta[sym] ? meta[sym].digits : 5);
