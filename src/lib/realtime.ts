@@ -13,3 +13,8 @@ export function emitRefresh(payload?: any) {
 export function reloadFeeds() {
   try { const p = getPub(); if (p) p.publish("cubex:feeds", "1"); } catch (e) {}
 }
+
+// Tell the price engine to reload its symbol catalog (after add/enable/disable).
+export function reloadCatalog() {
+  try { const p = getPub(); if (p) p.publish("cubex:catalog", "1"); } catch (e) {}
+}

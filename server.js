@@ -1264,13 +1264,13 @@ app.prepare().then(async () => {
   const io = new Server(server, { path: "/socket.io" });
   global.__io = io;
   const sub = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
-  sub.subscribe("cubex:refresh", "cubex:feeds").catch(() => {});
+  sub.subscribe("cubex:refresh", "cubex:feeds", "cubex:catalog", "cubex:spreads").catch(() => {});
   sub.on("message", (ch, msg) => {
     if (ch === "cubex:refresh" && global.__io) { try { global.__io.emit("refresh", JSON.parse(msg)); } catch (e) { global.__io.emit("refresh", {}); } }
     else if (ch === "cubex:feeds") { (async () => { await loadFeedConfig(); reconnectFeeds(); console.log("[feed] reloaded from SuperAdmin"); })().catch((e) => console.error("[feed] reload failed:", e.message)); }
-    else if (ch === "cubex:spreads") { loadSpreads().catch(() => {}); } // admin changed a spread → reload + push
+    else if (ch === "cubex:catalog") { loadCatalog().then(() => console.log("[feed] catalog hot-reloaded:", symbols.length, "symbols")).catch((e) => console.error("[feed] catalog reload failed:", e.message)); }
+    else if (ch === "cubex:spreads") { loadSpreads().catch(() => {}); }
   });
-  sub.subscribe("cubex:spreads").catch(() => {});
   io.on("connection", (socket) => {
     const h = {}; for (const s of symbols) h[s] = state[s].candles; socket.emit("history", h);
     // Snapshot of current prices so clients (incl. for FROZEN/closed markets) know the

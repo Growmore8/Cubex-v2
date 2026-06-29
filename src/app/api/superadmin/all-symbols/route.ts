@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
+import { reloadCatalog } from "@/lib/realtime";
 
 export async function GET() {
   const s = await requireSuperAdmin();
@@ -18,5 +19,6 @@ export async function PATCH(req: Request) {
   const { symbol, enabled } = await req.json();
   if (!symbol) return NextResponse.json({ ok: false, error: "symbol required" }, { status: 400 });
   await prisma.globalSymbol.update({ where: { symbol }, data: { enabled } });
+  reloadCatalog();
   return NextResponse.json({ ok: true });
 }
