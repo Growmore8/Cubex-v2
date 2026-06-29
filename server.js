@@ -603,7 +603,7 @@ function connectMassive() {
         } else if (m.ev === "C" && m.b != null && m.a != null) {
           // m.p is the pair code e.g. "EURUSD" — strip any slash just in case
           const sym = m.p ? m.p.replace("/", "") : null;
-          if (sym && MV_SYMBOLS.has(sym) && state[sym]) {
+          if (sym && state[sym]) {
             state[sym].bid = r(parseFloat(m.b), meta[sym] ? meta[sym].digits : 5);
             state[sym].ask = r(parseFloat(m.a), meta[sym] ? meta[sym].digits : 5);
             state[sym].realAt = Date.now(); // mark fresh so commitPrice emits real=ask even if MV is not primary
