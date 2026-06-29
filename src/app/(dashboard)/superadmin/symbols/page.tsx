@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 
-type Sym = { symbol: string; display: string; category: string; digits: number; enabled: boolean };
+type Sym = { symbol: string; display: string; category: string; digits: number; enabled: boolean; feed?: string };
 type Ticker = { symbol: string; display: string; name: string; category: string; digits: number; exchange?: string; feed?: string };
 
 const CAT_COLOR: Record<string, string> = {
@@ -28,6 +28,8 @@ export default function SuperadminSymbolsPage() {
   const cats = useMemo(() => [...new Set(symbols.map((s) => s.category).filter(Boolean))].sort() as string[], [symbols]);
   const byCat = (c: string) => symbols.filter((s) => s.category === c);
 
+  const [bulkToggling, setBulkToggling] = useState<string | null>(null);
+
   async function toggleEnabled(sym: Sym) {
     setToggling(sym.symbol);
     await fetch("/api/superadmin/all-symbols", {
@@ -37,6 +39,22 @@ export default function SuperadminSymbolsPage() {
     setSymbols((prev) => prev.map((s) => s.symbol === sym.symbol ? { ...s, enabled: !s.enabled } : s));
     setToggling(null);
   }
+
+  async function bulkToggle(syms: Sym[], enabled: boolean, key: string) {
+    setBulkToggling(key);
+    const symbolList = syms.map((s) => s.symbol);
+    await fetch("/api/superadmin/all-symbols", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols: symbolList, enabled }),
+    });
+    setSymbols((prev) => prev.map((s) => symbolList.includes(s.symbol) ? { ...s, enabled } : s));
+    setBulkToggling(null);
+  }
+
+  // Split stocks by exchange: NSE/BSE have feed like "NSE:RELIANCE"
+  const isNseStock = (s: Sym) => !!s.feed && /^(NSE|BSE):/.test(s.feed);
+  const nseStocks = useMemo(() => symbols.filter((s) => s.category === "stocks" && isNseStock(s)), [symbols]);
+  const nyseStocks = useMemo(() => symbols.filter((s) => s.category === "stocks" && !isNseStock(s)), [symbols]);
 
   // ── Import ──
   const [mvLoading, setMvLoading] = useState(false);
@@ -142,6 +160,7 @@ export default function SuperadminSymbolsPage() {
             <p style={{ color: "var(--text2)", fontSize: 13 }}>No symbols yet. Click &quot;+ Import from Massive&quot; to add from 1,750+ tickers.</p>
           )}
           {cats.map((cat) => {
+            if (cat === "stocks") return null; // rendered separately below
             const items = byCat(cat);
             return (
               <div key={cat} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 12 }}>
@@ -164,6 +183,61 @@ export default function SuperadminSymbolsPage() {
               </div>
             );
           })}
+
+          {/* ── Stocks split: NYSE/NASDAQ + NSE ── */}
+          {(nyseStocks.length > 0 || nseStocks.length > 0) && (() => {
+            const StockGroup = ({ label, items, groupKey, color }: { label: string; items: Sym[]; groupKey: string; color: string }) => {
+              const enabledCnt = items.filter((s) => s.enabled).length;
+              const allEnabled = enabledCnt === items.length;
+              const allDisabled = enabledCnt === 0;
+              return (
+                <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color }}>{label}</span>
+                    <span style={{ fontSize: 11, color: "var(--text2)" }}>{enabledCnt}/{items.length} enabled</span>
+                    <div style={{ marginLeft: "auto", display: "flex", gap: 5 }}>
+                      <button onClick={() => bulkToggle(items.filter((s) => !s.enabled), true, groupKey + ":on")}
+                        disabled={allEnabled || bulkToggling === groupKey + ":on"}
+                        style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #22c55e", cursor: allEnabled ? "not-allowed" : "pointer",
+                          background: "rgba(34,197,94,0.1)", color: "#22c55e", opacity: allEnabled ? 0.4 : 1 }}>
+                        {bulkToggling === groupKey + ":on" ? "…" : "Enable all"}
+                      </button>
+                      <button onClick={() => bulkToggle(items.filter((s) => s.enabled), false, groupKey + ":off")}
+                        disabled={allDisabled || bulkToggling === groupKey + ":off"}
+                        style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #ef4444", cursor: allDisabled ? "not-allowed" : "pointer",
+                          background: "rgba(239,68,68,0.1)", color: "#ef4444", opacity: allDisabled ? 0.4 : 1 }}>
+                        {bulkToggling === groupKey + ":off" ? "…" : "Disable all"}
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {items.map((s) => (
+                      <button key={s.symbol} onClick={() => toggleEnabled(s)} disabled={toggling === s.symbol}
+                        title={s.enabled ? "Click to disable (hides from market watch)" : "Click to enable"}
+                        style={{ fontFamily: "monospace", fontSize: 11, padding: "3px 10px", borderRadius: 6,
+                          border: `1px solid ${s.enabled ? color : "var(--border)"}`, cursor: "pointer",
+                          background: s.enabled ? `${color}18` : "var(--bg2)",
+                          color: s.enabled ? color : "var(--text2)",
+                          opacity: toggling === s.symbol ? 0.5 : 1, transition: "all 0.15s" }}>
+                        {s.display || s.symbol}
+                      </button>
+                    ))}
+                  </div>
+                  {label.includes("NSE") && (
+                    <p style={{ fontSize: 10, color: "var(--text2)", marginTop: 8, marginBottom: 0 }}>
+                      Disable all = hidden from traders market watch. Prices still stream to Redis for the external API.
+                    </p>
+                  )}
+                </div>
+              );
+            };
+            return (
+              <>
+                {nyseStocks.length > 0 && <StockGroup label="Stocks — NYSE / NASDAQ" items={nyseStocks} groupKey="nyse" color="#3b82f6" />}
+                {nseStocks.length > 0 && <StockGroup label="Stocks — NSE / BSE (India)" items={nseStocks} groupKey="nse" color="#eab308" />}
+              </>
+            );
+          })()}
         </div>
       )}
 
