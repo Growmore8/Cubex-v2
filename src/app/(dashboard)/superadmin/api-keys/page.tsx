@@ -47,7 +47,7 @@ export default function SAApiKeys() {
   const inp = "ui-input rounded-md border px-2 py-1.5 text-sm";
 
   return (<div className="max-w-5xl space-y-4 ui-fade-up">
-    <div><h1 className="text-2xl font-bold">API Keys</h1><p className="text-sm text-gray-500">Server-to-server keys that let a tenant&apos;s website pull account data (closed P&amp;L) from Cubex.</p></div>
+    <div><h1 className="text-2xl font-bold">API Keys</h1><p className="text-sm text-gray-500">Server-to-server keys for external integrations — account P&amp;L and live market prices (NYSE, BSE/NSE, Forex, Crypto, Metals).</p></div>
     {err && <div className="text-sm text-red-600">{err}</div>}{msg && <div className="text-sm text-green-600">{msg}</div>}
 
     {/* Newly created raw key — shown once */}
@@ -94,23 +94,57 @@ export default function SAApiKeys() {
     </div>
 
     {/* Usage docs */}
-    <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
-      <div className="mb-2 font-semibold">How a tenant uses it</div>
-      <p className="mb-2 text-xs text-gray-500">Call this from <b>their server</b> (keep the key secret). Pass the account/pool login number as <code>accountId</code>.</p>
-      <pre className="overflow-auto rounded-lg bg-gray-900 p-3 text-xs text-gray-100"><code>{`GET ${origin}/api/external/v1/account-pnl?accountId=900050
+    <div className="ui-card bg-white p-4 space-y-5" style={{ borderColor: "#e2e8f0" }}>
+      <div className="font-semibold">How a tenant uses it</div>
+      <p className="text-xs text-gray-500">Call from <b>their server</b> (keep the key secret). Same <code>x-api-key</code> header for all endpoints. Key only reads its own tenant&apos;s data.</p>
+
+      {/* Endpoint 1 — Account P&L */}
+      <div>
+        <div className="mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">① Account P&amp;L</div>
+        <pre className="overflow-auto rounded-lg bg-gray-900 p-3 text-xs text-gray-100"><code>{`GET ${origin}/api/external/v1/account-pnl?accountId=900050
 Header:  x-api-key: ck_live_xxxxxxxxxxxx
 
 Response:
 {
   "ok": true,
   "accountId": "900050",
-  "closedPnl": 1261.48,    // realized (closed trades)
-  "floatingPnl": 84.20,    // unrealized (open trades, live)
-  "totalPnl": 1345.68,     // closedPnl + floatingPnl
-  "pnl": 1261.48,          // = closedPnl (back-compat)
+  "closedPnl":   1261.48,   // realized (closed trades)
+  "floatingPnl":   84.20,   // unrealized (open trades, live)
+  "totalPnl":    1345.68,   // closedPnl + floatingPnl
+  "pnl":         1261.48,   // = closedPnl (back-compat)
   "currency": "USD"
 }`}</code></pre>
-      <p className="mt-2 text-xs text-gray-400">Returns <b>closed</b>, <b>floating</b> and <b>total</b> P&amp;L. A key only reads its own tenant&apos;s accounts. Limit: 120 requests/min per key. Errors: 401 (bad key), 404 (no such account), 429 (rate limit).</p>
+        <p className="mt-1 text-xs text-gray-400">Limit: 120 req/min · Errors: 401 bad key, 404 no account, 429 rate limit</p>
+      </div>
+
+      {/* Endpoint 2 — Live Prices */}
+      <div>
+        <div className="mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">② Live Prices (all symbols)</div>
+        <pre className="overflow-auto rounded-lg bg-gray-900 p-3 text-xs text-gray-100"><code>{`GET ${origin}/api/external/v1/prices
+Header:  x-api-key: ck_live_xxxxxxxxxxxx
+
+Response:
+{
+  "ok": true,
+  "prices": {
+    "EURUSD":   { "bid": 1.08520, "ask": 1.08522, "price": 1.08520, "category": "forex" },
+    "XAUUSD":   { "bid": 3245.50, "ask": 3246.00, "price": 3245.50, "category": "commodities" },
+    "BTCUSD":   { "bid": 59864.01,"ask": 59864.50,"price": 59864.01,"category": "crypto" },
+    "AAPL":     { "bid": 283.50,  "ask": 283.52,  "price": 283.50,  "category": "stocks" },
+    "RELIANCE": { "bid": 2941.00, "ask": 2941.50, "price": 2941.00, "category": "stocks" }
+  },
+  "ts": 1719648000000
+}`}</code></pre>
+        <p className="mt-1 text-xs text-gray-400">Limit: 300 req/min · Filter: add <code>?symbols=AAPL,EURUSD,RELIANCE</code> to get specific symbols only</p>
+      </div>
+
+      {/* Endpoint 3 — Filtered prices */}
+      <div>
+        <div className="mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">③ Live Prices (filtered)</div>
+        <pre className="overflow-auto rounded-lg bg-gray-900 p-3 text-xs text-gray-100"><code>{`GET ${origin}/api/external/v1/prices?symbols=AAPL,RELIANCE,EURUSD
+Header:  x-api-key: ck_live_xxxxxxxxxxxx`}</code></pre>
+        <p className="mt-1 text-xs text-gray-400">Returns only the requested symbols. Useful for spot trading pages with specific symbol lists.</p>
+      </div>
     </div>
 
     {/* Delete confirm */}
