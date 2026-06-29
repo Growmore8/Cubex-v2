@@ -25,9 +25,9 @@ async function fetchAll(baseUrl: string, apiKey: string): Promise<any[]> {
   const all: any[] = [];
   let url: string | null = `${baseUrl}?active=true&limit=1000&apikey=${apiKey}`;
   while (url) {
-    const r = await fetch(url, { cache: "no-store" });
+    const r: Response = await fetch(url, { cache: "no-store" });
     if (!r.ok) break;
-    const d = await r.json();
+    const d: any = await r.json();
     if (Array.isArray(d.results)) all.push(...d.results);
     // Polygon.io-style pagination
     url = d.next_url ? `${d.next_url}&apikey=${apiKey}` : null;
