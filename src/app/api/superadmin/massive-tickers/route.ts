@@ -9,6 +9,8 @@ interface MvTicker {
   name: string;
   category: string;
   digits: number;
+  feed?: string;   // Finnhub override e.g. "BSE:RELIANCE", "NSE:TCS"
+  exchange?: string; // UI label e.g. "BSE", "NSE", "NYSE", "NASDAQ"
 }
 
 // ── Comprehensive forex pair list (Massive C.* channel covers all of these) ──
@@ -275,6 +277,62 @@ const STOCK_LIST: [string, string][] = [
   ["GLD","Gold ETF"],["SLV","Silver ETF"],
 ];
 
+// ── BSE / NSE Indian stocks (Finnhub: NSE:SYMBOL or BSE:SYMBOL) ──
+// [symbol, displayName, finnhubFeed, exchange]
+const BSE_STOCKS: [string, string, string, string][] = [
+  // Nifty 50 — Large Cap
+  ["RELIANCE","Reliance Industries","NSE:RELIANCE","NSE"],
+  ["TCS","Tata Consultancy Services","NSE:TCS","NSE"],
+  ["HDFCBANK","HDFC Bank","NSE:HDFCBANK","NSE"],
+  ["INFY","Infosys","NSE:INFY","NSE"],
+  ["ICICIBANK","ICICI Bank","NSE:ICICIBANK","NSE"],
+  ["HINDUNILVR","Hindustan Unilever","NSE:HINDUNILVR","NSE"],
+  ["ITC","ITC Ltd","NSE:ITC","NSE"],
+  ["SBIN","State Bank of India","NSE:SBIN","NSE"],
+  ["BHARTIARTL","Bharti Airtel","NSE:BHARTIARTL","NSE"],
+  ["KOTAKBANK","Kotak Mahindra Bank","NSE:KOTAKBANK","NSE"],
+  ["LT","Larsen & Toubro","NSE:LT","NSE"],
+  ["ASIANPAINT","Asian Paints","NSE:ASIANPAINT","NSE"],
+  ["MARUTI","Maruti Suzuki","NSE:MARUTI","NSE"],
+  ["BAJFINANCE","Bajaj Finance","NSE:BAJFINANCE","NSE"],
+  ["WIPRO","Wipro Ltd","NSE:WIPRO","NSE"],
+  ["HCLTECH","HCL Technologies","NSE:HCLTECH","NSE"],
+  ["SUNPHARMA","Sun Pharmaceutical","NSE:SUNPHARMA","NSE"],
+  ["TATAMOTORS","Tata Motors","NSE:TATAMOTORS","NSE"],
+  ["AXISBANK","Axis Bank","NSE:AXISBANK","NSE"],
+  ["TECHM","Tech Mahindra","NSE:TECHM","NSE"],
+  ["ULTRACEMCO","Ultratech Cement","NSE:ULTRACEMCO","NSE"],
+  ["NESTLEIND","Nestle India","NSE:NESTLEIND","NSE"],
+  ["POWERGRID","Power Grid Corp","NSE:POWERGRID","NSE"],
+  ["NTPC","NTPC Ltd","NSE:NTPC","NSE"],
+  ["TATASTEEL","Tata Steel","NSE:TATASTEEL","NSE"],
+  ["JSWSTEEL","JSW Steel","NSE:JSWSTEEL","NSE"],
+  ["ONGC","ONGC Ltd","NSE:ONGC","NSE"],
+  ["COALINDIA","Coal India","NSE:COALINDIA","NSE"],
+  ["GRASIM","Grasim Industries","NSE:GRASIM","NSE"],
+  ["HEROMOTOCO","Hero MotoCorp","NSE:HEROMOTOCO","NSE"],
+  ["BAJAJFINSV","Bajaj Finserv","NSE:BAJAJFINSV","NSE"],
+  ["TITAN","Titan Company","NSE:TITAN","NSE"],
+  ["ADANIENT","Adani Enterprises","NSE:ADANIENT","NSE"],
+  ["ADANIPORTS","Adani Ports","NSE:ADANIPORTS","NSE"],
+  ["DIVISLAB","Divi's Laboratories","NSE:DIVISLAB","NSE"],
+  ["CIPLA","Cipla Ltd","NSE:CIPLA","NSE"],
+  ["DRREDDY","Dr. Reddy's Labs","NSE:DRREDDY","NSE"],
+  ["EICHERMOT","Eicher Motors","NSE:EICHERMOT","NSE"],
+  ["BPCL","Bharat Petroleum","NSE:BPCL","NSE"],
+  ["INDUSINDBK","IndusInd Bank","NSE:INDUSINDBK","NSE"],
+  ["M&M","Mahindra & Mahindra","NSE:M&M","NSE"],
+  ["APOLLOHOSP","Apollo Hospitals","NSE:APOLLOHOSP","NSE"],
+  ["TATACONSUM","Tata Consumer Products","NSE:TATACONSUM","NSE"],
+  ["HINDALCO","Hindalco Industries","NSE:HINDALCO","NSE"],
+  ["VEDL","Vedanta Ltd","NSE:VEDL","NSE"],
+  ["ZOMATO","Zomato Ltd","NSE:ZOMATO","NSE"],
+  ["PAYTM","One97 Communications (Paytm)","NSE:PAYTM","NSE"],
+  ["NYKAA","FSN E-Commerce (Nykaa)","NSE:NYKAA","NSE"],
+  ["POLICYBZR","PB Fintech (PolicyBazaar)","NSE:POLICYBZR","NSE"],
+  ["IRCTC","IRCTC Ltd","NSE:IRCTC","NSE"],
+];
+
 function buildTickerList(): MvTicker[] {
   const tickers: MvTicker[] = [];
 
@@ -289,13 +347,17 @@ function buildTickerList(): MvTicker[] {
   }
 
   for (const [symbol, name] of STOCK_LIST) {
-    tickers.push({ symbol, display: symbol, name, category: "stocks", digits: 2 });
+    tickers.push({ symbol, display: symbol, name, category: "stocks", digits: 2, exchange: "NYSE/NASDAQ" });
+  }
+
+  for (const [symbol, name, feed, exchange] of BSE_STOCKS) {
+    tickers.push({ symbol, display: symbol, name, category: "stocks", digits: 2, feed, exchange });
   }
 
   return tickers;
 }
 
-// Cache computed list (never expires — it's static)
+// Cached ticker list — rebuilt on first request after server start
 let cache: MvTicker[] | null = null;
 
 export async function GET() {
@@ -323,7 +385,7 @@ export async function POST(req: Request) {
       const existing = await prisma.globalSymbol.findFirst({ where: { symbol: t.symbol } });
       if (existing) { skipped++; continue; }
       await prisma.globalSymbol.create({
-        data: { symbol: t.symbol, display: t.display, category: t.category, digits: t.digits, enabled: true },
+        data: { symbol: t.symbol, display: t.display, category: t.category, digits: t.digits, enabled: true, ...(t.feed ? { feed: t.feed } : {}) },
       });
       added++;
     }
