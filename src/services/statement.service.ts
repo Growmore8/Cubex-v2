@@ -278,6 +278,40 @@ export async function sendStatementEmail(opts: { tenantId: string; accountId: st
   return { ok: true, to };
 }
 
+// ── Combined statement email — one email per user, all account PDFs attached ──
+async function sendCombinedStatementEmail(opts: {
+  tenantId: string; tenant: any; accounts: any[];
+  to: string; since?: Date; until?: Date; periodLabel: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const t = opts.tenant;
+  const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
+  let firstSummary: StatementSummary | null = null;
+
+  for (const acc of opts.accounts) {
+    const data = await loadStatement({ tenantId: opts.tenantId, accountId: acc.id, since: opts.since, until: opts.until });
+    if (!data) continue;
+    const pdfFileName = `Statement-${acc.login}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    const pdf = await buildStatementPdf(data, opts.periodLabel);
+    attachments.push({ filename: pdfFileName, content: pdf, contentType: "application/pdf" });
+    if (!firstSummary) firstSummary = summaryOf(data, opts.periodLabel, pdfFileName);
+  }
+
+  if (!attachments.length || !firstSummary) return { ok: false, error: "No data" };
+
+  const brand = brandOf(t);
+  const subject = attachments.length > 1
+    ? `${opts.periodLabel} (${attachments.length} accounts) — ${brand.brandName}`
+    : `Account statement ${opts.accounts[0]?.login} — ${brand.brandName}`;
+
+  await sendTenantMail(t.smtpEmail, t.smtpPassword, {
+    to: opts.to, subject, fromName: brand.brandName,
+    replyTo: noReplyAddress(t.smtpEmail),
+    html: statementEmail(brand, firstSummary),
+    attachments,
+  }, t.smtpHost);
+  return { ok: true };
+}
+
 // ── Periodic (weekly / monthly) batch, honouring each client's local time ──
 
 // ISO alpha-2 country code → representative IANA timezone. Multi-timezone countries
@@ -345,41 +379,55 @@ function localNow(tz: string): { weekday: number; day: number; hour: number; dat
 const SEND_HOUR = Number(process.env.REPORT_HOUR || 6); // local hour to send (default 06:00)
 const sentKeys = new Set<string>(); // dedup within process: `${accountId}:${period}:${dateKey}`
 
-// Called hourly. For each client account, if it's locally Monday/1st at SEND_HOUR,
-// email that account's weekly/monthly statement once. Returns how many were sent.
+// Called hourly. Groups accounts by user so each client gets ONE email even when
+// they have multiple accounts — all account PDFs are attached to that single email.
 export async function runStatementCron(): Promise<{ weekly: number; monthly: number }> {
   if (sentKeys.size > 50000) sentKeys.clear();
   const tenants = await prisma.tenant.findMany({ where: { NOT: { smtpEmail: null } } });
   let weekly = 0, monthly = 0;
+
   for (const t of tenants as any[]) {
     if (!t.smtpEmail || !t.smtpPassword) continue;
     const accounts = await prisma.account.findMany({
       where: { tenantId: t.id, deactivated: false, user: { role: "CLIENT" } },
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { id: true, email: true } } },
     });
+
+    // Group accounts by userId so multi-account clients get one combined email
+    const byUser = new Map<string, { email: string; accounts: typeof accounts }>();
     for (const a of accounts as any[]) {
-      if (!a.user?.email) continue;
-      const tz = tzFor(a.country);
-      const { weekday, day, hour } = localNow(tz);
+      if (!a.user?.email || !a.user?.id) continue;
+      const uid = a.user.id;
+      if (!byUser.has(uid)) byUser.set(uid, { email: a.user.email, accounts: [] });
+      byUser.get(uid)!.accounts.push(a);
+    }
+
+    for (const { email: userEmail, accounts: userAccounts } of byUser.values()) {
+      // Use first account's country for timezone (all belong to same user)
+      const tz = tzFor((userAccounts[0] as any).country);
+      const { weekday, day, hour, dateKey } = localNow(tz);
       if (hour !== SEND_HOUR) continue;
-      const { dateKey } = localNow(tz);
-      // Monthly takes precedence on the 1st so a client never gets two emails the same hour.
+
+      // Monthly takes precedence on the 1st
       if (day === 1) {
-        const key = `${a.id}:monthly:${dateKey}`;
-        if (!sentKeys.has(key)) {
-          sentKeys.add(key);
+        const groupKey = `${userEmail}:monthly:${dateKey}`;
+        if (!sentKeys.has(groupKey)) {
+          sentKeys.add(groupKey);
+          // also mark individual accounts to avoid double-send if cron runs again
+          userAccounts.forEach((a: any) => sentKeys.add(`${a.id}:monthly:${dateKey}`));
           const since = new Date(Date.now() - 31 * 86400000);
-          const r = await sendStatementEmail({ tenantId: t.id, accountId: a.id, since, periodLabel: "Monthly statement" }).catch((e) => ({ ok: false, error: String(e) }));
+          const r = await sendCombinedStatementEmail({ tenantId: t.id, tenant: t, accounts: userAccounts, to: userEmail, since, periodLabel: "Monthly statement" }).catch(() => ({ ok: false }));
           if (r.ok) monthly++;
         }
         continue;
       }
       if (weekday === 1) {
-        const key = `${a.id}:weekly:${dateKey}`;
-        if (!sentKeys.has(key)) {
-          sentKeys.add(key);
+        const groupKey = `${userEmail}:weekly:${dateKey}`;
+        if (!sentKeys.has(groupKey)) {
+          sentKeys.add(groupKey);
+          userAccounts.forEach((a: any) => sentKeys.add(`${a.id}:weekly:${dateKey}`));
           const since = new Date(Date.now() - 7 * 86400000);
-          const r = await sendStatementEmail({ tenantId: t.id, accountId: a.id, since, periodLabel: "Weekly statement" }).catch((e) => ({ ok: false, error: String(e) }));
+          const r = await sendCombinedStatementEmail({ tenantId: t.id, tenant: t, accounts: userAccounts, to: userEmail, since, periodLabel: "Weekly statement" }).catch(() => ({ ok: false }));
           if (r.ok) weekly++;
         }
       }
