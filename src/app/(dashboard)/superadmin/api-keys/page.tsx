@@ -6,32 +6,33 @@ type Key = { id: string; label: string; prefix: string; active: boolean; lastUse
 type UsagePt = { label: string; value: number };
 type UsageData = { hourly: UsagePt[]; daily: UsagePt[]; monthly: UsagePt[] };
 
-function MiniBarChart({ data, color = "#16c784" }: { data: UsagePt[]; color?: string }) {
+function BarChart({ data, color = "#16c784" }: { data: UsagePt[]; color?: string }) {
   const max = Math.max(...data.map((d) => d.value), 1);
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0) return (
-    <div className="flex flex-col items-center justify-center gap-1" style={{ height: 160 }}>
-      <i className="fa-solid fa-chart-simple text-2xl" style={{ color: "var(--border)" }} />
-      <span className="text-xs" style={{ color: "var(--text3)" }}>No requests yet</span>
+    <div className="flex flex-col items-center justify-center gap-2 h-full">
+      <i className="fa-solid fa-chart-simple text-3xl" style={{ color: "var(--border)" }} />
+      <span className="text-sm" style={{ color: "var(--text3)" }}>No requests yet</span>
     </div>
   );
   return (
-    <div className="flex items-end gap-[3px] w-full" style={{ height: 160 }}>
+    <div className="flex items-end gap-[3px] w-full h-full">
       {data.map((d, i) => (
-        <div key={i} title={`${d.label}: ${d.value}`} className="flex-1 rounded-t-sm cursor-default transition-all hover:opacity-80"
-          style={{ height: `${Math.max(2, (d.value / max) * 100)}%`, background: d.value > 0 ? color : "var(--border)", opacity: d.value > 0 ? 1 : 0.25 }} />
+        <div key={i} title={`${d.label}: ${d.value}`} className="flex-1 rounded-t-sm cursor-default transition-opacity hover:opacity-70"
+          style={{ height: `${Math.max(1, (d.value / max) * 100)}%`, background: d.value > 0 ? color : "var(--border)", opacity: d.value > 0 ? 1 : 0.2 }} />
       ))}
     </div>
   );
 }
 
-function UsagePanel({ keyId, keyLabel }: { keyId: string; keyLabel: string }) {
+function UsagePanel({ keyId, keyLabel, keys, onKeyChange }: { keyId: string; keyLabel: string; keys: Key[]; onKeyChange: (id: string) => void }) {
   const [tab, setTab] = useState<"hour" | "day" | "month">("day");
   const [data, setData] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
+    setData(null);
     fetch(`/api/superadmin/api-key-stats?keyId=${keyId}`)
       .then((r) => r.json())
       .then((d) => { if (d.ok) setData(d); })
@@ -51,15 +52,25 @@ function UsagePanel({ keyId, keyLabel }: { keyId: string; keyLabel: string }) {
   ];
 
   return (
-    <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+    <div className="flex flex-col h-full rounded-xl border overflow-hidden gap-3" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
       {/* Header */}
-      <div>
-        <div className="text-sm font-bold truncate" style={{ color: "var(--text)" }}>{keyLabel}</div>
-        <div className="text-xs mt-0.5" style={{ color: "var(--text3)" }}>API key usage analytics</div>
+      <div className="p-4 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
+        <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text2)" }}>
+          <i className="fa-solid fa-chart-bar mr-1.5" />API Usage
+        </div>
+        {/* Key selector */}
+        <select value={keyId} onChange={(e) => onKeyChange(e.target.value)}
+          className="w-full rounded-lg border px-2 py-1.5 text-sm font-medium"
+          style={{ background: "var(--bg2)", borderColor: "var(--border)", color: "var(--text)" }}>
+          {keys.map((k) => (
+            <option key={k.id} value={k.id}>{k.label} · {k.tenantName}</option>
+          ))}
+        </select>
+        <div className="text-xs mt-1.5" style={{ color: "var(--text3)" }}>{keyLabel}</div>
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 px-4 shrink-0">
         {[
           { label: "Total", value: total.toLocaleString() },
           { label: "Peak", value: peak.toLocaleString() },
@@ -73,7 +84,7 @@ function UsagePanel({ keyId, keyLabel }: { keyId: string; keyLabel: string }) {
       </div>
 
       {/* Tab selector */}
-      <div className="flex gap-1 rounded-lg p-1" style={{ background: "var(--bg2)" }}>
+      <div className="flex gap-1 rounded-lg p-1 mx-4 shrink-0" style={{ background: "var(--bg2)" }}>
         {tabs.map(({ key, label, sublabel }) => (
           <button key={key} onClick={() => setTab(key)} className="flex-1 rounded-md py-1.5 text-xs font-semibold transition-all"
             style={{ background: tab === key ? "var(--accent)" : "transparent", color: tab === key ? "#fff" : "var(--text2)" }}>
@@ -83,14 +94,16 @@ function UsagePanel({ keyId, keyLabel }: { keyId: string; keyLabel: string }) {
         ))}
       </div>
 
-      {/* Chart */}
-      {loading
-        ? <div className="flex items-center justify-center" style={{ height: 160 }}><span className="text-sm" style={{ color: "var(--text2)" }}>Loading…</span></div>
-        : <MiniBarChart data={chart} color="#16c784" />
-      }
+      {/* Chart — flex-1 fills all remaining height */}
+      <div className="flex-1 min-h-0 px-4 pb-1">
+        {loading
+          ? <div className="flex items-center justify-center h-full"><span className="text-sm" style={{ color: "var(--text2)" }}>Loading…</span></div>
+          : <BarChart data={chart} color="#16c784" />
+        }
+      </div>
 
       {/* Footer */}
-      <div className="flex justify-between items-center text-[10px] pt-1 border-t" style={{ color: "var(--text3)", borderColor: "var(--border)" }}>
+      <div className="flex justify-between items-center text-[10px] px-4 pb-4 shrink-0 border-t pt-2" style={{ color: "var(--text3)", borderColor: "var(--border)" }}>
         <span>{tab === "hour" ? "Last 24 hours" : tab === "day" ? "Last 30 days" : "Last 12 months"}</span>
         <span className="font-semibold" style={{ color: "var(--text2)" }}>{total.toLocaleString()} requests</span>
       </div>
@@ -107,6 +120,7 @@ export default function SAApiKeys() {
   const [created, setCreated] = useState("");
   const [confirmDel, setConfirmDel] = useState<Key | null>(null);
   const [publicApiUrl, setPublicApiUrl] = useState("");
+  const [selectedKeyId, setSelectedKeyId] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -114,7 +128,12 @@ export default function SAApiKeys() {
         fetch("/api/superadmin/api-keys").then((r) => r.json()),
         fetch("/api/superadmin/settings").then((r) => r.json()),
       ]);
-      if (d.ok) { setKeys(d.keys || []); setTenants(d.tenants || []); if (!tenantId && d.tenants?.[0]) setTenantId(d.tenants[0].id); }
+      if (d.ok) {
+        const ks: Key[] = d.keys || [];
+        setKeys(ks); setTenants(d.tenants || []);
+        if (!tenantId && d.tenants?.[0]) setTenantId(d.tenants[0].id);
+        if (!selectedKeyId && ks.find((k) => k.active)) setSelectedKeyId(ks.find((k) => k.active)!.id);
+      }
       if (cfg.ok && cfg.publicApiUrl) setPublicApiUrl(cfg.publicApiUrl);
     } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,6 +157,7 @@ export default function SAApiKeys() {
 
   const origin = publicApiUrl || (typeof window !== "undefined" ? window.location.origin : "https://your-api-domain");
   const activeKeys = keys.filter((k) => k.active);
+  const selectedKey = activeKeys.find((k) => k.id === selectedKeyId) ?? activeKeys[0];
 
   return (
     <div className="ui-fade-up" style={{ maxWidth: 1400 }}>
@@ -251,15 +271,20 @@ export default function SAApiKeys() {
           </div>
         </div>
 
-        {/* RIGHT — usage analytics */}
-        <div className="shrink-0 space-y-3" style={{ width: 360 }}>
-          <div className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text2)" }}>
-            <i className="fa-solid fa-chart-bar mr-1.5" />API Usage
-          </div>
-          {activeKeys.length === 0 && <div className="text-sm" style={{ color: "var(--text3)" }}>No active keys.</div>}
-          {activeKeys.map((k) => (
-            <UsagePanel key={k.id} keyId={k.id} keyLabel={`${k.label} · ${k.tenantName}`} />
-          ))}
+        {/* RIGHT — usage analytics, sticky full height */}
+        <div className="shrink-0 sticky self-start" style={{ width: 380, top: 16, height: "calc(100vh - 120px)" }}>
+          {activeKeys.length === 0
+            ? <div className="rounded-xl border flex items-center justify-center h-full text-sm" style={{ borderColor: "var(--border)", background: "var(--card)", color: "var(--text3)" }}>No active keys.</div>
+            : selectedKey && (
+              <UsagePanel
+                key={selectedKey.id}
+                keyId={selectedKey.id}
+                keyLabel={selectedKey.prefix}
+                keys={activeKeys}
+                onKeyChange={(id) => setSelectedKeyId(id)}
+              />
+            )
+          }
         </div>
       </div>
 
