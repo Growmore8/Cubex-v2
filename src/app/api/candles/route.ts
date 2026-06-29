@@ -3,18 +3,20 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // Feed keys come from the SuperAdmin Feeds UI (DB), falling back to env.
-async function feedKeys(): Promise<{ td: string; fh: string; primary: string }> {
+async function feedKeys(): Promise<{ td: string; fh: string; mv: string; primary: string }> {
   let td = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
   let fh = process.env.FINNHUB_KEY || "";
+  let mv = process.env.MASSIVE_KEY || "";
   let primary = "TD";
   try {
     const rec = await prisma.setting.findUnique({ where: { key: "feeds" } });
     const v: any = (rec && rec.value) || {};
     if (typeof v.tdKey === "string" && v.tdKey.trim()) td = v.tdKey.trim();
     if (typeof v.finnhubKey === "string" && v.finnhubKey.trim()) fh = v.finnhubKey.trim();
+    if (typeof v.massiveKey === "string" && v.massiveKey.trim()) mv = v.massiveKey.trim();
     if (v.primary === "TD" || v.primary === "FH") primary = v.primary;
   } catch {}
-  return { td, fh, primary };
+  return { td, fh, mv, primary };
 }
 
 const INTERVAL: Record<string, string> = {
@@ -22,6 +24,33 @@ const INTERVAL: Record<string, string> = {
 };
 // Finnhub candle resolution (forex/stock) — used for symbols with an OANDA feed.
 const FH_RES: Record<string, string> = { "1M": "1", "5M": "5", "15M": "15", "30M": "30", "1H": "60", "4H": "60", "1D": "D" };
+
+// Massive REST API — Polygon.io-compatible aggregate bars
+// Forex/metals: C:EURUSD  |  Crypto: X:BTCUSD
+// URL: https://api.massive.com/v2/aggs/ticker/{ticker}/range/{mult}/{span}/{from_ms}/{to_ms}?sort=asc&limit=N&apikey=KEY
+const MV_TF: Record<string, { mult: number; span: string; msPerBar: number }> = {
+  "1M":  { mult: 1,  span: "minute", msPerBar: 60_000 },
+  "5M":  { mult: 5,  span: "minute", msPerBar: 300_000 },
+  "15M": { mult: 15, span: "minute", msPerBar: 900_000 },
+  "30M": { mult: 30, span: "minute", msPerBar: 1_800_000 },
+  "1H":  { mult: 1,  span: "hour",   msPerBar: 3_600_000 },
+  "4H":  { mult: 4,  span: "hour",   msPerBar: 14_400_000 },
+  "1D":  { mult: 1,  span: "day",    msPerBar: 86_400_000 },
+  "1W":  { mult: 1,  span: "week",   msPerBar: 604_800_000 },
+};
+
+function mvTicker(symbol: string, cat: string): string | null {
+  const s = symbol.toUpperCase();
+  if (cat === "crypto") {
+    // BTCUSDT → X:BTCUSD  |  BTCUSD → X:BTCUSD
+    const base = s.endsWith("USDT") ? s.slice(0, -1) : s; // strip trailing T
+    return `X:${base}`;
+  }
+  if (cat === "forex" || cat === "commodities") {
+    return `C:${s}`; // EURUSD → C:EURUSD, XAUUSD → C:XAUUSD
+  }
+  return null; // indices/stocks — Massive not used for history
+}
 
 // Finnhub OHLC for an OANDA-fed symbol (e.g. OANDA:EUR_USD). Returns candles or null.
 async function finnhubCandles(feed: string, tf: string, fhKey: string): Promise<any[] | null> {
@@ -85,10 +114,37 @@ export async function GET(req: Request) {
   if (hit && Date.now() - hit.t < cacheTtl(tf)) return NextResponse.json({ ok: true, candles: hit.candles, source: hit.source, cached: true });
 
   let feed: string | null = null;
-  try { const gs = await prisma.globalSymbol.findUnique({ where: { symbol } }); feed = gs?.feed || null; } catch {}
-  const { td: TD_KEY, fh: FH_KEY, primary } = await feedKeys();
+  let cat = "";
+  try {
+    const gs = await prisma.globalSymbol.findUnique({ where: { symbol } });
+    feed = gs?.feed || null;
+    cat = (gs as any)?.cat || "";
+  } catch {}
+  const { td: TD_KEY, fh: FH_KEY, mv: MV_KEY, primary } = await feedKeys();
 
   const dedupe = (arr: any[]) => { arr.sort((a, b) => a.time - b.time); const seen = new Set<number>(); return arr.filter((c) => isFinite(c.time) && isFinite(c.close) && !seen.has(c.time) && seen.add(c.time)); };
+
+  // Massive REST — 10+ years of forex, metals, crypto history
+  const getMassive = async (): Promise<any[] | null> => {
+    if (!MV_KEY) return null;
+    const ticker = mvTicker(symbol, cat);
+    if (!ticker) return null;
+    const { mult, span, msPerBar } = MV_TF[tf] || MV_TF["1M"];
+    const toMs = beforeSec ? Number(beforeSec) * 1000 : Date.now();
+    const fromMs = toMs - Math.ceil(limit * msPerBar * 1.3); // 30% buffer for market gaps
+    const api = `https://api.massive.com/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/${mult}/${span}/${fromMs}/${toMs}?sort=asc&limit=${limit}&apikey=${MV_KEY}`;
+    try {
+      const d = await (await fetch(api, { cache: "no-store" })).json();
+      if (!d || d.status === "ERROR" || !Array.isArray(d.results) || !d.results.length) return null;
+      const out = d.results.map((r: any) => ({
+        time: Math.floor(r.t / 1000), // Massive returns ms → convert to seconds
+        open: Number(r.o), high: Number(r.h), low: Number(r.l), close: Number(r.c),
+        volume: Number(r.v ?? 0),
+      })).filter((c: any) => isFinite(c.time) && isFinite(c.close));
+      const clean = dedupe(out);
+      return clean.length ? clean : null;
+    } catch { return null; }
+  };
 
   // Twelve Data time_series.
   const getTD = async (): Promise<any[] | null> => {
@@ -122,8 +178,13 @@ export async function GET(req: Request) {
     return out.length ? out : null;
   };
 
-  // Try the configured PRIMARY feed first, the other as fallback.
-  const order = primary === "FH" ? [getFH, getTD] : [getTD, getFH];
+  // Priority: Massive first (deep history, real quotes) → TD → FH
+  // Massive only applies to forex, metals, and crypto (not stocks/indices)
+  const order: (() => Promise<any[] | null>)[] = [];
+  if (MV_KEY && (cat === "forex" || cat === "commodities" || cat === "crypto")) order.push(getMassive);
+  if (primary === "FH") { order.push(getFH); order.push(getTD); }
+  else { order.push(getTD); order.push(getFH); }
+
   for (const fn of order) {
     const candles = await fn();
     if (candles && candles.length) { candleCache.set(ckey, { t: Date.now(), candles }); return NextResponse.json({ ok: true, candles }); }
