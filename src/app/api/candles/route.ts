@@ -118,7 +118,7 @@ export async function GET(req: Request) {
   try {
     const gs = await prisma.globalSymbol.findUnique({ where: { symbol } });
     feed = gs?.feed || null;
-    cat = (gs as any)?.cat || "";
+    cat = gs?.category || "";
   } catch {}
   const { td: TD_KEY, fh: FH_KEY, mv: MV_KEY, primary } = await feedKeys();
 
