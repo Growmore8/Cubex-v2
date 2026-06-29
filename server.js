@@ -680,7 +680,7 @@ let tdWsFail200 = 0; // consecutive WS handshake failures
 function connectTD() {
   if (!TD_KEY) { console.log("[TD] no key"); return; }
   // Skip WS if no asset class uses TD for live prices (REST/candles still use TD key separately)
-  if (FOREX_FEED !== "TD" && CRYPTO_FEED !== "TD" && COMM_FEED !== "TD" && IDX_FEED !== "TD") {
+  if (FOREX_FEED !== "TD" && CRYPTO_FEED !== "TD" && COMM_FEED !== "TD" && IDX_FEED !== "TD" && STOCK_FEED !== "TD") {
     console.log("[TD] WS not needed — all live feeds on other providers");
     return;
   }
