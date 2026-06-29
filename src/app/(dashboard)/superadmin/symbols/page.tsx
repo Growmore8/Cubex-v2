@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from "react";
 
 type Sym = { symbol: string; display: string; category: string; digits: number; enabled: boolean };
-type Ticker = { symbol: string; display: string; name: string; category: string; digits: number };
+type Ticker = { symbol: string; display: string; name: string; category: string; digits: number; exchange?: string; feed?: string };
 
 const CAT_COLOR: Record<string, string> = {
   forex: "#3b82f6", crypto: "#f59e0b", commodities: "#8b5cf6",
@@ -71,8 +71,24 @@ export default function SuperadminSymbolsPage() {
     return t;
   }, [mvTickers, catFilter, search]);
 
+  const [exchFilter, setExchFilter] = useState("all");
+
   const newTickers = filtered.filter((t) => !existing.has(t.symbol));
   const mvCats = [...new Set(mvTickers.map((t) => t.category))].sort();
+
+  // Exchange sub-filter (only relevant when catFilter === "stocks")
+  const filteredByExch = useMemo(() => {
+    if (exchFilter === "all" || catFilter !== "stocks") return filtered;
+    return filtered.filter((t) => t.exchange === exchFilter);
+  }, [filtered, exchFilter, catFilter]);
+
+  const newByExch = filteredByExch.filter((t) => !existing.has(t.symbol));
+
+  // Unique exchanges within stocks
+  const stockExchanges = useMemo(() =>
+    [...new Set(mvTickers.filter((t) => t.category === "stocks" && t.exchange).map((t) => t.exchange!))].sort(),
+    [mvTickers]
+  );
 
   function toggleSelect(sym: string) {
     setSelected((prev) => { const n = new Set(prev); n.has(sym) ? n.delete(sym) : n.add(sym); return n; });
@@ -163,17 +179,24 @@ export default function SuperadminSymbolsPage() {
           )}
           {!mvLoading && !mvError && mvTickers.length > 0 && (
             <>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search symbol or name…"
                   style={{ flex: 1, minWidth: 180, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--text)", fontSize: 13 }} />
-                <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
+                <select value={catFilter} onChange={(e) => { setCatFilter(e.target.value); setExchFilter("all"); }}
                   style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--text)", fontSize: 13 }}>
                   <option value="all">All categories</option>
-                  {mvCats.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {mvCats.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
                 </select>
-                <button onClick={() => setSelected(new Set(newTickers.map((t) => t.symbol)))}
+                {catFilter === "stocks" && stockExchanges.length > 0 && (
+                  <select value={exchFilter} onChange={(e) => setExchFilter(e.target.value)}
+                    style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--text)", fontSize: 13 }}>
+                    <option value="all">All exchanges</option>
+                    {stockExchanges.map((e) => <option key={e} value={e}>{e}</option>)}
+                  </select>
+                )}
+                <button onClick={() => setSelected(new Set(newByExch.map((t) => t.symbol)))}
                   style={{ padding: "7px 12px", borderRadius: 8, background: "rgba(59,130,246,0.15)", color: "#3b82f6", border: "1px solid rgba(59,130,246,0.3)", cursor: "pointer", fontSize: 13 }}>
-                  Select all new ({newTickers.length})
+                  Select all new ({newByExch.length})
                 </button>
                 {selected.size > 0 && (
                   <button onClick={() => setSelected(new Set())}
@@ -187,6 +210,22 @@ export default function SuperadminSymbolsPage() {
                   style={{ padding: "7px 10px", borderRadius: 8, background: "var(--bg2)", color: "var(--text2)", border: "1px solid var(--border)", cursor: "pointer", fontSize: 13 }}>↻</button>
               </div>
 
+              {/* NYSE / NSE quick-select row when viewing stocks */}
+              {catFilter === "stocks" && !search && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  {stockExchanges.map((exch) => {
+                    const exchNew = mvTickers.filter((t) => t.category === "stocks" && t.exchange === exch && !existing.has(t.symbol));
+                    return (
+                      <button key={exch} onClick={() => { setExchFilter(exch); setSelected(new Set(exchNew.map((t) => t.symbol))); }}
+                        style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid var(--border)",
+                          background: exchFilter === exch ? "#3b82f6" : "var(--bg2)", color: exchFilter === exch ? "#fff" : "var(--text2)" }}>
+                        {exch} <span style={{ opacity: 0.7, fontWeight: 400 }}>({exchNew.length} new)</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {addResult && (
                 <div style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 8, padding: "10px 14px", color: "#22c55e", fontSize: 13, marginBottom: 10 }}>
                   ✓ Added {addResult.added} symbol{addResult.added !== 1 ? "s" : ""} to catalog.{addResult.skipped > 0 ? ` ${addResult.skipped} already existed.` : ""}
@@ -194,11 +233,11 @@ export default function SuperadminSymbolsPage() {
               )}
 
               <p style={{ fontSize: 12, color: "var(--text2)", marginBottom: 8 }}>
-                Showing {filtered.length} of {mvTickers.length} tickers · {existing.size} already in catalog (greyed out) · click tiles to select
+                Showing {filteredByExch.length} of {mvTickers.length} tickers · {existing.size} already in catalog (greyed out) · click tiles to select
               </p>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
-                {filtered.map((t) => {
+                {filteredByExch.map((t) => {
                   const inCatalog = existing.has(t.symbol);
                   const isSel = selected.has(t.symbol);
                   return (
@@ -213,10 +252,19 @@ export default function SuperadminSymbolsPage() {
                         <div style={{ fontSize: 12, fontWeight: 700, fontFamily: "monospace", color: "var(--text)" }}>{t.display}</div>
                         <div style={{ fontSize: 10, color: "var(--text2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
                       </div>
-                      <span style={{ fontSize: 9, padding: "2px 5px", borderRadius: 4, flexShrink: 0,
-                        background: `${CAT_COLOR[t.category] || "#64748b"}22`, color: CAT_COLOR[t.category] || "var(--text2)", textTransform: "capitalize" }}>
-                        {t.category === "commodities" ? "metal" : t.category}
-                      </span>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                        {t.exchange && (
+                          <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3,
+                            background: t.exchange === "NSE" ? "rgba(234,179,8,0.2)" : t.exchange === "NYSE/NASDAQ" ? "rgba(59,130,246,0.2)" : "rgba(100,116,139,0.2)",
+                            color: t.exchange === "NSE" ? "#ca8a04" : t.exchange === "NYSE/NASDAQ" ? "#3b82f6" : "var(--text2)", fontWeight: 700 }}>
+                            {t.exchange}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3,
+                          background: `${CAT_COLOR[t.category] || "#64748b"}22`, color: CAT_COLOR[t.category] || "var(--text2)", textTransform: "capitalize" }}>
+                          {t.category === "commodities" ? "metal" : t.category}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
