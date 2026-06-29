@@ -220,7 +220,7 @@ function reconnectFeeds() {
   if (MASSIVE_KEY) { connectMassive(); connectMassiveCrypto(); }
 }
 
-const CANDLE_MS = 5000, HISTORY = 300, MONITOR_MS = 2000;
+const CANDLE_MS = 5000, HISTORY = 100, MONITOR_MS = 3000;
 const state = {}, meta = {}, feedToSym = {}, tdToSym = {}, fhLast = {};
 let symbols = [];
 
@@ -789,11 +789,18 @@ function isMarketOpen(sym, cat) {
 }
 
 function microTick() {
+  // Compute time-based market-open checks once per tick (not once per symbol × 200)
+  const _day = new Date().getUTCDay(), _h = new Date().getUTCHours();
+  const _fxClosed = _day === 6 || (_day === 0 && _h < 21) || (_day === 5 && _h >= 21);
+  const _stockOpen = _day >= 1 && _day <= 5 && _h >= 13 && _h < 21;
   for (const sym of symbols) {
     const st = state[sym];
     if (!st || st.price == null) continue;
     if (!meta[sym].enabled) continue; // disabled → no socket.io ticks, Redis already updated via applyPrice
-    if (!isMarketOpen(sym, meta[sym] && meta[sym].cat)) continue; // market closed → freeze price
+    // Fast market-open check using pre-computed day/hour
+    const cat = meta[sym].cat;
+    if (cat === "stocks" || cat === "indices") { if (!_stockOpen) continue; }
+    else if (cat !== "crypto" && !/USDT$/i.test(sym)) { if (_fxClosed) continue; }
     // Exact real-time mode: a symbol with a fresh real tick holds it (the feed
     // drives the candle). Don't add synthetic walk/jitter on top, so candles
     // match the real market. After REAL_TTL of silence, resume synthetic so it
@@ -849,8 +856,9 @@ async function loadSpreads() {
     }
     const grps = await prisma.tradeGroup.findMany({ select: { id: true, spread: true, spreadType: true } });
     for (const g of grps) grpSpreads[g.id] = Number(g.spread || 0);
-    const accs = await prisma.account.findMany({ select: { id: true, spreadMarkup: true } });
-    for (const a of accs) accMarkups[a.id] = Number(a.spreadMarkup || 0);
+    // Only load accounts that have a non-zero per-account spread markup (avoids full table scan)
+    const accs = await prisma.account.findMany({ where: { spreadMarkup: { gt: 0 } }, select: { id: true, spreadMarkup: true } });
+    for (const a of accs) accMarkups[a.id] = Number(a.spreadMarkup);
     // Push spread updates to all connected clients — each tenant gets its own data
     if (global.__io) {
       for (const [tenantId, spreads] of Object.entries(tenantSpreadMap)) {
@@ -1002,7 +1010,10 @@ async function liquidate(acc, list, io) {
     console.log("[MC] liquidated", acc.login, list.length, "trades, total P/L:", total.toFixed(2));
   } catch (e) { console.error("[liquidate]", e); } finally { liquidating.delete(acc.id); }
 }
+let _monitorRunning = false;
 async function monitor(io) {
+  if (_monitorRunning) return; // skip if previous run hasn't finished
+  _monitorRunning = true;
   try {
     const trades = await prisma.trade.findMany({ include: { account: true } });
     const byAcc = {};
@@ -1015,10 +1026,11 @@ async function monitor(io) {
       const balance = Number(acc.deposit) - Number(acc.withdrawal) + Number(acc.credit) + Number(acc.bonus) + Number(acc.pnl);
       let floating = 0;
       const net = {};
+      // Build symbol→openPrice Map once to avoid O(n) list.find() inside inner loop
+      const symOpen = new Map(list.map((t) => [t.symbol, Number(t.openPrice)]));
       for (const t of list) {
         const m = meta[t.symbol]; if (!m) continue;
         const ask = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
-        // BUY P/L uses bid (ask − spread); SELL P/L uses ask
         const closePrice = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, acc.id, ask) : ask;
         floating += calcPnl(t.symbol, t.type, Number(t.openPrice), closePrice, Number(t.lots));
         net[t.symbol] = (net[t.symbol] || 0) + (t.type === "BUY" ? 1 : -1) * Number(t.lots);
@@ -1027,7 +1039,7 @@ async function monitor(io) {
       for (const sym in net) {
         const nl = Math.abs(net[sym]); if (nl < 1e-9) continue;
         const m = meta[sym]; if (!m) continue;
-        const ask = state[sym] && state[sym].price ? state[sym].price : Number((list.find((t) => t.symbol === sym) || {}).openPrice || 0);
+        const ask = state[sym] && state[sym].price ? state[sym].price : (symOpen.get(sym) || 0);
         let mg = (nl * m.contract * ask) / acc.leverage; if (/JPY$/i.test(sym)) mg = mg / 100; used += mg;
       }
       if (used <= 0) continue;
@@ -1071,7 +1083,7 @@ async function monitor(io) {
       // Close at bid (BUY) or ask (SELL)
       if (reason) closeTpSl(t, reason, t.type === "BUY" ? bid : ask, io);
     }
-  } catch (e) { console.error("[monitor]", e); }
+  } catch (e) { console.error("[monitor]", e); } finally { _monitorRunning = false; }
 }
 
 async function checkPending(io) {
@@ -1217,9 +1229,16 @@ async function swapCronTick() {
     const tenantIds = new Set(tenants.map((t) => t.id));
     if (!tenantIds.size) return;
     const trades = await prisma.trade.findMany({ where: { account: { tenantId: { in: Array.from(tenantIds) } } }, include: { account: true } });
+    // Pre-load all symbol swap rates in one query — eliminates N+1 (one DB call per trade → one total)
+    const symRows = await prisma.symbol.findMany({
+      where: { tenantId: { in: Array.from(tenantIds) } },
+      select: { tenantId: true, symbol: true, swapLong: true, swapShort: true, digits: true },
+    });
+    const symMap = new Map(symRows.map((s) => [s.tenantId + ":" + s.symbol, s]));
+    const { Prisma: PrismaClient } = require("@prisma/client");
     for (const t of trades) {
-      if (t.account.swapFree) continue; // Islamic account — skip
-      const sym = await prisma.symbol.findFirst({ where: { tenantId: t.account.tenantId, symbol: t.symbol }, select: { swapLong: true, swapShort: true, digits: true } }).catch(() => null);
+      if (t.account.swapFree) continue;
+      const sym = symMap.get(t.account.tenantId + ":" + t.symbol);
       if (!sym) continue;
       const swapRate = t.type === "BUY" ? Number(sym.swapLong) : Number(sym.swapShort);
       if (swapRate === 0) continue;
@@ -1228,7 +1247,7 @@ async function swapCronTick() {
       const m = meta[t.symbol];
       const contract = m ? m.contract : 100000;
       const swapAmt = swapRate * pip * Number(t.lots) * contract * multiplier;
-      await prisma.trade.update({ where: { id: t.id }, data: { swap: { increment: new (require("@prisma/client").Prisma.Decimal)(swapAmt) } } }).catch(() => {});
+      await prisma.trade.update({ where: { id: t.id }, data: { swap: { increment: new PrismaClient.Decimal(swapAmt) } } }).catch(() => {});
     }
     console.log("[swap] processed", trades.length, "trades, multiplier:", multiplier);
   } catch (e) { console.error("[swap]", e); }
@@ -1305,7 +1324,8 @@ app.prepare().then(async () => {
     else if (ch === "cubex:spreads") { loadSpreads().catch(() => {}); }
   });
   io.on("connection", (socket) => {
-    const h = {}; for (const s of symbols) h[s] = state[s].candles; socket.emit("history", h);
+    // Only send enabled symbols — disabled stocks have no market-watch clients
+    const h = {}; for (const s of symbols) { if (meta[s]?.enabled) h[s] = state[s].candles; } socket.emit("history", h);
     // Snapshot of current prices so clients (incl. for FROZEN/closed markets) know the
     // latest price immediately — open positions then show their real last P&L, not 0.
     const px = {}; for (const s of symbols) { const st = state[s]; if (st && st.price != null) px[s] = st.price; }

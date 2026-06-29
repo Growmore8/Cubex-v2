@@ -37,7 +37,10 @@ export async function assertMargin(account: any, newTrade: { symbol: string; typ
   const lev = account.leverage || 100;
   const existing = await prisma.trade.findMany({ where: { accountId: account.id } });
   const priceMap: Record<string, number> = { [newTrade.symbol]: price };
-  for (const t of existing) if (priceMap[t.symbol] == null) priceMap[t.symbol] = (await getPrice(t.symbol)) ?? Number(t.openPrice);
+  // Fetch all missing prices in parallel instead of sequential await-in-loop
+  const missing = [...new Set(existing.map((t) => t.symbol).filter((s) => priceMap[s] == null))];
+  const fetched = await Promise.all(missing.map((s) => getPrice(s)));
+  missing.forEach((s, i) => { priceMap[s] = fetched[i] ?? Number(existing.find((t) => t.symbol === s)?.openPrice ?? 0); });
   let floating = 0;
   for (const t of existing) floating += pnlFor(t.symbol, t.type as any, Number(t.openPrice), priceMap[t.symbol], Number(t.lots));
   const balance = Number(account.deposit) - Number(account.withdrawal) + Number(account.credit) + Number(account.bonus) + Number(account.pnl);
