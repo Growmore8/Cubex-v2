@@ -135,6 +135,7 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
   if (!trade) throw new Error("Position not found");
   if (trade.account.deactivated) throw new Error("Account is deactivated");
   if (trade.account.locked) throw new Error("Account is locked (read-only)");
+  await assertMarketOpen(trade.symbol);
 
   const { ask, bid } = await resolvePrice(tenantId, trade.symbol, trade.type as "BUY" | "SELL", trade.account);
   const price = trade.type === "BUY" ? bid : ask;

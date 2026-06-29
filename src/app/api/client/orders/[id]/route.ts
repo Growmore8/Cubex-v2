@@ -6,6 +6,7 @@ import { emitRefresh } from "@/lib/realtime";
 import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
 import { Prisma } from "@prisma/client";
+import { assertMarketOpen } from "@/services/trade.service";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const s = await requireClient();
@@ -18,6 +19,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       include: { account: { select: { login: true, managerId: true } } },
     });
     if (!trade) return NextResponse.json({ ok: false, error: "Position not found" }, { status: 404 });
+    await assertMarketOpen(trade.symbol);
     const newSl = body.sl !== undefined ? Number(body.sl) || 0 : Number(trade.sl);
     const newTp = body.tp !== undefined ? Number(body.tp) || 0 : Number(trade.tp);
     const err = validateSlTp(trade.type as "BUY" | "SELL", Number(trade.openPrice), newSl, newTp);
