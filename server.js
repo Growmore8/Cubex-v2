@@ -91,6 +91,7 @@ let CRYPTO_FEED = "BN";   // BN | KR | TD | FH | MV
 let FOREX_FEED  = "TD";   // KR | TD | MV | FH
 let COMM_FEED   = "TD";   // KR | TD | MV  (commodities = metals + energy)
 let IDX_FEED    = "TD";   // TD | FH  (indices)
+let STOCK_FEED  = "FH";   // FH | TD  (US stocks)
 // TD is always the intended primary. FH/MV are secondary fallbacks only.
 // When TD fails → switch to FH. Background probe tests TD every 2 min → auto-return when TD recovers.
 let PRIMARY = "TD";
@@ -165,6 +166,7 @@ function getSymCategory(sym) {
 function getCatFeed(cat) {
   if (cat === "crypto")      return CRYPTO_FEED;
   if (cat === "indices")     return IDX_FEED;
+  if (cat === "stocks")      return STOCK_FEED;
   if (cat === "commodities") return COMM_FEED;
   return FOREX_FEED;
 }
@@ -190,6 +192,7 @@ async function loadFeedConfig() {
     if (["KR","TD","MV","FH"].includes(v.forexFeed))       FOREX_FEED  = v.forexFeed;
     if (["KR","TD","MV"].includes(v.commFeed))              COMM_FEED   = v.commFeed;
     if (["TD","FH"].includes(v.idxFeed))                IDX_FEED    = v.idxFeed;
+    if (["FH","TD"].includes(v.stockFeed))              STOCK_FEED  = v.stockFeed;
     // Manual primary override (saved by SuperAdmin) or auto-pick best available
     if (["TD","FH","MV","BN","KR"].includes(v.manualPrimary)) {
       manualPrimaryOverride = v.manualPrimary;

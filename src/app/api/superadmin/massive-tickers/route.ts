@@ -230,6 +230,51 @@ const CRYPTO_PAIRS: [string, string, string, number?][] = [
   ["SHIBUSDT","SHIB/USDT","Shiba Inu / Tether",8],
 ];
 
+// ── Popular US & Global stocks (Finnhub WebSocket) ──
+const STOCK_LIST: [string, string][] = [
+  // Big Tech / NASDAQ
+  ["AAPL","Apple Inc."],["MSFT","Microsoft Corp."],["NVDA","NVIDIA Corp."],
+  ["AMZN","Amazon.com Inc."],["GOOGL","Alphabet Inc. (A)"],["GOOG","Alphabet Inc. (C)"],
+  ["META","Meta Platforms Inc."],["TSLA","Tesla Inc."],["AMD","Advanced Micro Devices"],
+  ["INTC","Intel Corp."],["AVGO","Broadcom Inc."],["QCOM","Qualcomm Inc."],
+  ["TXN","Texas Instruments"],["MU","Micron Technology"],["AMAT","Applied Materials"],
+  ["CSCO","Cisco Systems"],["ORCL","Oracle Corp."],["CRM","Salesforce Inc."],
+  ["ADBE","Adobe Inc."],["NFLX","Netflix Inc."],["PYPL","PayPal Holdings"],
+  ["UBER","Uber Technologies"],["ABNB","Airbnb Inc."],["COIN","Coinbase Global"],
+  ["NOW","ServiceNow Inc."],["SNOW","Snowflake Inc."],["PLTR","Palantir Technologies"],
+  // Finance
+  ["JPM","JPMorgan Chase"],["BAC","Bank of America"],["WFC","Wells Fargo"],
+  ["GS","Goldman Sachs"],["MS","Morgan Stanley"],["V","Visa Inc."],
+  ["MA","Mastercard Inc."],["AXP","American Express"],["BLK","BlackRock Inc."],
+  ["SCHW","Charles Schwab"],["C","Citigroup Inc."],
+  // Healthcare
+  ["UNH","UnitedHealth Group"],["JNJ","Johnson & Johnson"],["PFE","Pfizer Inc."],
+  ["LLY","Eli Lilly & Co."],["ABBV","AbbVie Inc."],["MRK","Merck & Co."],
+  ["AMGN","Amgen Inc."],["BMY","Bristol-Myers Squibb"],["CVS","CVS Health"],
+  // Consumer
+  ["WMT","Walmart Inc."],["COST","Costco Wholesale"],["HD","Home Depot"],
+  ["MCD","McDonald's Corp."],["SBUX","Starbucks Corp."],["NKE","Nike Inc."],
+  ["PG","Procter & Gamble"],["KO","Coca-Cola Co."],["PEP","PepsiCo Inc."],
+  ["DIS","Walt Disney Co."],["NFLX","Netflix Inc."],["TGT","Target Corp."],
+  // Energy
+  ["XOM","Exxon Mobil Corp."],["CVX","Chevron Corp."],["COP","ConocoPhillips"],
+  ["SLB","SLB (Schlumberger)"],
+  // Industrial / Other
+  ["BA","Boeing Co."],["CAT","Caterpillar Inc."],["GE","GE Aerospace"],
+  ["HON","Honeywell International"],["MMM","3M Company"],["DE","Deere & Company"],
+  ["LMT","Lockheed Martin"],["RTX","RTX Corp."],
+  // Telecom
+  ["T","AT&T Inc."],["VZ","Verizon Communications"],["TMUS","T-Mobile US"],
+  ["CMCSA","Comcast Corp."],
+  // Global stocks
+  ["TSM","Taiwan Semiconductor"],["ASML","ASML Holding"],["TM","Toyota Motor"],
+  ["SONY","Sony Group Corp."],["BABA","Alibaba Group"],["NIO","NIO Inc."],
+  ["BIDU","Baidu Inc."],["JD","JD.com Inc."],
+  // ETFs
+  ["SPY","S&P 500 ETF"],["QQQ","Nasdaq 100 ETF"],["IWM","Russell 2000 ETF"],
+  ["GLD","Gold ETF"],["SLV","Silver ETF"],
+];
+
 function buildTickerList(): MvTicker[] {
   const tickers: MvTicker[] = [];
 
@@ -241,6 +286,10 @@ function buildTickerList(): MvTicker[] {
   for (const item of CRYPTO_PAIRS) {
     const [symbol, display, name] = item;
     tickers.push({ symbol, display, name, category: "crypto", digits: 2 });
+  }
+
+  for (const [symbol, name] of STOCK_LIST) {
+    tickers.push({ symbol, display: symbol, name, category: "stocks", digits: 2 });
   }
 
   return tickers;

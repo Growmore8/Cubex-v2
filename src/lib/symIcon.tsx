@@ -90,11 +90,45 @@ function Flag({ ccy, size, ml }: { ccy: string; size: number; ml: number }) {
   );
 }
 
+// US stock logo from Financial Modeling Prep free CDN
+function StockIcon({ ticker, size, ml }: { ticker: string; size: number; ml: number }) {
+  const [err, setErr] = useState(false);
+  if (err) return <Chip label={ticker.slice(0, 3)} bg="#475569" size={size} ml={ml} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={`https://financialmodelingprep.com/image-stock/${ticker}.png`}
+      alt={ticker} loading="lazy" referrerPolicy="no-referrer" onError={() => setErr(true)}
+      style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #0a0d12", marginLeft: ml, flex: "none" }} />
+  );
+}
+
+// Well-known stock tickers — try logo CDN first
+const STOCK_TICKERS = new Set([
+  "AAPL","MSFT","TSLA","AMZN","GOOGL","GOOG","META","NVDA","NFLX","AMD","INTC",
+  "JPM","V","MA","BAC","WFC","GS","MS","C","AXP",
+  "JNJ","PFE","UNH","MRK","ABBV","LLY","BMY","AMGN",
+  "XOM","CVX","COP","SLB","BP","SHEL",
+  "HD","WMT","COST","TGT","AMZN","MCD","SBUX","NKE","PG","KO","PEP",
+  "DIS","CMCSA","T","VZ","TMUS",
+  "CRM","ORCL","SAP","IBM","CSCO","QCOM","TXN","AVGO","MU","AMAT",
+  "BA","CAT","DE","GE","MMM","HON","RTX","LMT","NOC","GD",
+  "SPGI","BRK","BRK.B","V","MA","AXP","BLK","SCHW",
+  "PLD","AMT","CCI","EQIX","SPG",
+  "JNJ","UNH","CVS","CI","HUM","AET",
+  "CRM","NOW","WDAY","ADBE","ZM","SNOW","PLTR","UBER","LYFT","ABNB",
+  "PYPL","SQ","COIN","HOOD","SOFI",
+  "BABA","JD","PDD","NIO","BIDU","TSM","ASML","SAP","TM","SONY",
+  "PG","CL","EL","ULTA","LULU","RH",
+  "GLD","SLV","USO","QQQ","SPY","IWM","DIA",
+  "CRM","NKE","MCD","XOM","CVX","PFE","BAC","JNJ","PG","HD","UNH","AVGO","COST","PEP",
+]);
+
 function assetIcon(code: string, size: number, ml: number): React.ReactNode {
   if (CRYPTO_COLORS[code] !== undefined || ["BTC","ETH","BNB","SOL","XRP","DOGE","ADA","LTC","TRX","DOT","AVAX","LINK","SHIB","UNI","ATOM","BCH","ETC","MATIC","FIL","XBT"].includes(code))
     return <CryptoIcon base={code} size={size} ml={ml} />;
   if (METAL[code]) return <Chip label={METAL[code][0]} bg={METAL[code][1]} size={size} ml={ml} />;
   if (CCY[code]) return <Flag ccy={code} size={size} ml={ml} />;
+  if (STOCK_TICKERS.has(code)) return <StockIcon ticker={code} size={size} ml={ml} />;
   return null;
 }
 

@@ -30,6 +30,7 @@ const CATEGORIES: { key: string; catName: string; label: string; icon: string; c
   { key: "forexFeed",  catName: "forex",        label: "Forex",        icon: "fa-solid fa-coins",       color: "#3b82f6" },
   { key: "commFeed",   catName: "commodities",  label: "Commodities",  icon: "fa-solid fa-oil-well",    color: "#8b5cf6" },
   { key: "idxFeed",    catName: "indices",      label: "Indices",      icon: "fa-solid fa-chart-line",  color: "#22c55e" },
+  { key: "stockFeed",  catName: "stocks",       label: "Stocks",       icon: "fa-solid fa-building-columns", color: "#64748b" },
 ];
 
 type TestStatus = { status: "idle" | "checking" | "ok" | "error"; latency?: number; error?: string };
