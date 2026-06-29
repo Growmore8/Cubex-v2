@@ -561,25 +561,18 @@ function connectKraken() {
 // ── Massive.com WebSocket — forex real bid/ask ──
 // Protocol: connect → send auth → on auth_success send subscribe → receive "C" events
 // Auth:      {"action":"auth","params":"API_KEY"}
-// Subscribe: {"action":"subscribe","params":"C.*"}
-// Message:   {"ev":"C","p":"EUR/USD","b":1.0856,"a":1.0858,"t":...}
+// Subscribe: {"action":"subscribe","params":"C.*"}  (or "C.EURUSD" for specific pair)
+// Message:   {"ev":"C","p":"EURUSD","b":1.0856,"a":1.0858,"t":...}  — p = pair code (no slash)
 let mvWs = null;
 let MV_BASE_URL = process.env.MASSIVE_WS_URL || "wss://socket.massive.com"; // override via env if different
-// Internal symbol → Massive pair format (slash)
-const MV_TICKERS = {
-  EURUSD:"EUR/USD",GBPUSD:"GBP/USD",AUDUSD:"AUD/USD",NZDUSD:"NZD/USD",
-  USDCAD:"USD/CAD",USDCHF:"USD/CHF",USDJPY:"USD/JPY",
-  EURGBP:"EUR/GBP",EURJPY:"EUR/JPY",EURCAD:"EUR/CAD",EURCHF:"EUR/CHF",
-  GBPJPY:"GBP/JPY",GBPCHF:"GBP/CHF",AUDJPY:"AUD/JPY",
-  AUDNZD:"AUD/NZD",AUDCAD:"AUD/CAD",NZDJPY:"NZD/JPY",
-  USDHKD:"USD/HKD",USDSGD:"USD/SGD",USDTRY:"USD/TRY",USDIDR:"USD/IDR",
-  USDMXN:"USD/MXN",USDZAR:"USD/ZAR",GBPAUD:"GBP/AUD",GBPCAD:"GBP/CAD",
-  GBPNZD:"GBP/NZD",EURNZD:"EUR/NZD",EURAUD:"EUR/AUD",CADCHF:"CAD/CHF",
-  CADJPY:"CAD/JPY",CHFJPY:"CHF/JPY",NZDCAD:"NZD/CAD",NZDCHF:"NZD/CHF",
-};
-// Reverse: "EUR/USD" → "EURUSD"
-const MV_MSG_TO_SYM = {};
-for (const [sym, tick] of Object.entries(MV_TICKERS)) MV_MSG_TO_SYM[tick] = sym;
+// Set of symbols we cover via Massive (pair code = our internal symbol name)
+const MV_SYMBOLS = new Set([
+  "EURUSD","GBPUSD","AUDUSD","NZDUSD","USDCAD","USDCHF","USDJPY",
+  "EURGBP","EURJPY","EURCAD","EURCHF","GBPJPY","GBPCHF","AUDJPY",
+  "AUDNZD","AUDCAD","NZDJPY","USDHKD","USDSGD","USDTRY","USDIDR",
+  "USDMXN","USDZAR","GBPAUD","GBPCAD","GBPNZD","EURNZD","EURAUD","CADCHF",
+  "CADJPY","CHFJPY","NZDCAD","NZDCHF",
+]);
 
 function connectMassive() {
   if (!MASSIVE_KEY) return;
@@ -604,8 +597,9 @@ function connectMassive() {
             recordFeedFailure("MV");
           }
         } else if (m.ev === "C" && m.b != null && m.a != null) {
-          const sym = MV_MSG_TO_SYM[m.p];
-          if (sym && state[sym]) {
+          // m.p is the pair code e.g. "EURUSD" — strip any slash just in case
+          const sym = m.p ? m.p.replace("/", "") : null;
+          if (sym && MV_SYMBOLS.has(sym) && state[sym]) {
             state[sym].bid = r(parseFloat(m.b), meta[sym] ? meta[sym].digits : 5);
             state[sym].ask = r(parseFloat(m.a), meta[sym] ? meta[sym].digits : 5);
             state[sym].realAt = Date.now(); // mark fresh so commitPrice emits real=ask even if MV is not primary
