@@ -1006,6 +1006,8 @@ async function monitor(io) {
     for (const id of Object.keys(byAcc)) {
       const { acc, list } = byAcc[id]; const mc = Number(acc.mcLevel);
       if (!(mc > 0) || acc.doNotLiquidate) continue;
+      // Skip liquidation check when all traded symbols have closed markets
+      if (list.every((t) => !isMarketOpen(t.symbol, meta[t.symbol] && meta[t.symbol].cat))) continue;
       const balance = Number(acc.deposit) - Number(acc.withdrawal) + Number(acc.credit) + Number(acc.bonus) + Number(acc.pnl);
       let floating = 0;
       const net = {};
@@ -1028,8 +1030,10 @@ async function monitor(io) {
       if (((balance + floating) / used) * 100 <= mc) await liquidate(acc, list, io);
     }
     // TP/SL: BUY triggered on bid, SELL triggered on ask (MT5 style)
+    // Skip when market is closed — prices are frozen, so TP/SL must not fire on weekend.
     for (const t of trades) {
       if (closing.has(t.id.toString())) continue;
+      if (!isMarketOpen(t.symbol, meta[t.symbol] && meta[t.symbol].cat)) continue;
       const st = state[t.symbol];
       if (!st || st.price == null) continue;
       const ask = st.price;
