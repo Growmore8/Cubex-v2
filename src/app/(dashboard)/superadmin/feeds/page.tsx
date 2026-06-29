@@ -6,21 +6,17 @@ import PasswordInput from "@/components/ui/PasswordInput";
 // ── Feed options per asset category ────────────────────────────────────────
 const CAT_FEEDS: Record<string, { key: string; name: string; free: boolean; hasBidAsk: boolean; info: string }[]> = {
   crypto: [
-    { key: "BN", name: "Binance",      free: true,  hasBidAsk: true,  info: "Real bid/ask · no key needed" },
     { key: "MV", name: "Massive.com",  free: false, hasBidAsk: true,  info: "Real bid/ask · $49/mo plan required" },
-    { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · no key needed" },
     { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Price only · key required" },
     { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "Price only · Finnhub key required" },
   ],
   forex: [
     { key: "MV", name: "Massive.com",  free: false, hasBidAsk: true,  info: "Real bid/ask · $49/mo plan required" },
-    { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · major pairs · no key" },
     { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Price only · key required" },
     { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "Price only · key required" },
   ],
   commodities: [
     { key: "MV", name: "Massive.com",  free: false, hasBidAsk: true,  info: "Real bid/ask · metals as forex pairs" },
-    { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · gold & silver only" },
     { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Metals + energy · key required" },
   ],
   indices: [
@@ -56,13 +52,11 @@ function getApiKey(feedKey: string, keys: Record<string, string>) {
   return "";
 }
 
-// Primary feed provider cards
+// Primary feed provider cards — Massive primary, TD + FH as fallback
 const PRIMARY_CARDS = [
-  { key: "BN", name: "Binance",     icon: "fa-brands fa-btc",      color: "#f59e0b", free: true,  desc: "Crypto bid/ask" },
-  { key: "KR", name: "Kraken",      icon: "fa-solid fa-anchor",    color: "#6366f1", free: true,  desc: "Forex + crypto bid/ask" },
-  { key: "TD", name: "TwelveData",  icon: "fa-solid fa-database",  color: "#3b82f6", free: false, desc: "Forex/crypto/indices/metals" },
+  { key: "MV", name: "Massive",     icon: "fa-solid fa-bolt",           color: "#ec4899", free: false, desc: "Forex real bid/ask" },
+  { key: "TD", name: "TwelveData",  icon: "fa-solid fa-database",       color: "#3b82f6", free: false, desc: "Forex/crypto/indices/metals" },
   { key: "FH", name: "Finnhub",     icon: "fa-solid fa-satellite-dish", color: "#22c55e", free: false, desc: "Stocks/forex/crypto" },
-  { key: "MV", name: "Massive",     icon: "fa-solid fa-bolt",      color: "#ec4899", free: false, desc: "Forex real bid/ask" },
 ];
 
 export default function SAFeeds() {
@@ -183,10 +177,9 @@ export default function SAFeeds() {
             <div className="flex gap-2 flex-wrap">
               {PRIMARY_CARDS.map((card) => {
                 const isActive = primary === card.key;
-                const hasKey = card.key === "BN" || card.key === "KR"
-                  || (card.key === "TD" && keys.tdKey)
-                  || (card.key === "FH" && keys.finnhubKey)
-                  || (card.key === "MV" && keys.massiveKey);
+                const hasKey = (card.key === "TD" && !!keys.tdKey)
+                  || (card.key === "FH" && !!keys.finnhubKey)
+                  || (card.key === "MV" && !!keys.massiveKey);
                 return (
                   <button
                     key={card.key}
