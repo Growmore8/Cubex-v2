@@ -7,7 +7,18 @@ import { SymIcon } from "@/lib/symIcon";
 
 type Sym = { symbol: string; display?: string; category?: string; digits?: number };
 
-const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "agriculture", "other"];
+const CAT_ORDER = ["forex", "crypto", "commodities", "metals", "stocks", "indices", "energy", "agriculture", "other"];
+
+const CAT_LABEL: Record<string, string> = {
+  forex: "Forex",
+  crypto: "Crypto",
+  commodities: "Metals",
+  metals: "Metals",
+  stocks: "Stocks",
+  indices: "Indices",
+  energy: "Energy",
+  agriculture: "Agriculture",
+};
 
 // Self-contained market watch with its OWN socket + price state, so it ticks
 // pip-by-pip independently of the (heavy) desk re-render — as smooth as the client.
@@ -108,7 +119,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               onContextMenu={(e) => { if (!onCategoryEdit) return; e.preventDefault(); setCatCtx({ x: e.clientX, y: e.clientY, cat, syms: list.map((s) => s.symbol) }); }}
               className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)] flex items-center justify-between cursor-pointer"
             >
-              <span>{collapsed[cat] ? "▸" : "▾"} {cat.toUpperCase()}</span>
+              <span>{collapsed[cat] ? "▸" : "▾"} {CAT_LABEL[cat] || cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
             </div>
             {!collapsed[cat] && list.map((s) => {
               const p = prices[s.symbol]; const d = dgFor(s);
@@ -119,8 +130,8 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const cfgSpPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
               const isFixed = (symbolTypes as any)?.[s.symbol] === "FIXED";
               // MT5 model: bid = price (primary), ask = price + spread. No inversion possible.
-              const spPips = isFixed ? cfgSpPips : (hasLive ? liveSp2! : 0);
-              const realSpPips = spPips; // spread column uses same value
+              const spPips = isFixed ? cfgSpPips : (hasLive ? liveSp2! : cfgSpPips);
+              const realSpPips = spPips;
               const ask = p != null ? gnum(p + spPips * pip, d) : "—";
               const bid = p != null ? gnum(p, d) : "—";
               const dir = dirs[s.symbol] || 0;
@@ -140,10 +151,10 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                         fontSize: 10,
                         fontWeight: spDir !== 0 ? 700 : 500,
                         cursor: realSpPips > 0 ? "help" : undefined,
-                        color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : (hasLive ? "#c8d0e0" : "var(--muted)"),
+                        color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : ((hasLive || cfgSpPips > 0) ? "#c8d0e0" : "var(--muted)"),
                         transition: "color 0.55s ease-out",
                       }}>
-                      {(isFixed || hasLive) ? Math.round(realSpPips * 10) : "—"}
+                      {p != null ? Math.round(realSpPips * 10) : "—"}
                     </span>
                   </span>
                 </div>);
