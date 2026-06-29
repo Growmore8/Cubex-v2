@@ -279,11 +279,25 @@ function applyDerived(sym, price) {
 function recomputeDerived(base) {
   const list = derivedByDep[base]; if (!list) return;
   const g = {}; for (const k in state) g[k] = state[k].price;
+  // Build an ask-price map: use exchange ask where available, else fall back to bid price.
+  // This lets derived-pair formulas produce a real derived ask so clients see a live spread.
+  const gAsk = {}; for (const k in state) gAsk[k] = state[k].ask ?? state[k].price;
   for (const ds of list) {
     if (!state[ds]) continue; // only if present in catalog
     const def = DERIVED[ds];
     if (def.d.some((dep) => g[dep] == null)) continue;
-    try { applyDerived(ds, def.f(g)); } catch (e) {}
+    try {
+      applyDerived(ds, def.f(g));
+      // Propagate ask to derived symbol so commitPrice emits real=ask for live spread.
+      if (def.d.every((dep) => gAsk[dep] != null)) {
+        const da = def.f(gAsk);
+        if (da && isFinite(da) && da > 0) {
+          const digs = (meta[ds] && meta[ds].digits) || 2;
+          state[ds].ask = r(da, digs);
+          state[ds].realAt = Date.now();
+        }
+      }
+    } catch (e) {}
   }
 }
 function contractFor(cat, sym) {
