@@ -36,16 +36,27 @@ export async function GET(req: Request) {
   const filterParam = url.searchParams.get("symbols");
   const filterSet = filterParam ? new Set(filterParam.toUpperCase().split(",").map((s) => s.trim()).filter(Boolean)) : null;
 
-  // Get tenant's configured symbols with their spreads
+  // Get tenant's configured symbols (for spread overrides)
   const tenantSymbols = await prisma.symbol.findMany({
     where: { tenantId: auth.tenantId },
     select: { symbol: true, category: true, spread: true, digits: true },
   });
+  const tenantMap = new Map(tenantSymbols.map((s) => [s.symbol, s]));
+
+  // Merge with ALL globalSymbols — so Growth Capital (and any tenant) gets prices
+  // for every symbol in the catalog, not just ones they've traded.
+  // Tenant config takes priority for spread/digits; globalSymbol fills the rest.
+  const globals = await prisma.globalSymbol.findMany({
+    select: { symbol: true, category: true, digits: true },
+  });
+
+  const merged = globals.map((g) => {
+    const t = tenantMap.get(g.symbol);
+    return { symbol: g.symbol, category: g.category, spread: t?.spread ?? 0, digits: t?.digits ?? g.digits ?? 5 };
+  });
 
   // Apply symbol filter if requested
-  const syms = filterSet
-    ? tenantSymbols.filter((s) => filterSet.has(s.symbol))
-    : tenantSymbols;
+  const syms = filterSet ? merged.filter((s) => filterSet.has(s.symbol)) : merged;
 
   if (!syms.length) return NextResponse.json({ ok: true, prices: {}, ts: Date.now() });
 
