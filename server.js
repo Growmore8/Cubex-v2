@@ -495,17 +495,21 @@ function connectKraken() {
   if (krPingTimer) { clearInterval(krPingTimer); krPingTimer = null; }
   krWs = new WebSocket("wss://ws.kraken.com");
   krWs.on("open", () => {
-    // Always subscribe forex + metals for real bid/ask spread data.
-    // Even when TD is the primary price feed, Kraken provides the live spread
-    // so that clients see a real ask != bid in the market watch.
-    // Only subscribe crypto when KR is the configured crypto feed.
+    // Only subscribe asset classes where KR is actually the selected feed.
+    // Massive provides real bid/ask for forex/metals/crypto so KR is only
+    // needed when explicitly chosen for that class.
     const pairs = [
-      ...KR_FOREX_PAIRS,
-      ...KR_METAL_PAIRS,
+      ...(FOREX_FEED === "KR" ? KR_FOREX_PAIRS : []),
+      ...(COMM_FEED  === "KR" ? KR_METAL_PAIRS : []),
       ...(CRYPTO_FEED === "KR" ? KR_CRYPTO_PAIRS : []),
     ];
+    if (!pairs.length) {
+      console.log("[KR] connected but no classes assigned to KR — closing");
+      krWs.close();
+      return;
+    }
     krWs.send(JSON.stringify({ event: "subscribe", pair: pairs, subscription: { name: "spread" } }));
-    console.log("[KR] connected, subscribed spread for", pairs.length, "pairs (spread-only for non-KR feeds)");
+    console.log("[KR] connected, subscribed spread for", pairs.length, "pairs");
     krPingTimer = setInterval(() => {
       if (krWs && krWs.readyState === 1) krWs.send(JSON.stringify({ event: "ping" }));
     }, 25000);
@@ -664,6 +668,11 @@ let tdWs = null;
 let tdWsFail200 = 0; // consecutive WS handshake failures
 function connectTD() {
   if (!TD_KEY) { console.log("[TD] no key"); return; }
+  // Skip WS if no asset class uses TD for live prices (REST/candles still use TD key separately)
+  if (FOREX_FEED !== "TD" && CRYPTO_FEED !== "TD" && COMM_FEED !== "TD" && IDX_FEED !== "TD") {
+    console.log("[TD] WS not needed — all live feeds on other providers");
+    return;
+  }
   if (tdWsFail200 >= 5) return; // give up after 5 failed attempts — REST poller covers prices
   // Close previous connection before creating a new one to avoid exhausting the 3-connection limit
   if (tdWs) { try { tdWs.removeAllListeners(); tdWs.terminate(); } catch (_) {} tdWs = null; }
