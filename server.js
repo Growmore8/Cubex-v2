@@ -596,6 +596,7 @@ function connectMassive() {
           if (sym && state[sym]) {
             state[sym].bid = r(parseFloat(m.b), meta[sym] ? meta[sym].digits : 5);
             state[sym].ask = r(parseFloat(m.a), meta[sym] ? meta[sym].digits : 5);
+            state[sym].realAt = Date.now(); // mark fresh so commitPrice emits real=ask even if MV is not primary
             applyPrice(sym, parseFloat(m.b), "MV"); // MT5: smooth toward BID
           }
         }
