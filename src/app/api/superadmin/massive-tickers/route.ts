@@ -125,7 +125,7 @@ const FOREX_PAIRS: [string, string, string, number][] = [
 ];
 
 // ── Comprehensive crypto pair list (Massive XQ.* channel) ──
-const CRYPTO_PAIRS: [string, string, string][] = [
+const CRYPTO_PAIRS: [string, string, string, number?][] = [
   ["BTCUSD","BTC/USD","Bitcoin / US Dollar"],
   ["ETHUSD","ETH/USD","Ethereum / US Dollar"],
   ["SOLUSD","SOL/USD","Solana / US Dollar"],
