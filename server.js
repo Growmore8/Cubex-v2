@@ -559,39 +559,51 @@ function connectKraken() {
 }
 
 // ── Massive.com WebSocket — forex real bid/ask ──
-// Docs: https://massive.com/docs/websocket/forex/quotes
-// Endpoint: wss://<base>/forex/C?ticker=EUR-USD,GBP-USD&apikey=KEY
-// Message:  {"ev":"C","p":"EUR/USD","b":1.0856,"a":1.0858,"t":...}
+// Protocol: connect → send auth → on auth_success send subscribe → receive "C" events
+// Auth:      {"action":"auth","params":"API_KEY"}
+// Subscribe: {"action":"subscribe","params":"C.*"}
+// Message:   {"ev":"C","p":"EUR/USD","b":1.0856,"a":1.0858,"t":...}
 let mvWs = null;
 let MV_BASE_URL = process.env.MASSIVE_WS_URL || "wss://socket.massive.com"; // override via env if different
-// Internal symbol → Massive ticker (dash format)
+// Internal symbol → Massive pair format (slash)
 const MV_TICKERS = {
-  EURUSD:"EUR-USD",GBPUSD:"GBP-USD",AUDUSD:"AUD-USD",NZDUSD:"NZD-USD",
-  USDCAD:"USD-CAD",USDCHF:"USD-CHF",USDJPY:"USD-JPY",
-  EURGBP:"EUR-GBP",EURJPY:"EUR-JPY",EURCAD:"EUR-CAD",EURCHF:"EUR-CHF",
-  GBPJPY:"GBP-JPY",GBPCHF:"GBP-CHF",AUDJPY:"AUD-JPY",
-  AUDNZD:"AUD-NZD",AUDCAD:"AUD-CAD",NZDJPY:"NZD-JPY",
-  USDHKD:"USD-HKD",USDSGD:"USD-SGD",USDTRY:"USD-TRY",USDIDR:"USD-IDR",
-  USDMXN:"USD-MXN",USDZAR:"USD-ZAR",GBPAUD:"GBP-AUD",GBPCAD:"GBP-CAD",
-  GBPNZD:"GBP-NZD",EURNZD:"EUR-NZD",EURAUD:"EUR-AUD",CADCHF:"CAD-CHF",
-  CADJPY:"CAD-JPY",CHFJPY:"CHF-JPY",NZDCAD:"NZD-CAD",NZDCHF:"NZD-CHF",
+  EURUSD:"EUR/USD",GBPUSD:"GBP/USD",AUDUSD:"AUD/USD",NZDUSD:"NZD/USD",
+  USDCAD:"USD/CAD",USDCHF:"USD/CHF",USDJPY:"USD/JPY",
+  EURGBP:"EUR/GBP",EURJPY:"EUR/JPY",EURCAD:"EUR/CAD",EURCHF:"EUR/CHF",
+  GBPJPY:"GBP/JPY",GBPCHF:"GBP/CHF",AUDJPY:"AUD/JPY",
+  AUDNZD:"AUD/NZD",AUDCAD:"AUD/CAD",NZDJPY:"NZD/JPY",
+  USDHKD:"USD/HKD",USDSGD:"USD/SGD",USDTRY:"USD/TRY",USDIDR:"USD/IDR",
+  USDMXN:"USD/MXN",USDZAR:"USD/ZAR",GBPAUD:"GBP/AUD",GBPCAD:"GBP/CAD",
+  GBPNZD:"GBP/NZD",EURNZD:"EUR/NZD",EURAUD:"EUR/AUD",CADCHF:"CAD/CHF",
+  CADJPY:"CAD/JPY",CHFJPY:"CHF/JPY",NZDCAD:"NZD/CAD",NZDCHF:"NZD/CHF",
 };
 // Reverse: "EUR/USD" → "EURUSD"
 const MV_MSG_TO_SYM = {};
-for (const [sym, tick] of Object.entries(MV_TICKERS)) MV_MSG_TO_SYM[tick.replace("-", "/")] = sym;
+for (const [sym, tick] of Object.entries(MV_TICKERS)) MV_MSG_TO_SYM[tick] = sym;
 
 function connectMassive() {
   if (!MASSIVE_KEY) return;
   if (mvWs) { try { mvWs.removeAllListeners(); mvWs.terminate(); } catch (_) {} mvWs = null; }
-  const tickers = Object.values(MV_TICKERS).join(",");
-  const url = `${MV_BASE_URL}/forex/C?ticker=${encodeURIComponent(tickers)}&apikey=${MASSIVE_KEY}`;
+  const url = `${MV_BASE_URL}/forex`;
   mvWs = new WebSocket(url);
-  mvWs.on("open", () => console.log("[MV] connected, streaming", Object.keys(MV_TICKERS).length, "forex pairs"));
+  mvWs.on("open", () => {
+    console.log("[MV] connected, authenticating...");
+    mvWs.send(JSON.stringify({ action: "auth", params: MASSIVE_KEY }));
+  });
   mvWs.on("message", (data) => {
     try {
       const msgs = JSON.parse(data);
       for (const m of (Array.isArray(msgs) ? msgs : [msgs])) {
-        if (m.ev === "C" && m.b != null && m.a != null) {
+        if (m.ev === "status") {
+          if (m.status === "auth_success" || m.message === "authenticated") {
+            console.log("[MV] authenticated, subscribing to C.*");
+            mvWs.send(JSON.stringify({ action: "subscribe", params: "C.*" }));
+            recordFeedSuccess("MV");
+          } else if (m.status === "auth_failed") {
+            console.error("[MV] auth failed:", m.message);
+            recordFeedFailure("MV");
+          }
+        } else if (m.ev === "C" && m.b != null && m.a != null) {
           const sym = MV_MSG_TO_SYM[m.p];
           if (sym && state[sym]) {
             state[sym].bid = r(parseFloat(m.b), meta[sym] ? meta[sym].digits : 5);
