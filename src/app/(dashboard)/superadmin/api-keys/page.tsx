@@ -12,11 +12,16 @@ export default function SAApiKeys() {
   const [err, setErr] = useState(""); const [msg, setMsg] = useState("");
   const [created, setCreated] = useState(""); // raw key shown once
   const [confirmDel, setConfirmDel] = useState<Key | null>(null);
+  const [publicApiUrl, setPublicApiUrl] = useState("");
 
   async function load() {
     try {
-      const d = await fetch("/api/superadmin/api-keys").then((r) => r.json());
+      const [d, cfg] = await Promise.all([
+        fetch("/api/superadmin/api-keys").then((r) => r.json()),
+        fetch("/api/superadmin/settings").then((r) => r.json()),
+      ]);
       if (d.ok) { setKeys(d.keys || []); setTenants(d.tenants || []); if (!tenantId && d.tenants?.[0]) setTenantId(d.tenants[0].id); }
+      if (cfg.ok && cfg.publicApiUrl) setPublicApiUrl(cfg.publicApiUrl);
     } catch {}
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
@@ -37,7 +42,8 @@ export default function SAApiKeys() {
     if (d?.key) { setCreated(d.key); setLabel(""); setMsg("Key created — copy it now, it won't be shown again."); }
   }
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://your-cubex-domain";
+  // Use configured public API URL (proxy domain) so CubeX internals are never exposed in docs
+  const origin = publicApiUrl || (typeof window !== "undefined" ? window.location.origin : "https://your-api-domain");
   const inp = "ui-input rounded-md border px-2 py-1.5 text-sm";
 
   return (<div className="max-w-5xl space-y-4 ui-fade-up">
