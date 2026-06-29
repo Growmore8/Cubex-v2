@@ -4,6 +4,16 @@ import { rateLimit } from "@/lib/rateLimit";
 import { livePrices } from "@/lib/livePrices";
 import { prisma } from "@/lib/prisma";
 
+// Cache globalSymbols for 60s — they rarely change and this route can be polled frequently.
+let _globalCache: { symbol: string; category: string; digits: number | null }[] = [];
+let _globalCacheAt = 0;
+async function getCachedGlobals() {
+  if (Date.now() - _globalCacheAt < 60_000 && _globalCache.length > 0) return _globalCache;
+  _globalCache = await prisma.globalSymbol.findMany({ select: { symbol: true, category: true, digits: true } });
+  _globalCacheAt = Date.now();
+  return _globalCache;
+}
+
 // Public, read-only, server-to-server endpoint.
 // GET /api/external/v1/prices
 // GET /api/external/v1/prices?symbols=AAPL,EURUSD,XAUUSD   (filter to specific symbols)
@@ -46,9 +56,7 @@ export async function GET(req: Request) {
   // Merge with ALL globalSymbols — so Growth Capital (and any tenant) gets prices
   // for every symbol in the catalog, not just ones they've traded.
   // Tenant config takes priority for spread/digits; globalSymbol fills the rest.
-  const globals = await prisma.globalSymbol.findMany({
-    select: { symbol: true, category: true, digits: true },
-  });
+  const globals = await getCachedGlobals();
 
   const merged = globals.map((g) => {
     const t = tenantMap.get(g.symbol);

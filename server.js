@@ -351,7 +351,7 @@ async function loadCatalog() {
     } else {
       td = toTD(x.symbol, x.category);
     }
-    meta[x.symbol] = { digits: x.digits || 5, contract: contractFor(x.category, x.symbol), feed: fh, td, cat: x.category };
+    meta[x.symbol] = { digits: x.digits || 5, contract: contractFor(x.category, x.symbol), feed: fh, td, cat: x.category, enabled: x.enabled !== false };
     state[x.symbol] = { price: null, bid: null, ask: null, candles: [], bucket: 0 };
     if (fh) feedToSym[fh] = x.symbol;
     tdToSym[td] = x.symbol;
@@ -380,6 +380,9 @@ function applyPrice(sym, price, source) {
   const d = meta[sym].digits, p = r(price, d), st = state[sym];
   st.target = p;
   st.realAt = Date.now();
+  // Disabled symbols: write price directly to Redis (for external API) but skip
+  // the smooth display walk and socket.io emit — no market watch client needs ticks for them.
+  if (!meta[sym].enabled) { st.price = p; redis.set("price:" + sym, String(p)); return; }
   if (REAL_EXACT) commitPrice(sym, p);
   else if (st.price == null) commitPrice(sym, p);
 }
@@ -789,6 +792,7 @@ function microTick() {
   for (const sym of symbols) {
     const st = state[sym];
     if (!st || st.price == null) continue;
+    if (!meta[sym].enabled) continue; // disabled → no socket.io ticks, Redis already updated via applyPrice
     if (!isMarketOpen(sym, meta[sym] && meta[sym].cat)) continue; // market closed → freeze price
     // Exact real-time mode: a symbol with a fresh real tick holds it (the feed
     // drives the candle). Don't add synthetic walk/jitter on top, so candles
