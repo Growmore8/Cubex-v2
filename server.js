@@ -334,7 +334,10 @@ function toFinnhub(sym, cat) {
 }
 
 async function loadCatalog() {
-  const rows = await prisma.globalSymbol.findMany({ where: { enabled: true } });
+  // Load ALL symbols (not just enabled) so prices stream to Redis regardless.
+  // The enabled flag only controls market-watch visibility — it must not cut off
+  // the external prices API that tenants like Growth Capital depend on.
+  const rows = await prisma.globalSymbol.findMany({});
   symbols = rows.map((x) => x.symbol);
   for (const x of rows) {
     // Finnhub feed — use stored override (e.g. "NSE:RELIANCE") or auto-derive
