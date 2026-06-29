@@ -63,21 +63,6 @@ function Chip({ label, bg, size, ml }: { label: string; bg: string; size: number
   return <span style={{ width: size, height: size, borderRadius: "50%", background: bg, color: "#fff", fontSize: fs, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "none", lineHeight: 1, border: "1.5px solid #0a0d12", marginLeft: ml }}>{label}</span>;
 }
 
-// Crypto icon from jsdelivr CDN — free, no API key needed. Falls back to coloured chip.
-function CryptoIcon({ base, size, ml }: { base: string; size: number; ml: number }) {
-  const [err, setErr] = useState(false);
-  const slug = (base === "XBT" ? "btc" : base).toLowerCase();
-  const fallbackColor = CRYPTO_COLORS[base] || "#475569";
-  if (err) return <Chip label={base.slice(0, 3)} bg={fallbackColor} size={size} ml={ml} />;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@latest/128/color/${slug}.png`}
-      alt={base} loading="lazy" referrerPolicy="no-referrer" onError={() => setErr(true)}
-      style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #0a0d12", marginLeft: ml, flex: "none" }}
-    />
-  );
-}
 
 function Flag({ ccy, size, ml }: { ccy: string; size: number; ml: number }) {
   const [err, setErr] = useState(false);
@@ -90,45 +75,52 @@ function Flag({ ccy, size, ml }: { ccy: string; size: number; ml: number }) {
   );
 }
 
-// US stock logo from Financial Modeling Prep free CDN
+// Stock logo: tries Parqet (comprehensive, free) → FMP → chip
+// Works for any ticker — no hardcoded list needed.
 function StockIcon({ ticker, size, ml }: { ticker: string; size: number; ml: number }) {
-  const [err, setErr] = useState(false);
-  if (err) return <Chip label={ticker.slice(0, 3)} bg="#475569" size={size} ml={ml} />;
+  const [stage, setStage] = useState(0); // 0=parqet 1=fmp 2=chip
+  const srcs = [
+    `https://assets.parqet.com/logos/symbol/${ticker}?format=png`,
+    `https://financialmodelingprep.com/image-stock/${ticker}.png`,
+  ];
+  if (stage >= srcs.length) return <Chip label={ticker.slice(0, 4)} bg="#334155" size={size} ml={ml} />;
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={`https://financialmodelingprep.com/image-stock/${ticker}.png`}
-      alt={ticker} loading="lazy" referrerPolicy="no-referrer" onError={() => setErr(true)}
+    <img src={srcs[stage]} alt={ticker} loading="lazy" referrerPolicy="no-referrer"
+      onError={() => setStage((s) => s + 1)}
       style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #0a0d12", marginLeft: ml, flex: "none" }} />
   );
 }
 
-// Well-known stock tickers — try logo CDN first
-const STOCK_TICKERS = new Set([
-  "AAPL","MSFT","TSLA","AMZN","GOOGL","GOOG","META","NVDA","NFLX","AMD","INTC",
-  "JPM","V","MA","BAC","WFC","GS","MS","C","AXP",
-  "JNJ","PFE","UNH","MRK","ABBV","LLY","BMY","AMGN",
-  "XOM","CVX","COP","SLB","BP","SHEL",
-  "HD","WMT","COST","TGT","AMZN","MCD","SBUX","NKE","PG","KO","PEP",
-  "DIS","CMCSA","T","VZ","TMUS",
-  "CRM","ORCL","SAP","IBM","CSCO","QCOM","TXN","AVGO","MU","AMAT",
-  "BA","CAT","DE","GE","MMM","HON","RTX","LMT","NOC","GD",
-  "SPGI","BRK","BRK.B","V","MA","AXP","BLK","SCHW",
-  "PLD","AMT","CCI","EQIX","SPG",
-  "JNJ","UNH","CVS","CI","HUM","AET",
-  "CRM","NOW","WDAY","ADBE","ZM","SNOW","PLTR","UBER","LYFT","ABNB",
-  "PYPL","SQ","COIN","HOOD","SOFI",
-  "BABA","JD","PDD","NIO","BIDU","TSM","ASML","SAP","TM","SONY",
-  "PG","CL","EL","ULTA","LULU","RH",
-  "GLD","SLV","USO","QQQ","SPY","IWM","DIA",
-  "CRM","NKE","MCD","XOM","CVX","PFE","BAC","JNJ","PG","HD","UNH","AVGO","COST","PEP",
-]);
+// CryptoIcon with CoinGecko CDN fallback for coins not on jsdelivr
+function CryptoIconWithFallback({ base, size, ml }: { base: string; size: number; ml: number }) {
+  const [stage, setStage] = useState(0);
+  const slug = (base === "XBT" ? "btc" : base).toLowerCase();
+  const color = CRYPTO_COLORS[base] || "#475569";
+  const srcs = [
+    `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@latest/128/color/${slug}.png`,
+    `https://assets.parqet.com/logos/crypto/${slug}?format=png`,
+  ];
+  if (stage >= srcs.length) return <Chip label={base.slice(0, 3)} bg={color} size={size} ml={ml} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={srcs[stage]} alt={base} loading="lazy" referrerPolicy="no-referrer"
+      onError={() => setStage((s) => s + 1)}
+      style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #0a0d12", marginLeft: ml, flex: "none" }} />
+  );
+}
+
+// Pure-alpha code that isn't crypto/metal/currency → treat as stock ticker
+function looksLikeStock(code: string) {
+  return /^[A-Z]{1,5}$/.test(code) && !CCY[code] && !METAL[code];
+}
 
 function assetIcon(code: string, size: number, ml: number): React.ReactNode {
   if (CRYPTO_COLORS[code] !== undefined || ["BTC","ETH","BNB","SOL","XRP","DOGE","ADA","LTC","TRX","DOT","AVAX","LINK","SHIB","UNI","ATOM","BCH","ETC","MATIC","FIL","XBT"].includes(code))
-    return <CryptoIcon base={code} size={size} ml={ml} />;
+    return <CryptoIconWithFallback base={code} size={size} ml={ml} />;
   if (METAL[code]) return <Chip label={METAL[code][0]} bg={METAL[code][1]} size={size} ml={ml} />;
   if (CCY[code]) return <Flag ccy={code} size={size} ml={ml} />;
-  if (STOCK_TICKERS.has(code)) return <StockIcon ticker={code} size={size} ml={ml} />;
+  if (looksLikeStock(code)) return <StockIcon ticker={code} size={size} ml={ml} />;
   return null;
 }
 
