@@ -472,14 +472,12 @@ function connectBinance() {
       const bid = parseFloat(d.b), ask = parseFloat(d.a);
       if (bid > 0 && ask > 0 && ask > bid) {
         const digits = meta[sym] ? meta[sym].digits : 2;
-        // Only set bid/ask/realAt when BN is the preferred crypto feed.
-        // When another feed (MV, KR, TD) is preferred, don't overwrite their bid/ask state.
-        if (CRYPTO_FEED === "BN") {
-          state[sym].bid = r(bid, digits);
-          state[sym].ask = r(ask, digits);
-          state[sym].realAt = Date.now(); // required for commitPrice to emit real=ask (live spread)
-        }
-        applyPrice(sym, bid, "BN"); // still attempt price update (rejected by feed guard if MV is recent)
+        // Always set bid/ask/realAt from Binance — it's the only source with real bid/ask
+        // for crypto spread (Massive XQ has no data). applyPrice is feed-guarded separately.
+        state[sym].bid = r(bid, digits);
+        state[sym].ask = r(ask, digits);
+        state[sym].realAt = Date.now(); // required for commitPrice to emit real=ask (live spread)
+        applyPrice(sym, bid, "BN"); // price only accepted when BN preferred (MV guard inside)
       }
     } catch (e) {}
   });
@@ -656,11 +654,10 @@ function connectMassiveCrypto() {
       const msgs = JSON.parse(data);
       for (const m of (Array.isArray(msgs) ? msgs : [msgs])) {
         if (m.ev === "status") {
-          if (m.status === "auth_success" || m.message === "authenticated" || m.status === "connected") {
-            // subscribe to both XQ.* (exchange quotes) and C.* (crypto pairs — same format as forex)
-            console.log("[MV-C] connected/auth, subscribing to XQ.* and C.*");
+          if (m.status === "auth_success" || m.message === "authenticated") {
+            // Only XQ.* is authorized on Massive /crypto endpoint
+            console.log("[MV-C] authenticated, subscribing to XQ.*");
             mvCryptoWs.send(JSON.stringify({ action: "subscribe", params: "XQ.*" }));
-            mvCryptoWs.send(JSON.stringify({ action: "subscribe", params: "C.*" }));
             recordFeedSuccess("MV");
           } else if (m.status === "auth_failed") {
             console.error("[MV-C] auth failed:", m.message);
