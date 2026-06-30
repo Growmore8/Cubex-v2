@@ -663,6 +663,8 @@ function connectMassiveCrypto() {
           } else if (m.status === "auth_failed") {
             console.error("[MV-C] auth failed:", m.message);
             recordFeedFailure("MV");
+          } else {
+            console.log("[MV-C] status msg:", JSON.stringify(m));
           }
         } else if ((m.ev === "XQ" || m.ev === "XA") && m.b != null && m.a != null) {
           // m.p = pair code e.g. "BTCUSD" — try direct match then USDT variant
@@ -674,7 +676,11 @@ function connectMassiveCrypto() {
             state[sym].ask = r(parseFloat(m.a), digits);
             state[sym].realAt = Date.now();
             applyPrice(sym, parseFloat(m.b), "MV");
+          } else if (raw) {
+            console.log("[MV-C] XQ no sym match:", raw, "→ sym:", sym); // symbol name mismatch debug
           }
+        } else if (m.ev && m.ev !== "XQ" && m.ev !== "XA") {
+          console.log("[MV-C] unknown event:", m.ev, JSON.stringify(m).slice(0, 100));
         }
       }
     } catch (e) {}
