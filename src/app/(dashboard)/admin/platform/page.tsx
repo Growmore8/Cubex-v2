@@ -1544,7 +1544,7 @@ export default function AdminDeskPage() {
                 await Promise.all(syms.map(async (sym) => {
                   const sid = adminSymIds[sym]; if (!sid) return;
                   // FLOATING: keep each symbol's current spread value; only change the type
-                  const pip = spreadType === "FLOATING" ? (adminSymSpreads[sym] ?? Number(spread) || 0) : (Number(spread) || 0);
+                  const pip = spreadType === "FLOATING" ? ((adminSymSpreads[sym] ?? Number(spread)) || 0) : (Number(spread) || 0);
                   await fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: pip, spreadType, spreadMax: 0 }) }).catch(() => {});
                   setAdminSymSpreads((m) => ({ ...m, [sym]: pip }));
                   setAdminSymTypes((m) => ({ ...m, [sym]: spreadType }));
