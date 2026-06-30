@@ -299,7 +299,12 @@ export default function ClientMobile({ t }: { t: any }) {
   }, [symbols]);
 
   const quoteList = useMemo(() => (symbols || []).filter((s: any) => {
-    if (search && !(`${s.display || s.symbol}`.toLowerCase().includes(search.toLowerCase()))) return false;
+    if (search) {
+      const q = search.toLowerCase().replace(/\//g, "");
+      const sym = s.symbol.toLowerCase();
+      const disp = (s.display || "").toLowerCase().replace(/\//g, "");
+      if (!sym.includes(q) && !disp.includes(q)) return false;
+    }
     if (qcat === "favs") return (favs || []).includes(s.symbol);
     return cap(s.category || "Other") === qcat;
   }), [symbols, search, qcat, favs]);
