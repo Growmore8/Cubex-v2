@@ -656,31 +656,40 @@ function connectMassiveCrypto() {
       const msgs = JSON.parse(data);
       for (const m of (Array.isArray(msgs) ? msgs : [msgs])) {
         if (m.ev === "status") {
-          if (m.status === "auth_success" || m.message === "authenticated") {
-            console.log("[MV-C] authenticated, subscribing to XQ.*");
+          if (m.status === "auth_success" || m.message === "authenticated" || m.status === "connected") {
+            // subscribe to both XQ.* (exchange quotes) and C.* (crypto pairs — same format as forex)
+            console.log("[MV-C] connected/auth, subscribing to XQ.* and C.*");
             mvCryptoWs.send(JSON.stringify({ action: "subscribe", params: "XQ.*" }));
+            mvCryptoWs.send(JSON.stringify({ action: "subscribe", params: "C.*" }));
             recordFeedSuccess("MV");
           } else if (m.status === "auth_failed") {
             console.error("[MV-C] auth failed:", m.message);
             recordFeedFailure("MV");
           } else {
-            console.log("[MV-C] status msg:", JSON.stringify(m));
+            console.log("[MV-C] status:", m.status, m.message || "");
           }
-        } else if ((m.ev === "XQ" || m.ev === "XA") && m.b != null && m.a != null) {
-          // m.p = pair code e.g. "BTCUSD" — try direct match then USDT variant
-          const raw = m.p ? m.p.replace("/", "") : null;
+        } else if ((m.ev === "XQ" || m.ev === "XA" || m.ev === "C") && (m.b != null || m.bp != null) && (m.a != null || m.ap != null)) {
+          // XQ/XA = exchange quotes, C = currency pair (same as forex feed)
+          // bid field: m.b (XQ) or m.bp (some variants); ask: m.a or m.ap
+          const bid = parseFloat(m.b ?? m.bp ?? m.bid ?? 0);
+          const ask = parseFloat(m.a ?? m.ap ?? m.ask ?? 0);
+          const raw = m.p ? String(m.p).replace("/", "") : null;
           const sym = raw && state[raw] ? raw : (raw && state[raw + "T"] ? raw + "T" : null);
-          if (sym && state[sym]) {
+          if (sym && state[sym] && bid > 0 && ask > 0 && ask >= bid) {
             const digits = meta[sym] ? meta[sym].digits : 2;
-            state[sym].bid = r(parseFloat(m.b), digits);
-            state[sym].ask = r(parseFloat(m.a), digits);
+            state[sym].bid = r(bid, digits);
+            state[sym].ask = r(ask, digits);
             state[sym].realAt = Date.now();
-            applyPrice(sym, parseFloat(m.b), "MV");
-          } else if (raw) {
-            console.log("[MV-C] XQ no sym match:", raw, "→ sym:", sym); // symbol name mismatch debug
+            applyPrice(sym, bid, "MV");
+          } else if (raw && !sym) {
+            console.log("[MV-C] no sym match:", raw); // symbol name mismatch
           }
-        } else if (m.ev && m.ev !== "XQ" && m.ev !== "XA") {
-          console.log("[MV-C] unknown event:", m.ev, JSON.stringify(m).slice(0, 100));
+        } else if (m.ev && m.ev !== "status") {
+          // Log first few unknown events to see what Massive crypto actually sends
+          if (!global._mvCryptoUnkAt || Date.now() - global._mvCryptoUnkAt < 15000) {
+            if (!global._mvCryptoUnkAt) global._mvCryptoUnkAt = Date.now();
+            console.log("[MV-C] unknown ev=" + m.ev + ":", JSON.stringify(m).slice(0, 120));
+          }
         }
       }
     } catch (e) {}
