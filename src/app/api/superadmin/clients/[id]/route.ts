@@ -30,7 +30,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (b.name) data.name = titleCaseName(b.name);
       if (b.phone !== undefined) data.phone = b.phone || null;
       if (b.country !== undefined) data.country = b.country || null;
-      if (Object.keys(data).length) await prisma.account.update({ where: { id: acc.id }, data });
+      if (Object.keys(data).length) {
+        await prisma.account.update({ where: { id: acc.id }, data });
+        // Sync name/phone/country to all sibling accounts (same user) — same behaviour as admin side
+        if (acc.userId) await prisma.account.updateMany({ where: { userId: acc.userId, NOT: { id: acc.id } }, data }).catch(() => {});
+      }
       // Email is the LOGIN identity — route it through the helper so it updates
       // User.email (source of truth) and repairs orphaned accounts.
       if (b.email !== undefined) await applyClientEmail(acc.tenantId, acc.id, b.email);
