@@ -665,12 +665,19 @@ function connectMassiveCrypto() {
           } else {
             console.log("[MV-C] status:", m.status, m.message || "");
           }
-        } else if ((m.ev === "XT" || m.ev === "XQ" || m.ev === "XA") && (m.bp != null || m.b != null) && (m.ap != null || m.a != null)) {
-          // XT = crypto quotes stream (bid_price/ask_price). XQ/XA = exchange quotes fallback.
-          // Massive XT fields: m.bp (bid price), m.ap (ask price), m.p (pair e.g. "BTC-USD")
+        } else if (m.ev === "XT" && m.pair != null && m.p != null) {
+          // XT = crypto trade. Fields: pair="BTC-USD", p=trade price, s=size.
+          // No bid/ask in XT — Binance bookTicker handles spread separately.
+          const raw = String(m.pair).replace(/[-/]/g, ""); // "BTC-USD" → "BTCUSD"
+          const sym = state[raw] ? raw : (state[raw + "T"] ? raw + "T" : null);
+          const price = parseFloat(m.p);
+          if (sym && state[sym] && price > 0) {
+            applyPrice(sym, price, "MV"); // price from Massive trade feed
+          }
+        } else if ((m.ev === "XQ" || m.ev === "XA") && (m.bp != null || m.b != null) && (m.ap != null || m.a != null)) {
+          // XQ/XA = exchange quotes with bid/ask (if plan ever unlocks them)
           const bid = parseFloat(m.bp ?? m.b ?? 0);
           const ask = parseFloat(m.ap ?? m.a ?? 0);
-          // Massive may format pair as "BTC-USD", "BTC/USD", or "BTCUSD" — normalise all
           const raw = m.p ? String(m.p).replace(/[-/]/g, "") : null;
           const sym = raw && state[raw] ? raw : (raw && state[raw + "T"] ? raw + "T" : null);
           if (sym && state[sym] && bid > 0 && ask > 0 && ask >= bid) {
@@ -680,7 +687,7 @@ function connectMassiveCrypto() {
             state[sym].realAt = Date.now();
             applyPrice(sym, bid, "MV");
           } else if (raw && !sym) {
-            console.log("[MV-C] no sym match:", raw); // symbol name mismatch
+            console.log("[MV-C] no sym match:", raw);
           }
         } else if (m.ev && m.ev !== "status") {
           // Log first few unknown events to see what Massive crypto actually sends
