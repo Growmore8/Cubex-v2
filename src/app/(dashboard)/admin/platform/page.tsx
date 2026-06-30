@@ -1460,7 +1460,7 @@ export default function AdminDeskPage() {
 
       {/* Symbol settings popup (from market watch right-click) */}
       {symEdit && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setSymEdit(null)}>
+        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[300px] rounded-xl border p-5 text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <div><div className="text-[14px] font-bold">{symEdit.sym}</div><div className="text-[10px] text-[var(--muted)]">Symbol spread settings</div></div>
@@ -1477,7 +1477,7 @@ export default function AdminDeskPage() {
               </div>
               <div>
                 <div className="mb-1 text-[10px] text-[var(--muted)]">{symEdit.spreadType === "FLOATING" ? "Base spread (pips)" : "Spread (pips)"}</div>
-                <input type="number" min="0" step="0.1" value={symEdit.spread} onChange={(e) => setSymEdit((s) => s ? { ...s, spread: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                <input type="number" min="0" step="0.1" value={symEdit.spread ?? ""} onChange={(e) => setSymEdit((s) => s ? { ...s, spread: e.target.value } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
                 {symEdit.spreadType === "FLOATING" && <div className="mt-1 text-[9px]" style={{ color: "#22c55e" }}>Floating: spread may widen automatically during off-market hours</div>}
               </div>
               {swapEnabled && (
@@ -1503,7 +1503,7 @@ export default function AdminDeskPage() {
               )}
             </div>
             <div className="mt-4 flex gap-2">
-              <button onClick={async () => { const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: symEdit.spread, spreadType: symEdit.spreadType, spreadMax: 0, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: symEdit.spread })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setOk(symEdit.sym + " saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
+              <button onClick={async () => { const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: Number(symEdit.spread) || 0, spreadType: symEdit.spreadType, spreadMax: 0, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: Number(symEdit.spread) || 0 })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setOk(symEdit.sym + " saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
               <button onClick={() => setSymEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
             </div>
           </div>
@@ -1512,7 +1512,7 @@ export default function AdminDeskPage() {
 
       {/* Category bulk spread popup */}
       {catEdit && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setCatEdit(null)}>
+        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[320px] rounded-xl border p-5 text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <div><div className="text-[14px] font-bold capitalize">{catEdit.cat}</div><div className="text-[10px] text-[var(--muted)]">Set spread for all {catEdit.syms.length} symbols in this category</div></div>
@@ -1534,7 +1534,7 @@ export default function AdminDeskPage() {
               ) : (
                 <div>
                   <div className="mb-1 text-[10px] text-[var(--muted)]">Spread (pips)</div>
-                  <input type="number" min="0" step="0.1" value={catEdit.spread} onChange={(e) => setCatEdit((s) => s ? { ...s, spread: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                  <input type="number" min="0" step="0.1" value={catEdit.spread ?? ""} onChange={(e) => setCatEdit((s) => s ? { ...s, spread: e.target.value } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
                 </div>
               )}
             </div>
@@ -1544,7 +1544,7 @@ export default function AdminDeskPage() {
                 await Promise.all(syms.map(async (sym) => {
                   const sid = adminSymIds[sym]; if (!sid) return;
                   // FLOATING: keep each symbol's current spread value; only change the type
-                  const pip = spreadType === "FLOATING" ? (adminSymSpreads[sym] ?? spread) : spread;
+                  const pip = spreadType === "FLOATING" ? (adminSymSpreads[sym] ?? Number(spread) || 0) : (Number(spread) || 0);
                   await fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: pip, spreadType, spreadMax: 0 }) }).catch(() => {});
                   setAdminSymSpreads((m) => ({ ...m, [sym]: pip }));
                   setAdminSymTypes((m) => ({ ...m, [sym]: spreadType }));
@@ -1560,7 +1560,7 @@ export default function AdminDeskPage() {
 
       {/* All Symbols bulk spread modal */}
       {allSymEdit && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setAllSymEdit(null)}>
+        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-[320px] rounded-xl border p-5 text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <div><div className="text-[14px] font-bold">All Symbols</div><div className="text-[10px] text-[var(--muted)]">Apply spread settings to every symbol</div></div>
@@ -1582,14 +1582,14 @@ export default function AdminDeskPage() {
               ) : (
                 <div>
                   <div className="mb-1 text-[10px] text-[var(--muted)]">Spread (pips) — applied to all</div>
-                  <input type="number" min="0" step="0.1" value={allSymEdit.pips} onChange={(e) => setAllSymEdit((s) => s ? { ...s, pips: Number(e.target.value) } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                  <input type="number" min="0" step="0.1" value={allSymEdit.pips ?? ""} onChange={(e) => setAllSymEdit((s) => s ? { ...s, pips: e.target.value } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
                 </div>
               )}
             </div>
             <div className="mt-4 flex gap-2">
               <button onClick={async () => {
                 const body: any = { spreadType: allSymEdit!.type };
-                if (allSymEdit!.type === "FIXED") body.spread = allSymEdit!.pips;
+                if (allSymEdit!.type === "FIXED") body.spread = Number(allSymEdit!.pips) || 0;
                 const r = await fetch("/api/admin/symbols/bulk-spread", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
                 const d = await r.json();
                 if (d.ok) {
@@ -1606,7 +1606,7 @@ export default function AdminDeskPage() {
 
       {/* Group Symbol Access modal */}
       {grpSymOv && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setGrpSymOv(null)}>
+        <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="flex w-[400px] max-h-[80vh] flex-col rounded-xl border text-[12px]" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
@@ -1743,10 +1743,10 @@ export default function AdminDeskPage() {
                     ) : (
                       <div>
                         <div className="mb-1 text-[9px]" style={{ color: "var(--muted)" }}>Spread markup (pips)</div>
-                        <input type="number" min="0" step="0.1" className={ginp} value={grpForm.spread ?? Number(g.spread ?? 0)} onChange={(e) => setGrpForm((f: any) => ({ ...f, spread: Number(e.target.value) }))} />
+                        <input type="number" min="0" step="0.1" className={ginp} value={grpForm.spread ?? g.spread ?? ""} onChange={(e) => setGrpForm((f: any) => ({ ...f, spread: e.target.value }))} />
                       </div>
                     )}
-                    <button onClick={async () => { const sType = grpForm.spreadType ?? g.spreadType ?? "FLOATING"; const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: sType === "FLOATING" ? 0 : (grpForm.spread ?? Number(g.spread ?? 0)), spreadType: sType, spreadMax: 0, managerId: g.managerId }) }); const d2 = await r.json(); if (d2.ok) { setOk("Group spread saved"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d2.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#22c55e" }}>Save group spread</button>
+                    <button onClick={async () => { const sType = grpForm.spreadType ?? g.spreadType ?? "FLOATING"; const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: Number(grpForm.spread ?? g.spread ?? 0) || 0, spreadType: sType, spreadMax: 0, managerId: g.managerId }) }); const d2 = await r.json(); if (d2.ok) { setOk("Group spread saved"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d2.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#22c55e" }}>Save group spread</button>
                     <button onClick={() => { setGrpCtx(null); setGrpSub(""); openSymPerm(); }} className="w-full rounded py-1 text-[9px] text-center" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)" }}>Symbol Spread Editor →</button>
                   </div>
                 </div>

@@ -113,7 +113,7 @@ export default function SATrials() {
       const clientEmail = `client@${trial.subdomain}.demo`;
       const allText = `Platform: ${url}\nAdmin: ${adminEmail} / ${pw}\nClient: ${clientEmail} / ${pw}${trial.endsAt ? `\nExpires: ${new Date(trial.endsAt).toLocaleDateString()}` : ""}`;
       return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" onClick={() => setWelcome(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
           <div className="ui-card ui-pop w-full max-w-md rounded-xl p-5" style={{ background: "var(--bg)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <div>

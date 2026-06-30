@@ -394,7 +394,7 @@ export default function SATenantsPage() {
 
       {/* Subscription Modal */}
       {subFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setSubFor(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="ui-card ui-pop w-[360px] bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <div className="font-semibold">Subscription — {subFor.brandName || subFor.name}</div>
@@ -511,7 +511,7 @@ export default function SATenantsPage() {
 
       {/* Permissions Modal */}
       {permFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6" onClick={() => setPermFor(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6">
           <div className="ui-card ui-pop max-h-[80vh] w-[520px] overflow-auto bg-white p-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center justify-between">
               <div className="font-semibold">Tenant Permissions — {permFor.brandName || permFor.name}</div>
