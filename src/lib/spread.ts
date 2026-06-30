@@ -17,10 +17,12 @@ export async function getSpreadPips(
 ): Promise<number> {
   const [sym, grp, acc] = await Promise.all([
     prisma.symbol.findFirst({ where: { tenantId, symbol }, select: { spread: true } }).catch(() => null),
-    groupId ? prisma.tradeGroup.findUnique({ where: { id: groupId }, select: { spread: true } }).catch(() => null) : null,
+    groupId ? prisma.tradeGroup.findUnique({ where: { id: groupId }, select: { spread: true, spreadType: true } }).catch(() => null) : null,
     accountId ? prisma.account.findUnique({ where: { id: accountId }, select: { spreadMarkup: true } }).catch(() => null) : null,
   ]);
-  return Number(sym?.spread ?? 0) + Number(grp?.spread ?? 0) + Number(acc?.spreadMarkup ?? 0);
+  // FIXED group = apply markup. FLOATING group = live exchange spread, no extra markup. Default FIXED.
+  const grpMarkup = (grp?.spreadType ?? "FIXED") === "FIXED" ? Number(grp?.spread ?? 0) : 0;
+  return Number(sym?.spread ?? 0) + grpMarkup + Number(acc?.spreadMarkup ?? 0);
 }
 
 // Spread converted to price units.
