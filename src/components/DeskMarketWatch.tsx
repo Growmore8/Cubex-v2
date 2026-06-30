@@ -154,7 +154,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                         color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : ((hasLive || cfgSpPips > 0) ? "#c8d0e0" : "var(--muted)"),
                         transition: "color 0.55s ease-out",
                       }}>
-                      {p != null ? (realSpPips % 1 === 0 ? realSpPips : parseFloat(realSpPips.toFixed(1))) : "—"}
+                      {p != null ? Math.round(realSpPips) : "—"}
                     </span>
                   </span>
                 </div>);

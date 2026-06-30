@@ -1477,7 +1477,7 @@ export default function AdminDeskPage() {
               </div>
               <div>
                 <div className="mb-1 text-[10px] text-[var(--muted)]">{symEdit.spreadType === "FLOATING" ? "Base spread (pips)" : "Spread (pips)"}</div>
-                <input type="number" min="0" step="0.1" value={symEdit.spread ?? ""} onChange={(e) => setSymEdit((s) => s ? { ...s, spread: e.target.value } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                <input type="number" min="0" step="1" value={symEdit.spread ?? ""} onChange={(e) => { const v = e.target.value; setSymEdit((s) => s ? { ...s, spread: v === "" ? "" : String(Math.max(0, parseInt(v) || 0)) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
                 {symEdit.spreadType === "FLOATING" && <div className="mt-1 text-[9px]" style={{ color: "#22c55e" }}>Floating: spread may widen automatically during off-market hours</div>}
               </div>
               {swapEnabled && (
@@ -1534,7 +1534,7 @@ export default function AdminDeskPage() {
               ) : (
                 <div>
                   <div className="mb-1 text-[10px] text-[var(--muted)]">Spread (pips)</div>
-                  <input type="number" min="0" step="0.1" value={catEdit.spread ?? ""} onChange={(e) => setCatEdit((s) => s ? { ...s, spread: e.target.value } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                  <input type="number" min="0" step="1" value={catEdit.spread ?? ""} onChange={(e) => { const v = e.target.value; setCatEdit((s) => s ? { ...s, spread: v === "" ? "" : String(Math.max(0, parseInt(v) || 0)) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
                 </div>
               )}
             </div>
@@ -1582,7 +1582,7 @@ export default function AdminDeskPage() {
               ) : (
                 <div>
                   <div className="mb-1 text-[10px] text-[var(--muted)]">Spread (pips) — applied to all</div>
-                  <input type="number" min="0" step="0.1" value={allSymEdit.pips ?? ""} onChange={(e) => setAllSymEdit((s) => s ? { ...s, pips: e.target.value } : s)} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                  <input type="number" min="0" step="1" value={allSymEdit.pips ?? ""} onChange={(e) => { const v = e.target.value; setAllSymEdit((s) => s ? { ...s, pips: v === "" ? "" : String(Math.max(0, parseInt(v) || 0)) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
                 </div>
               )}
             </div>
@@ -1743,7 +1743,7 @@ export default function AdminDeskPage() {
                     ) : (
                       <div>
                         <div className="mb-1 text-[9px]" style={{ color: "var(--muted)" }}>Spread markup (pips)</div>
-                        <input type="number" min="0" step="0.1" className={ginp} value={grpForm.spread ?? g.spread ?? ""} onChange={(e) => setGrpForm((f: any) => ({ ...f, spread: e.target.value }))} />
+                        <input type="number" min="0" step="1" className={ginp} value={grpForm.spread ?? g.spread ?? ""} onChange={(e) => { const v = e.target.value; setGrpForm((f: any) => ({ ...f, spread: v === "" ? "" : String(Math.max(0, parseInt(v) || 0)) })); }} />
                       </div>
                     )}
                     <button onClick={async () => { const sType = grpForm.spreadType ?? g.spreadType ?? "FLOATING"; const r = await fetch("/api/admin/groups/" + g.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: Number(grpForm.spread ?? g.spread ?? 0) || 0, spreadType: sType, spreadMax: 0, managerId: g.managerId }) }); const d2 = await r.json(); if (d2.ok) { setOk("Group spread saved"); setGrpCtx(null); setGrpSub(""); loadAll(); } else setErr(d2.error || "Failed"); }} className="w-full rounded-lg py-1.5 text-[10px] font-semibold text-white" style={{ background: "#22c55e" }}>Save group spread</button>
@@ -2193,7 +2193,7 @@ export default function AdminDeskPage() {
                 </div>
               ) : (
                 <div><div className={flab}>Spread Markup (pips)</div>
-                  <input type="number" min="0" step="0.1" className={inp} value={aform.spreadMarkup ?? Number(act.acc.spreadMarkup ?? 0)} onChange={(e) => af("spreadMarkup", e.target.value)} autoFocus />
+                  <input type="number" min="0" step="1" className={inp} value={aform.spreadMarkup ?? Number(act.acc.spreadMarkup ?? 0)} onChange={(e) => { const v = e.target.value; af("spreadMarkup", v === "" ? "" : String(Math.max(0, parseInt(v) || 0))); }} autoFocus />
                 </div>
               )}
               <div className="mt-1 text-[10px] text-[var(--muted)]">Current: <b>{Number(act.acc.spreadMarkup ?? 0)} pips</b> · {act.acc.spreadMarkupType || "FLOATING"}</div>
