@@ -826,7 +826,7 @@ export default function ClientTerminal() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}>
           <div className="ui-pop w-full max-w-sm rounded-2xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
             <div className="mb-1 font-semibold">Complete Your Profile</div>
-            <p className="mb-4 text-[11px] text-[var(--muted)]">This information is required for withdrawals and KYC. It cannot be changed after submission.</p>
+            <p className="mb-4 text-[11px] text-[var(--muted)]">Required to enable deposits, withdrawals and KYC verification. Please ensure your name matches your government-issued ID.</p>
             <div className="space-y-3 text-[13px]">
               <div>
                 <label className="mb-1 block text-[11px] text-[var(--muted)]">Full Name <span style={{ color: SELL }}>*</span></label>

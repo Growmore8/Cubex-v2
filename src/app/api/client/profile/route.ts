@@ -23,11 +23,13 @@ export async function PATCH(req: Request) {
     if (!name || name.length < 2) throw new Error("Full name is required (min 2 characters)");
     if (!phone) throw new Error("Phone number is required");
     if (!country) throw new Error("Country is required");
-    // Lock: if profile already complete, do not allow re-submission
-    const existing = await (prisma.user.findUnique as any)({ where: { id: s.sub }, select: { phone: true, country: true } });
-    if (existing?.phone && existing?.country) throw new Error("Profile already submitted and cannot be changed. Contact support if you need to update your details.");
-    const data: any = { name, phone, country };
-    await (prisma.user.update as any)({ where: { id: s.sub }, data });
+    // Check against account records (not user record) — account.phone is what the modal trigger reads
+    const existingAcc = await prisma.account.findFirst({ where: { userId: s.sub }, select: { phone: true, country: true } });
+    if (existingAcc?.phone && existingAcc?.country) throw new Error("Profile already submitted and cannot be changed. Contact support if you need to update your details.");
+    // Save to user record
+    await (prisma.user.update as any)({ where: { id: s.sub }, data: { name, phone, country } });
+    // Sync to all accounts so the profile modal doesn't reappear on next login
+    await prisma.account.updateMany({ where: { userId: s.sub }, data: { phone, country } });
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Update failed" }, { status: 400 });
