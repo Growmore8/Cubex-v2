@@ -666,13 +666,24 @@ function connectMassiveCrypto() {
             console.log("[MV-C] status:", m.status, m.message || "");
           }
         } else if (m.ev === "XT" && m.pair != null && m.p != null) {
-          // XT = crypto trade. Fields: pair="BTC-USD", p=trade price, s=size.
-          // No bid/ask in XT — Binance bookTicker handles spread separately.
+          // XT = crypto quotes. c:[1] = bid update, c:[2] = ask update, p = price.
+          // Each message updates one side of the book.
           const raw = String(m.pair).replace(/[-/]/g, ""); // "BTC-USD" → "BTCUSD"
           const sym = state[raw] ? raw : (state[raw + "T"] ? raw + "T" : null);
           const price = parseFloat(m.p);
           if (sym && state[sym] && price > 0) {
-            applyPrice(sym, price, "MV"); // price from Massive trade feed
+            const digits = meta[sym] ? meta[sym].digits : 2;
+            const cond = Array.isArray(m.c) ? m.c[0] : m.c;
+            if (cond === 1) {
+              state[sym].bid = r(price, digits);
+              applyPrice(sym, price, "MV");
+            } else if (cond === 2) {
+              state[sym].ask = r(price, digits);
+              state[sym].realAt = Date.now();
+            } else {
+              // Unknown condition — use as price only
+              applyPrice(sym, price, "MV");
+            }
           }
         } else if ((m.ev === "XQ" || m.ev === "XA") && (m.bp != null || m.b != null) && (m.ap != null || m.a != null)) {
           // XQ/XA = exchange quotes with bid/ask (if plan ever unlocks them)
