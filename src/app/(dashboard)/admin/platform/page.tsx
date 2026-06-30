@@ -1534,7 +1534,7 @@ export default function AdminDeskPage() {
               ) : (
                 <div>
                   <div className="mb-1 text-[10px] text-[var(--muted)]">Spread (pips)</div>
-                  <input type="number" min="0" step="1" value={catEdit.spread ?? ""} onChange={(e) => { const v = e.target.value; setCatEdit((s) => s ? { ...s, spread: v === "" ? "" : String(Math.max(0, parseInt(v) || 0)) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                  <input type="number" min="0" step="1" value={isNaN(catEdit.spread) ? "" : catEdit.spread} onChange={(e) => { const v = e.target.value; setCatEdit((s) => s ? { ...s, spread: v === "" ? NaN : Math.max(0, parseInt(v) || 0) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
                 </div>
               )}
             </div>
@@ -1582,7 +1582,7 @@ export default function AdminDeskPage() {
               ) : (
                 <div>
                   <div className="mb-1 text-[10px] text-[var(--muted)]">Spread (pips) — applied to all</div>
-                  <input type="number" min="0" step="1" value={allSymEdit.pips ?? ""} onChange={(e) => { const v = e.target.value; setAllSymEdit((s) => s ? { ...s, pips: v === "" ? "" : String(Math.max(0, parseInt(v) || 0)) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                  <input type="number" min="0" step="1" value={isNaN(allSymEdit.pips) ? "" : allSymEdit.pips} onChange={(e) => { const v = e.target.value; setAllSymEdit((s) => s ? { ...s, pips: v === "" ? NaN : Math.max(0, parseInt(v) || 0) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
                 </div>
               )}
             </div>
