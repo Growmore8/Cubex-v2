@@ -1477,7 +1477,7 @@ export default function AdminDeskPage() {
               </div>
               <div>
                 <div className="mb-1 text-[10px] text-[var(--muted)]">{symEdit.spreadType === "FLOATING" ? "Base spread (pips)" : "Spread (pips)"}</div>
-                <input type="number" min="0" step="1" value={symEdit.spread ?? ""} onChange={(e) => { const v = e.target.value; setSymEdit((s) => s ? { ...s, spread: v === "" ? "" : String(Math.max(0, parseInt(v) || 0)) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                <input type="number" min="0" step="1" value={isNaN(symEdit.spread) ? "" : symEdit.spread} onChange={(e) => { const v = e.target.value; setSymEdit((s) => s ? { ...s, spread: v === "" ? NaN : Math.max(0, parseInt(v) || 0) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
                 {symEdit.spreadType === "FLOATING" && <div className="mt-1 text-[9px]" style={{ color: "#22c55e" }}>Floating: spread may widen automatically during off-market hours</div>}
               </div>
               {swapEnabled && (
@@ -1503,7 +1503,7 @@ export default function AdminDeskPage() {
               )}
             </div>
             <div className="mt-4 flex gap-2">
-              <button onClick={async () => { const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: Number(symEdit.spread) || 0, spreadType: symEdit.spreadType, spreadMax: 0, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: Number(symEdit.spread) || 0 })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setOk(symEdit.sym + " saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
+              <button onClick={async () => { const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: isNaN(symEdit.spread) ? 0 : symEdit.spread, spreadType: symEdit.spreadType, spreadMax: 0, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: isNaN(symEdit.spread) ? 0 : symEdit.spread })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setOk(symEdit.sym + " saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
               <button onClick={() => setSymEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
             </div>
           </div>
