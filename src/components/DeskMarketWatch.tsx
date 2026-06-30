@@ -146,7 +146,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
                   <span className="flex items-center justify-end pr-1">
-                    <span className="tabular-nums" title={realSpPips > 0 ? `${realSpPips.toFixed(2)} pips · ${Math.round(realSpPips * 10)} points` : undefined}
+                    <span className="tabular-nums" title={realSpPips > 0 ? `${realSpPips.toFixed(1)} pips` : undefined}
                       style={{
                         fontSize: 10,
                         fontWeight: spDir !== 0 ? 700 : 500,
@@ -154,7 +154,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                         color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : ((hasLive || cfgSpPips > 0) ? "#c8d0e0" : "var(--muted)"),
                         transition: "color 0.55s ease-out",
                       }}>
-                      {p != null ? Math.round(realSpPips * 10) : "—"}
+                      {p != null ? (Number.isInteger(realSpPips) ? realSpPips : realSpPips.toFixed(1)) : "—"}
                     </span>
                   </span>
                 </div>);

@@ -1030,7 +1030,7 @@ export default function ClientTerminal() {
                 </div>
                 <div className="flex items-center justify-between px-2.5 py-1">
                   <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_spreadPips(selSym) * 10)}</span>
+                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{((_sp) => Number.isInteger(_sp) ? _sp : _sp.toFixed(1))(_spreadPips(selSym))}</span>
                 </div>
               </div>
 

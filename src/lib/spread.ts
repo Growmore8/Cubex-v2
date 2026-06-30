@@ -5,16 +5,10 @@ export function pipForDigits(digits: number): number {
   return Math.pow(10, -(digits - 1));
 }
 
-// Group/Account FLOATING = 0 extra markup. FIXED = add configured pips on top.
-// Symbol layer always contributes its stored spread (FLOATING = base markup, FIXED = total spread).
-function resolveMarkup(pips: number, type: string): number {
-  return type === "FLOATING" ? 0 : pips;
-}
-
 // Total spread in pips for execution:
-//   FIXED symbol  → sym.spread is the total spread (bid = ask − totalPips; realBid ignored in trade.service)
+//   FIXED symbol  → sym.spread is the total spread (bid = ask − totalPips)
 //   FLOATING symbol → sym.spread is a markup added on top of the live exchange bid
-// Group and account FLOATING contribute 0; FIXED adds their configured pips.
+// Group and account spreads are always additive pip markups on top of the symbol spread.
 export async function getSpreadPips(
   tenantId: string,
   symbol: string,
@@ -22,14 +16,11 @@ export async function getSpreadPips(
   accountId?: string | null,
 ): Promise<number> {
   const [sym, grp, acc] = await Promise.all([
-    prisma.symbol.findFirst({ where: { tenantId, symbol }, select: { spread: true, spreadType: true } }).catch(() => null),
-    groupId ? prisma.tradeGroup.findUnique({ where: { id: groupId }, select: { spread: true, spreadType: true } }).catch(() => null) : null,
-    accountId ? prisma.account.findUnique({ where: { id: accountId }, select: { spreadMarkup: true, spreadMarkupType: true } }).catch(() => null) : null,
+    prisma.symbol.findFirst({ where: { tenantId, symbol }, select: { spread: true } }).catch(() => null),
+    groupId ? prisma.tradeGroup.findUnique({ where: { id: groupId }, select: { spread: true } }).catch(() => null) : null,
+    accountId ? prisma.account.findUnique({ where: { id: accountId }, select: { spreadMarkup: true } }).catch(() => null) : null,
   ]);
-  const symPips = Number(sym?.spread ?? 0); // symbol base always applies
-  const grpPips = resolveMarkup(Number(grp?.spread ?? 0), grp?.spreadType ?? "FIXED");
-  const accPips = resolveMarkup(Number(acc?.spreadMarkup ?? 0), acc?.spreadMarkupType ?? "FIXED");
-  return symPips + grpPips + accPips;
+  return Number(sym?.spread ?? 0) + Number(grp?.spread ?? 0) + Number(acc?.spreadMarkup ?? 0);
 }
 
 // Spread converted to price units.

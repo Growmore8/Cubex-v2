@@ -94,10 +94,10 @@ export async function GET(req: Request) {
     const tenantSyms = await prisma.symbol.findMany({ where: { tenantId: s.tenantId! }, select: { symbol: true, spread: true, spreadType: true, spreadMax: true } });
     for (const ts of tenantSyms) symbolSpreads[ts.symbol] = { min: Number(ts.spread ?? 0), max: Number(ts.spreadMax ?? 0), type: ts.spreadType || "FLOATING" };
     if (account && (account as any).groupId) {
-      const grp = await prisma.tradeGroup.findUnique({ where: { id: (account as any).groupId }, select: { spread: true, spreadType: true } });
-      groupSpread = (grp?.spreadType ?? "FLOATING") === "FIXED" ? Number(grp?.spread ?? 0) : 0;
+      const grp = await prisma.tradeGroup.findUnique({ where: { id: (account as any).groupId }, select: { spread: true } });
+      groupSpread = Number(grp?.spread ?? 0); // group spread always applies — it's an additive pip markup
     }
-    if (account) accountSpreadMarkup = ((account as any).spreadMarkupType ?? "FLOATING") === "FIXED" ? Number((account as any).spreadMarkup ?? 0) : 0;
+    if (account) accountSpreadMarkup = Number((account as any).spreadMarkup ?? 0); // account markup always applies too
   } catch {}
 
   // tenant branding for the app header (never "CubeX")

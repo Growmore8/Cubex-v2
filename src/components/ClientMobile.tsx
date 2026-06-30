@@ -747,7 +747,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       </div>
                       <div className="flex items-center gap-2">
                         <Sparkline data={hist} up={upTrend} />
-                        <span className="text-[10px] text-[var(--muted)]">Spread: {Math.round(spread * 10)}</span>
+                        <span className="text-[10px] text-[var(--muted)]">Spread: {Number.isInteger(spread) ? spread : spread.toFixed(1)}</span>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 items-center gap-2">
