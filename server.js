@@ -655,9 +655,9 @@ function connectMassiveCrypto() {
       for (const m of (Array.isArray(msgs) ? msgs : [msgs])) {
         if (m.ev === "status") {
           if (m.status === "auth_success" || m.message === "authenticated") {
-            // Only XQ.* is authorized on Massive /crypto endpoint
-            console.log("[MV-C] authenticated, subscribing to XQ.*");
-            mvCryptoWs.send(JSON.stringify({ action: "subscribe", params: "XQ.*" }));
+            // XT.* = crypto quotes stream (bid/ask). XQ.* has no data on this plan.
+            console.log("[MV-C] authenticated, subscribing to XT.*");
+            mvCryptoWs.send(JSON.stringify({ action: "subscribe", params: "XT.*" }));
             recordFeedSuccess("MV");
           } else if (m.status === "auth_failed") {
             console.error("[MV-C] auth failed:", m.message);
@@ -665,12 +665,13 @@ function connectMassiveCrypto() {
           } else {
             console.log("[MV-C] status:", m.status, m.message || "");
           }
-        } else if ((m.ev === "XQ" || m.ev === "XA" || m.ev === "C") && (m.b != null || m.bp != null) && (m.a != null || m.ap != null)) {
-          // XQ/XA = exchange quotes, C = currency pair (same as forex feed)
-          // bid field: m.b (XQ) or m.bp (some variants); ask: m.a or m.ap
-          const bid = parseFloat(m.b ?? m.bp ?? m.bid ?? 0);
-          const ask = parseFloat(m.a ?? m.ap ?? m.ask ?? 0);
-          const raw = m.p ? String(m.p).replace("/", "") : null;
+        } else if ((m.ev === "XT" || m.ev === "XQ" || m.ev === "XA") && (m.bp != null || m.b != null) && (m.ap != null || m.a != null)) {
+          // XT = crypto quotes stream (bid_price/ask_price). XQ/XA = exchange quotes fallback.
+          // Massive XT fields: m.bp (bid price), m.ap (ask price), m.p (pair e.g. "BTC-USD")
+          const bid = parseFloat(m.bp ?? m.b ?? 0);
+          const ask = parseFloat(m.ap ?? m.a ?? 0);
+          // Massive may format pair as "BTC-USD", "BTC/USD", or "BTCUSD" — normalise all
+          const raw = m.p ? String(m.p).replace(/[-/]/g, "") : null;
           const sym = raw && state[raw] ? raw : (raw && state[raw + "T"] ? raw + "T" : null);
           if (sym && state[sym] && bid > 0 && ask > 0 && ask >= bid) {
             const digits = meta[sym] ? meta[sym].digits : 2;
