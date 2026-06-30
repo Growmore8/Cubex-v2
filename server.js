@@ -472,9 +472,14 @@ function connectBinance() {
       const bid = parseFloat(d.b), ask = parseFloat(d.a);
       if (bid > 0 && ask > 0 && ask > bid) {
         const digits = meta[sym] ? meta[sym].digits : 2;
-        state[sym].bid = r(bid, digits);
-        state[sym].ask = r(ask, digits); // exchange ask stored for spread display
-        applyPrice(sym, bid, "BN");      // MT5: smooth toward BID (primary price)
+        // Only set bid/ask/realAt when BN is the preferred crypto feed.
+        // When another feed (MV, KR, TD) is preferred, don't overwrite their bid/ask state.
+        if (CRYPTO_FEED === "BN") {
+          state[sym].bid = r(bid, digits);
+          state[sym].ask = r(ask, digits);
+          state[sym].realAt = Date.now(); // required for commitPrice to emit real=ask (live spread)
+        }
+        applyPrice(sym, bid, "BN"); // still attempt price update (rejected by feed guard if MV is recent)
       }
     } catch (e) {}
   });
