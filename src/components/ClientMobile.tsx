@@ -823,9 +823,9 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               </>
             )}
-            {/* Preview chart — KLineChart v10 (touch-action:none before init) */}
+            {/* Preview chart — drawing tools always hidden in normal view */}
             <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
-              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={isTV} spreadPips={_mobSpreadPips(selSym)}
+              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={true} spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
@@ -1000,9 +1000,9 @@ export default function ClientMobile({ t }: { t: any }) {
                 <i className="fa-solid fa-compress text-[12px]" />
               </button>
             </div>
-            {/* bare=isTV: TV suppresses own toolbar; KlineCharts shows period bar + left drawing tools */}
+            {/* Fullscreen chart: drawing tools shown; TV still suppresses own header via bare=true */}
             <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
-              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={isTV} spreadPips={_mobSpreadPips(selSym)}
+              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={isTV} showDrawingTools={true} spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),

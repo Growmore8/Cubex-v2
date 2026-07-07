@@ -18,6 +18,7 @@ interface Props {
   symbols?: Sym[];
   positions?: ChartPosition[];
   bare?: boolean;
+  showDrawingTools?: boolean;
   onSymbolChange?: (sym: string) => void;
   spreadPips?: number;
 }
@@ -124,7 +125,7 @@ function historyLimit(tfStr: string): number {
 }
 
 // ─── KlineCharts Pro chart (all non-TV domains) ──────────────────────────────
-function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, positions, spreadPips }: Props) {
+function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, showDrawingTools, positions, spreadPips }: Props) {
   const containerRef   = useRef<HTMLDivElement>(null);
   const chartRef       = useRef<KLineChartPro | null>(null);
   const kChartRef      = useRef<any>(null);           // underlying klinecharts instance
@@ -227,7 +228,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, posi
       mainIndicators: [],
       subIndicators: [],
       datafeed,
-      drawingBarVisible: !bare,
+      drawingBarVisible: showDrawingTools ?? !bare,
       styles: {
         candle: {
           tooltip: {
@@ -334,7 +335,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, posi
   return (
     <div
       ref={containerRef}
-      className={bare ? "kline-bare" : ""}
+      className={!showDrawingTools && bare ? "kline-bare" : ""}
       style={{ position: "absolute", inset: 0, overflow: "hidden" }}
     />
   );

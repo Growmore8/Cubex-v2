@@ -53,7 +53,7 @@ function loadScript(): Promise<void> {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TVChart({
   symbol, tf, theme, digits = 5,
-  positions, symbols, bare, onSymbolChange, spreadPips,
+  positions, symbols, bare, showDrawingTools, onSymbolChange, spreadPips,
 }: {
   symbol: string;
   tf: string;
@@ -62,6 +62,7 @@ export default function TVChart({
   positions?: ChartPosition[];
   symbols?: Sym[];
   bare?: boolean;
+  showDrawingTools?: boolean;
   onSymbolChange?: (sym: string) => void;
   spreadPips?: number;
 }) {
@@ -357,10 +358,10 @@ export default function TVChart({
       // Free Advanced Charts Agreement requires TradingView branding to remain visible.
     ];
     if (bare) {
-      disabledFeatures.push(
-        "left_toolbar", "header_toolbar", "header_indicators",
-        "header_chart_type", "header_resolutions",
-      );
+      // Always suppress TV's own header bar — we render a custom header above the chart
+      disabledFeatures.push("header_toolbar", "header_indicators", "header_chart_type", "header_resolutions");
+      // Left drawing toolbar: hide unless caller explicitly requests it (fullscreen only)
+      if (!showDrawingTools) disabledFeatures.push("left_toolbar");
     }
 
     const widget = new (window as any).TradingView.widget({
