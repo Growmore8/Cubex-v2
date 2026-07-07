@@ -103,9 +103,13 @@ export default function TVChart({
       const hasOrderLine    = typeof chart.createOrderLine    === "function";
 
       // Entry / position line (solid)
+      // IMPORTANT: createPositionLine/createOrderLine exist in newer TV builds but throw
+      // without a Trading Terminal broker license. Use separate try/catch so the
+      // createShape fallback always runs if the Trading Primitive API fails.
       const addPosition = (price: number, color: string, lots: string, label: string) => {
-        try {
-          if (hasPositionLine) {
+        let created = false;
+        if (hasPositionLine) {
+          try {
             linesRef.current.push(
               chart.createPositionLine()
                 .setPrice(price).setLineColor(color).setLineStyle(0).setLineWidth(2)
@@ -114,24 +118,28 @@ export default function TVChart({
                 .setQuantity(lots).setQuantityTextColor("#fff")
                 .setQuantityBorderColor(color).setQuantityBackgroundColor(color)
             );
-          } else {
-            // Fallback: horizontal_line shape with label text
+            created = true;
+          } catch {}
+        }
+        if (!created) {
+          try {
             const id = chart.createShape(
               { time: nowSec, price },
               { shape: "horizontal_line", lock: true, disableSave: true, disableUndo: true, showInObjectsTree: false,
                 overrides: { linecolor: color, linewidth: 2, linestyle: 0, showLabel: true,
-                  text: `${lots} ${label}`, textColor: "#fff", bold: true,
+                  text: label, textcolor: "#fff", bold: true,
                   fillBackground: true, backgroundColor: color, backgroundTransparency: 40 } }
             );
             linesRef.current.push({ id });
-          }
-        } catch {}
+          } catch {}
+        }
       };
 
       // SL / TP / pending order line (dashed)
       const addOrder = (price: number, color: string, lots: string, label: string) => {
-        try {
-          if (hasOrderLine) {
+        let created = false;
+        if (hasOrderLine) {
+          try {
             linesRef.current.push(
               chart.createOrderLine()
                 .setPrice(price).setLineColor(color).setLineStyle(2).setLineWidth(1)
@@ -141,16 +149,20 @@ export default function TVChart({
                 .setQuantity(lots).setQuantityTextColor("#fff")
                 .setQuantityBorderColor(color).setQuantityBackgroundColor(color)
             );
-          } else {
+            created = true;
+          } catch {}
+        }
+        if (!created) {
+          try {
             const id = chart.createShape(
               { time: nowSec, price },
               { shape: "horizontal_line", lock: true, disableSave: true, disableUndo: true, showInObjectsTree: false,
                 overrides: { linecolor: color, linewidth: 1, linestyle: 2, showLabel: true,
-                  text: `${lots} ${label}`, textColor: color, bold: false, fillBackground: false } }
+                  text: label, textcolor: color, bold: false, fillBackground: false } }
             );
             linesRef.current.push({ id });
-          }
-        } catch {}
+          } catch {}
+        }
       };
 
       for (const p of positionsRef.current || []) {
@@ -340,6 +352,7 @@ export default function TVChart({
       "legend_widget",
       "show_chart_property_page",  // hide settings gear — use Indicators for all options
       "display_market_status",
+      "create_volume_indicator_by_default", // prevent Volume sub-pane from auto-adding
       // NOTE: tradingview_logo intentionally NOT disabled — Section 3.2 of the
       // Free Advanced Charts Agreement requires TradingView branding to remain visible.
     ];
@@ -381,11 +394,11 @@ export default function TVChart({
     onReady(() => {
       isReadyRef.current = true;
 
-      // Remove any Volume sub-pane left over from previous chart state
+      // Remove any Volume sub-pane (belt-and-suspenders alongside the disabled_feature)
       try {
         const chart = widget.activeChart();
         for (const s of chart.getAllStudies()) {
-          if (s.name === "Volume") chart.removeEntity(s.id);
+          if (s.name?.toLowerCase().includes("volume")) chart.removeEntity(s.id);
         }
       } catch {}
 

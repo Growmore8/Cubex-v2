@@ -20,9 +20,9 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-              "style-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
               "img-src 'self' data: blob: https:",
-              "font-src 'self' data:",
+              "font-src 'self' data: https://cdnjs.cloudflare.com",
               // Block tradingview.com and twemoji CDN — allow only our own WS
               "connect-src 'self' wss: ws:",
               // TradingView charting library uses blob: iframes internally

@@ -240,7 +240,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, posi
       } as any,
     });
     chartRef.current = chart;
-    kChartRef.current = (chart as any)._chartApi ?? null;
+    // _chartApi is set asynchronously during KlineChartPro init; resolve lazily in the positions effect
 
     return () => {
       callbackRef.current = null;
@@ -269,6 +269,12 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, posi
 
   // ── Position / SL / TP / spread overlays (MT5 style) ────────────────────────
   useEffect(() => {
+    // KlineChartPro sets _chartApi asynchronously — resolve it lazily on first use
+    if (!kChartRef.current && chartRef.current) {
+      kChartRef.current = (chartRef.current as any)._chartApi
+        ?? (chartRef.current as any).chart
+        ?? null;
+    }
     const kChart = kChartRef.current; if (!kChart) return;
 
     // Remove old overlays
