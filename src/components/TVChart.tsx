@@ -102,18 +102,25 @@ export default function TVChart({
           } catch {}
         }
 
-        const dg     = digitsRef.current;
-        const fmt    = (v: number) => v.toFixed(dg);
-        const nowSec = Math.floor(Date.now() / 1000);
+        const dg  = digitsRef.current;
+        const fmt = (v: number) => v.toFixed(dg);
+        // Anchor shapes at the last loaded bar so they fall within the chart's
+        // data range. Using Date.now() can place the anchor in the empty
+        // "future" zone past the last bar, making lines invisible in some TV builds.
+        const anchorSec = lastBarRef.current
+          ? Math.floor(lastBarRef.current.time / 1000)  // lastBarRef stores ms
+          : Math.floor(Date.now() / 1000);
 
         // createShape — always available in Free Advanced Charts (horizontal line + label)
         const addShape = async (price: number, ovr: Record<string, any>) => {
           try {
-            const raw = chart.createShape({ time: nowSec, price }, {
+            const raw = chart.createShape({ time: anchorSec, price }, {
               shape: "horizontal_line", lock: true, disableSave: true,
-              disableUndo: true, showInObjectsTree: false, overrides: ovr,
+              showInObjectsTree: false, overrides: ovr,
             });
-            const id: any = raw instanceof Promise ? await raw : raw;
+            // TV v32 bundles its own code — the returned Promise may not pass
+            // `instanceof Promise`, so check for thenable instead.
+            const id: any = (raw && typeof (raw as any).then === "function") ? await raw : raw;
             if (id == null) return;
             if (drawSeqRef.current === seq) linesRef.current.push({ id });
             else try { chart.removeEntity(id); } catch {}
@@ -129,7 +136,7 @@ export default function TVChart({
           try {
             const raw = (chart as any).createPositionLine?.();
             if (raw == null) throw new Error();
-            const pl: any = raw instanceof Promise ? await raw : raw;
+            const pl: any = (raw && typeof (raw as any).then === "function") ? await raw : raw;
             if (!pl || typeof pl.setPrice !== "function") throw new Error();
             if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
             pl.setPrice(price).setText(body).setQuantity(qty)
@@ -143,7 +150,7 @@ export default function TVChart({
               linecolor: lineColor, linewidth: lineStyle === 0 ? 2 : 1,
               linestyle: lineStyle,
               showLabel: true, text: qty + (body ? "  " + body : ""),
-              textcolor: "#fff", bold: lineStyle === 0,
+              textcolor: "#fff",
               fillBackground: lineStyle === 0, backgroundColor: bg, backgroundTransparency: 30,
             });
           }
