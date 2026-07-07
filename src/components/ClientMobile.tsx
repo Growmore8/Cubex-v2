@@ -796,14 +796,16 @@ export default function ClientMobile({ t }: { t: any }) {
                       <div className="mt-1 text-[12px] font-semibold tabular-nums" style={{ color: upC ? BUY : SELL }}>{upC ? "▲" : "▼"} {chg >= 0 ? "+" : ""}{gnum(chg, dg(selSym))} ({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</div>
                     </div>
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5">
-                    {isTV && (TFS || []).map((x: string) => (
-                      <button key={x} onClick={() => setTf(x)} className="rounded-md px-2 py-1 text-[10px] font-semibold transition-colors" style={tf === x ? { background: "#2f81f7", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{x}</button>
-                    ))}
-                    <button onPointerDown={(e) => { e.preventDefault(); setChartFull(true); }} className="ml-auto flex h-7 w-7 items-center justify-center rounded border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
-                      <i className="fa-solid fa-expand text-[11px]" />
-                    </button>
-                  </div>
+                  {isTV && (
+                    <div className="mt-2 flex items-center gap-1.5">
+                      {(TFS || []).map((x: string) => (
+                        <button key={x} onClick={() => setTf(x)} className="rounded-md px-2 py-1 text-[10px] font-semibold transition-colors" style={tf === x ? { background: "#2f81f7", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{x}</button>
+                      ))}
+                      <button onPointerDown={(e) => { e.preventDefault(); setChartFull(true); }} className="ml-auto flex h-7 w-7 items-center justify-center rounded border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
+                        <i className="fa-solid fa-expand text-[11px]" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -989,16 +991,18 @@ export default function ClientMobile({ t }: { t: any }) {
             {/* Fullscreen header: TF dropdown + compress button */}
             <div className="flex items-center gap-2 border-b px-3" style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)", paddingBottom: 8, borderColor: "var(--border)", background: "var(--panel)" }}>
               <span className="font-bold text-sm shrink-0">{selSym}</span>
-              <select
-                value={tf}
-                onChange={(e) => setTf(e.target.value)}
-                className="ml-1 rounded-lg border border-[var(--border)] bg-[var(--soft)] px-2 py-1 text-[11px] font-semibold text-[var(--text)] outline-none"
-                style={{ touchAction: "manipulation" }}
-              >
-                {(TFS || ["1M","5M","15M","30M","1H","4H","1D","1W"]).map((x: string) => (
-                  <option key={x} value={x}>{x}</option>
-                ))}
-              </select>
+              {isTV && (
+                <select
+                  value={tf}
+                  onChange={(e) => setTf(e.target.value)}
+                  className="ml-1 rounded-lg border border-[var(--border)] bg-[var(--soft)] px-2 py-1 text-[11px] font-semibold text-[var(--text)] outline-none"
+                  style={{ touchAction: "manipulation" }}
+                >
+                  {(TFS || ["1M","5M","15M","30M","1H","4H","1D","1W"]).map((x: string) => (
+                    <option key={x} value={x}>{x}</option>
+                  ))}
+                </select>
+              )}
               <button onClick={() => setChartFull(false)} className="shrink-0 ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
                 <i className="fa-solid fa-compress text-[12px]" />
               </button>

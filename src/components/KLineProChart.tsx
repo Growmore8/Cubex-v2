@@ -35,7 +35,7 @@ function ensureOverlay() {
   try {
     registerOverlay({
       name: "cubeXLine",
-      totalStep: 2,
+      totalStep: 1,
       needDefaultPointFigure: false,
       needDefaultXAxisFigure: false,
       needDefaultYAxisFigure: false, // custom Y-axis label via createYAxisFigures
