@@ -231,9 +231,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, posi
       styles: {
         candle: {
           tooltip: {
-            labels: ["O", "H", "L", "C"],
-            showType: "rect",
-            rect: { position: "fixed", offsetLeft: 0, offsetTop: 8, offsetRight: 8 },
+            showType: "standard",
           },
         },
         yAxis: { position: "right" },
