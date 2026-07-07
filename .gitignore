@@ -43,6 +43,10 @@ next-env.d.ts
 # user uploads (runtime data)
 /uploads
 
+# TradingView Charting Library (private — do not commit)
+/public/charting_library/
+/public/datafeeds/
+
 # editor / backup dump files
 *.bak*
 *.orig

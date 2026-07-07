@@ -485,5 +485,15 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
    modals/lists keep normal scrolling. */
 .klinecharts-pro canvas { touch-action: none; }
 
+/* TradingView Charting Library: hide all branding/watermark elements */
+.tv-watermark,
+.tv-watermark-full-size,
+[class*="watermark"],
+[class*="tv-logo"],
+[class*="tradingview-logo"],
+a[href*="tradingview.com"],
+.chart-markup-table a[href*="tradingview"],
+iframe[src*="tradingview"] { display: none !important; pointer-events: none !important; }
+
 /* Mobile bottom-nav: scale pop when a tab becomes active (overshoot + settle) */
 @keyframes nav-pop { 0% { transform: scale(1); } 45% { transform: scale(1.16); } 70% { transform: scale(0.97); } 100% { transform: scale(1); } }
