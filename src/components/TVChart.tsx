@@ -166,7 +166,7 @@ export default function TVChart({
         if (isPend) {
           addOrder(p.openPrice, color, lots, `${p.kind} ${p.type}${tkt}  ${fmt(p.openPrice)}`);
         } else {
-          addPosition(p.openPrice, color, lots, `${p.type}${tkt}  ${fmt(p.openPrice)}${pnlStr}`);
+          addPosition(p.openPrice, color, lots, `${p.type}${tkt}${pnlStr}  ${fmt(p.openPrice)}`);
         }
         if (p.sl && p.sl > 0) addOrder(p.sl,  "#f43f5e", lots, `SL${tkt}  ${fmt(p.sl)}`);
         if (p.tp && p.tp > 0) addOrder(p.tp,  "#10b981", lots, `TP${tkt}  ${fmt(p.tp)}`);

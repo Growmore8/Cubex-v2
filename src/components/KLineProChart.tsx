@@ -309,14 +309,14 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, posi
         : "";
 
       if (isPend) {
-        // e.g. "LIMIT BUY #3510 0.01  60363.18"
-        addLine(p.openPrice, color, 1, "dashed", `${p.kind} ${p.type}${tkt} ${lots}  ${fmt(p.openPrice)}`);
+        // e.g. "LIMIT BUY #3510  60363.18"
+        addLine(p.openPrice, color, 1, "dashed", `${p.kind} ${p.type}${tkt}  ${fmt(p.openPrice)}`);
       } else {
-        // e.g. "SELL #3510 2.00 +12.50  60363.18"
-        addLine(p.openPrice, color, 2, "solid", `${p.type}${tkt} ${lots}${pnlStr}  ${fmt(p.openPrice)}`);
+        // e.g. "SELL #3510 +12.50  60363.18"
+        addLine(p.openPrice, color, 2, "solid", `${p.type}${tkt}${pnlStr}  ${fmt(p.openPrice)}`);
       }
-      if (p.sl && p.sl > 0) addLine(p.sl,  "#f43f5e", 1, "dashed", `SL${tkt} ${lots}  ${fmt(p.sl)}`);
-      if (p.tp && p.tp > 0) addLine(p.tp,  "#10b981", 1, "dashed", `TP${tkt} ${lots}  ${fmt(p.tp)}`);
+      if (p.sl && p.sl > 0) addLine(p.sl,  "#f43f5e", 1, "dashed", `SL${tkt}  ${fmt(p.sl)}`);
+      if (p.tp && p.tp > 0) addLine(p.tp,  "#10b981", 1, "dashed", `TP${tkt}  ${fmt(p.tp)}`);
     }
 
     // Spread ask line
