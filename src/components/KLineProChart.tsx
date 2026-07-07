@@ -37,16 +37,17 @@ function ensureOverlay() {
       totalStep: 2,
       needDefaultPointFigure: false,
       needDefaultXAxisFigure: false,
-      needDefaultYAxisFigure: true, // draws price box on right Y-axis (MT5 style)
+      needDefaultYAxisFigure: false, // custom Y-axis label via createYAxisFigures
+      // Draw the horizontal price line across the chart
       createPointFigures({ overlay, coordinates, bounding }: any) {
         const d = (overlay.extendData ?? {}) as {
-          label?: string; color?: string; lineWidth?: number; lineStyle?: string;
+          color?: string; lineWidth?: number; lineStyle?: string;
         };
         const color     = d.color     ?? "#2962ff";
         const lineWidth = d.lineWidth ?? 1;
         const lineStyle = d.lineStyle ?? "solid";
         const y = (coordinates[0]?.y ?? 0) as number;
-        const figs: any[] = [
+        return [
           {
             type: "line",
             ignoreEvent: true,
@@ -54,15 +55,31 @@ function ensureOverlay() {
             styles: { style: lineStyle, size: lineWidth, color },
           },
         ];
-        if (d.label) {
-          figs.push({
+      },
+      // Draw colored label box on right Y-axis (MT5 style — matches reference)
+      createYAxisFigures({ overlay, coordinates }: any) {
+        const d = (overlay.extendData ?? {}) as { label?: string; color?: string };
+        const color = d.color ?? "#2962ff";
+        const label = d.label ?? "";
+        const y = (coordinates[0]?.y ?? 0) as number;
+        if (!label) return [];
+        const fSize = 10;
+        const boxH  = fSize + 6;
+        const approxW = label.length * fSize * 0.62 + 10;
+        return [
+          {
+            type: "rect",
+            ignoreEvent: true,
+            attrs: { x: 0, y: y - boxH / 2, width: approxW, height: boxH },
+            styles: { style: "fill", color, borderColor: color, borderSize: 0, borderRadius: 2 },
+          },
+          {
             type: "text",
             ignoreEvent: true,
-            attrs: { x: 6, y: y - 3, text: d.label, align: "left", baseline: "bottom" },
-            styles: { color, size: 11, family: "monospace", weight: "bold" },
-          });
-        }
-        return figs;
+            attrs: { x: 4, y, text: label, align: "left", baseline: "middle" },
+            styles: { color: "#fff", size: fSize, family: "monospace", weight: "bold" },
+          },
+        ];
       },
     });
   } catch {}
@@ -282,21 +299,24 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, posi
     };
 
     for (const p of positionsRef.current || []) {
-      const isBuy  = p.type === "BUY";
-      const isPend = !!p.kind;
-      const color  = isBuy ? "#2962ff" : "#f23645";
-      const lots   = String(p.lots);
-      const pnlStr = p.pnl !== undefined
+      const isBuy   = p.type === "BUY";
+      const isPend  = !!p.kind;
+      const color   = isBuy ? "#2962ff" : "#f23645";
+      const lots    = String(p.lots);
+      const tkt     = p.ticket ? ` #${p.ticket}` : "";
+      const pnlStr  = p.pnl !== undefined
         ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}`
         : "";
 
       if (isPend) {
-        addLine(p.openPrice, color, 1, "dashed", `${p.kind} ${p.type} ${lots}  ${fmt(p.openPrice)}`);
+        // e.g. "LIMIT BUY #3510 0.01  60363.18"
+        addLine(p.openPrice, color, 1, "dashed", `${p.kind} ${p.type}${tkt} ${lots}  ${fmt(p.openPrice)}`);
       } else {
-        addLine(p.openPrice, color, 2, "solid", `${p.type} ${lots}${pnlStr}  ${fmt(p.openPrice)}`);
+        // e.g. "SELL #3510 2.00 +12.50  60363.18"
+        addLine(p.openPrice, color, 2, "solid", `${p.type}${tkt} ${lots}${pnlStr}  ${fmt(p.openPrice)}`);
       }
-      if (p.sl && p.sl > 0) addLine(p.sl,  "#f43f5e", 1, "dashed", `SL ${lots}  ${fmt(p.sl)}`);
-      if (p.tp && p.tp > 0) addLine(p.tp,  "#10b981", 1, "dashed", `TP ${lots}  ${fmt(p.tp)}`);
+      if (p.sl && p.sl > 0) addLine(p.sl,  "#f43f5e", 1, "dashed", `SL${tkt} ${lots}  ${fmt(p.sl)}`);
+      if (p.tp && p.tp > 0) addLine(p.tp,  "#10b981", 1, "dashed", `TP${tkt} ${lots}  ${fmt(p.tp)}`);
     }
 
     // Spread ask line

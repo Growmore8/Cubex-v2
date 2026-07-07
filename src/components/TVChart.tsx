@@ -7,6 +7,7 @@ type Bar = { time: number; open: number; high: number; low: number; close: numbe
 
 export type ChartPosition = {
   id: string;
+  ticket?: string | number;
   type: "BUY" | "SELL";
   lots: number | string;
   openPrice: number;
@@ -157,17 +158,18 @@ export default function TVChart({
         const isPend = !!p.kind;
         const color  = isBuy ? "#2962ff" : "#f23645";
         const lots   = String(p.lots);
+        const tkt    = p.ticket ? ` #${p.ticket}` : "";
         const pnlStr = p.pnl !== undefined
           ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}`
           : "";
 
         if (isPend) {
-          addOrder(p.openPrice, color, lots, `${p.kind} ${p.type}  ${fmt(p.openPrice)}`);
+          addOrder(p.openPrice, color, lots, `${p.kind} ${p.type}${tkt}  ${fmt(p.openPrice)}`);
         } else {
-          addPosition(p.openPrice, color, lots, `${p.type}  ${fmt(p.openPrice)}${pnlStr}`);
+          addPosition(p.openPrice, color, lots, `${p.type}${tkt}  ${fmt(p.openPrice)}${pnlStr}`);
         }
-        if (p.sl && p.sl > 0) addOrder(p.sl,  "#f43f5e", lots, `SL  ${fmt(p.sl)}`);
-        if (p.tp && p.tp > 0) addOrder(p.tp,  "#10b981", lots, `TP  ${fmt(p.tp)}`);
+        if (p.sl && p.sl > 0) addOrder(p.sl,  "#f43f5e", lots, `SL${tkt}  ${fmt(p.sl)}`);
+        if (p.tp && p.tp > 0) addOrder(p.tp,  "#10b981", lots, `TP${tkt}  ${fmt(p.tp)}`);
       }
 
       // Spread ask line
