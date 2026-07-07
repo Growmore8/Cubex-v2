@@ -338,11 +338,12 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
         if (p.tp && p.tp > 0) addLine(p.tp,  "#10b981", 1, "dashed", `TP${tkt}  ${fmt(p.tp)}`);
       }
 
-      // Spread ask line
+      // Spread ask line — round to avoid float garbage (e.g. 7.000000000000360 → 7)
       if (spreadRef.current > 0 && lastBarRef.current) {
         const pip      = Math.pow(10, -dg);
-        const askPrice = lastBarRef.current.close + spreadRef.current * pip;
-        addLine(askPrice, "#6b7280", 1, "dotted", `Ask +${spreadRef.current}p  ${fmt(askPrice)}`);
+        const spPips   = Math.round(spreadRef.current * 100) / 100;
+        const askPrice = lastBarRef.current.close + spPips * pip;
+        addLine(askPrice, "#6b7280", 1, "dotted", `Ask +${spPips}p  ${fmt(askPrice)}`);
       }
     };
 

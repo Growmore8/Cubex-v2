@@ -79,11 +79,7 @@ export default function TVChart({
   const digitsRef      = useRef(digits); digitsRef.current = digits;
   const positionsRef   = useRef(positions); positionsRef.current = positions;
 
-  // TV v32: createShape / createPositionLine / createOrderLine all return Promise<T>.
-  // We use createShape for all lines (works in free Advanced Charts; trading primitives
-  // need a Trading Terminal broker licence and throw silently in this library build).
-  // Debounce coalesces rapid price-tick renders into one draw; version counter discards
-  // stale Promise resolutions that arrive after a newer draw has already started.
+  // Debounce coalesces rapid price-tick renders; version counter discards stale callbacks.
   const drawTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawSeqRef   = useRef(0);
   const drawRef      = useRef<() => void>(() => {});
@@ -96,7 +92,7 @@ export default function TVChart({
       try {
         const chart = w.activeChart();
 
-        // Cleanup previous shapes
+        // Cleanup previous lines (position-line adapters have .remove(); shapes use entity id)
         const old = [...linesRef.current];
         linesRef.current = [];
         for (const l of old) {
@@ -110,62 +106,86 @@ export default function TVChart({
         const fmt    = (v: number) => v.toFixed(dg);
         const nowSec = Math.floor(Date.now() / 1000);
 
-        // createShape returns Promise<EntityId> in TV v32 or EntityId in older builds.
+        // createShape — always available in Free Advanced Charts (horizontal line + label)
         const addShape = async (price: number, ovr: Record<string, any>) => {
           try {
-            const raw    = chart.createShape({ time: nowSec, price }, {
+            const raw = chart.createShape({ time: nowSec, price }, {
               shape: "horizontal_line", lock: true, disableSave: true,
               disableUndo: true, showInObjectsTree: false, overrides: ovr,
             });
             const id: any = raw instanceof Promise ? await raw : raw;
             if (id == null) return;
-            if (drawSeqRef.current === seq) {
-              linesRef.current.push({ id });
-            } else {
-              try { chart.removeEntity(id); } catch {} // stale — remove immediately
-            }
+            if (drawSeqRef.current === seq) linesRef.current.push({ id });
+            else try { chart.removeEntity(id); } catch {}
           } catch {}
         };
 
+        // createPositionLine — MT5-style colored Y-axis box; v32 returns Promise.
+        // Falls back to createShape if unavailable in this library build.
+        const addPosLine = async (
+          price: number, qty: string, body: string,
+          lineColor: string, bg: string, lineStyle: number,
+        ) => {
+          try {
+            const raw = (chart as any).createPositionLine?.();
+            if (raw == null) throw new Error();
+            const pl: any = raw instanceof Promise ? await raw : raw;
+            if (!pl || typeof pl.setPrice !== "function") throw new Error();
+            if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
+            pl.setPrice(price).setText(body).setQuantity(qty)
+              .setLineColor(lineColor)
+              .setBodyBackgroundColor(bg).setBodyTextColor("#fff")
+              .setQuantityBackgroundColor(bg).setQuantityTextColor("#fff")
+              .setLineStyle(lineStyle);
+            linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
+          } catch {
+            await addShape(price, {
+              linecolor: lineColor, linewidth: lineStyle === 0 ? 2 : 1,
+              linestyle: lineStyle,
+              showLabel: true, text: qty + (body ? "  " + body : ""),
+              textcolor: "#fff", bold: lineStyle === 0,
+              fillBackground: lineStyle === 0, backgroundColor: bg, backgroundTransparency: 30,
+            });
+          }
+        };
+
         for (const p of positionsRef.current || []) {
-          if (drawSeqRef.current !== seq) return; // abort if superseded
+          if (drawSeqRef.current !== seq) return;
           const isBuy  = p.type === "BUY";
           const isPend = !!p.kind;
           const color  = isBuy ? "#2962ff" : "#f23645";
-          const tkt    = p.ticket ? ` #${p.ticket}` : "";
-          const pnlStr = p.pnl !== undefined
+          const tkt    = p.ticket ? `#${p.ticket}` : "";
+          const pnlStr = (!isPend && p.pnl !== undefined)
             ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}`
             : "";
-          const label  = isPend
-            ? `${p.kind} ${p.type}${tkt}  ${fmt(p.openPrice)}`
-            : `${p.type}${tkt}${pnlStr}  ${fmt(p.openPrice)}`;
 
-          await addShape(p.openPrice, {
-            linecolor: color, linewidth: isPend ? 1 : 2, linestyle: isPend ? 2 : 0,
-            showLabel: true, text: label, textcolor: "#fff", bold: !isPend,
-            fillBackground: !isPend, backgroundColor: color, backgroundTransparency: 40,
-          });
+          if (isPend) {
+            await addPosLine(p.openPrice, `${p.kind} ${p.type}`, `${tkt}  ${fmt(p.openPrice)}`, color, color, 2);
+          } else {
+            await addPosLine(p.openPrice, p.type, `${tkt}${pnlStr}  ${fmt(p.openPrice)}`, color, color, 0);
+          }
           if (p.sl && p.sl > 0) await addShape(p.sl, {
             linecolor: "#f43f5e", linewidth: 1, linestyle: 2,
-            showLabel: true, text: `SL${tkt}  ${fmt(p.sl)}`, textcolor: "#f43f5e", fillBackground: false,
+            showLabel: true, text: `SL ${tkt}  ${fmt(p.sl)}`, textcolor: "#f43f5e", fillBackground: false,
           });
           if (p.tp && p.tp > 0) await addShape(p.tp, {
             linecolor: "#10b981", linewidth: 1, linestyle: 2,
-            showLabel: true, text: `TP${tkt}  ${fmt(p.tp)}`, textcolor: "#10b981", fillBackground: false,
+            showLabel: true, text: `TP ${tkt}  ${fmt(p.tp)}`, textcolor: "#10b981", fillBackground: false,
           });
         }
 
-        // Spread ask line
+        // Ask spread line — round pips to avoid float garbage (e.g. 7.000000000000360 → 7)
         if (spreadRef.current > 0 && lastBarRef.current && drawSeqRef.current === seq) {
-          const askPrice = lastBarRef.current.close + spreadRef.current * Math.pow(10, -dg);
+          const spPips   = Math.round(spreadRef.current * 100) / 100;
+          const askPrice = lastBarRef.current.close + spPips * Math.pow(10, -dg);
           await addShape(askPrice, {
             linecolor: "#6b7280", linewidth: 1, linestyle: 1,
-            showLabel: true, text: `Ask +${spreadRef.current}p  ${fmt(askPrice)}`,
+            showLabel: true, text: `Ask +${spPips}p  ${fmt(askPrice)}`,
             textcolor: "#9ca3af", fillBackground: false,
           });
         }
       } catch {}
-    }, 150); // 150ms debounce — collapses 80ms price-tick renders
+    }, 150);
   };
 
   // ── Build and mount the widget (once per mount) ──────────────────────────────
@@ -404,7 +424,15 @@ export default function TVChart({
         if (chart.symbol() !== symbol) chart.setSymbol(symbol, () => {});
       } catch {}
     };
-    try { w.chartReady ? w.chartReady(apply) : w.onChartReady(apply); } catch { apply(); }
+    // Chart is already ready (isReadyRef set in readyCb) — call immediately.
+    // v32: chartReady() returns a Promise and ignores any argument passed to it,
+    // so we must NOT pass apply as an argument when the chart is ready.
+    if (isReadyRef.current) { apply(); return; }
+    try {
+      const p = w.chartReady?.();
+      if (p && typeof p.then === "function") { p.then(apply).catch(() => {}); }
+      else { w.onChartReady?.(apply); }
+    } catch { apply(); }
   }, [symbol]);
 
   // ── Timeframe change ─────────────────────────────────────────────────────────
