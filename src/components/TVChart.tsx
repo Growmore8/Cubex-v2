@@ -79,139 +79,93 @@ export default function TVChart({
   const digitsRef      = useRef(digits); digitsRef.current = digits;
   const positionsRef   = useRef(positions); positionsRef.current = positions;
 
-  // Defined every render so it always captures latest refs — stored in drawRef for stable access
-  const drawRef = useRef<() => void>(() => {});
+  // TV v32: createShape / createPositionLine / createOrderLine all return Promise<T>.
+  // We use createShape for all lines (works in free Advanced Charts; trading primitives
+  // need a Trading Terminal broker licence and throw silently in this library build).
+  // Debounce coalesces rapid price-tick renders into one draw; version counter discards
+  // stale Promise resolutions that arrive after a newer draw has already started.
+  const drawTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawSeqRef   = useRef(0);
+  const drawRef      = useRef<() => void>(() => {});
   drawRef.current = () => {
-    const w = widgetRef.current; if (!w) return;
-    try {
-      const chart = w.activeChart();
+    if (drawTimerRef.current) clearTimeout(drawTimerRef.current);
+    drawTimerRef.current = setTimeout(async () => {
+      drawTimerRef.current = null;
+      const seq = ++drawSeqRef.current;
+      const w = widgetRef.current; if (!w || !isReadyRef.current) return;
+      try {
+        const chart = w.activeChart();
 
-      // Cleanup: position/order line objects have .remove(); shape fallbacks have .id
-      for (const l of linesRef.current) {
-        try {
-          if (typeof l?.remove === "function") l.remove();
-          else if (l?.id != null) chart.removeEntity(l.id);
-        } catch {}
-      }
-      linesRef.current = [];
-
-      const dg     = digitsRef.current;
-      const fmt    = (v: number) => v.toFixed(dg);
-      const nowSec = Math.floor(Date.now() / 1000);
-
-      // Detect which APIs are available in this TV library version
-      const hasPositionLine = typeof chart.createPositionLine === "function";
-      const hasOrderLine    = typeof chart.createOrderLine    === "function";
-
-      // Entry / position line (solid)
-      // IMPORTANT: createPositionLine/createOrderLine exist in newer TV builds but throw
-      // without a Trading Terminal broker license. Use separate try/catch so the
-      // createShape fallback always runs if the Trading Primitive API fails.
-      const addPosition = (price: number, color: string, lots: string, label: string) => {
-        let created = false;
-        if (hasPositionLine) {
+        // Cleanup previous shapes
+        const old = [...linesRef.current];
+        linesRef.current = [];
+        for (const l of old) {
           try {
-            linesRef.current.push(
-              chart.createPositionLine()
-                .setPrice(price).setLineColor(color).setLineStyle(0).setLineWidth(2)
-                .setBodyTextColor("#fff").setBodyBorderColor(color).setBodyBackgroundColor(color)
-                .setText(label)
-                .setQuantity(lots).setQuantityTextColor("#fff")
-                .setQuantityBorderColor(color).setQuantityBackgroundColor(color)
-            );
-            created = true;
+            if (typeof l?.remove === "function") l.remove();
+            else if (l?.id != null) chart.removeEntity(l.id);
           } catch {}
         }
-        if (!created) {
+
+        const dg     = digitsRef.current;
+        const fmt    = (v: number) => v.toFixed(dg);
+        const nowSec = Math.floor(Date.now() / 1000);
+
+        // createShape returns Promise<EntityId> in TV v32 or EntityId in older builds.
+        const addShape = async (price: number, ovr: Record<string, any>) => {
           try {
-            const id = chart.createShape(
-              { time: nowSec, price },
-              { shape: "horizontal_line", lock: true, disableSave: true, disableUndo: true, showInObjectsTree: false,
-                overrides: { linecolor: color, linewidth: 2, linestyle: 0, showLabel: true,
-                  text: label, textcolor: "#fff", bold: true,
-                  fillBackground: true, backgroundColor: color, backgroundTransparency: 40 } }
-            );
-            linesRef.current.push({ id });
+            const raw    = chart.createShape({ time: nowSec, price }, {
+              shape: "horizontal_line", lock: true, disableSave: true,
+              disableUndo: true, showInObjectsTree: false, overrides: ovr,
+            });
+            const id: any = raw instanceof Promise ? await raw : raw;
+            if (id == null) return;
+            if (drawSeqRef.current === seq) {
+              linesRef.current.push({ id });
+            } else {
+              try { chart.removeEntity(id); } catch {} // stale — remove immediately
+            }
           } catch {}
-        }
-      };
+        };
 
-      // SL / TP / pending order line (dashed)
-      const addOrder = (price: number, color: string, lots: string, label: string) => {
-        let created = false;
-        if (hasOrderLine) {
-          try {
-            linesRef.current.push(
-              chart.createOrderLine()
-                .setPrice(price).setLineColor(color).setLineStyle(2).setLineWidth(1)
-                .setEditable(false)
-                .setBodyTextColor("#fff").setBodyBorderColor(color).setBodyBackgroundColor(color)
-                .setText(label)
-                .setQuantity(lots).setQuantityTextColor("#fff")
-                .setQuantityBorderColor(color).setQuantityBackgroundColor(color)
-            );
-            created = true;
-          } catch {}
-        }
-        if (!created) {
-          try {
-            const id = chart.createShape(
-              { time: nowSec, price },
-              { shape: "horizontal_line", lock: true, disableSave: true, disableUndo: true, showInObjectsTree: false,
-                overrides: { linecolor: color, linewidth: 1, linestyle: 2, showLabel: true,
-                  text: label, textcolor: color, bold: false, fillBackground: false } }
-            );
-            linesRef.current.push({ id });
-          } catch {}
-        }
-      };
+        for (const p of positionsRef.current || []) {
+          if (drawSeqRef.current !== seq) return; // abort if superseded
+          const isBuy  = p.type === "BUY";
+          const isPend = !!p.kind;
+          const color  = isBuy ? "#2962ff" : "#f23645";
+          const tkt    = p.ticket ? ` #${p.ticket}` : "";
+          const pnlStr = p.pnl !== undefined
+            ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}`
+            : "";
+          const label  = isPend
+            ? `${p.kind} ${p.type}${tkt}  ${fmt(p.openPrice)}`
+            : `${p.type}${tkt}${pnlStr}  ${fmt(p.openPrice)}`;
 
-      for (const p of positionsRef.current || []) {
-        const isBuy  = p.type === "BUY";
-        const isPend = !!p.kind;
-        const color  = isBuy ? "#2962ff" : "#f23645";
-        const lots   = String(p.lots);
-        const tkt    = p.ticket ? ` #${p.ticket}` : "";
-        const pnlStr = p.pnl !== undefined
-          ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}`
-          : "";
-
-        if (isPend) {
-          addOrder(p.openPrice, color, lots, `${p.kind} ${p.type}${tkt}  ${fmt(p.openPrice)}`);
-        } else {
-          addPosition(p.openPrice, color, lots, `${p.type}${tkt}${pnlStr}  ${fmt(p.openPrice)}`);
+          await addShape(p.openPrice, {
+            linecolor: color, linewidth: isPend ? 1 : 2, linestyle: isPend ? 2 : 0,
+            showLabel: true, text: label, textcolor: "#fff", bold: !isPend,
+            fillBackground: !isPend, backgroundColor: color, backgroundTransparency: 40,
+          });
+          if (p.sl && p.sl > 0) await addShape(p.sl, {
+            linecolor: "#f43f5e", linewidth: 1, linestyle: 2,
+            showLabel: true, text: `SL${tkt}  ${fmt(p.sl)}`, textcolor: "#f43f5e", fillBackground: false,
+          });
+          if (p.tp && p.tp > 0) await addShape(p.tp, {
+            linecolor: "#10b981", linewidth: 1, linestyle: 2,
+            showLabel: true, text: `TP${tkt}  ${fmt(p.tp)}`, textcolor: "#10b981", fillBackground: false,
+          });
         }
-        if (p.sl && p.sl > 0) addOrder(p.sl,  "#f43f5e", lots, `SL${tkt}  ${fmt(p.sl)}`);
-        if (p.tp && p.tp > 0) addOrder(p.tp,  "#10b981", lots, `TP${tkt}  ${fmt(p.tp)}`);
-      }
 
-      // Spread ask line
-      if (spreadRef.current > 0 && lastBarRef.current) {
-        const pip      = Math.pow(10, -dg);
-        const askPrice = lastBarRef.current.close + spreadRef.current * pip;
-        try {
-          if (hasOrderLine) {
-            linesRef.current.push(
-              chart.createOrderLine()
-                .setPrice(askPrice).setLineColor("#6b7280").setLineStyle(1).setLineWidth(1)
-                .setEditable(false)
-                .setBodyTextColor("#d1d5db").setBodyBorderColor("#4b5563").setBodyBackgroundColor("#374151")
-                .setText(`Ask  ${fmt(askPrice)}`)
-                .setQuantity(`+${spreadRef.current}p`).setQuantityTextColor("#9ca3af")
-                .setQuantityBorderColor("#374151").setQuantityBackgroundColor("#1f2937")
-            );
-          } else {
-            const id = chart.createShape(
-              { time: nowSec, price: askPrice },
-              { shape: "horizontal_line", lock: true, disableSave: true, disableUndo: true, showInObjectsTree: false,
-                overrides: { linecolor: "#6b7280", linewidth: 1, linestyle: 1, showLabel: true,
-                  text: `Ask +${spreadRef.current}p  ${fmt(askPrice)}`, textColor: "#9ca3af", fillBackground: false } }
-            );
-            linesRef.current.push({ id });
-          }
-        } catch {}
-      }
-    } catch {}
+        // Spread ask line
+        if (spreadRef.current > 0 && lastBarRef.current && drawSeqRef.current === seq) {
+          const askPrice = lastBarRef.current.close + spreadRef.current * Math.pow(10, -dg);
+          await addShape(askPrice, {
+            linecolor: "#6b7280", linewidth: 1, linestyle: 1,
+            showLabel: true, text: `Ask +${spreadRef.current}p  ${fmt(askPrice)}`,
+            textcolor: "#9ca3af", fillBackground: false,
+          });
+        }
+      } catch {}
+    }, 150); // 150ms debounce — collapses 80ms price-tick renders
   };
 
   // ── Build and mount the widget (once per mount) ──────────────────────────────
@@ -265,8 +219,8 @@ export default function TVChart({
         const tf = TV_TO_TF[resolution] || "1M";
         // Use larger limits for slower timeframes to cover ~1 year of history
         const limit = firstDataRequest
-          ? (["1D","1W"].includes(tf) ? 500 : ["4H","1H"].includes(tf) ? 2000 : 1000)
-          : 3000;
+          ? (["1D","1W"].includes(tf) ? 500 : ["4H","1H"].includes(tf) ? 1000 : 500)
+          : 1500;
         const beforeParam = firstDataRequest ? "" : `&before=${to}`;
         try {
           const d = await fetch(
@@ -391,8 +345,9 @@ export default function TVChart({
 
     widgetRef.current = widget;
 
-    const onReady = (cb: () => void) => widget.chartReady ? widget.chartReady(cb) : widget.onChartReady(cb);
-    onReady(() => {
+    // TV v32 changed chartReady() from accepting a callback to returning a Promise.
+    // Calling widget.chartReady(cb) in v32 silently ignores cb — must use .then().
+    const readyCb = () => {
       isReadyRef.current = true;
 
       // Remove any Volume sub-pane (belt-and-suspenders alongside the disabled_feature)
@@ -403,24 +358,26 @@ export default function TVChart({
         }
       } catch {}
 
-      // Redraw position lines every time TV finishes loading data.
-      // TV clears createShape overlays when a symbol change completes, so
-      // onDataLoaded is the only reliable hook to recreate them afterwards.
+      // Redraw position lines every time TV finishes loading data (symbol changes clear shapes).
       try {
-        widget.activeChart().onDataLoaded().subscribe(null, () => {
-          drawRef.current();
-        });
+        widget.activeChart().onDataLoaded().subscribe(null, () => { drawRef.current(); });
       } catch {}
 
-      // Initial draw
-      drawRef.current();
+      drawRef.current(); // initial draw
 
       try {
         widget.activeChart().onSymbolChanged().subscribe(null, () => {
           try { onSymRef.current?.(widget.activeChart().symbol()); } catch {}
         });
       } catch {}
-    });
+    };
+    // v32+: chartReady() returns Promise and ignores arguments
+    // older: onChartReady(cb) accepts a callback
+    try {
+      const p = widget.chartReady?.();
+      if (p && typeof p.then === "function") { p.then(readyCb).catch(() => {}); }
+      else { widget.onChartReady?.(readyCb); }
+    } catch { widget.onChartReady?.(readyCb); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Mount / unmount ──────────────────────────────────────────────────────────

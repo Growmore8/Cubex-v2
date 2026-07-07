@@ -825,7 +825,7 @@ export default function ClientMobile({ t }: { t: any }) {
             )}
             {/* Preview chart — drawing tools always hidden in normal view */}
             <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
-              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={true} spreadPips={_mobSpreadPips(selSym)}
+              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={true} symbols={symbols} spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
@@ -986,23 +986,26 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── FULL-SCREEN CHART OVERLAY ───────── */}
         {chartFull && (
           <div className="fixed inset-0 z-[85] flex flex-col" style={{ background: "var(--bg)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
-            {/* Fullscreen header: TV gets HTML TF buttons; KlineCharts uses its own period bar */}
+            {/* Fullscreen header: TF dropdown + compress button */}
             <div className="flex items-center gap-2 border-b px-3" style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)", paddingBottom: 8, borderColor: "var(--border)", background: "var(--panel)" }}>
               <span className="font-bold text-sm shrink-0">{selSym}</span>
-              {isTV && (
-                <div className="flex items-center gap-1 overflow-x-auto flex-1 no-scrollbar">
-                  {(TFS || []).map((x: string) => (
-                    <button key={x} onClick={() => setTf(x)} className="shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold transition-colors" style={tf === x ? { background: "#2f81f7", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{x}</button>
-                  ))}
-                </div>
-              )}
+              <select
+                value={tf}
+                onChange={(e) => setTf(e.target.value)}
+                className="ml-1 rounded-lg border border-[var(--border)] bg-[var(--soft)] px-2 py-1 text-[11px] font-semibold text-[var(--text)] outline-none"
+                style={{ touchAction: "manipulation" }}
+              >
+                {(TFS || ["1M","5M","15M","30M","1H","4H","1D","1W"]).map((x: string) => (
+                  <option key={x} value={x}>{x}</option>
+                ))}
+              </select>
               <button onClick={() => setChartFull(false)} className="shrink-0 ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
                 <i className="fa-solid fa-compress text-[12px]" />
               </button>
             </div>
             {/* Fullscreen chart: drawing tools shown; TV still suppresses own header via bare=true */}
             <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
-              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={isTV} showDrawingTools={true} spreadPips={_mobSpreadPips(selSym)}
+              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={isTV} showDrawingTools={true} symbols={symbols} spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),

@@ -478,6 +478,9 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
    data-drawing-bar-visible attribute, but we also hide it explicitly.
    The period bar (with Indicators button) stays visible so users can add indicators. */
 .kline-bare .klinecharts-pro-drawing-bar { display: none !important; }
+/* Hide the built-in symbol navigator (hamburger + symbol name) from the period bar —
+   the app has its own symbol selector. */
+.klinecharts-pro-period-bar .symbol { display: none !important; }
 /* Chart background matches the app panels (navigator / toolbox). */
 .klinecharts-pro { --klinecharts-pro-background-color: var(--panel) !important; }
 /* Let the chart canvas own touch gestures (pinch / drag) on mobile, while

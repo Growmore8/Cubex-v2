@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import { registerOverlay } from "klinecharts";
+import { registerOverlay, init as klineInit } from "klinecharts";
 import TVChart, { type ChartPosition } from "./TVChart";
 import "@klinecharts/pro/dist/klinecharts-pro.css";
 import { KLineChartPro } from "@klinecharts/pro";
@@ -126,10 +126,11 @@ function historyLimit(tfStr: string): number {
 
 // ─── KlineCharts Pro chart (all non-TV domains) ──────────────────────────────
 function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, showDrawingTools, positions, spreadPips }: Props) {
-  const containerRef   = useRef<HTMLDivElement>(null);
-  const chartRef       = useRef<KLineChartPro | null>(null);
-  const kChartRef      = useRef<any>(null);           // underlying klinecharts instance
-  const overlayIdsRef  = useRef<string[]>([]);        // cubeXLine overlay ids
+  const containerRef    = useRef<HTMLDivElement>(null);
+  const chartRef        = useRef<KLineChartPro | null>(null);
+  const kChartRef       = useRef<any>(null);           // raw klinecharts instance (has createOverlay)
+  const overlayIdsRef   = useRef<string[]>([]);        // cubeXLine overlay ids
+  const drawOverlaysRef = useRef<() => void>(() => {}); // called after klinecharts onMount
   const socketRef      = useRef<Socket | null>(null);
   const lastBarRef     = useRef<{ timestamp: number; open: number; high: number; low: number; close: number; volume: number } | null>(null);
   const callbackRef    = useRef<((data: any) => void) | null>(null);
@@ -232,6 +233,8 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
       styles: {
         candle: {
           tooltip: {
+            // Only show OHLC values when the user hovers/crosses the chart, not always
+            showRule: "follow_cross",
             showType: "standard",
           },
         },
@@ -239,9 +242,21 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
       } as any,
     });
     chartRef.current = chart;
-    // _chartApi is set asynchronously during KlineChartPro init; resolve lazily in the positions effect
+
+    // KlineChartPro renders via SolidJS which calls klinecharts init() inside onMount
+    // (asynchronous). After ~300ms that sets the k-line-chart-id attribute on the inner
+    // element. klineInit(el) then returns the existing instance from its instances Map.
+    // We call drawOverlaysRef so positions are drawn without waiting for a price tick.
+    const resolveTimer = setTimeout(() => {
+      if (!kChartRef.current && containerRef.current) {
+        const el = containerRef.current.querySelector("[k-line-chart-id]") as HTMLElement | null;
+        if (el) kChartRef.current = klineInit(el);
+      }
+      drawOverlaysRef.current();
+    }, 400);
 
     return () => {
+      clearTimeout(resolveTimer);
       callbackRef.current = null;
       if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
       chartRef.current = null;
@@ -268,68 +283,71 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
 
   // ── Position / SL / TP / spread overlays (MT5 style) ────────────────────────
   useEffect(() => {
-    // KlineChartPro sets _chartApi asynchronously — resolve it lazily on first use
-    if (!kChartRef.current && chartRef.current) {
-      kChartRef.current = (chartRef.current as any)._chartApi
-        ?? (chartRef.current as any).chart
-        ?? null;
-    }
-    const kChart = kChartRef.current; if (!kChart) return;
+    const doDrawOverlays = () => {
+      // klinecharts sets k-line-chart-id on the inner element inside its own onMount.
+      // klineInit(el) returns the cached instance from the instances Map — giving us
+      // the real chart API with createOverlay / removeOverlay (not on KLineChartPro).
+      if (!kChartRef.current && containerRef.current) {
+        const el = containerRef.current.querySelector("[k-line-chart-id]") as HTMLElement | null;
+        if (el) kChartRef.current = klineInit(el);
+      }
+      const kChart = kChartRef.current; if (!kChart) return;
 
-    // Remove old overlays
-    for (const id of overlayIdsRef.current) {
-      try { kChart.removeOverlay({ id }); } catch {}
-    }
-    overlayIdsRef.current = [];
+      // Remove old overlays
+      for (const id of overlayIdsRef.current) {
+        try { kChart.removeOverlay({ id }); } catch {}
+      }
+      overlayIdsRef.current = [];
 
-    const dg  = digitsRef.current;
-    const fmt = (v: number) => v.toFixed(dg);
+      const dg  = digitsRef.current;
+      const fmt = (v: number) => v.toFixed(dg);
 
-    const addLine = (
-      price: number, color: string,
-      lineWidth: number, lineStyle: string,
-      label: string,
-    ) => {
-      try {
-        const id = kChart.createOverlay({
-          name: "cubeXLine",
-          lock: true,
-          visible: true,
-          points: [{ value: price }],
-          extendData: { label, color, lineWidth, lineStyle },
-          styles: { line: { color, size: lineWidth, style: lineStyle } },
-        });
-        if (id) overlayIdsRef.current.push(id);
-      } catch {}
+      const addLine = (
+        price: number, color: string,
+        lineWidth: number, lineStyle: string,
+        label: string,
+      ) => {
+        try {
+          const id = kChart.createOverlay({
+            name: "cubeXLine",
+            lock: true,
+            visible: true,
+            points: [{ value: price }],
+            extendData: { label, color, lineWidth, lineStyle },
+            styles: { line: { color, size: lineWidth, style: lineStyle } },
+          });
+          if (id) overlayIdsRef.current.push(Array.isArray(id) ? id[0] : id);
+        } catch {}
+      };
+
+      for (const p of positionsRef.current || []) {
+        const isBuy   = p.type === "BUY";
+        const isPend  = !!p.kind;
+        const color   = isBuy ? "#2962ff" : "#f23645";
+        const tkt     = p.ticket ? ` #${p.ticket}` : "";
+        const pnlStr  = p.pnl !== undefined
+          ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}`
+          : "";
+
+        if (isPend) {
+          addLine(p.openPrice, color, 1, "dashed", `${p.kind} ${p.type}${tkt}  ${fmt(p.openPrice)}`);
+        } else {
+          addLine(p.openPrice, color, 2, "solid", `${p.type}${tkt}${pnlStr}  ${fmt(p.openPrice)}`);
+        }
+        if (p.sl && p.sl > 0) addLine(p.sl,  "#f43f5e", 1, "dashed", `SL${tkt}  ${fmt(p.sl)}`);
+        if (p.tp && p.tp > 0) addLine(p.tp,  "#10b981", 1, "dashed", `TP${tkt}  ${fmt(p.tp)}`);
+      }
+
+      // Spread ask line
+      if (spreadRef.current > 0 && lastBarRef.current) {
+        const pip      = Math.pow(10, -dg);
+        const askPrice = lastBarRef.current.close + spreadRef.current * pip;
+        addLine(askPrice, "#6b7280", 1, "dotted", `Ask +${spreadRef.current}p  ${fmt(askPrice)}`);
+      }
     };
 
-    for (const p of positionsRef.current || []) {
-      const isBuy   = p.type === "BUY";
-      const isPend  = !!p.kind;
-      const color   = isBuy ? "#2962ff" : "#f23645";
-      const lots    = String(p.lots);
-      const tkt     = p.ticket ? ` #${p.ticket}` : "";
-      const pnlStr  = p.pnl !== undefined
-        ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}`
-        : "";
-
-      if (isPend) {
-        // e.g. "LIMIT BUY #3510  60363.18"
-        addLine(p.openPrice, color, 1, "dashed", `${p.kind} ${p.type}${tkt}  ${fmt(p.openPrice)}`);
-      } else {
-        // e.g. "SELL #3510 +12.50  60363.18"
-        addLine(p.openPrice, color, 2, "solid", `${p.type}${tkt}${pnlStr}  ${fmt(p.openPrice)}`);
-      }
-      if (p.sl && p.sl > 0) addLine(p.sl,  "#f43f5e", 1, "dashed", `SL${tkt}  ${fmt(p.sl)}`);
-      if (p.tp && p.tp > 0) addLine(p.tp,  "#10b981", 1, "dashed", `TP${tkt}  ${fmt(p.tp)}`);
-    }
-
-    // Spread ask line
-    if (spreadRef.current > 0 && lastBarRef.current) {
-      const pip      = Math.pow(10, -dg);
-      const askPrice = lastBarRef.current.close + spreadRef.current * pip;
-      addLine(askPrice, "#6b7280", 1, "dotted", `Ask +${spreadRef.current}p  ${fmt(askPrice)}`);
-    }
+    drawOverlaysRef.current = doDrawOverlays;
+    doDrawOverlays();
   }, [positions, symbol, digits, spreadPips]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// Feed keys come from the SuperAdmin Feeds UI (DB), falling back to env.
+// Feed keys — module-level cache (30s TTL) to avoid a DB round-trip on every candle request
+let _feedCache: { v: { td: string; fh: string; mv: string; primary: string }; t: number } | null = null;
 async function feedKeys(): Promise<{ td: string; fh: string; mv: string; primary: string }> {
+  if (_feedCache && Date.now() - _feedCache.t < 30_000) return _feedCache.v;
   let td = process.env.TWELVEDATA_KEY || process.env.TD_API_KEY || process.env.TD_KEY || "";
   let fh = process.env.FINNHUB_KEY || "";
   let mv = process.env.MASSIVE_KEY || "";
@@ -16,7 +18,9 @@ async function feedKeys(): Promise<{ td: string; fh: string; mv: string; primary
     if (typeof v.massiveKey === "string" && v.massiveKey.trim()) mv = v.massiveKey.trim();
     if (v.primary === "TD" || v.primary === "FH") primary = v.primary;
   } catch {}
-  return { td, fh, mv, primary };
+  const result = { td, fh, mv, primary };
+  _feedCache = { v: result, t: Date.now() };
+  return result;
 }
 
 const INTERVAL: Record<string, string> = {
@@ -113,14 +117,15 @@ export async function GET(req: Request) {
   const hit = candleCache.get(ckey);
   if (hit && Date.now() - hit.t < cacheTtl(tf)) return NextResponse.json({ ok: true, candles: hit.candles, source: hit.source, cached: true });
 
+  // Parallelise the two DB calls — feedKeys is cached after first hit
   let feed: string | null = null;
   let cat = "";
-  try {
-    const gs = await prisma.globalSymbol.findUnique({ where: { symbol } });
-    feed = gs?.feed || null;
-    cat = gs?.category || "";
-  } catch {}
-  const { td: TD_KEY, fh: FH_KEY, mv: MV_KEY, primary } = await feedKeys();
+  const [gs, { td: TD_KEY, fh: FH_KEY, mv: MV_KEY, primary }] = await Promise.all([
+    prisma.globalSymbol.findUnique({ where: { symbol } }).catch(() => null),
+    feedKeys(),
+  ]);
+  feed = gs?.feed || null;
+  cat  = gs?.category || "";
 
   const dedupe = (arr: any[]) => { arr.sort((a, b) => a.time - b.time); const seen = new Set<number>(); return arr.filter((c) => isFinite(c.time) && isFinite(c.close) && !seen.has(c.time) && seen.add(c.time)); };
 
