@@ -377,7 +377,8 @@ export default function TVChart({
 
     widgetRef.current = widget;
 
-    widget.onChartReady(() => {
+    const onReady = (cb: () => void) => widget.chartReady ? widget.chartReady(cb) : widget.onChartReady(cb);
+    onReady(() => {
       isReadyRef.current = true;
 
       // Remove any Volume sub-pane left over from previous chart state
@@ -432,7 +433,7 @@ export default function TVChart({
         if (chart.symbol() !== symbol) chart.setSymbol(symbol, () => {});
       } catch {}
     };
-    try { w.onChartReady(apply); } catch { apply(); }
+    try { w.chartReady ? w.chartReady(apply) : w.onChartReady(apply); } catch { apply(); }
   }, [symbol]);
 
   // ── Timeframe change ─────────────────────────────────────────────────────────

@@ -25,7 +25,8 @@ const nextConfig = {
               "font-src 'self' data:",
               // Block tradingview.com and twemoji CDN — allow only our own WS
               "connect-src 'self' wss: ws:",
-              "frame-src 'none'",
+              // TradingView charting library uses blob: iframes internally
+              "frame-src 'self' blob:",
               "object-src 'none'",
             ].join("; "),
           },
