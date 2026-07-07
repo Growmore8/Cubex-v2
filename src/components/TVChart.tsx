@@ -13,7 +13,7 @@ export type ChartPosition = {
   sl?: number;
   tp?: number;
   pnl?: number;
-  kind?: string; // pending order type
+  kind?: string;
 };
 
 type Sym = { symbol: string; category?: string; digits?: number; display?: string };
@@ -69,10 +69,135 @@ export default function TVChart({
   const socketRef      = useRef<Socket | null>(null);
   const lastBarRef     = useRef<Bar | null>(null);
   const realtimeCbRef  = useRef<((bar: Bar) => void) | null>(null);
-  const shapeIdsRef    = useRef<(string | null)[]>([]);
+  const linesRef       = useRef<any[]>([]);
+  const isReadyRef     = useRef(false);
   const symbolsRef     = useRef(symbols); symbolsRef.current = symbols;
   const onSymRef       = useRef(onSymbolChange); onSymRef.current = onSymbolChange;
   const spreadRef      = useRef(spreadPips ?? 0); spreadRef.current = spreadPips ?? 0;
+  const digitsRef      = useRef(digits); digitsRef.current = digits;
+  const positionsRef   = useRef(positions); positionsRef.current = positions;
+
+  // Defined every render so it always captures latest refs — stored in drawRef for stable access
+  const drawRef = useRef<() => void>(() => {});
+  drawRef.current = () => {
+    const w = widgetRef.current; if (!w) return;
+    try {
+      const chart = w.activeChart();
+
+      // Cleanup: position/order line objects have .remove(); shape fallbacks have .id
+      for (const l of linesRef.current) {
+        try {
+          if (typeof l?.remove === "function") l.remove();
+          else if (l?.id != null) chart.removeEntity(l.id);
+        } catch {}
+      }
+      linesRef.current = [];
+
+      const dg     = digitsRef.current;
+      const fmt    = (v: number) => v.toFixed(dg);
+      const nowSec = Math.floor(Date.now() / 1000);
+
+      // Detect which APIs are available in this TV library version
+      const hasPositionLine = typeof chart.createPositionLine === "function";
+      const hasOrderLine    = typeof chart.createOrderLine    === "function";
+
+      // Entry / position line (solid)
+      const addPosition = (price: number, color: string, lots: string, label: string) => {
+        try {
+          if (hasPositionLine) {
+            linesRef.current.push(
+              chart.createPositionLine()
+                .setPrice(price).setLineColor(color).setLineStyle(0).setLineWidth(2)
+                .setBodyTextColor("#fff").setBodyBorderColor(color).setBodyBackgroundColor(color)
+                .setText(label)
+                .setQuantity(lots).setQuantityTextColor("#fff")
+                .setQuantityBorderColor(color).setQuantityBackgroundColor(color)
+            );
+          } else {
+            // Fallback: horizontal_line shape with label text
+            const id = chart.createShape(
+              { time: nowSec, price },
+              { shape: "horizontal_line", lock: true, disableSave: true, disableUndo: true, showInObjectsTree: false,
+                overrides: { linecolor: color, linewidth: 2, linestyle: 0, showLabel: true,
+                  text: `${lots} ${label}`, textColor: "#fff", bold: true,
+                  fillBackground: true, backgroundColor: color, backgroundTransparency: 40 } }
+            );
+            linesRef.current.push({ id });
+          }
+        } catch {}
+      };
+
+      // SL / TP / pending order line (dashed)
+      const addOrder = (price: number, color: string, lots: string, label: string) => {
+        try {
+          if (hasOrderLine) {
+            linesRef.current.push(
+              chart.createOrderLine()
+                .setPrice(price).setLineColor(color).setLineStyle(2).setLineWidth(1)
+                .setEditable(false)
+                .setBodyTextColor("#fff").setBodyBorderColor(color).setBodyBackgroundColor(color)
+                .setText(label)
+                .setQuantity(lots).setQuantityTextColor("#fff")
+                .setQuantityBorderColor(color).setQuantityBackgroundColor(color)
+            );
+          } else {
+            const id = chart.createShape(
+              { time: nowSec, price },
+              { shape: "horizontal_line", lock: true, disableSave: true, disableUndo: true, showInObjectsTree: false,
+                overrides: { linecolor: color, linewidth: 1, linestyle: 2, showLabel: true,
+                  text: `${lots} ${label}`, textColor: color, bold: false, fillBackground: false } }
+            );
+            linesRef.current.push({ id });
+          }
+        } catch {}
+      };
+
+      for (const p of positionsRef.current || []) {
+        const isBuy  = p.type === "BUY";
+        const isPend = !!p.kind;
+        const color  = isBuy ? "#2962ff" : "#f23645";
+        const lots   = String(p.lots);
+        const pnlStr = p.pnl !== undefined
+          ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}`
+          : "";
+
+        if (isPend) {
+          addOrder(p.openPrice, color, lots, `${p.kind} ${p.type}  ${fmt(p.openPrice)}`);
+        } else {
+          addPosition(p.openPrice, color, lots, `${p.type}  ${fmt(p.openPrice)}${pnlStr}`);
+        }
+        if (p.sl && p.sl > 0) addOrder(p.sl,  "#f43f5e", lots, `SL  ${fmt(p.sl)}`);
+        if (p.tp && p.tp > 0) addOrder(p.tp,  "#10b981", lots, `TP  ${fmt(p.tp)}`);
+      }
+
+      // Spread ask line
+      if (spreadRef.current > 0 && lastBarRef.current) {
+        const pip      = Math.pow(10, -dg);
+        const askPrice = lastBarRef.current.close + spreadRef.current * pip;
+        try {
+          if (hasOrderLine) {
+            linesRef.current.push(
+              chart.createOrderLine()
+                .setPrice(askPrice).setLineColor("#6b7280").setLineStyle(1).setLineWidth(1)
+                .setEditable(false)
+                .setBodyTextColor("#d1d5db").setBodyBorderColor("#4b5563").setBodyBackgroundColor("#374151")
+                .setText(`Ask  ${fmt(askPrice)}`)
+                .setQuantity(`+${spreadRef.current}p`).setQuantityTextColor("#9ca3af")
+                .setQuantityBorderColor("#374151").setQuantityBackgroundColor("#1f2937")
+            );
+          } else {
+            const id = chart.createShape(
+              { time: nowSec, price: askPrice },
+              { shape: "horizontal_line", lock: true, disableSave: true, disableUndo: true, showInObjectsTree: false,
+                overrides: { linecolor: "#6b7280", linewidth: 1, linestyle: 1, showLabel: true,
+                  text: `Ask +${spreadRef.current}p  ${fmt(askPrice)}`, textColor: "#9ca3af", fillBackground: false } }
+            );
+            linesRef.current.push({ id });
+          }
+        } catch {}
+      }
+    } catch {}
+  };
 
   // ── Build and mount the widget (once per mount) ──────────────────────────────
   const buildWidget = useCallback(() => {
@@ -84,22 +209,21 @@ export default function TVChart({
       onReady(cb: (cfg: any) => void) {
         setTimeout(() => cb({
           supported_resolutions: ["1", "5", "15", "30", "60", "240", "1D", "1W"],
-          supports_marks: false,
-          supports_timescale_marks: false,
-          supports_time: false,
+          supports_marks: false, supports_timescale_marks: false, supports_time: false,
         }), 0);
       },
 
       searchSymbols(query: string, _ex: string, _type: string, onResult: (r: any[]) => void) {
         const q = query.toLowerCase();
-        const res = allSymbols()
-          .filter((s) => !q || s.symbol.toLowerCase().includes(q) || (s.display || "").toLowerCase().includes(q))
-          .slice(0, 30)
-          .map((s) => ({
-            symbol: s.symbol, full_name: s.symbol, ticker: s.symbol,
-            description: s.display || s.symbol, exchange: "", type: s.category || "forex",
-          }));
-        onResult(res);
+        onResult(
+          allSymbols()
+            .filter((s) => !q || s.symbol.toLowerCase().includes(q) || (s.display || "").toLowerCase().includes(q))
+            .slice(0, 30)
+            .map((s) => ({
+              symbol: s.symbol, full_name: s.symbol, ticker: s.symbol,
+              description: s.display || s.symbol, exchange: "", type: s.category || "forex",
+            }))
+        );
       },
 
       resolveSymbol(name: string, onResolve: (info: any) => void, _onErr: (e: string) => void) {
@@ -124,7 +248,10 @@ export default function TVChart({
         onError: (e: string) => void,
       ) {
         const tf = TV_TO_TF[resolution] || "1M";
-        const limit = firstDataRequest ? 500 : 2000;
+        // Use larger limits for slower timeframes to cover ~1 year of history
+        const limit = firstDataRequest
+          ? (["1D","1W"].includes(tf) ? 500 : ["4H","1H"].includes(tf) ? 2000 : 1000)
+          : 3000;
         const beforeParam = firstDataRequest ? "" : `&before=${to}`;
         try {
           const d = await fetch(
@@ -134,10 +261,13 @@ export default function TVChart({
           if (!d.ok || !Array.isArray(d.candles) || !d.candles.length) {
             onHistory([], { noData: true }); return;
           }
-          // candles API returns time in seconds → TradingView expects milliseconds
-          const bars: Bar[] = d.candles
-            .filter((c: any) => c.time >= from && c.time <= to)
-            .map((c: any) => ({ time: c.time * 1000, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume ?? 0 }));
+          const mapped = d.candles.map((c: any) => ({
+            time: c.time * 1000, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume ?? 0,
+          }));
+          // On first request return everything — TV handles scroll; on page requests filter to range
+          const bars: Bar[] = firstDataRequest
+            ? mapped
+            : mapped.filter((b: Bar) => b.time >= from * 1000 && b.time <= to * 1000);
           if (bars.length) lastBarRef.current = bars[bars.length - 1];
           onHistory(bars, { noData: bars.length === 0 });
         } catch (e: any) { onError(e.message || "candles fetch failed"); }
@@ -196,25 +326,25 @@ export default function TVChart({
       "header_screenshot",
       "header_saveload",
       "go_to_date",
-      // Remove TradingView branding, external links, and outbound calls
       "show_logo_on_all_charts",
       "caption_buttons_text_if_possible",
-      // Disable screenshot — removes tradingview.com/snapshot/ call
-      // (already in list above but kept for clarity)
-      // Disable emoji tool — prevents twemoji.maxcdn.com + cdnjs CDN requests
       "drawing_templates",
       "pine_script_editor_aspect_ratio",
-      // Disable "Share on Twitter" and "Publish idea" buttons
       "publish_study",
       "share_study_templates",
-      // Disable "Go to TradingView" link in header
-      "tradingview_logo",
+      // header_symbol_search re-enabled — TV search uses our datafeed (platform symbols only)
+      "symbol_search_hot_key",
+      "timeframes_toolbar",
+      "legend_widget",
+      "show_chart_property_page",  // hide settings gear — use Indicators for all options
+      "display_market_status",
+      // NOTE: tradingview_logo intentionally NOT disabled — Section 3.2 of the
+      // Free Advanced Charts Agreement requires TradingView branding to remain visible.
     ];
     if (bare) {
       disabledFeatures.push(
         "left_toolbar", "header_toolbar", "header_indicators",
-        "header_chart_type", "header_resolutions", "timeframes_toolbar",
-        "header_symbol_search",
+        "header_chart_type", "header_resolutions",
       );
     }
 
@@ -240,13 +370,34 @@ export default function TVChart({
         "paneProperties.horzGridProperties.color": "rgba(0,0,0,0.04)",
       },
       disabled_features: disabledFeatures,
-      enabled_features:  ["side_toolbar_in_fullscreen_mode"],
+      enabled_features:  ["side_toolbar_in_fullscreen_mode", "items_favoriting"],
     });
 
     widgetRef.current = widget;
 
-    // Notify parent when user picks a symbol from the search bar
     widget.onChartReady(() => {
+      isReadyRef.current = true;
+
+      // Remove any Volume sub-pane left over from previous chart state
+      try {
+        const chart = widget.activeChart();
+        for (const s of chart.getAllStudies()) {
+          if (s.name === "Volume") chart.removeEntity(s.id);
+        }
+      } catch {}
+
+      // Redraw position lines every time TV finishes loading data.
+      // TV clears createShape overlays when a symbol change completes, so
+      // onDataLoaded is the only reliable hook to recreate them afterwards.
+      try {
+        widget.activeChart().onDataLoaded().subscribe(null, () => {
+          drawRef.current();
+        });
+      } catch {}
+
+      // Initial draw
+      drawRef.current();
+
       try {
         widget.activeChart().onSymbolChanged().subscribe(null, () => {
           try { onSymRef.current?.(widget.activeChart().symbol()); } catch {}
@@ -261,7 +412,10 @@ export default function TVChart({
     loadScript().then(() => { if (!cancelled) buildWidget(); }).catch(() => {});
     return () => {
       cancelled = true;
+      isReadyRef.current = false;
       realtimeCbRef.current = null;
+      for (const l of linesRef.current) { try { l.remove(); } catch {} }
+      linesRef.current = [];
       if (socketRef.current)  { socketRef.current.disconnect();  socketRef.current  = null; }
       if (widgetRef.current)  { try { widgetRef.current.remove(); } catch {}; widgetRef.current = null; }
     };
@@ -291,50 +445,10 @@ export default function TVChart({
     try { w.changeTheme(theme === "dark" ? "Dark" : "Light"); } catch {}
   }, [theme]);
 
-  // ── Position / SL / TP shapes ────────────────────────────────────────────────
+  // ── Position / SL / TP / spread lines (MT5 style) ───────────────────────────
   useEffect(() => {
-    const w = widgetRef.current; if (!w) return;
-    const draw = () => {
-      try {
-        const chart = w.activeChart();
-        for (const id of shapeIdsRef.current) { try { if (id) chart.removeEntity(id); } catch {} }
-        shapeIdsRef.current = [];
-        const nowSec = Math.floor(Date.now() / 1000);
-
-        for (const p of positions || []) {
-          const color = p.type === "BUY" ? "#3b82f6" : "#ef4444";
-          const label = `${p.kind ? p.kind + " " : ""}${p.type} ${p.lots}${p.pnl !== undefined ? ` · ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}` : ""}`;
-
-          const eId = chart.createShape(
-            { time: nowSec, price: p.openPrice },
-            {
-              shape: "horizontal_line", lock: true,
-              disableSelection: false, disableSave: true, disableUndo: true,
-              showInObjectsTree: false,
-              overrides: { linecolor: color, linewidth: 2, linestyle: 0, showLabel: true, text: label, textColor: "#ffffff", bold: true, fillBackground: false },
-            }
-          );
-          shapeIdsRef.current.push(eId);
-
-          if (p.sl && p.sl > 0) {
-            const sId = chart.createShape(
-              { time: nowSec, price: p.sl },
-              { shape: "horizontal_line", lock: true, disableSelection: false, disableSave: true, disableUndo: true, showInObjectsTree: false, overrides: { linecolor: "#f43f5e", linewidth: 1, linestyle: 2, showLabel: true, text: "SL", textColor: "#fff", fillBackground: false } }
-            );
-            shapeIdsRef.current.push(sId);
-          }
-          if (p.tp && p.tp > 0) {
-            const tId = chart.createShape(
-              { time: nowSec, price: p.tp },
-              { shape: "horizontal_line", lock: true, disableSelection: false, disableSave: true, disableUndo: true, showInObjectsTree: false, overrides: { linecolor: "#10b981", linewidth: 1, linestyle: 2, showLabel: true, text: "TP", textColor: "#fff", fillBackground: false } }
-            );
-            shapeIdsRef.current.push(tId);
-          }
-        }
-      } catch {}
-    };
-    try { w.onChartReady(draw); } catch { draw(); }
-  }, [positions, symbol]);
+    if (isReadyRef.current) drawRef.current();
+  }, [positions, symbol, digits, spreadPips]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div ref={containerRef} style={{ position: "absolute", inset: 0, overflow: "hidden" }} />

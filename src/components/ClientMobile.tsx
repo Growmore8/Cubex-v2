@@ -279,6 +279,8 @@ export default function ClientMobile({ t }: { t: any }) {
   const avatarRef = useRef<HTMLInputElement>(null);
   const baselineRef = useRef<Record<string, number>>({});
   const [chartFull, setChartFull] = useState(false);
+  const [isTV, setIsTV] = useState(false);
+  useEffect(() => { setIsTV(window.location.hostname === "trade.growthcapitalltd.com"); }, []);
 
   // capture a session baseline price for % change movers
   useEffect(() => {
@@ -795,7 +797,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     </div>
                   </div>
                   <div className="mt-2 flex items-center gap-1.5">
-                    {(TFS || []).map((x: string) => (
+                    {isTV && (TFS || []).map((x: string) => (
                       <button key={x} onClick={() => setTf(x)} className="rounded-md px-2 py-1 text-[10px] font-semibold transition-colors" style={tf === x ? { background: "#2f81f7", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{x}</button>
                     ))}
                     <button onPointerDown={(e) => { e.preventDefault(); setChartFull(true); }} className="ml-auto flex h-7 w-7 items-center justify-center rounded border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
@@ -823,7 +825,7 @@ export default function ClientMobile({ t }: { t: any }) {
             )}
             {/* Preview chart — KLineChart v10 (touch-action:none before init) */}
             <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
-              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={true} spreadPips={_mobSpreadPips(selSym)}
+              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={isTV} spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
@@ -984,14 +986,23 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── FULL-SCREEN CHART OVERLAY ───────── */}
         {chartFull && (
           <div className="fixed inset-0 z-[85] flex flex-col" style={{ background: "var(--bg)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
-            <div className="flex items-center gap-2 border-b px-4" style={{ paddingTop: "calc(env(safe-area-inset-top) + 10px)", paddingBottom: 10, borderColor: "var(--border)", background: "var(--panel)" }}>
-              <span className="font-bold text-sm">{selSym}</span>
-              <button onClick={() => setChartFull(false)} className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
+            {/* Fullscreen header: TV gets HTML TF buttons; KlineCharts uses its own period bar */}
+            <div className="flex items-center gap-2 border-b px-3" style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)", paddingBottom: 8, borderColor: "var(--border)", background: "var(--panel)" }}>
+              <span className="font-bold text-sm shrink-0">{selSym}</span>
+              {isTV && (
+                <div className="flex items-center gap-1 overflow-x-auto flex-1 no-scrollbar">
+                  {(TFS || []).map((x: string) => (
+                    <button key={x} onClick={() => setTf(x)} className="shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold transition-colors" style={tf === x ? { background: "#2f81f7", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{x}</button>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setChartFull(false)} className="shrink-0 ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
                 <i className="fa-solid fa-compress text-[12px]" />
               </button>
             </div>
+            {/* bare=isTV: TV suppresses own toolbar; KlineCharts shows period bar + left drawing tools */}
             <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
-              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} spreadPips={_mobSpreadPips(selSym)}
+              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={isTV} spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),

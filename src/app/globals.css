@@ -474,26 +474,16 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
    container instead, so it resizes correctly when the desk toolbox / panels
    are dragged (otherwise the chart overflows into the panel below). */
 .klinecharts-pro { height: 100% !important; width: 100% !important; }
-/* Bare preview (mobile dashboard): hide the period bar so only candles show;
-   the app's own header provides symbol / timeframe. Drawing rail is hidden via
-   drawingBarVisible. Content then fills the full height. */
-.kline-bare .klinecharts-pro-period-bar { display: none !important; }
-.kline-bare .klinecharts-pro-content { height: 100% !important; }
+/* Bare mode: only hide the drawing sidebar — klinecharts handles it via the
+   data-drawing-bar-visible attribute, but we also hide it explicitly.
+   The period bar (with Indicators button) stays visible so users can add indicators. */
+.kline-bare .klinecharts-pro-drawing-bar { display: none !important; }
 /* Chart background matches the app panels (navigator / toolbox). */
 .klinecharts-pro { --klinecharts-pro-background-color: var(--panel) !important; }
 /* Let the chart canvas own touch gestures (pinch / drag) on mobile, while
    modals/lists keep normal scrolling. */
 .klinecharts-pro canvas { touch-action: none; }
 
-/* TradingView Charting Library: hide all branding/watermark elements */
-.tv-watermark,
-.tv-watermark-full-size,
-[class*="watermark"],
-[class*="tv-logo"],
-[class*="tradingview-logo"],
-a[href*="tradingview.com"],
-.chart-markup-table a[href*="tradingview"],
-iframe[src*="tradingview"] { display: none !important; pointer-events: none !important; }
 
 /* Mobile bottom-nav: scale pop when a tab becomes active (overshoot + settle) */
 @keyframes nav-pop { 0% { transform: scale(1); } 45% { transform: scale(1.16); } 70% { transform: scale(0.97); } 100% { transform: scale(1); } }
