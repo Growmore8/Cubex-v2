@@ -329,18 +329,7 @@ export default function ClientMobile({ t }: { t: any }) {
   }, []);
   const avatarRef = useRef<HTMLInputElement>(null);
   const baselineRef = useRef<Record<string, number>>({});
-  const [chartFull, setChartFull] = useState(false);
-  const [isTV, setIsTV] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(false);
   const [nowMsMob, setNowMsMob] = useState(Date.now());
-  useEffect(() => { setIsTV(window.location.hostname === "trade.growthcapitalltd.com"); }, []);
-  useEffect(() => {
-    const check = () => { const land = window.innerWidth > window.innerHeight && window.innerWidth > 480; setIsLandscape(land); if (land && tab === "chart") setChartFull(true); };
-    check();
-    window.addEventListener("resize", check);
-    window.addEventListener("orientationchange", check);
-    return () => { window.removeEventListener("resize", check); window.removeEventListener("orientationchange", check); };
-  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const iv = setInterval(() => setNowMsMob(Date.now()), 30000); return () => clearInterval(iv); }, []);
   const mobSessions = (() => {
     const t2 = new Date(nowMsMob).getUTCHours() * 60 + new Date(nowMsMob).getUTCMinutes();
@@ -514,11 +503,6 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            {account && positions && positions.length > 0 && (
-              <span className="rounded-full px-2.5 py-1 text-[10px] font-bold tabular-nums" style={{ background: floating >= 0 ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)", color: floating >= 0 ? BUY : SELL, border: `1px solid ${floating >= 0 ? "rgba(22,163,74,0.3)" : "rgba(220,38,38,0.3)"}` }}>
-                {(floating >= 0 ? "+" : "-") + _cSym + fmt(Math.abs(floating))}
-              </span>
-            )}
             {/* Theme toggle */}
             <button onClick={() => { haptic(30); toggleTheme && toggleTheme(); }} className="flex h-9 w-9 items-center justify-center rounded-full transition-transform active:scale-90" style={{ background: "var(--soft)", border: "1px solid var(--border)" }} title={theme === "dark" ? "Light mode" : "Dark mode"}>
               <i className={"fa-solid text-[12px] " + (theme === "dark" ? "fa-sun" : "fa-moon")} style={{ color: "var(--muted)" }} />
@@ -707,10 +691,9 @@ export default function ClientMobile({ t }: { t: any }) {
                   </div>
                 </div>
                 <div className="relative my-3 h-px" style={{ background: "rgba(255,255,255,0.18)" }} />
-                <div className="relative grid grid-cols-3 gap-2 text-white">
+                <div className="relative grid grid-cols-2 gap-2 text-white">
                   <div><div className="text-[8px] tracking-[0.12em] text-white/50">EQUITY</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(equity)}</div></div>
-                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(free)}</div></div>
-                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">PROFIT</div><div className="text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#5ef2b3" : "#ff9a9a" }}>{floating >= 0 ? "+" : ""}{fmt(floating)}</div></div>
+                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE MARGIN</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(free)}</div></div>
                 </div>
               </div>
             </div>
@@ -1023,11 +1006,6 @@ export default function ClientMobile({ t }: { t: any }) {
                         <option key={x} value={x}>{x}</option>
                       ))}
                     </select>
-                    <button onPointerDown={(e) => { e.preventDefault(); setChartFull(true); }}
-                      className="ml-auto flex h-7 w-7 items-center justify-center rounded border border-[var(--border)]"
-                      style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
-                      <i className="fa-solid fa-expand text-[11px]" />
-                    </button>
                   </div>
                 </div>
               );
@@ -1208,36 +1186,6 @@ export default function ClientMobile({ t }: { t: any }) {
           </div>
         )}</KeepAlive>
 
-        {/* ───────── FULL-SCREEN CHART OVERLAY ───────── */}
-        {chartFull && (
-          <div className="fixed inset-0 z-[85] flex flex-col" style={{ background: "var(--bg)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}>
-            {/* Fullscreen header: TF dropdown + compress button */}
-            <div className="flex items-center gap-2 border-b px-3" style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)", paddingBottom: 8, borderColor: "var(--border)", background: "var(--panel)" }}>
-              <span className="font-bold text-sm shrink-0">{selSym}</span>
-              <select
-                value={tf}
-                onChange={(e) => setTf(e.target.value)}
-                className="ml-1 rounded-lg border border-[var(--border)] bg-[var(--soft)] px-2 py-1 text-[11px] font-semibold text-[var(--text)] outline-none"
-                style={{ touchAction: "manipulation" }}
-              >
-                {(TFS || ["1M","5M","15M","30M","1H","4H","1D","1W"]).map((x: string) => (
-                  <option key={x} value={x}>{x}</option>
-                ))}
-              </select>
-              <button onClick={() => setChartFull(false)} className="shrink-0 ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)]" style={{ background: "var(--soft)", color: "var(--muted)", touchAction: "manipulation" }}>
-                <i className="fa-solid fa-compress text-[12px]" />
-              </button>
-            </div>
-            {/* Fullscreen chart: drawing tools shown; TV still suppresses own header via bare=true */}
-            <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
-              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={isTV} showDrawingTools={true} symbols={symbols} spreadPips={_mobSpreadPips(selSym)}
-                positions={[
-                  ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
-                  ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]} />
-            </div>
-          </div>
-        )}
 
         {/* ───────── TRADES ───────── */}
         {tab === "trades" && (
@@ -1299,7 +1247,6 @@ export default function ClientMobile({ t }: { t: any }) {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums" style={{ background: plv >= 0 ? "rgba(22,163,74,0.13)" : "rgba(220,38,38,0.13)", color: plv >= 0 ? BUY : SELL }}>{(plv >= 0 ? "+" : "") + _cSym + fmt(plv)}</span>
                       <button onClick={(e) => { e.stopPropagation(); close(p.id); }} className="flex h-7 w-7 items-center justify-center rounded-full border" style={{ borderColor: SELL, color: SELL }}><i className="fa-solid fa-xmark" /></button>
                     </div>
                   </div>

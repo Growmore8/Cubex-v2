@@ -826,7 +826,7 @@ function LWChart({
         return (
           <>
             <div style={{ position: "fixed", inset: 0, zIndex: 130 }} onMouseDown={close} onContextMenu={(e) => { e.preventDefault(); close(); }} />
-            <div style={{ position: "fixed", left: Math.min(ctxMenu.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 220), top: ctxMenu.y, zIndex: 131, minWidth: 200, padding: "4px 0", borderRadius: 10, background: panelBg, border: `1px solid ${bord}`, boxShadow: "0 16px 40px rgba(0,0,0,0.45)" }} onContextMenu={(e) => e.preventDefault()}>
+            <div style={{ position: "fixed", left: Math.min(ctxMenu.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 220), top: Math.min(Math.max(ctxMenu.y, 4), (typeof window !== "undefined" ? window.innerHeight : 9999) - 244), zIndex: 131, minWidth: 200, padding: "4px 0", borderRadius: 10, background: panelBg, border: `1px solid ${bord}`, boxShadow: "0 16px 40px rgba(0,0,0,0.45)" }} onContextMenu={(e) => e.preventDefault()}>
               {item("Reset chart view", "fa-rotate-left", () => { try { chartRef.current?.timeScale().fitContent(); seriesRef.current?.priceScale().applyOptions({ autoScale: true }); } catch {} })}
               {ctxMenu.price != null && item(`Copy price ${ctxMenu.price.toFixed(digits)}`, "fa-copy", () => { try { navigator.clipboard.writeText(ctxMenu.price!.toFixed(digits)); } catch {} })}
               {sep}

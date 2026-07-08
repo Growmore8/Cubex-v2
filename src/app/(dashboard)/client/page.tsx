@@ -1095,9 +1095,9 @@ export default function ClientTerminal() {
       )}
 
       <div className="flex min-h-0 flex-1">
-        {posCtx && (() => { const p = posCtx.pos; const pl = pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)); const net = swapEnabled ? pl + Number(p.swap) - Number(p.commission) : pl; return (<>
+        {posCtx && (() => { const p = posCtx.pos; const pl = pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)); const net = swapEnabled ? pl + Number(p.swap) - Number(p.commission) : pl; const _vw = typeof window !== "undefined" ? window.innerWidth : 1200; const _vh = typeof window !== "undefined" ? window.innerHeight : 800; const _px = Math.min(posCtx.x, _vw - 196); const _py = Math.min(Math.max(posCtx.y, 4), _vh - 224); return (<>
           <div className="fixed inset-0 z-[80]" onClick={() => setPosCtx(null)} onContextMenu={(e) => { e.preventDefault(); setPosCtx(null); }} />
-          <div className="ui-pop fixed z-[90] min-w-[180px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] py-1 text-[12px] shadow-xl" style={{ left: posCtx.x, top: posCtx.y }}>
+          <div className="ui-pop fixed z-[90] min-w-[180px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] py-1 text-[12px] shadow-xl" style={{ left: _px, top: _py }}>
             <div className="border-b border-[var(--border)] px-3 py-1.5">
               <div className="text-[11px] font-bold" style={{ color: "var(--text)" }}>{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type}</span></div>
               <div className="text-[10px]" style={{ color: "var(--muted)" }}>#{p.ticket} · {p.lots}L · <span style={{ color: net >= 0 ? BUY : SELL }}>{net >= 0 ? "+" : ""}{fmt(net)}</span></div>
@@ -1114,7 +1114,8 @@ export default function ClientTerminal() {
         </>); })()}
         {ctx && (<>
             <div className="fixed inset-0 z-[80]" onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
-            <div className="ui-pop fixed z-[90] min-w-[150px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] py-1 text-[12px] shadow-lg" style={{ left: ctx.x, top: ctx.y }}>
+            {(() => { const _vw2 = typeof window !== "undefined" ? window.innerWidth : 1200; const _vh2 = typeof window !== "undefined" ? window.innerHeight : 800; const _px2 = Math.min(ctx.x, _vw2 - 164); const _py2 = Math.min(Math.max(ctx.y, 4), _vh2 - 180); return (
+            <div className="ui-pop fixed z-[90] min-w-[150px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] py-1 text-[12px] shadow-lg" style={{ left: _px2, top: _py2 }}>
               <div className="px-3 py-1 text-[10px] text-[var(--muted)]">{ctx.sym}</div>
               {oneClick && <>
                 <button className="block w-full px-3 py-1.5 text-left font-semibold hover:bg-[var(--soft)]" style={{ color: BUY }} onClick={() => { quickTrade(ctx.sym, "BUY"); setCtx(null); }}><i className="fa-solid fa-bolt mr-1.5 text-[9px]" />Buy at Market ({vol}L)</button>
@@ -1126,6 +1127,7 @@ export default function ClientTerminal() {
               <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { if (navigator.clipboard) navigator.clipboard.writeText(ctx.sym); setCtx(null); }}>Copy Symbol</button>
               <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { toggleFav(ctx.sym); setCtx(null); }}>{favs.includes(ctx.sym) ? "Remove favourite" : "Add favourite"}</button>
             </div>
+            ); })()}
           </>)}
           <aside className="flex flex-col border-r border-[var(--border)] bg-[var(--panel)]" style={{ width: mwW }}>
           <div className="border-b border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">MARKET WATCH</div>
@@ -1688,7 +1690,7 @@ export default function ClientTerminal() {
                       <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+" : "-") + cSym + fmt(Math.abs(pl))}</td>
                     </>}
                     {/* Net P/L = gross + swap - commission (or just gross when swap disabled) */}
-                    {(() => { const net = swapEnabled ? pl + Number(p.swap) - Number(p.commission) : pl; return <td className="px-1 py-0.5 text-right"><span className="inline-block rounded px-2 py-0.5 font-bold tabular-nums text-[11px]" style={{ background: net >= 0 ? "rgba(38,166,154,0.13)" : "rgba(239,83,80,0.13)", color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+" : "-") + cSym + fmt(Math.abs(net))}</span></td>; })()}
+                    {(() => { const net = swapEnabled ? pl + Number(p.swap) - Number(p.commission) : pl; return <td className="px-1 py-0.5 text-right font-bold tabular-nums text-[11px]" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+" : "-") + cSym + fmt(Math.abs(net))}</td>; })()}
                     <td className="px-2 py-1 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {Number(p.lots) > 0.01 ? <button title="Partial close" style={{ color: "var(--muted)" }} onClick={() => setPartialClose({ id: p.id, sym: p.symbol, lots: Number(p.lots), closeLots: "" })} className="text-[9px] px-1">½</button> : <span title="Min lot — cannot partial close" className="text-[9px] px-1 opacity-20 cursor-not-allowed">½</span>}

@@ -167,7 +167,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
       {/* Category right-click context menu */}
       {catCtx && onCategoryEdit && (<>
         <div className="fixed inset-0 z-[120]" onClick={() => setCatCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCatCtx(null); }} />
-        <div className="fixed z-[121] min-w-[180px] overflow-hidden rounded-lg border py-1 text-[11px] shadow-2xl" style={{ left: Math.min(catCtx.x, vw - 220), top: catCtx.y, background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
+        <div className="fixed z-[121] min-w-[180px] overflow-hidden rounded-lg border py-1 text-[11px] shadow-2xl" style={{ left: Math.min(catCtx.x, vw - 220), top: Math.min(Math.max(catCtx.y, 4), (typeof window !== "undefined" ? window.innerHeight : 9999) - 74), background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
           <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{catCtx.cat.toUpperCase()} · {catCtx.syms.length} symbols</div>
           <button onClick={() => { onCategoryEdit(catCtx.cat, catCtx.syms); setCatCtx(null); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--soft)]">
             <i className="fa-solid fa-sliders text-[10px]" style={{ color: "var(--accent)" }} /> Set spread for all {catCtx.cat}

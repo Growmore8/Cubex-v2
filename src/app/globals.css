@@ -474,10 +474,16 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
    container instead, so it resizes correctly when the desk toolbox / panels
    are dragged (otherwise the chart overflows into the panel below). */
 .klinecharts-pro { height: 100% !important; width: 100% !important; }
-/* Bare mode: only hide the drawing sidebar — klinecharts handles it via the
-   data-drawing-bar-visible attribute, but we also hide it explicitly.
-   The period bar (with Indicators button) stays visible so users can add indicators. */
+/* Bare (compact mobile) mode: hide drawing sidebar and built-in TF/period bar.
+   The custom header dropdown is the only TF control in compact view. */
 .kline-bare .klinecharts-pro-drawing-bar { display: none !important; }
+.kline-bare .klinecharts-pro-period-bar { display: none !important; }
+/* Restore period bar + drawing bar when chart enters native fullscreen
+   (triggered by the chart's own fullscreen button). */
+:-webkit-full-screen .klinecharts-pro-period-bar { display: flex !important; }
+:fullscreen .klinecharts-pro-period-bar { display: flex !important; }
+:-webkit-full-screen .klinecharts-pro-drawing-bar { display: flex !important; }
+:fullscreen .klinecharts-pro-drawing-bar { display: flex !important; }
 /* Hide the built-in symbol navigator (hamburger + symbol name) from the period bar —
    the app has its own symbol selector. */
 .klinecharts-pro-period-bar .symbol { display: none !important; }
