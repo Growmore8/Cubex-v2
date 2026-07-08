@@ -114,6 +114,14 @@ export default function ClientTerminal() {
   const [alertForm, setAlertForm] = useState({ condition: "ABOVE", price: "", note: "" });
   const loadAlerts = () => fetch("/api/client/alerts?accountId=" + (accIdRef.current || "")).then((r) => r.json()).then((d) => { if (d.ok) { setAlerts(d.alerts); setAlertsLoaded(true); } }).catch(() => {});
   const [rightTab, setRightTab] = useState("TRADE");
+  const [calendar, setCalendar] = useState<any[]>([]);
+  const [calendarLoaded, setCalendarLoaded] = useState(false);
+  const [calImpact, setCalImpact] = useState<"all" | "high" | "medium" | "low">("all");
+  const [oneClick, setOneClick] = useState(false);
+  const mwSearchRef = useRef<HTMLInputElement>(null);
+  const volInputRef  = useRef<HTMLInputElement>(null);
+  useEffect(() => { try { setOneClick(localStorage.getItem("cubex-1click") === "1"); } catch {} }, []);
+  function toggleOneClick() { setOneClick((v) => { const n = !v; try { localStorage.setItem("cubex-1click", n ? "1" : "0"); } catch {} return n; }); }
   const [ctx, setCtx] = useState<{ x: number; y: number; sym: string } | null>(null);
   const [botTab, setBotTab] = useState<"positions" | "pending" | "history" | "summary" | "requests">("positions");
   const [myReqs, setMyReqs] = useState<any[]>([]);
@@ -160,6 +168,7 @@ export default function ClientTerminal() {
   const sortRows = (tbl: string, rows: any[], acc: Record<string, (r: any) => any>) => { const cfg = sortBy[tbl]; if (!cfg || !acc[cfg.k]) return rows; const get = acc[cfg.k]; return [...rows].sort((a, b) => { const va = get(a), vb = get(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; if (typeof va === "number" && typeof vb === "number") return (va - vb) * cfg.d; return String(va).localeCompare(String(vb), undefined, { numeric: true }) * cfg.d; }); };
   const Sth = ({ tbl, k, label, align, cls }: { tbl: string; k: string; label: any; align?: "right"; cls?: string }) => { const cfg = sortBy[tbl]; const active = !!cfg && cfg.k === k; return (<th className={(cls || "px-2 py-1 font-normal") + (align === "right" ? " text-right" : " text-left") + " cursor-pointer select-none"} onClick={() => toggleSort(tbl, k)}><span className={"inline-flex items-center gap-1 " + (align === "right" ? "flex-row-reverse" : "")}>{label}<i className={"fa-solid text-[8px] " + (active ? (cfg!.d === 1 ? "fa-arrow-up-long" : "fa-arrow-down-long") : "fa-sort")} style={{ opacity: active ? 1 : 0.3 }} /></span></th>); };
   useEffect(() => { if (rightTab === "NEWS" && news.length === 0) { fetch("/api/client/news?category=forex").then((r) => r.json()).then((dd) => { if (dd.ok) setNews(dd.items || []); }).catch(() => {}); } }, [rightTab]);
+  useEffect(() => { if (rightTab === "CALENDAR" && !calendarLoaded) { fetch("/api/client/calendar").then((r) => r.json()).then((dd) => { if (dd.ok) { setCalendar(dd.events || []); setCalendarLoaded(true); } }).catch(() => {}); } }, [rightTab, calendarLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -504,6 +513,37 @@ export default function ClientTerminal() {
     if (!r.ok) { setErr(r.error || "Top-up failed"); return; }
     pushToast({ title: `Demo balance topped up $${amt.toLocaleString()}`, type: "FUNDS" }); load();
   }
+
+  function exportCSV(type: "positions" | "history") {
+    if (type === "positions") {
+      const headers = ["Ticket","Symbol","Type","Lots","Open Price","Current","SL","TP","Commission","Swap","P/L","Opened At"];
+      const rows = positions.map((p: any) => {
+        const cur = prices[p.symbol] ?? p.openPrice;
+        const pl  = pnlOf(p, cur, csz(p.symbol));
+        return [p.ticket ?? "", p.symbol, p.type, p.lots, p.openPrice, cur, p.sl || "", p.tp || "", p.commission || 0, p.swap || 0, pl.toFixed(2), new Date(p.openedAt).toLocaleString()];
+      });
+      const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "positions.csv"; a.click();
+    } else {
+      const headers = ["Ticket","Symbol","Type","Lots","Open Price","Close Price","SL","TP","P/L","Swap","Commission","Opened At","Closed At"];
+      const rows = history.map((h: any) => [h.ticket ?? "", h.symbol, h.side, h.lots, h.openPrice, h.closePrice, h.sl || "", h.tp || "", h.pnl, h.swap || 0, h.commission || 0, h.openedAt ? new Date(h.openedAt).toLocaleString() : "", h.closedAt ? new Date(h.closedAt).toLocaleString() : ""]);
+      const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "history.csv"; a.click();
+    }
+  }
+
+  // Keyboard shortcuts: F9=new order, Ctrl+F=search, Escape=close overlays
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      const inInput = tag === "input" || tag === "textarea" || tag === "select";
+      if (e.key === "F9") { setRightTab("TRADE"); setTimeout(() => volInputRef.current?.focus(), 50); }
+      if (e.ctrlKey && e.key === "f") { e.preventDefault(); mwSearchRef.current?.focus(); }
+      if (e.key === "Escape") { setCtx(null); setPosCtx(null); setAlertModal(false); setPartialClose(null); setNotiOpen(false); setAcctSwitchOpen(false); setProfileOpen(false); if (inInput) (e.target as HTMLElement).blur(); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function dragX(e: any, which: "mw" | "rt") { e.preventDefault(); setDragging(true); const sx = e.clientX; const sw = which === "mw" ? mwW : rtW; const mv = (ev: any) => { const dx = ev.clientX - sx; if (which === "mw") setMwW(Math.max(150, Math.min(380, sw + dx))); else setRtW(Math.max(200, Math.min(380, sw - dx))); }; const up = () => { setDragging(false); document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }; document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); }
   function dragY(e: any) { e.preventDefault(); setDragging(true); const sy = e.clientY; const sh = tbH; const mv = (ev: any) => { const dy = sy - ev.clientY; setTbH(Math.max(120, Math.min(520, sh + dy))); }; const up = () => { setDragging(false); document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }; document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); }
@@ -887,7 +927,12 @@ export default function ClientTerminal() {
             <div className="fixed inset-0 z-[80]" onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
             <div className="ui-pop fixed z-[90] min-w-[150px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] py-1 text-[12px] shadow-lg" style={{ left: ctx.x, top: ctx.y }}>
               <div className="px-3 py-1 text-[10px] text-[var(--muted)]">{ctx.sym}</div>
-              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setSelSym(ctx.sym); setCtx(null); }}>New Order</button>
+              {oneClick && <>
+                <button className="block w-full px-3 py-1.5 text-left font-semibold hover:bg-[var(--soft)]" style={{ color: BUY }} onClick={() => { quickTrade(ctx.sym, "BUY"); setCtx(null); }}><i className="fa-solid fa-bolt mr-1.5 text-[9px]" />Buy at Market ({vol}L)</button>
+                <button className="block w-full px-3 py-1.5 text-left font-semibold hover:bg-[var(--soft)]" style={{ color: SELL }} onClick={() => { quickTrade(ctx.sym, "SELL"); setCtx(null); }}><i className="fa-solid fa-bolt mr-1.5 text-[9px]" />Sell at Market ({vol}L)</button>
+                <div className="border-t border-[var(--border)] my-0.5" />
+              </>}
+              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setSelSym(ctx.sym); setRightTab("TRADE"); setCtx(null); }}>New Order</button>
               <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setSelSym(ctx.sym); setCtx(null); }}>Open Chart</button>
               <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { if (navigator.clipboard) navigator.clipboard.writeText(ctx.sym); setCtx(null); }}>Copy Symbol</button>
               <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { toggleFav(ctx.sym); setCtx(null); }}>{favs.includes(ctx.sym) ? "Remove favourite" : "Add favourite"}</button>
@@ -898,7 +943,7 @@ export default function ClientTerminal() {
           <div className="border-b border-[var(--border)] px-1.5 py-1">
             <div className="relative">
               <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-[var(--muted)]" />
-              <input value={mwSearch} onChange={(e) => setMwSearch(e.target.value)} name="mw-search" autoComplete="off" placeholder="Search symbol…" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] py-1 pl-6 pr-6 text-[10px] text-[var(--text)]" />
+              <input ref={mwSearchRef} value={mwSearch} onChange={(e) => setMwSearch(e.target.value)} name="mw-search" autoComplete="off" placeholder="Search symbol… (Ctrl+F)" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] py-1 pl-6 pr-6 text-[10px] text-[var(--text)]" />
               {mwSearch && <button onClick={() => setMwSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--text)]">{"×"}</button>}
             </div>
           </div>
@@ -941,15 +986,27 @@ export default function ClientTerminal() {
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
         <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: rtW }}>
+          {/* Right panel header: symbol info + alert bell + 1-click toggle */}
           <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2" style={{ background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent)" }}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide" style={{ color: "var(--text)" }}><i className="fa-solid fa-bolt text-[10px]" style={{ color: "#2f81f7" }} />NEW ORDER</div>
             <div className="flex items-center gap-1.5">
               <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "var(--soft)", color: "#2f81f7" }}>{selSym}</span>
               {price != null && <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{gnum(price, d)}</span>}
+              <button title={oneClick ? "One-click trading ON — click to disable" : "One-click trading OFF — click to enable"} onClick={toggleOneClick} className="rounded px-1.5 py-0.5 text-[9px] font-bold border transition-colors" style={oneClick ? { background: "#2f81f722", borderColor: "#2f81f7", color: "#2f81f7" } : { borderColor: "var(--border)", color: "var(--muted)" }}>
+                <i className="fa-solid fa-bolt mr-0.5" />1-Click
+              </button>
               <button title="Price Alerts" onClick={() => { if (!alertsLoaded) loadAlerts(); setAlertModal(true); }} className="rounded p-1 text-[11px]" style={{ color: alerts.filter((a) => a.symbol === selSym).length > 0 ? "#f59e0b" : "var(--muted)" }}>
                 <i className="fa-solid fa-bell" />
               </button>
             </div>
+          </div>
+          {/* Tab bar: TRADE | NEWS | CALENDAR */}
+          <div className="flex shrink-0 border-b border-[var(--border)]">
+            {(["TRADE", "NEWS", "CALENDAR"] as const).map((t) => (
+              <button key={t} onClick={() => setRightTab(t)} className="flex-1 py-1.5 text-[9px] font-semibold uppercase tracking-wide transition-colors" style={rightTab === t ? { color: "#2f81f7", borderBottom: "2px solid #2f81f7" } : { color: "var(--muted)" }}>
+                {t === "TRADE" ? <><i className="fa-solid fa-arrow-right-arrow-left mr-1" />Trade</> : t === "NEWS" ? <><i className="fa-solid fa-newspaper mr-1" />News</> : <><i className="fa-solid fa-calendar-days mr-1" />Calendar</>}
+              </button>
+            ))}
           </div>
           {/* Scrollable form area */}
           <div className="min-h-0 flex-1 overflow-auto">
@@ -962,8 +1019,47 @@ export default function ClientTerminal() {
                 </a>
               ))}
             </div>
-          ) : rightTab !== "TRADE" ? (
-            <div className="p-6 text-center text-[11px] text-[var(--muted)]">{rightTab} panel - coming soon</div>
+          ) : rightTab === "CALENDAR" ? (
+            <div className="text-[11px]">
+              {/* Impact filter */}
+              <div className="sticky top-0 z-10 flex gap-1 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5">
+                {(["all","high","medium","low"] as const).map((imp) => (
+                  <button key={imp} onClick={() => setCalImpact(imp)} className="rounded px-2 py-0.5 text-[9px] font-semibold capitalize transition-colors" style={calImpact === imp ? { background: imp === "high" ? "#ef444420" : imp === "medium" ? "#f9731620" : imp === "low" ? "#22c55e20" : "#2f81f720", color: imp === "high" ? "#ef4444" : imp === "medium" ? "#f97316" : imp === "low" ? "#22c55e" : "#2f81f7", border: `1px solid ${imp === "high" ? "#ef4444" : imp === "medium" ? "#f97316" : imp === "low" ? "#22c55e" : "#2f81f7"}` } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{imp}</button>
+                ))}
+              </div>
+              {!calendarLoaded ? (
+                <div className="p-6 text-center text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-1" />Loading calendar…</div>
+              ) : (() => {
+                const filtered = calendar.filter((ev) => calImpact === "all" || ev.impact === calImpact);
+                if (!filtered.length) return <div className="p-6 text-center text-[var(--muted)]">No events for this week.</div>;
+                let lastDate = "";
+                return filtered.map((ev, i) => {
+                  const dt = ev.time ? new Date(ev.time.replace(" ", "T") + "Z") : null;
+                  const dateStr = dt ? dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "";
+                  const timeStr = dt ? dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "";
+                  const impColor = ev.impact === "high" ? "#ef4444" : ev.impact === "medium" ? "#f97316" : ev.impact === "low" ? "#22c55e" : "var(--muted)";
+                  const showDate = dateStr !== lastDate; lastDate = dateStr;
+                  return (
+                    <div key={i}>
+                      {showDate && <div className="border-b border-[var(--border)] bg-[var(--soft)] px-2 py-1 text-[9px] font-bold text-[var(--muted)] uppercase tracking-wide">{dateStr}</div>}
+                      <div className="flex items-start gap-2 border-b border-[var(--border)] px-2 py-1.5">
+                        <div className="mt-0.5 w-3 shrink-0 h-3 rounded-full" style={{ background: impColor }} title={ev.impact} />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium text-[var(--text)]">{ev.event}</div>
+                          <div className="mt-0.5 flex items-center gap-2 text-[9px] text-[var(--muted)]">
+                            <span className="rounded bg-[var(--soft)] px-1 py-0.5 font-bold">{ev.country}</span>
+                            <span>{timeStr}</span>
+                            {ev.actual != null && <span style={{ color: "#22c55e" }}>A: {ev.actual}{ev.unit}</span>}
+                            {ev.estimate != null && <span>F: {ev.estimate}{ev.unit}</span>}
+                            {ev.prev != null && <span>P: {ev.prev}{ev.unit}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
           ) : (
             <div className="flex flex-col gap-2 p-2">
 
@@ -1004,7 +1100,7 @@ export default function ClientTerminal() {
                 </div>
                 <div className="flex items-center gap-1 px-1.5 py-1.5">
                   <button onClick={() => setVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] transition-colors hover:bg-[var(--soft)] hover:text-[var(--text)] active:scale-95">−</button>
-                  <input type="number" step="0.01" value={vol} onChange={(e) => setVol(Number(e.target.value))} className="h-8 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[14px] font-bold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                  <input ref={volInputRef} type="number" step="0.01" value={vol} onChange={(e) => setVol(Number(e.target.value))} className="h-8 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[14px] font-bold tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]" />
                   <button onClick={() => setVol((v) => +(v + 0.01).toFixed(2))} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] transition-colors hover:bg-[var(--soft)] hover:text-[var(--text)] active:scale-95">+</button>
                 </div>
                 <div className="grid grid-cols-5 border-t border-[var(--border)]">
@@ -1111,11 +1207,23 @@ export default function ClientTerminal() {
       <div onMouseDown={dragY} className="h-1 cursor-row-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
       <div className="flex shrink-0 flex-col bg-[var(--panel)]" style={{ height: tbH }}>
-        <div className="flex gap-1 border-b border-[var(--border)] px-2">
+        <div className="flex items-center gap-1 border-b border-[var(--border)] px-2">
           <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length}{pending.length ? <span className="ml-1 rounded-full px-1.5 text-[9px]" style={{ background: "rgba(90,169,255,0.2)", color: "#5aa9ff" }}>{pending.length} pending</span> : ""}</button>
           <button onClick={() => setBotTab("history")} className={tab(botTab === "history")} style={botTab === "history" ? { color: BUY } : undefined}>History</button>
           <button onClick={() => setBotTab("summary")} className={tab(botTab === "summary")} style={botTab === "summary" ? { color: BUY } : undefined}>Summary</button>
           <button onClick={() => setBotTab("requests")} className={tab(botTab === "requests")} style={botTab === "requests" ? { color: BUY } : undefined}>My Requests</button>
+          <div className="ml-auto flex items-center gap-1 pr-1">
+            {botTab === "positions" && positions.length > 0 && (
+              <button title="Export positions as CSV" onClick={() => exportCSV("positions")} className="flex items-center gap-1 rounded border border-[var(--border)] px-2 py-0.5 text-[9px] font-semibold" style={{ color: "var(--muted)" }}>
+                <i className="fa-solid fa-download text-[8px]" />CSV
+              </button>
+            )}
+            {botTab === "history" && history.length > 0 && (
+              <button title="Export history as CSV" onClick={() => exportCSV("history")} className="flex items-center gap-1 rounded border border-[var(--border)] px-2 py-0.5 text-[9px] font-semibold" style={{ color: "var(--muted)" }}>
+                <i className="fa-solid fa-download text-[8px]" />CSV
+              </button>
+            )}
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-3">
           {botTab === "positions" && positions.length > 0 && (
