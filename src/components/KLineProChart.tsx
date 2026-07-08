@@ -186,6 +186,10 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
         sock.on("tick", ({ symbol: tickSym, price }: any) => {
           if (tickSym !== sym.ticker || price == null) return;
           const cb = callbackRef.current; if (!cb) return;
+          // Spike filter: reject ticks >5% from last close (bad feed outliers)
+          if (lastBarRef.current && lastBarRef.current.close > 0) {
+            if (Math.abs(price - lastBarRef.current.close) / lastBarRef.current.close > 0.05) return;
+          }
           const barTsMs = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
 
           if (lastBarRef.current && lastBarRef.current.timestamp === barTsMs) {

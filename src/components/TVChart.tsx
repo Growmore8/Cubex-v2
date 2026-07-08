@@ -283,6 +283,13 @@ export default function TVChart({
         sock.on("tick", ({ symbol: sym, price, real }: any) => {
           if (sym !== symbolInfo.name || price == null) return;
           const cb = realtimeCbRef.current; if (!cb) return;
+          // Spike filter: reject any tick that moves >5% from the last close.
+          // Bad feed ticks (e.g. a zero or extreme outlier) permanently stretch
+          // the candle's high/low, causing huge wicks. 5% catches bad data while
+          // allowing legitimate sharp moves in crypto.
+          if (lastBarRef.current && lastBarRef.current.close > 0) {
+            if (Math.abs(price - lastBarRef.current.close) / lastBarRef.current.close > 0.05) return;
+          }
           const truePrice = real ?? price;
           const barTimeMs = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
 
