@@ -22,7 +22,7 @@ import { gnum, gmoney, gsign, titleCaseName } from "@/lib/format";
 import { ADSS_DARK, ADSS_LIGHT, ADSS_FONT, BUY, SELL, GOLD, BUYBTN, SELLBTN } from "@/config/theme";
 
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
-const TABS: [string, string][] = [["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"]];
+const TABS: [string, string][] = [["overview", "Overview"], ["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"], ["symbols", "Symbols"], ["groups", "Groups"], ["risk", "Risk"], ["broadcast", "Broadcast"]];
 
 function pnlOf(p: any, price: number, cs: number) {
   const sym = String(p.symbol || "");
@@ -63,6 +63,7 @@ export default function AdminDeskPage() {
   const toggleTabCloseX = () => setTabCloseX((v) => { const n = !v; try { localStorage.setItem("cubex-tabx", n ? "1" : "0"); } catch {} return n; });
   const [tradeGroups, setTradeGroups] = useState<any[]>([]);
   const [nrecent, setNrecent] = useState<any[]>([]);
+  const [dataReady, setDataReady] = useState(false);
   const NOTI_TEMPLATES: any = { Maintenance: { title: "Scheduled Maintenance", body: "Our platform will undergo scheduled maintenance. Trading may be briefly unavailable. We apologize for any inconvenience." }, Promotion: { title: "Special Promotion", body: "A new promotion is now available. Contact your account manager to learn more." }, News: { title: "Market News", body: "Stay informed with the latest market updates and analysis." }, Notice: { title: "Important Notice", body: "Please review this important notice regarding your trading account." }, Custom: { title: "", body: "" } };
   
   const [symbols, setSymbols] = useState<any[]>([]);
@@ -70,6 +71,9 @@ export default function AdminDeskPage() {
   const [adminSymTypes, setAdminSymTypes] = useState<Record<string, string>>({});
   const [adminSymMax, setAdminSymMax] = useState<Record<string, number>>({});
   const [adminSymIds, setAdminSymIds] = useState<Record<string, string>>({});
+  const [adminSymbols, setAdminSymbols] = useState<any[]>([]); // full admin symbol list (includes enabled, swap, commission)
+  const [symQ, setSymQ] = useState(""); // Symbols tab search query
+  const [symCat, setSymCat] = useState("all"); // Symbols tab category filter
   const [symEdit, setSymEdit] = useState<{ sym: string; spread: number; spreadType: string; spreadMax: number; id: string; swapLong: number; swapShort: number; commissionPerLot: number } | null>(null);
   const [grpCtx, setGrpCtx] = useState<{ x: number; y: number; g: any } | null>(null);
   const [grpSub, setGrpSub] = useState(""); // which inline section is open in grpCtx panel
@@ -96,7 +100,7 @@ export default function AdminDeskPage() {
   const [sl, setSl] = useState(0);
   const [tp, setTp] = useState(0);
   const [tab, setTab] = useState("trade");
-  const [tabState, setTabState] = useState<Record<string, boolean>>({ trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true, requests: true });
+  const [tabState, setTabState] = useState<Record<string, boolean>>({ overview: true, trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true, requests: true, symbols: true, groups: true, risk: true, broadcast: true });
   const [menu, setMenu] = useState<{ x: number; y: number; acc: any } | null>(null);
   const [menuSub, setMenuSub] = useState("");
   const [act, setAct] = useState<any>(null);
@@ -237,6 +241,10 @@ export default function AdminDeskPage() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<any[]>([]);
   const [notifUnread, setNotifUnread] = useState(0);
+  const [bcTitle, setBcTitle] = useState("");
+  const [bcBody, setBcBody] = useState("");
+  const [bcSending, setBcSending] = useState(false);
+  const [bcMsg, setBcMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [kycUploadFor, setKycUploadFor] = useState<any>(null);
   const [kycUploadType, setKycUploadType] = useState("PASSPORT");
   const [kycUploadFile, setKycUploadFile] = useState<File | null>(null);
@@ -297,12 +305,13 @@ export default function AdminDeskPage() {
     if (c.ok) setClients(c.clients);
     if (sy.ok) { const seen = new Set<string>(); const uniq = (sy.symbols || []).filter((s: any) => { if (seen.has(s.symbol)) return false; seen.add(s.symbol); return true; }); setSymbols(uniq); if (!selSymRef.current && uniq.length) setSelSym((uniq.find((s: any) => s.symbol === "BTCUSD") || uniq[0]).symbol); }
     // Load per-symbol spreads for market watch bid/ask display
-    fetch("/api/admin/symbols").then((r) => r.json()).then((asr) => { if (asr.ok) { const m: Record<string, number> = {}; const types: Record<string, string> = {}; const maxes: Record<string, number> = {}; const ids: Record<string, string> = {}; (asr.symbols || []).forEach((s: any) => { m[s.symbol] = Number(s.spread ?? 0); types[s.symbol] = s.spreadType || "FIXED"; maxes[s.symbol] = Number(s.spreadMax ?? 0); ids[s.symbol] = s.id; }); setAdminSymSpreads(m); setAdminSymTypes(types); setAdminSymMax(maxes); setAdminSymIds(ids); } }).catch(() => {});
+    fetch("/api/admin/symbols").then((r) => r.json()).then((asr) => { if (asr.ok) { const m: Record<string, number> = {}; const types: Record<string, string> = {}; const maxes: Record<string, number> = {}; const ids: Record<string, string> = {}; (asr.symbols || []).forEach((s: any) => { m[s.symbol] = Number(s.spread ?? 0); types[s.symbol] = s.spreadType || "FIXED"; maxes[s.symbol] = Number(s.spreadMax ?? 0); ids[s.symbol] = s.id; }); setAdminSymSpreads(m); setAdminSymTypes(types); setAdminSymMax(maxes); setAdminSymIds(ids); setAdminSymbols(asr.symbols || []); } }).catch(() => {});
     if (o.ok) setOpen(o.trades);
     if (h.ok) setHistory(h.history);
     if (a.ok) setAudit(a.logs);
     if (mg.ok) setManagers(mg.managers || []);
     if (gr.ok) setTradeGroups(gr.groups || []);
+    setDataReady(true);
     fetch("/api/admin/symbol-perms").then((r) => r.json()).then((d) => { if (d.ok) setSymDisabledCount((d.disabled || []).length); }).catch(() => {});
   }
   useEffect(() => {
@@ -1451,6 +1460,395 @@ export default function AdminDeskPage() {
             {tab === "payments" && <PaymentsPanel />}
             {tab === "kyc" && <KycPanel />}
             {tab === "requests" && <RequestsPanel />}
+
+            {/* ── OVERVIEW tab ── */}
+            {tab === "overview" && !dataReady && <div className="flex h-full items-center justify-center text-[11px]" style={{ color: "var(--muted)" }}><i className="fa-solid fa-circle-notch fa-spin mr-2" />Loading…</div>}
+            {tab === "overview" && dataReady && (() => {
+              const totalClients = clients.length;
+              const liveClients = clients.filter((c: any) => c.type === "LIVE").length;
+              const demoClients = clients.filter((c: any) => c.type === "DEMO").length;
+              const totalPositions = open.length;
+              const totalFloating = open.reduce((sum: number, p: any) => {
+                const cur = prices[p.symbol] ?? Number(p.openPrice);
+                return sum + pnlOf(p, cur, contractFor(catMap[p.symbol] || "forex", p.symbol));
+              }, 0);
+              const totalDeposits = clients.reduce((s: number, c: any) => s + Number(c.deposit ?? 0), 0);
+              const totalWithdrawals = clients.reduce((s: number, c: any) => s + Number(c.withdrawal ?? 0), 0);
+              const totalCredit = clients.reduce((s: number, c: any) => s + Number(c.credit ?? 0) + Number(c.bonus ?? 0), 0);
+              const totalPnl = clients.reduce((s: number, c: any) => s + Number(c.pnl ?? 0), 0);
+              const totalEquity = totalDeposits - totalWithdrawals + totalCredit + totalPnl;
+              const nearMC = clients.filter((c: any) => {
+                const dep = Number(c.deposit ?? 0) - Number(c.withdrawal ?? 0) + Number(c.credit ?? 0) + Number(c.bonus ?? 0) + Number(c.pnl ?? 0);
+                const accPositions = open.filter((p: any) => p.accountLogin === c.login || p.accountId === c.id);
+                if (accPositions.length === 0) return false;
+                const fl = accPositions.reduce((s: number, p: any) => s + pnlOf(p, prices[p.symbol] ?? Number(p.openPrice), contractFor(catMap[p.symbol] || "forex", p.symbol)), 0);
+                const eq = dep + fl;
+                const used = accPositions.reduce((s: number, p: any) => {
+                  const pr = prices[p.symbol] ?? Number(p.openPrice);
+                  const margin = (Number(p.lots) * contractFor(catMap[p.symbol] || "forex", p.symbol) * pr) / (Number(c.leverage) || 100);
+                  return s + (/JPY$/i.test(p.symbol) ? margin / (pr || 1) : margin);
+                }, 0);
+                if (used === 0) return false;
+                return (eq / used) * 100 < 150;
+              }).length;
+              const statCard = (icon: string, label: string, value: string | number, color?: string, sub?: string) => (
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3">
+                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
+                    <i className={"fa-solid " + icon} style={{ width: 12, textAlign: "center" }} />{label}
+                  </div>
+                  <div className="text-[18px] font-bold tabular-nums" style={{ color: color || "var(--text)" }}>{value}</div>
+                  {sub && <div className="mt-0.5 text-[10px]" style={{ color: "var(--muted)" }}>{sub}</div>}
+                </div>
+              );
+              return (
+                <div className="grid grid-cols-4 gap-2 p-2 2xl:grid-cols-6">
+                  {statCard("fa-users", "Total Accounts", totalClients, undefined, `${liveClients} Live · ${demoClients} Demo`)}
+                  {statCard("fa-chart-line", "Open Positions", totalPositions)}
+                  {statCard("fa-dollar-sign", "Total Floating P/L", (totalFloating >= 0 ? "+" : "") + gnum(totalFloating, 2), totalFloating >= 0 ? BUY : SELL)}
+                  {statCard("fa-arrow-down-to-bracket", "Total Deposits", gnum(totalDeposits, 2), BUY)}
+                  {statCard("fa-arrow-up-from-bracket", "Total Withdrawals", gnum(totalWithdrawals, 2), SELL)}
+                  {statCard("fa-wallet", "Total Equity", gnum(totalEquity, 2), totalEquity >= 0 ? BUY : SELL, "Across all accounts")}
+                  {statCard("fa-triangle-exclamation", "Near Margin Call", nearMC, nearMC > 0 ? SELL : "var(--muted)", "Accounts below 150% margin level")}
+                  {statCard("fa-layer-group", "Client Groups", tradeGroups.length, undefined, tradeGroups.map((g: any) => g.name).join(", ") || "None")}
+                  {statCard("fa-bars-progress", "Live Trades Today", history.filter((h: any) => { const d = h.closeTime || h.closedAt; if (!d) return false; return new Date(d).toDateString() === new Date().toDateString(); }).length, undefined, "Closed today")}
+                </div>
+              );
+            })()}
+
+            {/* ── GROUPS tab ── */}
+            {/* ── SYMBOLS tab ── */}
+            {tab === "symbols" && (() => {
+              const thc = "px-2 py-1.5 text-left text-[10px] font-semibold sticky top-0 z-10 bg-[var(--panel)] border-b border-[var(--border)]" as const;
+              const tdc = "px-2 py-1.5 text-[11px] border-b border-[color-mix(in_srgb,var(--border)_38%,transparent)]" as const;
+              const cats = Array.from(new Set(adminSymbols.map((s) => s.category || "forex"))).sort();
+              const filtered = adminSymbols.filter((s) => {
+                const matchCat = symCat === "all" || s.category === symCat;
+                const matchQ = !symQ || s.symbol.toLowerCase().includes(symQ.toLowerCase()) || (s.display || "").toLowerCase().includes(symQ.toLowerCase());
+                return matchCat && matchQ;
+              });
+              const openEdit = (s: any) => setSymEdit({ sym: s.symbol, spread: Number(s.spread ?? 0), spreadType: s.spreadType || "FIXED", spreadMax: Number(s.spreadMax ?? 0), id: s.id, swapLong: Number(s.swapLong ?? 0), swapShort: Number(s.swapShort ?? 0), commissionPerLot: Number(s.commissionPerLot ?? 0) });
+              const toggleEnabled = async (s: any) => {
+                const r = await fetch("/api/admin/symbols/" + s.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: !s.enabled }) }).then((x) => x.json());
+                if (r.ok) setAdminSymbols((prev) => prev.map((x) => x.id === s.id ? { ...x, enabled: !s.enabled } : x));
+                else setErr(r.error || "Failed");
+              };
+              return (
+                <div className="flex h-full flex-col">
+                  {/* Toolbar */}
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--border)] px-3 py-2">
+                    <input value={symQ} onChange={(e) => setSymQ(e.target.value)} placeholder="Search symbol…" className="h-7 rounded border border-[var(--border)] bg-[var(--bg)] px-2 text-[11px] outline-none" style={{ color: "var(--text)", width: 160 }} />
+                    <select value={symCat} onChange={(e) => setSymCat(e.target.value)} className="h-7 rounded border border-[var(--border)] bg-[var(--bg)] px-2 text-[11px] outline-none" style={{ color: "var(--text)" }}>
+                      <option value="all">All categories</option>
+                      {cats.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                    </select>
+                    <span className="text-[10px]" style={{ color: "var(--muted)" }}>{filtered.length} / {adminSymbols.length} symbols</span>
+                    <span className="ml-auto text-[10px]" style={{ color: "var(--muted)" }}>Click a row to edit spread / swap / commission</span>
+                  </div>
+                  {/* Table */}
+                  <div className="flex-1 overflow-auto">
+                    {adminSymbols.length === 0 ? (
+                      <div className="flex h-full items-center justify-center text-[11px]" style={{ color: "var(--muted)" }}>No symbols configured. Add them via Admin → Symbols.</div>
+                    ) : (
+                      <table className="w-full border-collapse text-[11px]">
+                        <thead>
+                          <tr>
+                            <th className={thc} style={{ color: "var(--muted)" }}>Symbol</th>
+                            <th className={thc} style={{ color: "var(--muted)" }}>Display</th>
+                            <th className={thc} style={{ color: "var(--muted)" }}>Cat</th>
+                            <th className={thc} style={{ color: "var(--muted)" }}>Digits</th>
+                            <th className={thc + " text-right"} style={{ color: "var(--muted)" }}>Spread</th>
+                            <th className={thc} style={{ color: "var(--muted)" }}>Type</th>
+                            <th className={thc + " text-right"} style={{ color: "var(--muted)" }}>Swap L</th>
+                            <th className={thc + " text-right"} style={{ color: "var(--muted)" }}>Swap S</th>
+                            <th className={thc + " text-right"} style={{ color: "var(--muted)" }}>Comm/lot</th>
+                            <th className={thc + " text-center"} style={{ color: "var(--muted)" }}>On</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtered.map((s) => {
+                            const isFloat = (s.spreadType || "FIXED") === "FLOATING";
+                            const liveSp = liveSpreadPips[s.symbol];
+                            const dispSp = isFloat && liveSp != null && liveSp > 0 ? liveSp : Number(s.spread ?? 0);
+                            return (
+                              <tr key={s.id} className="cursor-pointer hover:bg-[color-mix(in_srgb,var(--accent)_5%,transparent)]" onClick={() => openEdit(s)}>
+                                <td className={tdc + " font-mono font-semibold"}>{s.symbol}</td>
+                                <td className={tdc} style={{ color: "var(--muted)" }}>{s.display || s.symbol}</td>
+                                <td className={tdc} style={{ color: "var(--muted)" }}>{s.category || "forex"}</td>
+                                <td className={tdc + " tabular-nums text-center"}>{s.digits}</td>
+                                <td className={tdc + " tabular-nums text-right"}>{dispSp} pips</td>
+                                <td className={tdc}>
+                                  <span className="rounded px-1 py-0.5 text-[9px] font-semibold" style={{ background: isFloat ? "rgba(245,158,11,0.15)" : "rgba(99,102,241,0.15)", color: isFloat ? "#d97706" : "#6366f1" }}>{isFloat ? "Float" : "Fixed"}</span>
+                                </td>
+                                <td className={tdc + " tabular-nums text-right"} style={{ color: Number(s.swapLong) !== 0 ? (Number(s.swapLong) > 0 ? "#22c55e" : "#e05260") : "var(--muted)" }}>{Number(s.swapLong ?? 0).toFixed(2)}</td>
+                                <td className={tdc + " tabular-nums text-right"} style={{ color: Number(s.swapShort) !== 0 ? (Number(s.swapShort) > 0 ? "#22c55e" : "#e05260") : "var(--muted)" }}>{Number(s.swapShort ?? 0).toFixed(2)}</td>
+                                <td className={tdc + " tabular-nums text-right"}>{Number(s.commissionPerLot ?? 0).toFixed(2)}</td>
+                                <td className={tdc + " text-center"} onClick={(e) => { e.stopPropagation(); toggleEnabled(s); }}>
+                                  <span className={"rounded-full px-1.5 py-0.5 text-[9px] font-bold cursor-pointer " + (s.enabled ? "text-[#16a34a]" : "text-[var(--muted)]")} style={{ background: s.enabled ? "rgba(22,163,74,0.12)" : "color-mix(in srgb, var(--border) 60%, transparent)" }}>{s.enabled ? "ON" : "OFF"}</span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {tab === "groups" && !dataReady && <div className="flex h-full items-center justify-center text-[11px]" style={{ color: "var(--muted)" }}><i className="fa-solid fa-circle-notch fa-spin mr-2" />Loading…</div>}
+            {tab === "groups" && dataReady && (() => {
+              const thc = "px-2 py-1.5 text-left text-[10px] font-semibold text-[var(--muted)]";
+              const tdc = "px-2 py-1.5 text-[11px] border-b border-[color-mix(in_srgb,var(--border)_38%,transparent)]";
+              return (
+                <div className="flex h-full gap-3">
+                  {/* Group list */}
+                  <div className="flex-1 overflow-auto">
+                    <table className="w-full border-collapse">
+                      <thead><tr className="sticky top-0 z-10 bg-[var(--panel)] border-b border-[var(--border)]">
+                        <th className={thc}>Name</th>
+                        <th className={thc}>Manager</th>
+                        <th className={thc + " text-right"}>Clients</th>
+                        <th className={thc + " text-right"}>Spread Markup</th>
+                        <th className={thc + " text-right"}>Leverage</th>
+                        <th className={thc + " text-center"}>Swap-Free</th>
+                        <th className={thc + " text-right"}>Actions</th>
+                      </tr></thead>
+                      <tbody>
+                        {tradeGroups.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-[11px] italic" style={{ color: "var(--muted)" }}>No groups yet. Create one →</td></tr>}
+                        {tradeGroups.map((g: any) => {
+                          const mgr = managers.find((m: any) => m.id === g.managerId);
+                          const memberCount = clients.filter((c: any) => c.groupId === g.id).length;
+                          const isEditing = grpEdit?.id === g.id;
+                          const cfg = g.config || {};
+                          return (
+                            <tr key={g.id} style={isEditing ? { background: "color-mix(in srgb, var(--accent) 8%, transparent)" } : undefined}>
+                              <td className={tdc + " font-medium"}>{g.name}</td>
+                              <td className={tdc} style={{ color: "var(--muted)" }}>{mgr ? mgr.name : "Admin-level"}</td>
+                              <td className={tdc + " text-right tabular-nums"}>{memberCount}</td>
+                              <td className={tdc + " text-right tabular-nums"}>{g.spread != null ? `${g.spread} pips` : "—"}</td>
+                              <td className={tdc + " text-right tabular-nums"}>{cfg.leverage ? `1:${cfg.leverage}` : "—"}</td>
+                              <td className={tdc + " text-center"}>{cfg.swapFree ? <span className="text-[9px] font-bold" style={{ color: "#22c55e" }}>YES</span> : <span className="text-[9px]" style={{ color: "var(--muted)" }}>No</span>}</td>
+                              <td className={tdc + " text-right"}>
+                                <button onClick={() => setGrpEdit(g)} className="mr-1.5 rounded px-1.5 py-0.5 text-[10px]" style={{ color: "var(--accent)" }} title="Edit"><i className="fa-solid fa-pen" /></button>
+                                <button onClick={() => delGroup(g)} className="rounded px-1.5 py-0.5 text-[10px]" style={{ color: SELL }} title="Delete"><i className="fa-solid fa-trash" /></button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Create/Edit panel */}
+                  <div className="w-60 shrink-0 overflow-y-auto border-l border-[var(--border)] pl-3">
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{grpEdit ? "Edit Group" : "New Group"}</div>
+                    {/* helper to read/write a config field on either grpEdit or grpForm */}
+                    {(() => {
+                      const cfgVal = (key: string) => (grpEdit ? (grpEdit.config || {}) : (grpForm.config || {}))[key];
+                      const setCfg = (key: string, val: any) => grpEdit
+                        ? setGrpEdit((g: any) => ({ ...g, config: { ...(g.config || {}), [key]: val } }))
+                        : setGrpForm((f: any) => ({ ...f, config: { ...(f.config || {}), [key]: val } }));
+                      const inp = "mb-2 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none";
+                      const lbl = "mb-1 text-[9px] font-semibold uppercase" as const;
+                      return (
+                        <>
+                          <div className={lbl} style={{ color: "var(--muted)" }}>Name</div>
+                          <input value={grpEdit?.name ?? grpForm.name ?? ""} onChange={(e) => grpEdit ? setGrpEdit((g: any) => ({ ...g, name: e.target.value })) : setGrpForm((f: any) => ({ ...f, name: e.target.value }))} placeholder="e.g. VIP, Standard" className={inp} />
+                          <div className={lbl} style={{ color: "var(--muted)" }}>Manager</div>
+                          <select value={grpEdit?.managerId ?? grpForm.managerId ?? ""} onChange={(e) => { const v = e.target.value || null; grpEdit ? setGrpEdit((g: any) => ({ ...g, managerId: v })) : setGrpForm((f: any) => ({ ...f, managerId: v })); }} className={inp}>
+                            <option value="">Admin-level</option>
+                            {managers.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select>
+                          <div className={lbl} style={{ color: "var(--muted)" }}>Spread Markup (pips)</div>
+                          <input type="number" min={0} step={0.1} value={grpEdit?.spread ?? grpForm.spread ?? ""} onChange={(e) => grpEdit ? setGrpEdit((g: any) => ({ ...g, spread: e.target.value })) : setGrpForm((f: any) => ({ ...f, spread: e.target.value }))} placeholder="0" className={inp} />
+                          <div className={lbl} style={{ color: "var(--muted)" }}>Default Leverage</div>
+                          <select value={cfgVal("leverage") ?? ""} onChange={(e) => setCfg("leverage", e.target.value ? Number(e.target.value) : null)} className={inp}>
+                            <option value="">Inherit from account</option>
+                            {[10,25,50,100,200,400,500,1000].map((v) => <option key={v} value={v}>1:{v}</option>)}
+                          </select>
+                          <div className="mb-2 flex items-center justify-between">
+                            <div className={lbl} style={{ color: "var(--muted)", marginBottom: 0 }}>Swap-Free</div>
+                            <button onClick={() => setCfg("swapFree", !cfgVal("swapFree"))} className="relative h-5 w-9 rounded-full transition-colors" style={{ background: cfgVal("swapFree") ? "var(--accent)" : "var(--border)" }}>
+                              <span className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform" style={{ left: cfgVal("swapFree") ? "calc(100% - 18px)" : 2, boxShadow: "0 1px 2px rgba(0,0,0,0.3)" }} />
+                            </button>
+                          </div>
+                          <div className="mb-2 flex gap-2">
+                            <div className="flex-1">
+                              <div className={lbl} style={{ color: "var(--muted)" }}>Min Lots</div>
+                              <input type="number" min={0.01} step={0.01} value={cfgVal("minLots") ?? ""} onChange={(e) => setCfg("minLots", e.target.value ? Number(e.target.value) : null)} placeholder="0.01" className={inp} style={{ marginBottom: 0 }} />
+                            </div>
+                            <div className="flex-1">
+                              <div className={lbl} style={{ color: "var(--muted)" }}>Max Lots</div>
+                              <input type="number" min={0.01} step={1} value={cfgVal("maxLots") ?? ""} onChange={(e) => setCfg("maxLots", e.target.value ? Number(e.target.value) : null)} placeholder="100" className={inp} style={{ marginBottom: 0 }} />
+                            </div>
+                          </div>
+                          <div className={lbl} style={{ color: "var(--muted)" }}>MC Level (%)</div>
+                          <input type="number" min={0} step={5} value={cfgVal("mcLevel") ?? ""} onChange={(e) => setCfg("mcLevel", e.target.value ? Number(e.target.value) : null)} placeholder="50" className={inp} />
+                        </>
+                      );
+                    })()}
+                    <div className="flex gap-1.5 pt-1">
+                      {grpEdit ? (<>
+                        <button onClick={async () => {
+                          const r = await fetch("/api/admin/groups/" + grpEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpEdit.name, managerId: grpEdit.managerId || null, spread: Number(grpEdit.spread) || 0, config: grpEdit.config || {} }) }).then((x) => x.json());
+                          if (r.ok) { setOk("Group updated"); setGrpEdit(null); loadAll(); } else setErr(r.error || "Failed");
+                        }} className="flex-1 rounded py-1.5 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
+                        <button onClick={() => setGrpEdit(null)} className="rounded border border-[var(--border)] px-2 py-1.5 text-[11px]">Cancel</button>
+                      </>) : (
+                        <button onClick={async () => {
+                          if (!grpForm.name) return;
+                          const r = await fetch("/api/admin/groups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpForm.name, managerId: grpForm.managerId || null, spread: Number(grpForm.spread) || 0, config: grpForm.config || {} }) }).then((x) => x.json());
+                          if (r.ok) { setOk("Group created"); setGrpForm({}); loadAll(); } else setErr(r.error || "Failed");
+                        }} className="flex-1 rounded py-1.5 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Create Group</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── RISK tab ── */}
+            {tab === "risk" && !dataReady && <div className="flex h-full items-center justify-center text-[11px]" style={{ color: "var(--muted)" }}><i className="fa-solid fa-circle-notch fa-spin mr-2" />Loading…</div>}
+            {tab === "risk" && dataReady && (() => {
+              const thc = "px-2 py-1.5 text-left text-[10px] font-semibold text-[var(--muted)]";
+              const tdc = "px-2 py-1.5 text-[11px] border-b border-[color-mix(in_srgb,var(--border)_38%,transparent)] tabular-nums";
+              // Symbol-level net exposure
+              const symExp: Record<string, { buy: number; sell: number; syms: number }> = {};
+              open.forEach((p: any) => {
+                if (!symExp[p.symbol]) symExp[p.symbol] = { buy: 0, sell: 0, syms: 0 };
+                if (p.type === "BUY") symExp[p.symbol].buy += Number(p.lots);
+                else symExp[p.symbol].sell += Number(p.lots);
+                symExp[p.symbol].syms += 1;
+              });
+              const symRows = Object.entries(symExp).map(([sym, e]) => ({ sym, ...e, net: e.buy - e.sell })).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+              // Clients near margin call
+              const riskClients = clients.map((c: any) => {
+                const accPositions = open.filter((p: any) => p.accountLogin === c.login || p.accountId === c.id);
+                if (accPositions.length === 0) return null;
+                const fl = accPositions.reduce((s: number, p: any) => s + pnlOf(p, prices[p.symbol] ?? Number(p.openPrice), contractFor(catMap[p.symbol] || "forex", p.symbol)), 0);
+                const balance = Number(c.deposit ?? 0) - Number(c.withdrawal ?? 0) + Number(c.credit ?? 0) + Number(c.bonus ?? 0) + Number(c.pnl ?? 0);
+                const eq = balance + fl;
+                const usedMargin = accPositions.reduce((s: number, p: any) => {
+                  const pr = prices[p.symbol] ?? Number(p.openPrice);
+                  const m = (Number(p.lots) * contractFor(catMap[p.symbol] || "forex", p.symbol) * pr) / (Number(c.leverage) || 100);
+                  return s + (/JPY$/i.test(p.symbol) ? m / (pr || 1) : m);
+                }, 0);
+                const mlvl = usedMargin > 0 ? (eq / usedMargin) * 100 : null;
+                return { c, fl, eq, usedMargin, mlvl, positions: accPositions.length };
+              }).filter(Boolean).filter((r: any) => r.mlvl !== null).sort((a: any, b: any) => (a.mlvl ?? 9999) - (b.mlvl ?? 9999));
+              const mlColor = (v: number) => v >= 200 ? BUY : v >= 150 ? "#f59e0b" : v >= 100 ? "#f97316" : SELL;
+              return (
+                <div className="grid h-full gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                  {/* Symbol net exposure */}
+                  <div className="flex flex-col overflow-hidden">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Symbol Net Exposure</div>
+                    <div className="flex-1 overflow-auto">
+                      <table className="w-full border-collapse">
+                        <thead><tr className="sticky top-0 z-10 bg-[var(--panel)] border-b border-[var(--border)]">
+                          <th className={thc}>Symbol</th>
+                          <th className={thc + " text-right"}>Buy Lots</th>
+                          <th className={thc + " text-right"}>Sell Lots</th>
+                          <th className={thc + " text-right"}>Net</th>
+                          <th className={thc + " text-right"}>Trades</th>
+                        </tr></thead>
+                        <tbody>
+                          {symRows.length === 0 && <tr><td colSpan={5} className="py-4 text-center text-[11px] italic" style={{ color: "var(--muted)" }}>No open positions</td></tr>}
+                          {symRows.map((r) => (
+                            <tr key={r.sym}>
+                              <td className={tdc + " font-medium"}>{r.sym}</td>
+                              <td className={tdc + " text-right"} style={{ color: BUY }}>{r.buy.toFixed(2)}</td>
+                              <td className={tdc + " text-right"} style={{ color: SELL }}>{r.sell.toFixed(2)}</td>
+                              <td className={tdc + " text-right font-bold"} style={{ color: r.net > 0 ? BUY : r.net < 0 ? SELL : "var(--muted)" }}>{r.net > 0 ? "+" : ""}{r.net.toFixed(2)}</td>
+                              <td className={tdc + " text-right"}>{r.syms}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  {/* Clients near margin call */}
+                  <div className="flex flex-col overflow-hidden border-l border-[var(--border)] pl-3">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Client Margin Levels (with open positions)</div>
+                    <div className="flex-1 overflow-auto">
+                      <table className="w-full border-collapse">
+                        <thead><tr className="sticky top-0 z-10 bg-[var(--panel)] border-b border-[var(--border)]">
+                          <th className={thc}>Login</th>
+                          <th className={thc}>Name</th>
+                          <th className={thc + " text-right"}>Equity</th>
+                          <th className={thc + " text-right"}>Margin</th>
+                          <th className={thc + " text-right"}>Level</th>
+                        </tr></thead>
+                        <tbody>
+                          {riskClients.length === 0 && <tr><td colSpan={5} className="py-4 text-center text-[11px] italic" style={{ color: "var(--muted)" }}>No accounts with open positions</td></tr>}
+                          {(riskClients as any[]).map((r: any) => (
+                            <tr key={r.c.id} style={(r.mlvl ?? 9999) < 150 ? { background: "color-mix(in srgb, var(--red) 6%, transparent)" } : undefined}>
+                              <td className={tdc}>{r.c.login}</td>
+                              <td className={tdc}>{r.c.name}</td>
+                              <td className={tdc + " text-right"} style={{ color: r.eq >= 0 ? BUY : SELL }}>{gnum(r.eq, 2)}</td>
+                              <td className={tdc + " text-right"}>{gnum(r.usedMargin, 2)}</td>
+                              <td className={tdc + " text-right font-bold"} style={{ color: mlColor(r.mlvl ?? 0) }}>{r.mlvl != null ? r.mlvl.toFixed(0) + "%" : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── BROADCAST tab ── */}
+            {tab === "broadcast" && (
+              <div className="flex h-full gap-4 p-2">
+                <div className="flex w-80 flex-col gap-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Send Announcement to All Clients</div>
+                  <div>
+                    <div className="mb-1 text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Title</div>
+                    <input value={bcTitle} onChange={(e) => { setBcTitle(e.target.value); setBcMsg(null); }} placeholder="e.g. Scheduled Maintenance" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Message (optional)</div>
+                    <textarea rows={4} value={bcBody} onChange={(e) => { setBcBody(e.target.value); setBcMsg(null); }} placeholder="Message body…" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none focus:border-[var(--accent)] resize-none" />
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {[["Maintenance", "Scheduled Maintenance", "Our platform will undergo scheduled maintenance. Trading may be briefly unavailable."], ["Promotion", "Special Promotion", "A new promotion is now available. Contact your account manager to learn more."], ["Market News", "Market Update", "Stay informed with the latest market updates and analysis."]].map(([label, title, body]) => (
+                      <button key={label} onClick={() => { setBcTitle(title); setBcBody(body); setBcMsg(null); }} className="rounded border px-2 py-0.5 text-[9px]" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>{label}</button>
+                    ))}
+                  </div>
+                  {bcMsg && <div className="text-[11px]" style={{ color: bcMsg.ok ? BUY : SELL }}>{bcMsg.text}</div>}
+                  <button
+                    disabled={bcSending || !bcTitle.trim()}
+                    onClick={async () => {
+                      setBcSending(true); setBcMsg(null);
+                      const r = await fetch("/api/admin/broadcast", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: bcTitle.trim(), body: bcBody.trim() || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
+                      setBcSending(false);
+                      if (r.ok) { setBcMsg({ ok: true, text: "✓ Announcement sent to all clients" }); setBcTitle(""); setBcBody(""); }
+                      else setBcMsg({ ok: false, text: r.error || "Failed to send" });
+                    }}
+                    className="rounded py-2 text-[11px] font-semibold text-white disabled:opacity-50"
+                    style={{ background: BUY }}
+                  >
+                    <i className="fa-solid fa-bullhorn mr-1.5" />{bcSending ? "Sending…" : "Send to All Clients"}
+                  </button>
+                </div>
+                <div className="flex-1 border-l border-[var(--border)] pl-4">
+                  <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Recently Sent</div>
+                  <div className="space-y-1.5 overflow-auto">
+                    {notifs.filter((n: any) => n.type === "BROADCAST" || n.type === "ANNOUNCEMENT" || String(n.type || "").toUpperCase().includes("BROAD")).length === 0
+                      ? <div className="text-[11px] italic" style={{ color: "var(--muted)" }}>No broadcasts sent yet. Use the Send Notification modal for a full history.</div>
+                      : notifs.filter((n: any) => n.type === "BROADCAST" || n.type === "ANNOUNCEMENT" || String(n.type || "").toUpperCase().includes("BROAD")).slice(0, 20).map((n: any, i: number) => (
+                        <div key={i} className="rounded border border-[var(--border)] bg-[var(--soft)] px-2 py-1.5 text-[11px]">
+                          <div className="font-semibold">{n.title}</div>
+                          {n.body && <div className="text-[10px]" style={{ color: "var(--muted)" }}>{n.body}</div>}
+                          <div className="mt-0.5 text-[9px]" style={{ color: "var(--muted)" }}>{new Date(n.createdAt).toLocaleString()}</div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       </>)}
@@ -1503,7 +1901,7 @@ export default function AdminDeskPage() {
               )}
             </div>
             <div className="mt-4 flex gap-2">
-              <button onClick={async () => { const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: isNaN(symEdit.spread) ? 0 : symEdit.spread, spreadType: symEdit.spreadType, spreadMax: 0, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: isNaN(symEdit.spread) ? 0 : symEdit.spread })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setOk(symEdit.sym + " saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
+              <button onClick={async () => { const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: isNaN(symEdit.spread) ? 0 : symEdit.spread, spreadType: symEdit.spreadType, spreadMax: 0, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: isNaN(symEdit.spread) ? 0 : symEdit.spread })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setAdminSymbols((prev) => prev.map((x) => x.id === symEdit.id ? { ...x, spread: isNaN(symEdit.spread) ? 0 : symEdit.spread, spreadType: symEdit.spreadType, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot } : x)); setOk(symEdit.sym + " saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
               <button onClick={() => setSymEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
             </div>
           </div>

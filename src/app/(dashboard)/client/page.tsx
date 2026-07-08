@@ -161,6 +161,10 @@ export default function ClientTerminal() {
   const [news, setNews] = useState<any[]>([]);
   const [indicators, setIndicators] = useState<string[]>([]);
   function toggleInd(id: string) { setIndicators((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]); }
+  const [domOpen, setDomOpen] = useState(false);
+  const [analyticsRange, setAnalyticsRange] = useState<"today" | "week" | "month" | "all">("all");
+  const alertsRef = useRef<any[]>([]);
+  useEffect(() => { alertsRef.current = alerts; }, [alerts]);
   const [histRange, setHistRange] = useState<"all" | "today" | "week" | "month">("all");
   // Per-table column sort (1st click asc, 2nd desc, 3rd clears).
   const [sortBy, setSortBy] = useState<Record<string, { k: string; d: 1 | -1 }>>({});
@@ -531,6 +535,22 @@ export default function ClientTerminal() {
       const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "history.csv"; a.click();
     }
   }
+
+  // Price alert trigger — checked on every price update
+  useEffect(() => {
+    const al = alertsRef.current;
+    if (!al.length) return;
+    const hit = al.filter((a) => {
+      const p = prices[a.symbol]; if (!p) return false;
+      return a.condition === "ABOVE" ? p >= Number(a.price) : p <= Number(a.price);
+    });
+    if (!hit.length) return;
+    hit.forEach((a) => {
+      pushToast({ title: `Alert: ${a.symbol} ${a.condition === "ABOVE" ? "≥" : "≤"} ${a.price}`, body: a.note || undefined, type: "NOTICE" });
+      fetch("/api/client/alerts?id=" + a.id, { method: "DELETE" }).catch(() => {});
+    });
+    setAlerts((prev) => prev.filter((x) => !hit.find((h) => h.id === x.id)));
+  }, [prices]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcuts: F9=new order, Ctrl+F=search, Escape=close overlays
   useEffect(() => {
@@ -985,7 +1005,7 @@ export default function ClientTerminal() {
         </div>
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
-        <aside className="flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: rtW }}>
+        <aside className="relative flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: rtW }}>
           {/* Right panel header: symbol info + alert bell + 1-click toggle */}
           <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2" style={{ background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent)" }}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide" style={{ color: "var(--text)" }}><i className="fa-solid fa-bolt text-[10px]" style={{ color: "#2f81f7" }} />NEW ORDER</div>
@@ -1000,13 +1020,16 @@ export default function ClientTerminal() {
               </button>
             </div>
           </div>
-          {/* Tab bar: TRADE | NEWS | CALENDAR */}
+          {/* Tab bar: TRADE | NEWS | CALENDAR | ANALYTICS | DOM */}
           <div className="flex shrink-0 border-b border-[var(--border)]">
-            {(["TRADE", "NEWS", "CALENDAR"] as const).map((t) => (
+            {(["TRADE", "NEWS", "CALENDAR", "ANALYTICS"] as const).map((t) => (
               <button key={t} onClick={() => setRightTab(t)} className="flex-1 py-1.5 text-[9px] font-semibold uppercase tracking-wide transition-colors" style={rightTab === t ? { color: "#2f81f7", borderBottom: "2px solid #2f81f7" } : { color: "var(--muted)" }}>
-                {t === "TRADE" ? <><i className="fa-solid fa-arrow-right-arrow-left mr-1" />Trade</> : t === "NEWS" ? <><i className="fa-solid fa-newspaper mr-1" />News</> : <><i className="fa-solid fa-calendar-days mr-1" />Calendar</>}
+                {t === "TRADE" ? <><i className="fa-solid fa-arrow-right-arrow-left mr-1" />Trade</> : t === "NEWS" ? <><i className="fa-solid fa-newspaper mr-1" />News</> : t === "CALENDAR" ? <><i className="fa-solid fa-calendar-days mr-1" />Cal</> : <><i className="fa-solid fa-chart-bar mr-1" />Stats</>}
               </button>
             ))}
+            <button onClick={() => setDomOpen((v) => !v)} title="Depth of Market" className="px-2 py-1.5 text-[9px] font-semibold uppercase tracking-wide transition-colors" style={{ color: domOpen ? "#2f81f7" : "var(--muted)", borderBottom: domOpen ? "2px solid #2f81f7" : "2px solid transparent" }}>
+              <i className="fa-solid fa-table-list mr-1" />DOM
+            </button>
           </div>
           {/* Scrollable form area */}
           <div className="min-h-0 flex-1 overflow-auto">
@@ -1060,7 +1083,65 @@ export default function ClientTerminal() {
                 });
               })()}
             </div>
-          ) : (
+          ) : rightTab === "ANALYTICS" ? (() => {
+            const day = 86400000;
+            const now = Date.now();
+            const cutoff = analyticsRange === "today" ? now - day : analyticsRange === "week" ? now - 7 * day : analyticsRange === "month" ? now - 30 * day : 0;
+            const rows = history.filter((h: any) => {
+              if (h.kind === "FIN") return false;
+              const t = new Date(h.closedAt || h.closeTime || h.closeDate || 0).getTime();
+              return t >= cutoff;
+            });
+            if (!rows.length) return (
+              <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>No closed trades{analyticsRange !== "all" ? " in this period" : ""}.</div>
+            );
+            const wins = rows.filter((h: any) => Number(h.pnl) > 0).length;
+            const losses = rows.filter((h: any) => Number(h.pnl) < 0).length;
+            const totalPL = rows.reduce((s: number, h: any) => s + Number(h.pnl || 0), 0);
+            const avgPL = totalPL / rows.length;
+            const best = rows.reduce((b: any, h: any) => Number(h.pnl) > Number(b.pnl) ? h : b, rows[0]);
+            const worst = rows.reduce((b: any, h: any) => Number(h.pnl) < Number(b.pnl) ? h : b, rows[0]);
+            const avgHold = rows.reduce((s: number, h: any) => {
+              const o = new Date(h.openedAt || 0).getTime(), c = new Date(h.closedAt || h.closeTime || 0).getTime();
+              return s + (c > o ? c - o : 0);
+            }, 0) / rows.length;
+            const holdStr = (ms: number) => { if (!ms || ms < 0) return "—"; const m = Math.floor(ms / 60000); if (m < 60) return m + "m"; return Math.floor(m / 60) + "h " + (m % 60) + "m"; };
+            const symMap: Record<string, number> = {};
+            rows.forEach((h: any) => { symMap[h.symbol] = (symMap[h.symbol] || 0) + Number(h.pnl || 0); });
+            const topSyms = Object.entries(symMap).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 5);
+            const stat = (label: string, val: string, color?: string) => (
+              <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1.5">
+                <span className="text-[9px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>{label}</span>
+                <span className="text-[11px] font-bold tabular-nums" style={{ color: color || "var(--text)" }}>{val}</span>
+              </div>
+            );
+            return (
+              <div className="text-[11px]">
+                <div className="sticky top-0 z-10 flex gap-1 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5">
+                  {(["today", "week", "month", "all"] as const).map((r) => (
+                    <button key={r} onClick={() => setAnalyticsRange(r)} className="flex-1 rounded py-0.5 text-[9px] font-semibold capitalize" style={{ background: analyticsRange === r ? "var(--accent)" : "transparent", color: analyticsRange === r ? "#fff" : "var(--muted)", border: "1px solid " + (analyticsRange === r ? "transparent" : "var(--border)") }}>{r === "today" ? "Today" : r === "week" ? "7D" : r === "month" ? "30D" : "All"}</button>
+                  ))}
+                </div>
+                {stat("Total Trades", String(rows.length))}
+                {stat("Win Rate", rows.length ? (wins / rows.length * 100).toFixed(1) + "%" : "—", wins > losses ? BUY : SELL)}
+                {stat("Wins / Losses", `${wins} / ${losses}`)}
+                {stat("Total P/L", (totalPL >= 0 ? "+" : "") + fmt(totalPL), totalPL >= 0 ? BUY : SELL)}
+                {stat("Avg P/L", (avgPL >= 0 ? "+" : "") + fmt(avgPL), avgPL >= 0 ? BUY : SELL)}
+                {stat("Best Trade", "+" + fmt(Number(best.pnl)) + " " + best.symbol, BUY)}
+                {stat("Worst Trade", fmt(Number(worst.pnl)) + " " + worst.symbol, SELL)}
+                {stat("Avg Hold Time", holdStr(avgHold))}
+                <div className="border-b border-[var(--border)] px-2 py-1.5">
+                  <div className="mb-1 text-[9px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>Top Symbols</div>
+                  {topSyms.map(([sym, pl]) => (
+                    <div key={sym} className="flex items-center justify-between py-0.5">
+                      <span className="font-medium">{sym}</span>
+                      <span className="tabular-nums font-bold" style={{ color: pl >= 0 ? BUY : SELL }}>{pl >= 0 ? "+" : ""}{fmt(pl)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })() : (
             <div className="flex flex-col gap-2 p-2">
 
               {/* Order type: MARKET | LIMIT | STOP | STOP_LIMIT */}
@@ -1120,6 +1201,25 @@ export default function ClientTerminal() {
                 </div>
               </div>
 
+              {/* R/R ratio + position size hint */}
+              {(() => {
+                const ref = orderType === "MARKET" ? (price ?? 0) : (Number(pendingPrice) || (price ?? 0));
+                const pipSz = Math.pow(10, -(dg(selSym) - 1));
+                const tpPips = tp && ref ? Math.abs(Number(tp) - ref) / pipSz : 0;
+                const slPips = sl && ref ? Math.abs(Number(sl) - ref) / pipSz : 0;
+                if (!tpPips && !slPips) return null;
+                const rr = slPips > 0 && tpPips > 0 ? tpPips / slPips : null;
+                const estTP = tpPips > 0 ? tpPips * vol * 1 : null; // $1/pip/lot approx
+                const estSL = slPips > 0 ? slPips * vol * 1 : null;
+                return (
+                  <div className="flex items-center justify-between rounded-lg bg-[var(--soft)] px-2 py-1 text-[9px]">
+                    {rr != null && <span style={{ color: rr >= 1 ? "#22c55e" : "#f97316" }}>R/R {rr.toFixed(2)}</span>}
+                    {estTP != null && <span style={{ color: "#10b981" }}>TP ≈ +{fmt(estTP)}</span>}
+                    {estSL != null && <span style={{ color: "#e0394a" }}>SL ≈ −{fmt(estSL)}</span>}
+                  </div>
+                );
+              })()}
+
               {/* Trailing Stop (market orders only) + Comment */}
               {orderType === "MARKET" && (
                 <div>
@@ -1170,6 +1270,68 @@ export default function ClientTerminal() {
               </div>
             </div>
           )}
+
+          {/* DOM — Depth of Market floating panel inside the aside */}
+          {domOpen && (() => {
+            if (!price) return null;
+            const spPx = _spreadPx(selSym);
+            const pipSz = Math.pow(10, -(d - 1));
+            const LEVELS = 6;
+            const asks: { px: number; vol: number }[] = [];
+            const bids: { px: number; vol: number }[] = [];
+            for (let i = 0; i < LEVELS; i++) {
+              const apx = ask + i * pipSz;
+              const bpx = bid - i * pipSz;
+              // Deterministic synthetic volume (reproducible per price level)
+              const av = Math.round(10 + Math.abs(Math.sin((apx * 10000) + i * 7)) * 90);
+              const bv = Math.round(10 + Math.abs(Math.sin((bpx * 10000) + i * 13)) * 90);
+              asks.push({ px: apx, vol: av });
+              bids.push({ px: bpx, vol: bv });
+            }
+            const totalAsk = asks.reduce((s, r) => s + r.vol, 0);
+            const totalBid = bids.reduce((s, r) => s + r.vol, 0);
+            const maxVol = Math.max(...asks.map((r) => r.vol), ...bids.map((r) => r.vol));
+            const row = (r: { px: number; vol: number }, side: "ask" | "bid", cumVol: number) => {
+              const pct = (r.vol / maxVol) * 100;
+              const col = side === "ask" ? SELL : BUY;
+              return (
+                <button key={r.px} onClick={() => { setPendingPrice(r.px.toFixed(d)); setOrderType(side === "ask" ? "LIMIT" : "STOP"); setRightTab("TRADE"); }}
+                  className="group relative flex w-full items-center justify-between px-2 py-[3px] text-[9px] font-mono tabular-nums hover:brightness-105"
+                  style={{ background: `linear-gradient(${side === "ask" ? "to right" : "to left"}, color-mix(in srgb, ${col} 18%, transparent) ${pct}%, transparent ${pct}%)` }}>
+                  <span style={{ color: col }}>{gnum(r.px, d)}</span>
+                  <span style={{ color: "var(--muted)" }}>{r.vol}</span>
+                  <span style={{ color: "var(--muted)" }}>{cumVol}</span>
+                </button>
+              );
+            };
+            let cumAsk = 0, cumBid = 0;
+            return (
+              <div className="absolute inset-x-0 bottom-[72px] z-30 mx-1.5 rounded-xl border border-[var(--border)] shadow-2xl" style={{ background: "var(--panel)" }}>
+                <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1">
+                  <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Depth of Market — {selSym}</span>
+                  <button onClick={() => setDomOpen(false)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark text-[10px]" /></button>
+                </div>
+                <div className="grid grid-cols-3 border-b border-[var(--border)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
+                  <span>Price</span><span className="text-center">Vol</span><span className="text-right">Total</span>
+                </div>
+                <div className="flex flex-col-reverse">
+                  {asks.map((r) => { cumAsk += r.vol; return row(r, "ask", cumAsk); })}
+                </div>
+                <div className="flex items-center justify-between border-y border-[var(--border)] bg-[var(--soft)] px-2 py-1">
+                  <span className="text-[10px] font-bold" style={{ color: SELL }}>{gnum(ask, d)}</span>
+                  <span className="text-[9px]" style={{ color: "var(--muted)" }}>Spread {Math.round(_spreadPips(selSym))}</span>
+                  <span className="text-[10px] font-bold" style={{ color: BUY }}>{gnum(bid, d)}</span>
+                </div>
+                <div>
+                  {bids.map((r) => { cumBid += r.vol; return row(r, "bid", cumBid); })}
+                </div>
+                <div className="grid grid-cols-2 border-t border-[var(--border)] px-2 py-1 text-[8px]">
+                  <span style={{ color: SELL }}>Ask Vol: {totalAsk}</span>
+                  <span className="text-right" style={{ color: BUY }}>Bid Vol: {totalBid}</span>
+                </div>
+              </div>
+            );
+          })()}
         </aside>
       </div>
 
@@ -1237,7 +1399,7 @@ export default function ClientTerminal() {
             <table className="w-full text-[10px]">
               <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right" title="Trailing Stop (pips)">Trail</th>{swapEnabled && <><th className="px-2 py-1 font-normal text-right">Commission</th><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /></>}<Sth tbl="pos" k="pnl" label={swapEnabled ? "Net P/L" : "P/L"} align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
               <tbody>
-                {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={14}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
+                {!dataReady ? <tr><td colSpan={14} className="px-2 py-3 text-center text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-2" />Loading…</td></tr> : positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={14}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
                   <tr key={p.id} className="border-t border-[var(--border)] cursor-context-menu" title={p.comment || undefined} onContextMenu={(e) => { e.preventDefault(); setPosCtx({ x: e.clientX, y: e.clientY, pos: p }); }}>
                     <td className="px-2 py-1 text-[var(--muted)] tabular-nums">{p.ticket ? String(p.ticket) : "—"}</td>
                     <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span></td>

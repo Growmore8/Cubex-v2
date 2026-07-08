@@ -7,10 +7,10 @@ export async function GET() {
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   const groups = await listGroups(s.tenantId!);
-  return NextResponse.json({ ok: true, groups: groups.map((g) => ({ id: g.id, name: g.name, spread: Number(g.spread), managerId: g.managerId || null })) });
+  return NextResponse.json({ ok: true, groups: groups.map((g) => ({ id: g.id, name: g.name, spread: Number(g.spread), managerId: g.managerId || null, config: (g.config as any) || {} })) });
 }
 
-const schema = z.object({ name: z.string().min(1), spread: z.number().optional(), managerId: z.string().nullable().optional() });
+const schema = z.object({ name: z.string().min(1), spread: z.number().optional(), managerId: z.string().nullable().optional(), config: z.any().optional() });
 
 export async function POST(req: Request) {
   const s = await requireAdmin();

@@ -165,6 +165,8 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mobSlEnabled, setMobSlEnabled] = useState(false);
   const [histTab, setHistTab] = useState<"trades" | "financial">("trades");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [swipeX, setSwipeX] = useState<Record<string, number>>({});
+  const swipeStart = useRef<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [qcat, setQcat] = useState<string>("Crypto"); // quotes open on Crypto by default
   const [symPickerOpen, setSymPickerOpen] = useState(false);
@@ -631,7 +633,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   { label: "Withdraw", icon: "fa-hand-holding-dollar", col: SELL, on: () => setWalletTab("withdraw") },
                   { label: "Transfer", icon: "fa-money-bill-transfer", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); } },
                 ]).map((b) => (
-                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, #ffffff, #eef1f6)", border: "1px solid var(--border)", boxShadow: cardDark ? "inset 0 1px 0 rgba(255,255,255,0.06)" : "0 1px 2px rgba(0,0,0,0.05)" }}>
+                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, var(--card), var(--soft))", border: "1px solid var(--border)", boxShadow: cardDark ? "inset 0 1px 0 rgba(255,255,255,0.06)" : "0 1px 2px rgba(0,0,0,0.05)" }}>
                     {/* metallic chrome icon chip (reference look) */}
                     <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#f7f9fc,#cfd6e2 42%,#9aa3b4 72%,#eef1f6)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -2px 3px rgba(0,0,0,0.25), 0 2px 5px rgba(0,0,0,0.28)" }}>
                       <i className={"fa-solid " + b.icon} style={{ color: b.col, fontSize: 15, filter: "drop-shadow(0 1px 0 rgba(255,255,255,0.6))" }} />
@@ -645,7 +647,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="mb-1.5 text-[10px] font-semibold text-[var(--muted)]">Top up your demo balance</div>
                 <div className="grid grid-cols-3 gap-2">
                   {[1000, 5000, 10000].map((amt) => (
-                    <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, #ffffff, #eef1f6)", border: "1px solid var(--border)" }}>
+                    <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, var(--card), var(--soft))", border: "1px solid var(--border)" }}>
                       <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#fde7b8,#e0b94e 45%,#b8860b 72%,#fbe9b0)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -2px 3px rgba(0,0,0,0.25), 0 2px 5px rgba(0,0,0,0.28)" }}><i className="fa-solid fa-coins" style={{ color: "#7a5b07", fontSize: 15 }} /></span>
                       <span className="text-[12px]">${amt.toLocaleString()}</span>
                     </button>
@@ -653,6 +655,57 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               </div>
             )}
+
+            {/* Equity curve — cumulative trade P/L */}
+            {(() => {
+              const tradePL = (history || []).filter((h: any) => h.kind === "TRADE" || !h.kind);
+              if (tradePL.length < 2) return null;
+              const sorted = [...tradePL].sort((a: any, b: any) => {
+                const da = new Date(a.closeTime || a.closedAt || a.closeDate || a.createdAt || 0).getTime();
+                const db = new Date(b.closeTime || b.closedAt || b.closeDate || b.createdAt || 0).getTime();
+                return da - db;
+              });
+              let running = 0;
+              const pts: { v: number }[] = [{ v: 0 }];
+              sorted.forEach((h: any) => { running += Number(h.pnl || 0); pts.push({ v: running }); });
+              const vals = pts.map((p) => p.v);
+              const minV = Math.min(...vals, 0), maxV = Math.max(...vals, 0);
+              const range = maxV - minV || 1;
+              const W = 320, H = 64;
+              const px = (i: number) => ((i / (pts.length - 1)) * W).toFixed(1);
+              const py = (v: number) => (H - ((v - minV) / range) * H).toFixed(1);
+              const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${px(i)},${py(p.v)}`).join(" ");
+              const fillPath = linePath + ` L${px(pts.length - 1)},${H} L0,${H}Z`;
+              const lastV = running;
+              const col = lastV >= 0 ? BUY : SELL;
+              const first = sorted[0]; const last = sorted[sorted.length - 1];
+              const fmtDate = (h: any) => { const d = h.closeTime || h.closedAt || h.closeDate || h.createdAt; return d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""; };
+              return (
+                <div className="glass-card p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-[11px] font-bold tracking-wide"><i className="fa-solid fa-chart-area mr-1.5" style={{ color: col }} />EQUITY CURVE</div>
+                    <span className="text-[12px] font-bold tabular-nums" style={{ color: col }}>{lastV >= 0 ? "+" : ""}{fmt(lastV)}</span>
+                  </div>
+                  <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ height: 56, display: "block" }}>
+                    <defs>
+                      <linearGradient id="mob-eq-fill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={col} stopOpacity="0.28" />
+                        <stop offset="100%" stopColor={col} stopOpacity="0.02" />
+                      </linearGradient>
+                    </defs>
+                    <line x1="0" y1={py(0)} x2={W} y2={py(0)} stroke="var(--border)" strokeWidth="0.8" strokeDasharray="4,4" />
+                    <path d={fillPath} fill="url(#mob-eq-fill)" />
+                    <path d={linePath} fill="none" stroke={col} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+                    <circle cx={px(pts.length - 1)} cy={py(lastV)} r="3" fill={col} />
+                  </svg>
+                  <div className="mt-1.5 flex items-center justify-between text-[9px]" style={{ color: "var(--muted)" }}>
+                    <span>{fmtDate(first)}</span>
+                    <span>{sorted.length} trades</span>
+                    <span>{fmtDate(last)}</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* market movers */}
             <div className="glass-card p-3">
@@ -1027,22 +1080,45 @@ export default function ClientMobile({ t }: { t: any }) {
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)] px-3 py-2">
               <div className="flex gap-4">
                 <button onClick={() => setTradeView("positions")} className="pb-1 text-[13px] font-bold transition-colors" style={{ color: tradeView === "positions" ? "var(--text)" : "var(--muted)", borderBottom: tradeView === "positions" ? "2px solid var(--accent)" : "2px solid transparent" }}>
-                  Positions {(positions || []).length > 0 ? <span className="ml-1 rounded-full px-1.5 py-0.5 text-[10px]" style={{ background: "var(--soft)", color: "var(--muted)" }}>{positions.length}</span> : null}
+                  Positions {(positions || []).length > 0 ? <span className="ml-1 rounded-full px-1.5 py-0.5 text-[11px]" style={{ background: "var(--soft)", color: "var(--muted)" }}>{positions.length}</span> : null}
                 </button>
                 <button onClick={() => setTradeView("history")} className="pb-1 text-[13px] font-bold transition-colors" style={{ color: tradeView === "history" ? "var(--text)" : "var(--muted)", borderBottom: tradeView === "history" ? "2px solid var(--accent)" : "2px solid transparent" }}>
                   History
                 </button>
               </div>
-              <button onClick={() => { setNoForm({ idx: 0, lots: vol || 0.01, trigger: "", sl: "", tp: "" }); setNoOpen(true); }} className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus text-[10px]" /> New</button>
+              <button onClick={() => { setNoForm({ idx: 0, lots: vol || 0.01, trigger: "", sl: "", tp: "" }); setNoOpen(true); }} className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[13px] font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus text-[11px]" /> New</button>
             </div>
 
           {tradeView === "positions" && (
-          <div className="space-y-3 p-3">
+          <div className="space-y-3 p-3 pb-16">
             {(positions || []).length === 0 ? <div className="py-4 text-center text-[12px] text-[var(--muted)]">No open positions.</div> : (positions || []).map((p: any) => {
               const cur = prices[p.symbol] ?? p.openPrice; const plv = pnlOf(p, cur, csz(p.symbol)); const dd = dg(p.symbol);
               const open = expanded === p.id;
               return (
-                <div key={p.id} className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]" style={{ borderLeft: `4px solid ${p.type === "BUY" ? BLUE : SELL}` }}>
+                <div key={p.id} className="relative overflow-hidden rounded-xl">
+                  {/* Red stripe revealed on left-swipe */}
+                  <div className="absolute inset-y-0 right-0 flex w-20 items-center justify-center" style={{ background: SELL }}>
+                    <i className="fa-solid fa-xmark text-xl text-white" />
+                  </div>
+                  {/* Swipeable card */}
+                  <div
+                    className="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]"
+                    style={{
+                      borderLeft: `4px solid ${p.type === "BUY" ? BLUE : SELL}`,
+                      transform: `translateX(${-(swipeX[p.id] ?? 0)}px)`,
+                      transition: (swipeX[p.id] ?? 0) > 0 ? "none" : "transform 0.2s ease",
+                    }}
+                    onTouchStart={(e) => { swipeStart.current[p.id] = e.touches[0].clientX; }}
+                    onTouchMove={(e) => {
+                      const dx = swipeStart.current[p.id] - e.touches[0].clientX;
+                      setSwipeX((prev) => ({ ...prev, [p.id]: Math.max(0, Math.min(120, dx)) }));
+                    }}
+                    onTouchEnd={() => {
+                      const dx = swipeX[p.id] ?? 0;
+                      if (dx > 90) { close(p.id); setSwipeX((prev) => { const n = { ...prev }; delete n[p.id]; return n; }); }
+                      else setSwipeX((prev) => ({ ...prev, [p.id]: 0 }));
+                    }}
+                  >
                   {/* Tap the row to open/close trade details (no separate arrow) */}
                   <div onClick={() => setExpanded(open ? null : p.id)} className="flex cursor-pointer select-none items-center justify-between p-3 active:bg-[var(--soft)]">
                     <div>
@@ -1100,6 +1176,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       )}
                     </div>
                   )}
+                  </div>{/* end swipeable card */}
                 </div>
               );
             })}
@@ -1138,6 +1215,37 @@ export default function ClientMobile({ t }: { t: any }) {
           </div>
           )}
 
+          {/* ── Quick trade bar (positions view only) ── */}
+          {tradeView === "positions" && (
+            <div className="sticky bottom-0 z-10 border-t border-[var(--border)]" style={{ background: "var(--panel)" }}>
+              <div className="flex items-stretch gap-1 px-1.5 py-1.5 min-[380px]:gap-1.5 min-[380px]:px-2.5 min-[380px]:py-2">
+                <button
+                  onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", chartVol); }}
+                  disabled={!account || account?.locked}
+                  className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50"
+                  style={{ background: SELLBTN, touchAction: "manipulation" }}
+                >
+                  <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Sell</div>
+                  <div className="text-[12px] font-bold tabular-nums">{bid != null ? gnum(bid, dg(selSym)) : "…"}</div>
+                </button>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button onClick={() => setChartVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] active:scale-95" style={{ background: "var(--soft)", touchAction: "manipulation" }}>−</button>
+                  <input type="number" inputMode="decimal" step="0.01" autoComplete="off" value={chartVol} onChange={(e) => setChartVol(Number(e.target.value))} className="h-8 w-12 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[11px] font-bold tabular-nums text-[var(--text)] outline-none" style={{ touchAction: "manipulation" }} />
+                  <button onClick={() => setChartVol((v) => +(v + 0.01).toFixed(2))} className="flex h-8 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] active:scale-95" style={{ background: "var(--soft)", touchAction: "manipulation" }}>+</button>
+                </div>
+                <button
+                  onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", chartVol); }}
+                  disabled={!account || account?.locked}
+                  className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50"
+                  style={{ background: BUYBTN, touchAction: "manipulation" }}
+                >
+                  <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Buy</div>
+                  <div className="text-[12px] font-bold tabular-nums">{ask != null ? gnum(ask, dg(selSym)) : "…"}</div>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ── HISTORY view inside Trade tab ── */}
           {tradeView === "history" && (
           <div className="p-3">
@@ -1154,7 +1262,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold">{h.symbol}</span>
-                          <span className="rounded px-1.5 py-0.5 text-[9px] font-bold text-white" style={{ background: h.side === "BUY" ? BUY : SELL }}>{h.side}</span>
+                          <span className="rounded px-1.5 py-0.5 text-[11px] font-bold text-white" style={{ background: h.side === "BUY" ? BUY : SELL }}>{h.side}</span>
                           <span className="text-[11px] text-[var(--muted)]">{h.lots}</span>
                           {h.closeReason && (() => {
                             const cr = String(h.closeReason).toUpperCase();
@@ -1488,7 +1596,7 @@ export default function ClientMobile({ t }: { t: any }) {
         const sprd = _mobSpreadPips(selSym);
         return (
           <div className="fixed inset-0 z-[95] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setNoOpen(false)}>
-            <div className="glass glass-edge w-full rounded-t-[26px]" style={{ background: theme === "dark" ? "rgba(18,22,32,0.97)" : "rgba(255,255,255,0.97)", borderTop: "1px solid var(--border)", maxHeight: "92dvh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <div className="glass glass-edge w-full rounded-t-[26px]" style={{ background: theme === "dark" ? "rgba(18,22,32,0.97)" : "var(--panel)", borderTop: "1px solid var(--border)", maxHeight: "92dvh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
               {/* handle */}
               <div className="flex justify-center pt-2.5 pb-1"><div className="h-1 w-10 rounded-full" style={{ background: "var(--border)" }} /></div>
               {/* header */}
@@ -1599,7 +1707,7 @@ export default function ClientMobile({ t }: { t: any }) {
       })()}
 
       {/* PERSISTENT BALANCE BAR */}
-      <button onClick={() => setBalOpen((v: boolean) => !v)} className="glass flex w-full items-center justify-between border-t px-4 py-1.5" style={{ borderColor: "var(--border)", background: theme === "dark" ? "rgba(20,24,34,0.55)" : "rgba(255,255,255,0.55)" }}>
+      <button onClick={() => setBalOpen((v: boolean) => !v)} className="glass flex w-full items-center justify-between border-t px-4 py-1.5" style={{ borderColor: "var(--border)", background: theme === "dark" ? "rgba(20,24,34,0.55)" : "var(--panel)" }}>
         <span className="text-[11px] text-[var(--muted)]"><i className="fa-solid fa-briefcase mr-1.5" />Balance <i className={"fa-solid ml-0.5 " + (balOpen ? "fa-chevron-down" : "fa-chevron-up")} /></span>
         <span className="text-base font-bold tabular-nums" style={{ color: balance >= 0 ? BUY : SELL }}>${fmt(balance)}</span>
       </button>
@@ -1642,7 +1750,7 @@ export default function ClientMobile({ t }: { t: any }) {
       {/* TRANSFER MODAL */}
       {xferModal && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.6)" }}>
-          <div className="glass glass-edge w-full max-w-[340px] rounded-[22px] border p-4" style={{ background: theme === "dark" ? "rgba(28,30,38,0.85)" : "rgba(255,255,255,0.85)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="glass glass-edge w-full max-w-[340px] rounded-[22px] border p-4" style={{ background: theme === "dark" ? "rgba(28,30,38,0.85)" : "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 text-sm font-bold">Transfer Funds</div>
             <label className="text-[10px] text-[var(--muted)]">From</label>
             <select value={xfer?.fromId || ""} onChange={(e) => setXfer({ ...(xfer || {}), fromId: e.target.value })} className="mb-2 mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]">
@@ -1737,7 +1845,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
       {pin?.pinModal && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="glass glass-edge w-full max-w-[320px] rounded-[22px] border p-4" style={{ background: theme === "dark" ? "rgba(28,30,38,0.85)" : "rgba(255,255,255,0.85)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="glass glass-edge w-full max-w-[320px] rounded-[22px] border p-4" style={{ background: theme === "dark" ? "rgba(28,30,38,0.85)" : "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-sm font-semibold">{pin.pinHasPin ? "Change PIN" : "Set PIN"}</div>
               <button onClick={() => pin.setPinModal(false)} aria-label="Close" className="-mr-1 flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button>
