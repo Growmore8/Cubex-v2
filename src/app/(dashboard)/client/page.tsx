@@ -1603,21 +1603,21 @@ export default function ClientTerminal() {
         const mlPct   = Math.min((level / 500) * 100, 100); // bar fills at 500% level
         return (
           <div className="border-y border-[var(--border)] bg-[var(--panel)]" style={{ color: "#facc15" }}>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 px-3 py-1.5 text-[10px] font-semibold">
-              <span className="flex items-center gap-1"><i className="fa-solid fa-wallet text-[8px] opacity-50" /><span style={{ color: "var(--muted)" }}>Bal</span> <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(balance) : "--"}</span></span>
-              <span className="flex items-center gap-1"><i className="fa-solid fa-scale-balanced text-[8px] opacity-50" /><span style={{ color: "var(--muted)" }}>Eq</span> <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? cSym + fmt(equity) : "--"}</span></span>
-              <span className="flex items-center gap-1"><i className="fa-solid fa-lock text-[8px] opacity-50" /><span style={{ color: "var(--muted)" }}>Mrg</span> <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(used) : "--"}</span></span>
-              <span className="flex items-center gap-1"><i className="fa-solid fa-unlock text-[8px] opacity-50" /><span style={{ color: "var(--muted)" }}>Free</span> <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? cSym + fmt(free) : "--"}</span></span>
-              <span className="flex items-center gap-1.5">
-                <span style={{ color: "var(--muted)" }}>Lvl</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-1.5 text-[11px] font-bold">
+              <span style={{ color: "var(--muted)" }}>Balance: <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(balance) : "--"}</span></span>
+              <span style={{ color: "var(--muted)" }}>Equity: <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? cSym + fmt(equity) : "--"}</span></span>
+              <span style={{ color: "var(--muted)" }}>Margin: <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(used) : "--"}</span></span>
+              <span style={{ color: "var(--muted)" }}>Free Margin: <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? cSym + fmt(free) : "--"}</span></span>
+              <span className="flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
+                Margin Level:
                 <span className="font-mono font-bold" style={{ color: mlColor }}>{account && level ? level.toFixed(1) + "%" : "--"}</span>
                 {account && used > 0 && (
-                  <span className="inline-flex h-[5px] w-[48px] overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
+                  <span className="inline-flex h-[6px] w-[64px] overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
                     <span className="h-full rounded-full transition-all duration-500" style={{ width: mlPct + "%", background: mlColor }} />
                   </span>
                 )}
               </span>
-              <span className="flex items-center gap-1"><i className="fa-solid fa-chart-line text-[8px] opacity-50" /><span style={{ color: "var(--muted)" }}>P/L</span> <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+" : "-") + cSym + fmt(Math.abs(floating)) : "--"}</span></span>
+              <span style={{ color: "var(--muted)" }}>Profit: <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+" : "-") + cSym + fmt(Math.abs(floating)) : "--"}</span></span>
               <span className="ml-auto flex items-center gap-2.5">
                 {sessions.map((s) => (
                   <span key={s.name} className="flex items-center gap-1">
