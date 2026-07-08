@@ -104,22 +104,17 @@ export default function TVChart({
 
         const dg  = digitsRef.current;
         const fmt = (v: number) => v.toFixed(dg);
-        // Anchor shapes at the last loaded bar so they fall within the chart's
-        // data range. Using Date.now() can place the anchor in the empty
-        // "future" zone past the last bar, making lines invisible in some TV builds.
         const anchorSec = lastBarRef.current
-          ? Math.floor(lastBarRef.current.time / 1000)  // lastBarRef stores ms
+          ? Math.floor(lastBarRef.current.time / 1000)
           : Math.floor(Date.now() / 1000);
 
-        // createShape — always available in Free Advanced Charts (horizontal line + label)
+        // createShape — fallback for ask spread line and when createPositionLine fails
         const addShape = async (price: number, ovr: Record<string, any>) => {
           try {
             const raw = chart.createShape({ time: anchorSec, price }, {
               shape: "horizontal_line", lock: true, disableSave: true,
               showInObjectsTree: false, overrides: ovr,
             });
-            // TV v32 bundles its own code — the returned Promise may not pass
-            // `instanceof Promise`, so check for thenable instead.
             const id: any = (raw && typeof (raw as any).then === "function") ? await raw : raw;
             if (id == null) return;
             if (drawSeqRef.current === seq) linesRef.current.push({ id });
@@ -127,28 +122,36 @@ export default function TVChart({
           } catch {}
         };
 
-        // createPositionLine — MT5-style colored Y-axis box; v32 returns Promise.
-        // Falls back to createShape if unavailable in this library build.
-        const addPosLine = async (
+        // Full TradingView Charting Library: createPositionLine gives the exact
+        // MT5-style colored Y-axis boxes (qty box left + body box right).
+        // lineStyle: 0=solid (open positions), 2=dashed (pending/SL/TP)
+        // lineWidth: 2 for entry lines, 1 for SL/TP
+        const makeLine = async (
           price: number, qty: string, body: string,
-          lineColor: string, bg: string, lineStyle: number,
+          lineColor: string, bg: string,
+          lineStyle: number, lineWidth: number,
         ) => {
           try {
             const raw = (chart as any).createPositionLine?.();
-            if (raw == null) throw new Error();
+            if (raw == null) throw new Error("unavailable");
             const pl: any = (raw && typeof (raw as any).then === "function") ? await raw : raw;
-            if (!pl || typeof pl.setPrice !== "function") throw new Error();
+            if (!pl || typeof pl.setPrice !== "function") throw new Error("invalid");
             if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
-            pl.setPrice(price).setText(body).setQuantity(qty)
+            pl.setPrice(price)
+              .setQuantity(qty)
+              .setText(body)
               .setLineColor(lineColor)
-              .setBodyBackgroundColor(bg).setBodyTextColor("#fff")
-              .setQuantityBackgroundColor(bg).setQuantityTextColor("#fff")
-              .setLineStyle(lineStyle);
+              .setLineStyle(lineStyle)
+              .setLineWidth(lineWidth)
+              .setBodyBackgroundColor(bg)
+              .setBodyTextColor("#fff")
+              .setQuantityBackgroundColor(bg)
+              .setQuantityTextColor("#fff");
             linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
           } catch {
+            // fallback: horizontal_line shape with label text
             await addShape(price, {
-              linecolor: lineColor, linewidth: lineStyle === 0 ? 2 : 1,
-              linestyle: lineStyle,
+              linecolor: lineColor, linewidth: lineWidth, linestyle: lineStyle,
               showLabel: true, text: qty + (body ? "  " + body : ""),
               textcolor: "#fff",
               fillBackground: lineStyle === 0, backgroundColor: bg, backgroundTransparency: 30,
@@ -167,21 +170,20 @@ export default function TVChart({
             : "";
 
           if (isPend) {
-            await addPosLine(p.openPrice, `${p.kind} ${p.type}`, `${tkt}  ${fmt(p.openPrice)}`, color, color, 2);
+            // Pending order: dashed line, quantity = order type, body = ticket + price
+            await makeLine(p.openPrice, `${p.kind} ${p.type}`, `${tkt}  ${fmt(p.openPrice)}`, color, color, 2, 1);
           } else {
-            await addPosLine(p.openPrice, p.type, `${tkt}${pnlStr}  ${fmt(p.openPrice)}`, color, color, 0);
+            // Open position: solid thick line, quantity = BUY/SELL, body = ticket + P&L + price
+            await makeLine(p.openPrice, p.type, `${tkt}${pnlStr}  ${fmt(p.openPrice)}`, color, color, 0, 2);
           }
-          if (p.sl && p.sl > 0) await addShape(p.sl, {
-            linecolor: "#f43f5e", linewidth: 1, linestyle: 2,
-            showLabel: true, text: `SL ${tkt}  ${fmt(p.sl)}`, textcolor: "#f43f5e", fillBackground: false,
-          });
-          if (p.tp && p.tp > 0) await addShape(p.tp, {
-            linecolor: "#10b981", linewidth: 1, linestyle: 2,
-            showLabel: true, text: `TP ${tkt}  ${fmt(p.tp)}`, textcolor: "#10b981", fillBackground: false,
-          });
+          // SL/TP: thin dashed lines with colored Y-axis boxes
+          if (p.sl && p.sl > 0)
+            await makeLine(p.sl,       "SL", `${tkt}  ${fmt(p.sl)}`,  "#f43f5e", "#f43f5e", 2, 1);
+          if (p.tp && p.tp > 0)
+            await makeLine(p.tp,       "TP", `${tkt}  ${fmt(p.tp)}`,  "#10b981", "#10b981", 2, 1);
         }
 
-        // Ask spread line — round pips to avoid float garbage (e.g. 7.000000000000360 → 7)
+        // Ask spread line (dotted gray)
         if (spreadRef.current > 0 && lastBarRef.current && drawSeqRef.current === seq) {
           const spPips   = Math.round(spreadRef.current * 100) / 100;
           const askPrice = lastBarRef.current.close + spPips * Math.pow(10, -dg);
