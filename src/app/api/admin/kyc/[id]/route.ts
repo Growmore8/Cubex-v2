@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { notify, notifyStaff } from "@/services/notification.service";
 import { syncAccountKyc } from "@/services/kyc.service";
+import { sendUserMail } from "@/lib/tenant-mail";
+import { kycStatusEmail } from "@/lib/email-templates";
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -41,6 +43,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (rec.account.userId) {
       const msg = status === "APPROVED" ? "Your KYC has been approved ✓" : "Your KYC was rejected" + (b.note ? ": " + b.note : "");
       await notify(rec.account.tenantId, rec.account.userId, "KYC " + (status === "APPROVED" ? "Approved" : "Rejected"), msg, "NOTICE").catch(() => {});
+      // Email notification
+      sendUserMail(rec.account.tenantId, rec.account.userId,
+        status === "APPROVED" ? "KYC Verified – Identity Confirmed" : "KYC Update – Action Required",
+        (brand) => kycStatusEmail(brand, {
+          holderName: (rec.account as any).name || "Valued Client",
+          status: status as "APPROVED" | "REJECTED",
+          note: b.note || null,
+        })
+      ).catch(() => {});
     }
     // Confirmation to staff + superadmin.
     notifyStaff(s.tenantId as string, { title: "KYC " + (status === "APPROVED" ? "approved" : "rejected") + " — " + rec.account.login, body: rec.docType + " by " + (s.email || "admin"), type: "NOTICE" }, rec.account.managerId).catch(() => {});

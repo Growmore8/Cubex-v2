@@ -48,3 +48,26 @@ export async function verifyDeviceToken(token: string): Promise<string | null> {
     return null;
   }
 }
+
+// Short-lived (5 min) cookie issued after password check when 2FA is required.
+// Holds the user id and the remember-me preference so the login can complete
+// after the TOTP code is verified.
+export const TOTP_PENDING_COOKIE = "cubex_totp_pending";
+
+export async function signTotpPending(userId: string, remember: boolean): Promise<string> {
+  return await new SignJWT({ uid: userId, remember, kind: "totp_pending" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(getSecret());
+}
+
+export async function verifyTotpPending(token: string): Promise<{ userId: string; remember: boolean } | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    if ((payload as any).kind !== "totp_pending") return null;
+    return { userId: (payload as any).uid as string, remember: !!(payload as any).remember };
+  } catch {
+    return null;
+  }
+}

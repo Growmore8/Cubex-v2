@@ -22,7 +22,7 @@ import { gnum, gmoney, gsign, titleCaseName } from "@/lib/format";
 import { ADSS_DARK, ADSS_LIGHT, ADSS_FONT, BUY, SELL, GOLD, BUYBTN, SELLBTN } from "@/config/theme";
 
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
-const TABS: [string, string][] = [["overview", "Overview"], ["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"], ["symbols", "Symbols"], ["groups", "Groups"], ["risk", "Risk"], ["broadcast", "Broadcast"]];
+const TABS: [string, string][] = [["overview", "Overview"], ["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"], ["symbols", "Symbols"], ["groups", "Groups"], ["risk", "Risk"], ["copy", "Copy Trading"], ["signals", "Signals"], ["broadcast", "Broadcast"]];
 
 function pnlOf(p: any, price: number, cs: number) {
   const sym = String(p.symbol || "");
@@ -39,6 +39,43 @@ export default function AdminDeskPage() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   useEffect(() => { const t = localStorage.getItem("cubex-theme"); if (t === "light" || t === "dark") setTheme(t); }, []);
   function toggleTheme() { setTheme((t) => { const n = t === "dark" ? "light" : "dark"; localStorage.setItem("cubex-theme", n); return n; }); }
+
+  // 2FA state for admin
+  const [adminTotpEnabled, setAdminTotpEnabled] = useState(false);
+  const [adminTotpModal, setAdminTotpModal] = useState<"setup" | "disable" | null>(null);
+  const [adminTotpQr, setAdminTotpQr] = useState("");
+  const [adminTotpSecret, setAdminTotpSecret] = useState("");
+  const [adminTotpCode, setAdminTotpCode] = useState("");
+  const [adminTotpBusy, setAdminTotpBusy] = useState(false);
+  const [adminTotpErr, setAdminTotpErr] = useState("");
+  useEffect(() => { fetch("/api/auth/totp/status").then((r) => r.json()).then((d) => { if (d.ok) setAdminTotpEnabled(d.totpEnabled); }).catch(() => {}); }, []);
+  async function adminOpenTotpSetup() {
+    setAdminTotpErr(""); setAdminTotpCode(""); setAdminTotpQr(""); setAdminTotpSecret(""); setAdminTotpBusy(true);
+    try {
+      const r = await fetch("/api/auth/totp/setup").then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed");
+      setAdminTotpQr(r.qrDataUrl); setAdminTotpSecret(r.secret); setAdminTotpModal("setup");
+    } catch (e: any) { setAdminTotpErr(e.message || "Failed"); }
+    finally { setAdminTotpBusy(false); }
+  }
+  async function adminConfirmTotpEnable() {
+    setAdminTotpErr(""); setAdminTotpBusy(true);
+    try {
+      const r = await fetch("/api/auth/totp/enable", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: adminTotpCode }) }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed");
+      setAdminTotpEnabled(true); setAdminTotpModal(null);
+    } catch (e: any) { setAdminTotpErr(e.message || "Invalid code"); }
+    finally { setAdminTotpBusy(false); }
+  }
+  async function adminConfirmTotpDisable() {
+    setAdminTotpErr(""); setAdminTotpBusy(true);
+    try {
+      const r = await fetch("/api/auth/totp/disable", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: adminTotpCode }) }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed");
+      setAdminTotpEnabled(false); setAdminTotpModal(null);
+    } catch (e: any) { setAdminTotpErr(e.message || "Invalid code"); }
+    finally { setAdminTotpBusy(false); }
+  }
 
   const [clients, setClients] = useState<any[]>([]);
   // Accounts that are "secondary" for their userId (oldest account = root, all others = sub)
@@ -72,6 +109,13 @@ export default function AdminDeskPage() {
   const [adminSymMax, setAdminSymMax] = useState<Record<string, number>>({});
   const [adminSymIds, setAdminSymIds] = useState<Record<string, string>>({});
   const [adminSymbols, setAdminSymbols] = useState<any[]>([]); // full admin symbol list (includes enabled, swap, commission)
+  const [adminNowMs, setAdminNowMs] = useState(Date.now());
+  useEffect(() => { const iv = setInterval(() => setAdminNowMs(Date.now()), 10000); return () => clearInterval(iv); }, []);
+  const adminSessions = (() => {
+    const t = new Date(adminNowMs).getUTCHours() * 60 + new Date(adminNowMs).getUTCMinutes();
+    const inR = (s: number, e: number) => s < e ? t >= s && t < e : t >= s || t < e;
+    return [{ n: "TKY", o: inR(0, 9*60) }, { n: "LON", o: inR(8*60, 17*60) }, { n: "NY", o: inR(13*60, 22*60) }, { n: "SYD", o: inR(22*60, 7*60) }];
+  })();
   const [symQ, setSymQ] = useState(""); // Symbols tab search query
   const [symCat, setSymCat] = useState("all"); // Symbols tab category filter
   const [symEdit, setSymEdit] = useState<{ sym: string; spread: number; spreadType: string; spreadMax: number; id: string; swapLong: number; swapShort: number; commissionPerLot: number } | null>(null);
@@ -100,7 +144,10 @@ export default function AdminDeskPage() {
   const [sl, setSl] = useState(0);
   const [tp, setTp] = useState(0);
   const [tab, setTab] = useState("trade");
-  const [tabState, setTabState] = useState<Record<string, boolean>>({ overview: true, trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true, requests: true, symbols: true, groups: true, risk: true, broadcast: true });
+  const [tabState, setTabState] = useState<Record<string, boolean>>({ overview: true, trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true, requests: true, symbols: true, groups: true, risk: true, copy: true, signals: true, broadcast: true });
+  const [copyRelations, setCopyRelations] = useState<any[]>([]);
+  const [copyForm, setCopyForm] = useState({ masterAccId: "", followerAccId: "", ratio: "1.0" });
+  const [copyErr, setCopyErr] = useState("");
   const [menu, setMenu] = useState<{ x: number; y: number; acc: any } | null>(null);
   const [menuSub, setMenuSub] = useState("");
   const [act, setAct] = useState<any>(null);
@@ -180,8 +227,6 @@ export default function AdminDeskPage() {
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false, psar: false, cdl: false, stoch: false, atr: false, adx: false, sig: false, ribbon: false });
   const [chartCfg, setChartCfg] = useState<any>({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 });
   const [cfgOpen, setCfgOpen] = useState(false);
-  const [chartTool, setChartTool] = useState<"none" | "hline" | "trend" | "erase">("none");
-  const [chartClearKey, setChartClearKey] = useState(0);
   const [stmtModal, setStmtModal] = useState(false);
   const [stmtEmailModal, setStmtEmailModal] = useState(false);
   const [stmtPreset, setStmtPreset] = useState("all");
@@ -245,6 +290,12 @@ export default function AdminDeskPage() {
   const [bcBody, setBcBody] = useState("");
   const [bcSending, setBcSending] = useState(false);
   const [bcMsg, setBcMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Signals state
+  const [adminSignals, setAdminSignals] = useState<any[]>([]);
+  const [sigForm, setSigForm] = useState({ symbol: "", direction: "BUY", entryPrice: "", sl: "", tp: "", rationale: "" });
+  const [sigSending, setSigSending] = useState(false);
+  const [sigMsg, setSigMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const loadSignals = () => fetch("/api/admin/signals").then((r) => r.json()).then((d) => { if (d.ok) setAdminSignals(d.signals || []); }).catch(() => {});
   const [kycUploadFor, setKycUploadFor] = useState<any>(null);
   const [kycUploadType, setKycUploadType] = useState("PASSPORT");
   const [kycUploadFile, setKycUploadFile] = useState<File | null>(null);
@@ -869,6 +920,16 @@ export default function AdminDeskPage() {
                   ); })}
               </div></>)}
           </div>
+          <div className="flex items-center gap-2 border-l border-[var(--border)] pl-2 ml-1 text-[9px]">
+            {adminSessions.map((s) => (
+              <span key={s.n} className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.o ? BUY : "#3b4455" }} />
+                <span style={{ color: s.o ? BUY : "var(--muted)", fontWeight: s.o ? 700 : 400 }}>{s.n}</span>
+              </span>
+            ))}
+            <span className="font-mono" style={{ color: "var(--muted)" }}>{new Date(adminNowMs).toUTCString().slice(17, 22)} UTC</span>
+          </div>
+          <button onClick={() => { setAdminTotpErr(""); setAdminTotpCode(""); if (adminTotpEnabled) setAdminTotpModal("disable"); else adminOpenTotpSetup(); }} disabled={adminTotpBusy} title={adminTotpEnabled ? "2FA enabled – click to disable" : "Set up 2FA"} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)] disabled:opacity-50" style={adminTotpEnabled ? { color: BUY } : undefined}><i className="fa-solid fa-lock" /></button>
           <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: SELL }} title="Logout"><i className="fa-solid fa-right-from-bracket" /></button>
         </div>
       </div>      {ok && <div className="px-3 py-1 text-[11px]" style={{ color: BUY }}>{ok}</div>}
@@ -1813,88 +1874,419 @@ export default function AdminDeskPage() {
             {/* ── RISK tab ── */}
             {tab === "risk" && !dataReady && <div className="flex h-full items-center justify-center text-[11px]" style={{ color: "var(--muted)" }}><i className="fa-solid fa-circle-notch fa-spin mr-2" />Loading…</div>}
             {tab === "risk" && dataReady && (() => {
-              const thc = "px-2 py-1.5 text-left text-[10px] font-semibold text-[var(--muted)]";
+              const thc = "px-2 py-1.5 text-left text-[10px] font-semibold text-[var(--muted)] whitespace-nowrap";
               const tdc = "px-2 py-1.5 text-[11px] border-b border-[color-mix(in_srgb,var(--border)_38%,transparent)] tabular-nums";
-              // Symbol-level net exposure
-              const symExp: Record<string, { buy: number; sell: number; syms: number }> = {};
+
+              // --- Symbol-level net exposure (computed from live open positions + live prices) ---
+              const symExp: Record<string, { buy: number; sell: number; cnt: number }> = {};
               open.forEach((p: any) => {
-                if (!symExp[p.symbol]) symExp[p.symbol] = { buy: 0, sell: 0, syms: 0 };
+                if (!symExp[p.symbol]) symExp[p.symbol] = { buy: 0, sell: 0, cnt: 0 };
                 if (p.type === "BUY") symExp[p.symbol].buy += Number(p.lots);
                 else symExp[p.symbol].sell += Number(p.lots);
-                symExp[p.symbol].syms += 1;
+                symExp[p.symbol].cnt++;
               });
-              const symRows = Object.entries(symExp).map(([sym, e]) => ({ sym, ...e, net: e.buy - e.sell })).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
-              // Clients near margin call
+              const symRows = Object.entries(symExp).map(([sym, e]) => {
+                const net = e.buy - e.sell;
+                const price = prices[sym] || 0;
+                const cs = contractFor(catMap[sym] || "forex", sym);
+                const exposure = Math.abs(net) * cs * price;
+                return { sym, ...e, net, price, exposure, var1: exposure * 0.01 };
+              }).sort((a, b) => Math.abs(b.exposure) - Math.abs(a.exposure));
+
+              const totalBuy = symRows.reduce((s, r) => s + r.buy, 0);
+              const totalSell = symRows.reduce((s, r) => s + r.sell, 0);
+              const totalNet = totalBuy - totalSell;
+              const totalExp = symRows.reduce((s, r) => s + r.exposure, 0);
+              const fmtUSD = (v: number) => v >= 1e6 ? "$" + (v / 1e6).toFixed(2) + "M" : v >= 1e3 ? "$" + (v / 1e3).toFixed(1) + "K" : "$" + v.toFixed(0);
+
+              // --- Client margin levels ---
               const riskClients = clients.map((c: any) => {
-                const accPositions = open.filter((p: any) => p.accountLogin === c.login || p.accountId === c.id);
-                if (accPositions.length === 0) return null;
-                const fl = accPositions.reduce((s: number, p: any) => s + pnlOf(p, prices[p.symbol] ?? Number(p.openPrice), contractFor(catMap[p.symbol] || "forex", p.symbol)), 0);
+                const accPos = open.filter((p: any) => p.accountLogin === c.login);
+                if (!accPos.length) return null;
+                const fl = accPos.reduce((s: number, p: any) =>
+                  s + pnlOf(p, prices[p.symbol] ?? Number(p.openPrice), contractFor(catMap[p.symbol] || "forex", p.symbol)), 0);
                 const balance = Number(c.deposit ?? 0) - Number(c.withdrawal ?? 0) + Number(c.credit ?? 0) + Number(c.bonus ?? 0) + Number(c.pnl ?? 0);
                 const eq = balance + fl;
-                const usedMargin = accPositions.reduce((s: number, p: any) => {
+                const usedM = accPos.reduce((s: number, p: any) => {
                   const pr = prices[p.symbol] ?? Number(p.openPrice);
                   const m = (Number(p.lots) * contractFor(catMap[p.symbol] || "forex", p.symbol) * pr) / (Number(c.leverage) || 100);
-                  return s + (/JPY$/i.test(p.symbol) ? m / (pr || 1) : m);
+                  return s + (/JPY$/i.test(p.symbol) ? m / 100 : m);
                 }, 0);
-                const mlvl = usedMargin > 0 ? (eq / usedMargin) * 100 : null;
-                return { c, fl, eq, usedMargin, mlvl, positions: accPositions.length };
-              }).filter(Boolean).filter((r: any) => r.mlvl !== null).sort((a: any, b: any) => (a.mlvl ?? 9999) - (b.mlvl ?? 9999));
+                const mlvl = usedM > 0 ? (eq / usedM) * 100 : null;
+                return { c, fl, eq, usedM, freeM: eq - usedM, mlvl, positions: accPos.length };
+              }).filter(Boolean).filter((r: any) => r.mlvl !== null)
+                .sort((a: any, b: any) => (a.mlvl ?? 9999) - (b.mlvl ?? 9999));
+
+              const inDanger = (riskClients as any[]).filter((r) => (r.mlvl ?? 9999) < 100).length;
+              const inWarning = (riskClients as any[]).filter((r) => { const m = r.mlvl ?? 9999; return m >= 100 && m < 150; }).length;
+              const activeAccounts = (riskClients as any[]).length;
               const mlColor = (v: number) => v >= 200 ? BUY : v >= 150 ? "#f59e0b" : v >= 100 ? "#f97316" : SELL;
+
+              const KpiCard = ({ label, value, sub, col }: { label: string; value: string; sub?: string; col?: string }) => (
+                <div className="flex min-w-[90px] flex-col gap-0.5 rounded-lg border border-[var(--border)] px-3 py-2">
+                  <div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{label}</div>
+                  <div className="text-[15px] font-bold tabular-nums leading-tight" style={{ color: col || "var(--text)" }}>{value}</div>
+                  {sub && <div className="text-[9px]" style={{ color: "var(--muted)" }}>{sub}</div>}
+                </div>
+              );
+
               return (
-                <div className="grid h-full gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
-                  {/* Symbol net exposure */}
-                  <div className="flex flex-col overflow-hidden">
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Symbol Net Exposure</div>
-                    <div className="flex-1 overflow-auto">
-                      <table className="w-full border-collapse">
-                        <thead><tr className="sticky top-0 z-10 bg-[var(--panel)] border-b border-[var(--border)]">
-                          <th className={thc}>Symbol</th>
-                          <th className={thc + " text-right"}>Buy Lots</th>
-                          <th className={thc + " text-right"}>Sell Lots</th>
-                          <th className={thc + " text-right"}>Net</th>
-                          <th className={thc + " text-right"}>Trades</th>
-                        </tr></thead>
-                        <tbody>
-                          {symRows.length === 0 && <tr><td colSpan={5} className="py-4 text-center text-[11px] italic" style={{ color: "var(--muted)" }}>No open positions</td></tr>}
-                          {symRows.map((r) => (
-                            <tr key={r.sym}>
-                              <td className={tdc + " font-medium"}>{r.sym}</td>
-                              <td className={tdc + " text-right"} style={{ color: BUY }}>{r.buy.toFixed(2)}</td>
-                              <td className={tdc + " text-right"} style={{ color: SELL }}>{r.sell.toFixed(2)}</td>
-                              <td className={tdc + " text-right font-bold"} style={{ color: r.net > 0 ? BUY : r.net < 0 ? SELL : "var(--muted)" }}>{r.net > 0 ? "+" : ""}{r.net.toFixed(2)}</td>
-                              <td className={tdc + " text-right"}>{r.syms}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                <div className="flex h-full flex-col gap-2 overflow-hidden">
+                  {/* Active risk alert banners */}
+                  {(inDanger > 0 || inWarning > 0) && (
+                    <div className="flex shrink-0 flex-col gap-1">
+                      {inDanger > 0 && (
+                        <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-semibold" style={{ borderColor: SELL, background: "color-mix(in srgb, var(--red) 12%, transparent)", color: SELL }}>
+                          <i className="fa-solid fa-triangle-exclamation" />
+                          {inDanger} account{inDanger !== 1 ? "s" : ""} in danger zone (margin level below 100%) — liquidation imminent
+                        </div>
+                      )}
+                      {inWarning > 0 && (
+                        <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-semibold" style={{ borderColor: "#f97316", background: "color-mix(in srgb, #f97316 8%, transparent)", color: "#f97316" }}>
+                          <i className="fa-solid fa-triangle-exclamation" />
+                          {inWarning} account{inWarning !== 1 ? "s" : ""} in warning zone (margin 100–150%) — monitor closely and consider reaching out
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* KPI summary row */}
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <KpiCard label="Open Positions" value={String(open.length)} sub={activeAccounts + " accounts"} />
+                    <KpiCard label="Gross Long" value={totalBuy.toFixed(2) + "L"} sub="total buy lots" col={BUY} />
+                    <KpiCard label="Gross Short" value={totalSell.toFixed(2) + "L"} sub="total sell lots" col={SELL} />
+                    <KpiCard label="Net Position" value={(totalNet > 0 ? "+" : "") + totalNet.toFixed(2) + "L"} sub="buy − sell" col={totalNet > 0 ? BUY : totalNet < 0 ? SELL : "var(--muted)"} />
+                    <KpiCard label="Net USD Exposure" value={fmtUSD(totalExp)} sub="broker book risk" />
+                    <KpiCard label="1% VAR" value={fmtUSD(totalExp * 0.01)} sub="if price moves 1%" />
+                    <KpiCard label="Danger Zone" value={String(inDanger)} sub="margin < 100%" col={inDanger > 0 ? SELL : "var(--muted)"} />
+                    <KpiCard label="Warning Zone" value={String(inWarning)} sub="margin 100–150%" col={inWarning > 0 ? "#f97316" : "var(--muted)"} />
+                  </div>
+
+                  {/* Two-panel tables */}
+                  <div className="grid min-h-0 flex-1 gap-3 overflow-hidden" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                    {/* Symbol net exposure */}
+                    <div className="flex flex-col overflow-hidden">
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
+                        Symbol Net Exposure · sorted by USD risk
+                      </div>
+                      <div className="flex-1 overflow-auto">
+                        <table className="w-full border-collapse">
+                          <thead><tr className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--panel)]">
+                            <SortTh tbl="riskSym" k="sym" label="Symbol" cls={thc} />
+                            <SortTh tbl="riskSym" k="buy" label="Buy L" align="right" cls={thc} />
+                            <SortTh tbl="riskSym" k="sell" label="Sell L" align="right" cls={thc} />
+                            <SortTh tbl="riskSym" k="net" label="Net" align="right" cls={thc} />
+                            <th className={thc + " text-center"}>Bias</th>
+                            <SortTh tbl="riskSym" k="price" label="Price" align="right" cls={thc} />
+                            <SortTh tbl="riskSym" k="exposure" label="Exp. USD" align="right" cls={thc} />
+                            <SortTh tbl="riskSym" k="var1" label="1% VAR" align="right" cls={thc} />
+                            <SortTh tbl="riskSym" k="cnt" label="Pos" align="right" cls={thc} />
+                          </tr></thead>
+                          <tbody>
+                            {symRows.length === 0 && <tr><td colSpan={9} className="py-4 text-center text-[11px] italic" style={{ color: "var(--muted)" }}>No open positions</td></tr>}
+                            {sortRows("riskSym", symRows, {
+                              sym: (r) => r.sym, buy: (r) => r.buy, sell: (r) => r.sell,
+                              net: (r) => r.net, price: (r) => r.price,
+                              exposure: (r) => r.exposure, var1: (r) => r.var1, cnt: (r) => r.cnt,
+                            }).map((r) => {
+                              const total = r.buy + r.sell;
+                              const buyPct = total > 0 ? (r.buy / total) * 100 : 50;
+                              const priceStr = r.price ? (r.price < 10 ? r.price.toFixed(5) : r.price < 1000 ? r.price.toFixed(3) : r.price.toFixed(1)) : "—";
+                              return (
+                                <tr key={r.sym}>
+                                  <td className={tdc + " font-semibold"}>{r.sym}</td>
+                                  <td className={tdc + " text-right"} style={{ color: BUY }}>{r.buy.toFixed(2)}</td>
+                                  <td className={tdc + " text-right"} style={{ color: SELL }}>{r.sell.toFixed(2)}</td>
+                                  <td className={tdc + " text-right font-bold"} style={{ color: r.net > 0 ? BUY : r.net < 0 ? SELL : "var(--muted)" }}>
+                                    {r.net > 0 ? "+" : ""}{r.net.toFixed(2)}
+                                  </td>
+                                  <td className={tdc + " text-center"}>
+                                    <div className="mx-auto relative h-2 w-14 overflow-hidden rounded-full" style={{ background: "color-mix(in srgb,var(--red) 25%,transparent)" }}>
+                                      <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: buyPct + "%", background: BUY, opacity: 0.85 }} />
+                                    </div>
+                                  </td>
+                                  <td className={tdc + " text-right"}>{priceStr}</td>
+                                  <td className={tdc + " text-right font-semibold"}>{r.price ? fmtUSD(r.exposure) : "—"}</td>
+                                  <td className={tdc + " text-right"} style={{ color: "var(--muted)" }}>{r.price ? fmtUSD(r.var1) : "—"}</td>
+                                  <td className={tdc + " text-right"}>{r.cnt}</td>
+                                </tr>
+                              );
+                            })}
+                            {symRows.length > 0 && (
+                              <tr style={{ background: "color-mix(in srgb, var(--accent) 7%, transparent)" }}>
+                                <td className={tdc + " font-bold"}>TOTAL</td>
+                                <td className={tdc + " text-right font-bold"} style={{ color: BUY }}>{totalBuy.toFixed(2)}</td>
+                                <td className={tdc + " text-right font-bold"} style={{ color: SELL }}>{totalSell.toFixed(2)}</td>
+                                <td className={tdc + " text-right font-bold"} style={{ color: totalNet > 0 ? BUY : totalNet < 0 ? SELL : "var(--muted)" }}>
+                                  {totalNet > 0 ? "+" : ""}{totalNet.toFixed(2)}
+                                </td>
+                                <td className={tdc} />
+                                <td className={tdc} />
+                                <td className={tdc + " text-right font-bold"}>{fmtUSD(totalExp)}</td>
+                                <td className={tdc + " text-right"} style={{ color: "var(--muted)" }}>{fmtUSD(totalExp * 0.01)}</td>
+                                <td className={tdc + " text-right font-bold"}>{open.length}</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Client margin levels */}
+                    <div className="flex flex-col overflow-hidden border-l border-[var(--border)] pl-3">
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
+                        Client Margin Levels · worst first · click to open in Clients
+                      </div>
+                      <div className="flex-1 overflow-auto">
+                        <table className="w-full border-collapse">
+                          <thead><tr className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--panel)]">
+                            <SortTh tbl="riskCli" k="login" label="Login" cls={thc} />
+                            <SortTh tbl="riskCli" k="name" label="Name" cls={thc} />
+                            <SortTh tbl="riskCli" k="eq" label="Equity" align="right" cls={thc} />
+                            <SortTh tbl="riskCli" k="usedM" label="Margin" align="right" cls={thc} />
+                            <SortTh tbl="riskCli" k="freeM" label="Free" align="right" cls={thc} />
+                            <SortTh tbl="riskCli" k="mlvl" label="Level" align="right" cls={thc} />
+                            <SortTh tbl="riskCli" k="soLevel" label="S/O" align="right" cls={thc} />
+                            <SortTh tbl="riskCli" k="positions" label="Pos" align="right" cls={thc} />
+                          </tr></thead>
+                          <tbody>
+                            {riskClients.length === 0 && <tr><td colSpan={8} className="py-4 text-center text-[11px] italic" style={{ color: "var(--muted)" }}>No accounts with open positions</td></tr>}
+                            {sortRows("riskCli", riskClients as any[], {
+                              login: (r) => r.c.login, name: (r) => r.c.name,
+                              eq: (r) => r.eq, usedM: (r) => r.usedM, freeM: (r) => r.freeM,
+                              mlvl: (r) => r.mlvl, soLevel: (r) => Number(r.c.mcLevel), positions: (r) => r.positions,
+                            }).map((r: any) => {
+                              const lvl = r.mlvl ?? 9999;
+                              const rowBg = lvl < 100
+                                ? { background: "color-mix(in srgb, var(--red) 9%, transparent)" }
+                                : lvl < 150 ? { background: "color-mix(in srgb, #f97316 6%, transparent)" } : undefined;
+                              return (
+                                <tr key={r.c.id} style={rowBg} className="cursor-pointer hover:opacity-80"
+                                  onClick={() => { setTab("clients"); setCliQ(r.c.login); }}
+                                  title="Click to open in Clients tab">
+                                  <td className={tdc}>{r.c.login}</td>
+                                  <td className={tdc + " max-w-[90px] truncate"}>{r.c.name}</td>
+                                  <td className={tdc + " text-right"} style={{ color: r.eq >= 0 ? BUY : SELL }}>{gnum(r.eq, 2)}</td>
+                                  <td className={tdc + " text-right"}>{gnum(r.usedM, 2)}</td>
+                                  <td className={tdc + " text-right"} style={{ color: r.freeM >= 0 ? BUY : SELL }}>{gnum(r.freeM, 2)}</td>
+                                  <td className={tdc + " text-right font-bold"} style={{ color: mlColor(lvl) }}>{r.mlvl != null ? lvl.toFixed(0) + "%" : "—"}</td>
+                                  <td className={tdc + " text-right"} style={{ color: "var(--muted)" }}>{Number(r.c.mcLevel) > 0 ? Number(r.c.mcLevel).toFixed(0) + "%" : "—"}</td>
+                                  <td className={tdc + " text-right"}>{r.positions}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
-                  {/* Clients near margin call */}
-                  <div className="flex flex-col overflow-hidden border-l border-[var(--border)] pl-3">
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Client Margin Levels (with open positions)</div>
-                    <div className="flex-1 overflow-auto">
-                      <table className="w-full border-collapse">
-                        <thead><tr className="sticky top-0 z-10 bg-[var(--panel)] border-b border-[var(--border)]">
-                          <th className={thc}>Login</th>
-                          <th className={thc}>Name</th>
-                          <th className={thc + " text-right"}>Equity</th>
-                          <th className={thc + " text-right"}>Margin</th>
-                          <th className={thc + " text-right"}>Level</th>
-                        </tr></thead>
-                        <tbody>
-                          {riskClients.length === 0 && <tr><td colSpan={5} className="py-4 text-center text-[11px] italic" style={{ color: "var(--muted)" }}>No accounts with open positions</td></tr>}
-                          {(riskClients as any[]).map((r: any) => (
-                            <tr key={r.c.id} style={(r.mlvl ?? 9999) < 150 ? { background: "color-mix(in srgb, var(--red) 6%, transparent)" } : undefined}>
-                              <td className={tdc}>{r.c.login}</td>
-                              <td className={tdc}>{r.c.name}</td>
-                              <td className={tdc + " text-right"} style={{ color: r.eq >= 0 ? BUY : SELL }}>{gnum(r.eq, 2)}</td>
-                              <td className={tdc + " text-right"}>{gnum(r.usedMargin, 2)}</td>
-                              <td className={tdc + " text-right font-bold"} style={{ color: mlColor(r.mlvl ?? 0) }}>{r.mlvl != null ? r.mlvl.toFixed(0) + "%" : "—"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                </div>
+              );
+            })()}
+
+            {/* ── COPY TRADING tab ── */}
+            {tab === "copy" && (() => {
+              if (tabState.copy && copyRelations.length === 0) {
+                fetch("/api/admin/copy-relations").then((r) => r.json()).then((d) => { if (d.ok) setCopyRelations(d.relations); }).catch(() => {});
+              }
+              const accOptions = clients.filter((c: any) => !c.locked && !c.deactivated);
+              const thc = "px-2 py-1.5 text-left text-[10px] font-semibold text-[var(--muted)] whitespace-nowrap";
+              const tdc = "px-2 py-1.5 text-[11px] border-b border-[color-mix(in_srgb,var(--border)_38%,transparent)] tabular-nums";
+              const createCopy = async () => {
+                setCopyErr("");
+                if (!copyForm.masterAccId || !copyForm.followerAccId) { setCopyErr("Select both accounts"); return; }
+                const r = await fetch("/api/admin/copy-relations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ masterAccId: copyForm.masterAccId, followerAccId: copyForm.followerAccId, ratio: Number(copyForm.ratio) || 1.0 }) }).then((x) => x.json());
+                if (!r.ok) { setCopyErr(r.error || "Failed"); return; }
+                setCopyRelations((prev) => [r.relation, ...prev]); setCopyForm({ masterAccId: "", followerAccId: "", ratio: "1.0" });
+              };
+              const deleteCopy = async (id: string) => {
+                const r = await fetch("/api/admin/copy-relations/" + id, { method: "DELETE" }).then((x) => x.json());
+                if (r.ok) setCopyRelations((prev) => prev.filter((x) => x.id !== id));
+              };
+              const toggleActive = async (id: string, active: boolean) => {
+                const r = await fetch("/api/admin/copy-relations/" + id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active }) }).then((x) => x.json());
+                if (r.ok) setCopyRelations((prev) => prev.map((x) => x.id === id ? { ...x, active } : x));
+              };
+              return (
+                <div className="flex h-full flex-col gap-3 overflow-auto p-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
+                    Copy Trading — master account trades automatically replicate to follower accounts
+                  </div>
+
+                  {/* Create new relation */}
+                  <div className="flex shrink-0 flex-wrap items-end gap-2 rounded-lg border border-[var(--border)] bg-[var(--soft)] p-3">
+                    <div className="flex flex-col gap-1">
+                      <div className="text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Master Account</div>
+                      <select value={copyForm.masterAccId} onChange={(e) => setCopyForm((f) => ({ ...f, masterAccId: e.target.value }))} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none min-w-[160px]">
+                        <option value="">— select master —</option>
+                        {accOptions.map((c: any) => <option key={c.id} value={c.id}>{c.login} · {c.name}</option>)}
+                      </select>
                     </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Follower Account</div>
+                      <select value={copyForm.followerAccId} onChange={(e) => setCopyForm((f) => ({ ...f, followerAccId: e.target.value }))} className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none min-w-[160px]">
+                        <option value="">— select follower —</option>
+                        {accOptions.filter((c: any) => c.id !== copyForm.masterAccId).map((c: any) => <option key={c.id} value={c.id}>{c.login} · {c.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Lot Ratio</div>
+                      <input type="number" min="0.01" step="0.01" value={copyForm.ratio} onChange={(e) => setCopyForm((f) => ({ ...f, ratio: e.target.value }))} placeholder="1.0" className="w-20 rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none" />
+                    </div>
+                    <button onClick={createCopy} className="rounded-lg px-3 py-1.5 text-[11px] font-semibold text-white" style={{ background: BUY }}>
+                      <i className="fa-solid fa-link mr-1.5" />Add Relation
+                    </button>
+                    {copyErr && <div className="text-[11px]" style={{ color: SELL }}>{copyErr}</div>}
+                  </div>
+
+                  {/* Relations table */}
+                  <div className="flex-1 overflow-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--panel)]">
+                          <th className={thc}>Master</th>
+                          <th className={thc}>Follower</th>
+                          <th className={thc + " text-right"}>Ratio</th>
+                          <th className={thc + " text-center"}>Status</th>
+                          <th className={thc}>Since</th>
+                          <th className={thc} />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {copyRelations.length === 0 && (
+                          <tr><td colSpan={6} className="py-8 text-center text-[11px] italic" style={{ color: "var(--muted)" }}>No copy relations yet — add one above</td></tr>
+                        )}
+                        {copyRelations.map((r) => (
+                          <tr key={r.id} className="hover:bg-[var(--soft)]">
+                            <td className={tdc}>
+                              <div className="font-semibold">{r.master.login}</div>
+                              <div className="text-[9px]" style={{ color: "var(--muted)" }}>{r.master.name}</div>
+                            </td>
+                            <td className={tdc}>
+                              <div className="font-semibold">{r.follower.login}</div>
+                              <div className="text-[9px]" style={{ color: "var(--muted)" }}>{r.follower.name}</div>
+                            </td>
+                            <td className={tdc + " text-right font-mono font-semibold"}>{Number(r.ratio).toFixed(2)}×</td>
+                            <td className={tdc + " text-center"}>
+                              <button onClick={() => toggleActive(r.id, !r.active)} className="rounded px-1.5 py-0.5 text-[9px] font-bold" style={{ background: r.active ? "color-mix(in srgb, var(--green) 15%, transparent)" : "color-mix(in srgb, var(--border) 40%, transparent)", color: r.active ? BUY : "var(--muted)" }}>
+                                {r.active ? "LIVE" : "PAUSED"}
+                              </button>
+                            </td>
+                            <td className={tdc + " text-[9px]"} style={{ color: "var(--muted)" }}>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}</td>
+                            <td className={tdc + " text-right"}>
+                              <button onClick={() => deleteCopy(r.id)} className="rounded px-2 py-0.5 text-[9px] font-semibold hover:opacity-80" style={{ background: "color-mix(in srgb, var(--red) 12%, transparent)", color: SELL }} title="Remove copy relation">
+                                <i className="fa-solid fa-unlink mr-0.5" />Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="shrink-0 text-[9px]" style={{ color: "var(--muted)" }}>
+                    Ratio 1.0 = same lots as master · 0.5 = half lots · 2.0 = double lots. SL/TP are mirrored at the same price levels. Follower positions close when the master closes (or hit their own SL/TP independently).
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── SIGNALS tab ── */}
+            {tab === "signals" && (() => {
+              if (tabState.signals && adminSignals.length === 0) loadSignals();
+              const activeSignals = adminSignals.filter((s) => s.active);
+              const closedSignals = adminSignals.filter((s) => !s.active);
+              return (
+                <div className="flex h-full gap-4 overflow-auto p-2">
+                  {/* Publish form */}
+                  <div className="flex w-80 shrink-0 flex-col gap-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Publish New Signal</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="mb-1 text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Symbol</div>
+                        <input value={sigForm.symbol} onChange={(e) => setSigForm((f) => ({ ...f, symbol: e.target.value.toUpperCase() }))} placeholder="EURUSD" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                      </div>
+                      <div>
+                        <div className="mb-1 text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Direction</div>
+                        <div className="flex rounded border border-[var(--border)] overflow-hidden text-[11px] font-semibold">
+                          <button onClick={() => setSigForm((f) => ({ ...f, direction: "BUY" }))} className="flex-1 py-1.5 transition-colors" style={{ background: sigForm.direction === "BUY" ? BUY : "var(--bg)", color: sigForm.direction === "BUY" ? "#fff" : "var(--muted)" }}>BUY</button>
+                          <button onClick={() => setSigForm((f) => ({ ...f, direction: "SELL" }))} className="flex-1 py-1.5 transition-colors" style={{ background: sigForm.direction === "SELL" ? SELL : "var(--bg)", color: sigForm.direction === "SELL" ? "#fff" : "var(--muted)" }}>SELL</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[["Entry Price", "entryPrice"], ["Stop Loss", "sl"], ["Take Profit", "tp"]].map(([label, key]) => (
+                        <div key={key}>
+                          <div className="mb-1 text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>{label}</div>
+                          <input type="number" step="any" value={(sigForm as any)[key]} onChange={(e) => setSigForm((f) => ({ ...f, [key]: e.target.value }))} placeholder="0.00000" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Rationale (optional)</div>
+                      <textarea rows={3} value={sigForm.rationale} onChange={(e) => setSigForm((f) => ({ ...f, rationale: e.target.value }))} placeholder="e.g. Bullish breakout above 1.0850 resistance…" className="w-full resize-none rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                    </div>
+                    {sigMsg && <div className="text-[11px]" style={{ color: sigMsg.ok ? BUY : SELL }}>{sigMsg.text}</div>}
+                    <button
+                      disabled={sigSending || !sigForm.symbol.trim() || !sigForm.entryPrice}
+                      onClick={async () => {
+                        setSigSending(true); setSigMsg(null);
+                        const r = await fetch("/api/admin/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sigForm.symbol.trim(), direction: sigForm.direction, entryPrice: parseFloat(sigForm.entryPrice), sl: parseFloat(sigForm.sl) || 0, tp: parseFloat(sigForm.tp) || 0, rationale: sigForm.rationale.trim() || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
+                        setSigSending(false);
+                        if (r.ok) { setSigMsg({ ok: true, text: "✓ Signal published to all clients" }); setSigForm({ symbol: "", direction: "BUY", entryPrice: "", sl: "", tp: "", rationale: "" }); loadSignals(); }
+                        else setSigMsg({ ok: false, text: r.error || "Failed" });
+                      }}
+                      className="rounded py-2 text-[11px] font-semibold text-white disabled:opacity-50"
+                      style={{ background: sigForm.direction === "BUY" ? BUY : SELL }}
+                    >
+                      <i className="fa-solid fa-signal mr-1.5" />{sigSending ? "Publishing…" : `Publish ${sigForm.direction} Signal`}
+                    </button>
+                  </div>
+                  {/* Signal list */}
+                  <div className="flex min-w-0 flex-1 flex-col border-l border-[var(--border)] pl-4 gap-3 overflow-auto">
+                    <div>
+                      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Active Signals <span className="ml-1 rounded-full px-1.5 py-0.5 text-[9px]" style={{ background: BUY + "22", color: BUY }}>{activeSignals.length}</span></div>
+                      {activeSignals.length === 0 ? (
+                        <div className="text-[11px] italic" style={{ color: "var(--muted)" }}>No active signals. Publish one using the form.</div>
+                      ) : activeSignals.map((sig: any) => (
+                        <div key={sig.id} className="mb-2 rounded border border-[var(--border)] bg-[var(--soft)] px-3 py-2 text-[11px]">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="rounded px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: sig.direction === "BUY" ? BUY : SELL }}>{sig.direction}</span>
+                              <span className="font-semibold">{sig.symbol}</span>
+                              <span className="tabular-nums text-[10px]" style={{ color: "var(--muted)" }}>@ {Number(sig.entryPrice).toFixed(5)}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button title="Close signal" onClick={async () => { await fetch("/api/admin/signals/" + sig.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active: false }) }); loadSignals(); }} className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: "var(--border)", color: "var(--muted)" }}>Close</button>
+                              <button title="Delete" onClick={async () => { await fetch("/api/admin/signals/" + sig.id, { method: "DELETE" }); loadSignals(); }} className="rounded p-1 text-[10px]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
+                            </div>
+                          </div>
+                          <div className="mt-1 flex gap-3 text-[10px]" style={{ color: "var(--muted)" }}>
+                            {Number(sig.sl) > 0 && <span>SL: <span className="font-semibold tabular-nums" style={{ color: SELL }}>{Number(sig.sl).toFixed(5)}</span></span>}
+                            {Number(sig.tp) > 0 && <span>TP: <span className="font-semibold tabular-nums" style={{ color: BUY }}>{Number(sig.tp).toFixed(5)}</span></span>}
+                            <span className="ml-auto">{new Date(sig.createdAt).toLocaleString()}</span>
+                          </div>
+                          {sig.rationale && <div className="mt-1 text-[10px] italic" style={{ color: "var(--muted)" }}>{sig.rationale}</div>}
+                        </div>
+                      ))}
+                    </div>
+                    {closedSignals.length > 0 && (
+                      <div>
+                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Closed / Expired</div>
+                        {closedSignals.slice(0, 10).map((sig: any) => (
+                          <div key={sig.id} className="mb-1.5 rounded border border-[var(--border)] px-3 py-1.5 text-[11px] opacity-50">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="rounded px-2 py-0.5 text-[9px] font-bold text-white" style={{ background: sig.direction === "BUY" ? BUY : SELL }}>{sig.direction}</span>
+                                <span>{sig.symbol}</span>
+                                <span className="tabular-nums text-[10px]" style={{ color: "var(--muted)" }}>@ {Number(sig.entryPrice).toFixed(5)}</span>
+                              </div>
+                              <button onClick={async () => { await fetch("/api/admin/signals/" + sig.id, { method: "DELETE" }); loadSignals(); }} className="rounded p-1 text-[10px]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -1958,6 +2350,41 @@ export default function AdminDeskPage() {
 
       {mgrModal && <ManagersModal onClose={() => { setMgrModal(false); loadAll(); }} />}
       {pmModal && <PaymentMethodsModal onClose={() => setPmModal(false)} />}
+
+      {/* Admin 2FA setup / disable modal */}
+      {adminTotpModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => { setAdminTotpModal(null); setAdminTotpErr(""); setAdminTotpCode(""); }}>
+          <div className="ui-pop w-full max-w-sm rounded-2xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            {adminTotpModal === "setup" ? (<>
+              <div className="mb-2 font-semibold">Set up Two-Factor Authentication</div>
+              <p className="mb-3 text-[11px] text-[var(--muted)]">Scan this QR code with Google Authenticator or Authy, then enter the 6-digit code to confirm.</p>
+              {adminTotpQr && <img src={adminTotpQr} alt="QR code" className="mx-auto mb-2 rounded-lg" style={{ width: 160, height: 160 }} />}
+              <div className="mb-3 rounded-lg px-3 py-2 text-center text-[10px] font-mono break-all" style={{ background: "var(--soft)", color: "var(--muted)" }}>{adminTotpSecret}</div>
+              {adminTotpErr && <div className="mb-2 text-[11px]" style={{ color: SELL }}>{adminTotpErr}</div>}
+              <input autoFocus type="text" inputMode="numeric" maxLength={6} value={adminTotpCode} onChange={(e) => setAdminTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000" className="mb-3 w-full rounded-xl border px-3 py-2.5 text-center text-sm tracking-[0.4em]" style={{ borderColor: "var(--border)", background: "var(--soft)", color: "var(--text)" }} />
+              <div className="flex gap-2">
+                <button onClick={() => { setAdminTotpModal(null); setAdminTotpCode(""); setAdminTotpErr(""); }} className="flex-1 rounded-xl border py-2.5 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
+                <button onClick={adminConfirmTotpEnable} disabled={adminTotpBusy || adminTotpCode.length < 6} className="flex-[2] rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ background: BUY }}>
+                  {adminTotpBusy ? "Verifying…" : "Enable 2FA"}
+                </button>
+              </div>
+            </>) : (<>
+              <div className="mb-2 font-semibold">Disable Two-Factor Authentication</div>
+              <p className="mb-3 text-[11px] text-[var(--muted)]">Enter the 6-digit code from your authenticator app to confirm.</p>
+              {adminTotpErr && <div className="mb-2 text-[11px]" style={{ color: SELL }}>{adminTotpErr}</div>}
+              <input autoFocus type="text" inputMode="numeric" maxLength={6} value={adminTotpCode} onChange={(e) => setAdminTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000" className="mb-3 w-full rounded-xl border px-3 py-2.5 text-center text-sm tracking-[0.4em]" style={{ borderColor: "var(--border)", background: "var(--soft)", color: "var(--text)" }} />
+              <div className="flex gap-2">
+                <button onClick={() => { setAdminTotpModal(null); setAdminTotpCode(""); setAdminTotpErr(""); }} className="flex-1 rounded-xl border py-2.5 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
+                <button onClick={adminConfirmTotpDisable} disabled={adminTotpBusy || adminTotpCode.length < 6} className="flex-[2] rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ background: SELL }}>
+                  {adminTotpBusy ? "Verifying…" : "Disable 2FA"}
+                </button>
+              </div>
+            </>)}
+          </div>
+        </div>
+      )}
 
       {/* Symbol settings popup (from market watch right-click) */}
       {symEdit && (

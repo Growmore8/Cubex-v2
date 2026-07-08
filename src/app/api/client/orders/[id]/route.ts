@@ -7,6 +7,7 @@ import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
 import { Prisma } from "@prisma/client";
 import { assertMarketOpen } from "@/services/trade.service";
+import { syncCopySlTp } from "@/services/copy.service";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const s = await requireClient();
@@ -32,6 +33,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const label = `${trade.account.login} modified ${trade.symbol} ${trade.type} #${trade.ticket} — SL: ${newSl || "off"} TP: ${newTp || "off"}`;
     audit(s.tenantId!, "trade.modify_sl_tp", label, trade.account.login, "CLIENT");
     notifyStaff(s.tenantId!, { type: "TRADE", title: "SL/TP modified", body: label }, trade.account.managerId).catch(() => {});
+    // Sync SL/TP changes to followers if this is a master trade (not a copied trade itself)
+    if ((body.sl !== undefined || body.tp !== undefined) && !(trade as any).masterTradeId) {
+      syncCopySlTp(trade.id, newSl, newTp, s.tenantId!).catch(() => {});
+    }
     emitRefresh();
     return NextResponse.json({ ok: true });
   } catch (e: any) {

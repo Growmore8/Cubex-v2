@@ -199,3 +199,189 @@ export function statementEmail(brand: BrandInfo, s: StatementSummary): string {
     </div>
     <p style="font-size:12px;color:#9ca3af;margin:0 0 16px">Figures are indicative. The attached PDF is the full record of trades, financials and requests.</p>`);
 }
+
+// ── Transactional trade + account notification emails ──────────────────────
+
+export interface TradeInfo {
+  ticket: string | number;
+  symbol: string;
+  side: string;         // "BUY" | "SELL"
+  lots: number;
+  openPrice: number;
+  closePrice?: number;
+  pnl?: number;
+  closeReason?: string;
+  login: string | number;
+  holderName: string;
+}
+
+const sideColor = (s: string) => s === "BUY" ? "#16a34a" : "#dc2626";
+
+export function tradeOpenEmail(brand: BrandInfo, t: TradeInfo): string {
+  const side = esc(String(t.side).toUpperCase());
+  const col = sideColor(side);
+  const row = (k: string, v: string) => `<tr><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;color:#6b7280;font-size:13px">${esc(k)}</td><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;text-align:right;font-weight:700;font-size:13px;color:#111827">${v}</td></tr>`;
+  return brandedEmail(brand, "Trade opened", `
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 14px">Dear ${esc(t.holderName)}, a new position has been opened on your account.</p>
+    <table style="width:100%;border-collapse:collapse;margin:6px 0 18px">
+      ${row("Account", esc(String(t.login)))}
+      ${row("Ticket", esc(String(t.ticket)))}
+      ${row("Symbol", esc(t.symbol))}
+      ${row("Direction", `<span style="color:${col};font-weight:800">${side}</span>`)}
+      ${row("Lots", esc(String(t.lots)))}
+      ${row("Open Price", esc(String(t.openPrice)))}
+    </table>
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">Log in to your trading account to monitor and manage this position.</p>`);
+}
+
+export function tradeCloseEmail(brand: BrandInfo, t: TradeInfo): string {
+  const side = esc(String(t.side).toUpperCase());
+  const col = sideColor(side);
+  const pnl = t.pnl ?? 0;
+  const pnlCol = pnl >= 0 ? "#16a34a" : "#dc2626";
+  const row = (k: string, v: string) => `<tr><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;color:#6b7280;font-size:13px">${esc(k)}</td><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;text-align:right;font-weight:700;font-size:13px;color:#111827">${v}</td></tr>`;
+  return brandedEmail(brand, "Trade closed", `
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 14px">Dear ${esc(t.holderName)}, a position has been closed on your account.</p>
+    <table style="width:100%;border-collapse:collapse;margin:6px 0 18px">
+      ${row("Account", esc(String(t.login)))}
+      ${row("Ticket", esc(String(t.ticket)))}
+      ${row("Symbol", esc(t.symbol))}
+      ${row("Direction", `<span style="color:${col};font-weight:800">${side}</span>`)}
+      ${row("Lots", esc(String(t.lots)))}
+      ${row("Open Price", esc(String(t.openPrice)))}
+      ${t.closePrice != null ? row("Close Price", esc(String(t.closePrice))) : ""}
+      ${t.closeReason ? row("Reason", esc(t.closeReason)) : ""}
+      ${row("P / L", `<span style="color:${pnlCol};font-weight:800">${pnl >= 0 ? "+" : ""}$${Math.abs(pnl).toFixed(2)}</span>`)}
+    </table>
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">Log in to your account to view your updated balance and history.</p>`);
+}
+
+export function depositWithdrawalEmail(brand: BrandInfo, o: {
+  holderName: string;
+  kind: "DEPOSIT" | "WITHDRAWAL";
+  amount: string | number;
+  method?: string | null;
+  status: "APPROVED" | "REJECTED";
+  login: string | number;
+}): string {
+  const approved = o.status === "APPROVED";
+  const kind = o.kind === "DEPOSIT" ? "Deposit" : "Withdrawal";
+  const statusCol = approved ? "#16a34a" : "#dc2626";
+  const statusLabel = approved ? "Approved ✓" : "Rejected";
+  const row = (k: string, v: string) => `<tr><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;color:#6b7280;font-size:13px">${esc(k)}</td><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;text-align:right;font-weight:700;font-size:13px;color:#111827">${v}</td></tr>`;
+  return brandedEmail(brand, `${kind} ${statusLabel}`, `
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 14px">Dear ${esc(o.holderName)}, your ${kind.toLowerCase()} request has been reviewed.</p>
+    <table style="width:100%;border-collapse:collapse;margin:6px 0 18px">
+      ${row("Account", esc(String(o.login)))}
+      ${row("Type", esc(kind))}
+      ${row("Amount", `$${esc(String(o.amount))}`)}
+      ${o.method ? row("Method", esc(o.method)) : ""}
+      ${row("Status", `<span style="color:${statusCol};font-weight:800">${esc(statusLabel)}</span>`)}
+    </table>
+    ${approved
+      ? `<p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 14px">Your account balance has been ${o.kind === "DEPOSIT" ? "credited" : "debited"} accordingly.</p>`
+      : `<p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 14px">If you have questions about this decision, please contact support.</p>`}
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">Log in to your account to view your updated balance.</p>`);
+}
+
+export function marginCallEmail(brand: BrandInfo, o: {
+  holderName: string;
+  login: string | number;
+  marginLevel: number;
+  equity: number;
+  usedMargin: number;
+}): string {
+  const levelCol = o.marginLevel < 100 ? "#dc2626" : "#d97706";
+  const row = (k: string, v: string) => `<tr><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;color:#6b7280;font-size:13px">${esc(k)}</td><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;text-align:right;font-weight:700;font-size:13px;color:#111827">${v}</td></tr>`;
+  return brandedEmail(brand, "⚠️ Margin Call Warning", `
+    <div style="background:#fef3cd;border:1px solid #fbbf24;border-radius:10px;padding:14px 16px;margin:0 0 18px">
+      <strong style="color:#92400e;font-size:14px">⚠️ Your margin level is critically low.</strong>
+      <p style="color:#92400e;font-size:13px;margin:6px 0 0">Positions may be automatically liquidated to protect your account if the margin level falls below the minimum threshold. Please add funds or reduce your exposure.</p>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin:6px 0 18px">
+      ${row("Account", esc(String(o.login)))}
+      ${row("Margin Level", `<span style="color:${levelCol};font-weight:800">${o.marginLevel.toFixed(1)}%</span>`)}
+      ${row("Equity", `$${o.equity.toFixed(2)}`)}
+      ${row("Used Margin", `$${o.usedMargin.toFixed(2)}`)}
+    </table>
+    <p style="font-size:13px;color:#4b5563;margin:0 0 14px">To avoid automatic liquidation, you can: <strong>deposit additional funds</strong> or <strong>close some open positions</strong>.</p>
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">This is an automated alert. Log in immediately to manage your account.</p>`);
+}
+
+export function priceAlertEmail(brand: BrandInfo, o: {
+  holderName: string;
+  symbol: string;
+  condition: "ABOVE" | "BELOW";
+  targetPrice: string | number;
+  note?: string | null;
+}): string {
+  const condLabel = o.condition === "ABOVE" ? "risen above" : "fallen below";
+  const col = o.condition === "ABOVE" ? "#16a34a" : "#dc2626";
+  return brandedEmail(brand, `Price Alert: ${esc(o.symbol)}`, `
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 14px">Dear ${esc(o.holderName)}, your price alert for <strong>${esc(o.symbol)}</strong> has triggered.</p>
+    <div style="text-align:center;margin:20px 0">
+      <div style="display:inline-block;background:#f3f4f6;border-radius:12px;padding:16px 28px">
+        <div style="font-size:13px;color:#6b7280;margin-bottom:4px">${esc(o.symbol)} has <strong style="color:${col}">${condLabel}</strong></div>
+        <div style="font-size:32px;font-weight:800;color:${col}">${esc(String(o.targetPrice))}</div>
+      </div>
+    </div>
+    ${o.note ? `<p style="font-size:14px;color:#4b5563;margin:0 0 14px">Note: ${esc(o.note)}</p>` : ""}
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">This alert has been automatically removed. Log in to set new alerts or take action.</p>`);
+}
+
+export function kycStatusEmail(brand: BrandInfo, o: {
+  holderName: string;
+  status: "APPROVED" | "REJECTED";
+  note?: string | null;
+}): string {
+  const approved = o.status === "APPROVED";
+  const col = approved ? "#16a34a" : "#dc2626";
+  const heading = approved ? "KYC Verified ✓" : "KYC Review Update";
+  return brandedEmail(brand, heading, `
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 14px">Dear ${esc(o.holderName)},</p>
+    ${approved
+      ? `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:14px 16px;margin:0 0 18px">
+           <strong style="color:#15803d;font-size:15px">✓ Your identity has been verified.</strong>
+           <p style="color:#166534;font-size:13px;margin:6px 0 0">You can now deposit funds and trade on your live account.</p>
+         </div>`
+      : `<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px 16px;margin:0 0 18px">
+           <strong style="color:#991b1b;font-size:15px">Your KYC documents were not accepted.</strong>
+           ${o.note ? `<p style="color:#991b1b;font-size:13px;margin:6px 0 0">Reason: ${esc(o.note)}</p>` : ""}
+           <p style="color:#991b1b;font-size:13px;margin:6px 0 0">Please log in and upload clear, valid documents to complete your verification.</p>
+         </div>`}
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">Log in to your account to view your KYC status${approved ? " and start trading" : " and re-submit your documents"}.</p>`);
+}
+
+export function stopOutEmail(brand: BrandInfo, o: {
+  holderName: string;
+  login: string | number;
+  symbol: string;
+  side: string;
+  lots: number;
+  openPrice: number;
+  closePrice: number;
+  pnl: number;
+  marginLevel: number;
+}): string {
+  const pnlCol = o.pnl >= 0 ? "#16a34a" : "#dc2626";
+  const pnlStr = (o.pnl >= 0 ? "+" : "") + "$" + Math.abs(o.pnl).toFixed(2);
+  const row = (k: string, v: string) => `<tr><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;color:#6b7280;font-size:13px">${esc(k)}</td><td style="padding:8px 12px;border-bottom:1px solid #eef1f5;text-align:right;font-weight:700;font-size:13px;color:#111827">${v}</td></tr>`;
+  return brandedEmail(brand, "⛔ Stop-Out Executed", `
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 14px">Dear ${esc(o.holderName)},</p>
+    <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px 16px;margin:0 0 18px">
+      <strong style="color:#991b1b;font-size:14px">⛔ A position on your account was automatically closed.</strong>
+      <p style="color:#991b1b;font-size:13px;margin:6px 0 0">Your margin level dropped to <strong>${o.marginLevel.toFixed(1)}%</strong>, triggering a stop-out. The largest losing position was closed to protect your remaining balance.</p>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin:6px 0 18px">
+      ${row("Account", esc(String(o.login)))}
+      ${row("Symbol", esc(o.symbol))}
+      ${row("Direction", esc(o.side))}
+      ${row("Volume", o.lots.toFixed(2) + " lots")}
+      ${row("Open Price", o.openPrice.toFixed(5))}
+      ${row("Close Price", o.closePrice.toFixed(5))}
+      ${row("P &amp; L", `<span style="color:${pnlCol};font-weight:800">${esc(pnlStr)}</span>`)}
+      ${row("Margin Level at Close", `<span style="color:#dc2626;font-weight:800">${o.marginLevel.toFixed(1)}%</span>`)}
+    </table>
+    <p style="font-size:13px;color:#4b5563;margin:0 0 14px">To prevent future stop-outs: <strong>deposit additional funds</strong> to increase your free margin, or <strong>reduce position sizes</strong> to lower your margin usage.</p>
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 12px">This is an automated notification. Log in to your account to review your open positions and current balance.</p>`);
+}

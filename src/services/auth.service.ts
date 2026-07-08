@@ -18,7 +18,7 @@ function makeCode(): string {
   return String(randomInt(100_000, 1_000_000)); // crypto-secure 6-digit OTP
 }
 
-export async function authenticate(host: string | null, email: string, password: string, ip?: string, ua?: string): Promise<SessionPayload> {
+export async function authenticate(host: string | null, email: string, password: string, ip?: string, ua?: string): Promise<SessionPayload & { totpRequired?: boolean }> {
   const tenant = await resolveTenant(host);
   const tenantId = tenant?.id ?? null;
 
@@ -62,6 +62,12 @@ export async function authenticate(host: string | null, email: string, password:
   // Checked only after password is confirmed so we don't leak account existence.
   if ((user as any).emailToken && !String((user as any).emailToken).startsWith("reset:")) {
     throw new Error("Please verify your email before signing in. Check your inbox for the verification code.");
+  }
+
+  // If 2FA is enabled, stop here — the caller issues a short-lived pending token
+  // and the login is completed in /api/auth/totp/verify after the code is checked.
+  if ((user as any).totpEnabled) {
+    return { sub: user.id, role: user.role as Role, tenantId: user.tenantId, email: user.email, name: user.name, totpRequired: true };
   }
 
   // Single-device enforcement for staff roles: issue a fresh session id that

@@ -950,6 +950,10 @@ function calcPnl(symbol, type, openPrice, price, lots) {
 }
 const liquidating = new Set(); // guard: prevent double-liquidation of same account
 const closing = new Set();    // guard: prevent double-close of same trade (TP/SL)
+// Risk alert cooldown — key: "accountId:condition", value: last-alert timestamp.
+// Prevents spamming the same alert every 3s when an account is in a prolonged risk state.
+const riskCooldown = new Map();
+const RISK_COOL_MS = 5 * 60 * 1000; // 5-minute gap between repeat alerts per account per condition
 
 // Mirror of notification.service.notifyStaff for the server runtime (CommonJS):
 // tenant admins + the owning manager + ALL SuperAdmins. Realtime delivery rides
@@ -1004,12 +1008,18 @@ async function closeTpSl(t, reason, price, io) {
   try {
     const pnl = calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
     const swap = Number(t.swap ?? 0);
-    await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: t.accountId, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl, swap, commission: t.commission ?? 0, comment: t.comment || null, closeReason: reason, openedAt: t.openedAt } });
+    // Convert USD P&L and swap to the account's base currency before crediting.
+    const cur = t.account?.currency;
+    const fxRate = cur === 'EUR' ? (state['EURUSD']?.price || 1) : cur === 'GBP' ? (state['GBPUSD']?.price || 1) : 1;
+    const cs = cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : '$';
+    const pnlAcc = pnl / fxRate;
+    const swapAcc = swap / fxRate;
+    await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: t.accountId, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnlAcc, swap: swapAcc, commission: t.commission ?? 0, comment: t.comment || null, closeReason: reason, openedAt: t.openedAt } });
     await prisma.trade.delete({ where: { id: t.id } });
-    await prisma.account.update({ where: { id: t.accountId }, data: { pnl: { increment: pnl + swap } } });
+    await prisma.account.update({ where: { id: t.accountId }, data: { pnl: { increment: pnlAcc + swapAcc } } });
     if (t.account && t.account.userId) {
       const title = reason === "TP" ? "Take Profit hit ✓" : "Stop Loss hit";
-      const body = `${t.symbol} ${t.type} closed @ ${price} | P/L ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}`;
+      const body = `${t.symbol} ${t.type} closed @ ${price} | P/L ${pnlAcc >= 0 ? "+" : ""}${cs}${Math.abs(pnlAcc).toFixed(2)}`;
       await prisma.notification.create({ data: { tenantId: t.account.tenantId, userId: t.account.userId, title, body, type: "TRADE" } }).catch(() => {});
       pushToUser(t.account.userId, { title, body }); // push even if app is closed
       await notifyStaffRaw(t.account.tenantId, { title: (reason === "TP" ? "TP hit" : "SL hit") + " — " + (t.account.login || ""), body, type: "TRADE" }, t.account.managerId);
@@ -1017,7 +1027,7 @@ async function closeTpSl(t, reason, price, io) {
     }
     io.emit("refresh", {});
     io.emit("refresh", { kind: "notification" }); // make client + staff reload notifs (sound + toast)
-    console.log("[" + reason + "]", t.symbol, t.type, Number(t.lots) + "L @ " + price, "P/L", calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots)).toFixed(2));
+    console.log("[" + reason + "]", t.symbol, t.type, Number(t.lots) + "L @ " + price, "P/L (USD)", pnl.toFixed(2));
   } catch (e) { console.error("[tp/sl close]", e); } finally { closing.delete(t.id.toString()); }
 }
 
@@ -1025,18 +1035,22 @@ async function liquidate(acc, list, io) {
   if (liquidating.has(acc.id)) return;
   liquidating.add(acc.id);
   try {
-    let total = 0;
+    const liqFxRate = acc.currency === 'EUR' ? (state['EURUSD']?.price || 1) : acc.currency === 'GBP' ? (state['GBPUSD']?.price || 1) : 1;
+    const liqCs = acc.currency === 'EUR' ? '€' : acc.currency === 'GBP' ? '£' : '$';
+    let total = 0; // accumulated in account currency
     for (const t of list) {
       const ask = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
       const price = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, acc.id, ask) : ask;
       const pnl = calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
       const swapAmt = Number(t.swap ?? 0);
-      total += pnl + swapAmt;
-      await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl, swap: swapAmt, commission: t.commission ?? 0, comment: t.comment || null, closeReason: "MC", openedAt: t.openedAt } });
+      const pnlAcc = pnl / liqFxRate;
+      const swapAcc = swapAmt / liqFxRate;
+      total += pnlAcc + swapAcc;
+      await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnlAcc, swap: swapAcc, commission: t.commission ?? 0, comment: t.comment || null, closeReason: "MC", openedAt: t.openedAt } });
       await prisma.trade.delete({ where: { id: t.id } });
     }
     await prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: total } } });
-    const body = acc.login + " margin call — " + list.length + " trade(s) closed, P/L " + total.toFixed(2);
+    const body = acc.login + " margin call — " + list.length + " trade(s) closed, P/L " + liqCs + Math.abs(total).toFixed(2);
     if (acc.userId) { await prisma.notification.create({ data: { tenantId: acc.tenantId, userId: acc.userId, title: "Stop out", body: "Positions liquidated at margin call", type: "TRADE" } }).catch(() => {}); pushToUser(acc.userId, { title: "Stop out", body: "Positions liquidated at margin call" }); }
     await notifyStaffRaw(acc.tenantId, { title: "⚠ Margin call — " + acc.login, body, type: "TRADE" }, acc.managerId);
     await prisma.auditLog.create({ data: { tenantId: acc.tenantId, action: "account.liquidated", detail: body, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
@@ -1060,6 +1074,10 @@ async function monitor(io) {
       // Skip liquidation check when all traded symbols have closed markets
       if (list.every((t) => !isMarketOpen(t.symbol, meta[t.symbol] && meta[t.symbol].cat))) continue;
       const balance = Number(acc.deposit) - Number(acc.withdrawal) + Number(acc.credit) + Number(acc.bonus) + Number(acc.pnl);
+      // FX rate converts account-currency balance to USD for margin level (floating/used are USD).
+      const monFxRate = acc.currency === 'EUR' ? (state['EURUSD']?.price || 1) : acc.currency === 'GBP' ? (state['GBPUSD']?.price || 1) : 1;
+      const monCs = acc.currency === 'EUR' ? '€' : acc.currency === 'GBP' ? '£' : '$';
+      const balanceUSD = balance * monFxRate;
       let floating = 0;
       const net = {};
       // Build symbol→openPrice Map once to avoid O(n) list.find() inside inner loop
@@ -1079,7 +1097,44 @@ async function monitor(io) {
         let mg = (nl * m.contract * ask) / acc.leverage; if (/JPY$/i.test(sym)) mg = mg / 100; used += mg;
       }
       if (used <= 0) continue;
-      if (((balance + floating) / used) * 100 <= mc) await liquidate(acc, list, io);
+      const mlvl = ((balanceUSD + floating) / used) * 100;
+      if (mlvl <= mc) {
+        await liquidate(acc, list, io);
+      } else {
+        // Risk alerts: warn staff proactively before liquidation occurs.
+        // Convert USD values to account currency for human-readable alert text.
+        const equityAcc = (balanceUSD + floating) / monFxRate;
+        const usedAcc = used / monFxRate;
+        const floatingAcc = floating / monFxRate;
+        const now = Date.now();
+
+        // Alert 1: margin level falling below 150% (account approaching stop-out)
+        const kMargin = acc.id + ":margin-warn";
+        if (mlvl < 150) {
+          if (!riskCooldown.has(kMargin) || now - riskCooldown.get(kMargin) > RISK_COOL_MS) {
+            riskCooldown.set(kMargin, now);
+            const body = acc.login + " margin level at " + mlvl.toFixed(0) + "% (S/O at " + mc + "%) — equity " + monCs + equityAcc.toFixed(2) + ", used margin " + monCs + usedAcc.toFixed(2);
+            await notifyStaffRaw(acc.tenantId, { title: "⚠ Low Margin — " + acc.login, body, type: "RISK" }, acc.managerId);
+            io.emit("refresh", { kind: "notification" });
+          }
+        } else {
+          riskCooldown.delete(kMargin); // condition cleared — reset so next breach re-alerts immediately
+        }
+
+        // Alert 2: floating loss exceeds 20% of account balance (in account currency)
+        const kFloat = acc.id + ":float-loss";
+        if (balance > 0 && floatingAcc < 0 && (-floatingAcc / balance) * 100 > 20) {
+          if (!riskCooldown.has(kFloat) || now - riskCooldown.get(kFloat) > RISK_COOL_MS) {
+            riskCooldown.set(kFloat, now);
+            const pct = ((-floatingAcc / balance) * 100).toFixed(1);
+            const body = acc.login + " floating loss " + pct + "% of balance — " + monCs + (-floatingAcc).toFixed(2) + " unrealised loss on " + monCs + balance.toFixed(2) + " balance";
+            await notifyStaffRaw(acc.tenantId, { title: "⚠ High Floating Loss — " + acc.login, body, type: "RISK" }, acc.managerId);
+            io.emit("refresh", { kind: "notification" });
+          }
+        } else {
+          riskCooldown.delete(kFloat);
+        }
+      }
     }
     // TP/SL: BUY triggered on bid, SELL triggered on ask (MT5 style)
     // Skip when market is closed — prices are frozen, so TP/SL must not fire on weekend.
@@ -1244,6 +1299,12 @@ async function checkPriceAlerts(io) {
       if (al.account?.userId) {
         await prisma.notification.create({ data: { tenantId: al.tenantId, userId: al.account.userId, title: "Price alert triggered", body, type: "TRADE" } }).catch(() => {});
         pushToUser(al.account.userId, { title: "Price alert triggered", body });
+        // Send branded email — fire-and-forget via internal route
+        fetch("http://127.0.0.1:" + port + "/api/internal/alert-fire", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(CRON_SECRET ? { "x-cron-secret": CRON_SECRET } : {}) },
+          body: JSON.stringify({ tenantId: al.tenantId, userId: al.account.userId, holderName: al.account.name || "Trader", symbol: al.symbol, condition: al.condition, price: Number(al.price), note: al.note }),
+        }).catch(() => {});
       }
       if (io) io.emit("refresh", { kind: "notification" });
     }

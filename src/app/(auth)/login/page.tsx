@@ -16,6 +16,9 @@ export default function LoginPage() {
   const [canRegister, setCanRegister] = useState(false); // tenant login + registration enabled
   const [siteUrl, setSiteUrl] = useState(""); // tenant marketing site for "Back to website"
   const [googleOn, setGoogleOn] = useState(false);
+  const [totpStep, setTotpStep] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
+  const [totpBusy, setTotpBusy] = useState(false);
 
   useEffect(() => {
     fetch("/api/public/brand").then((r) => r.json()).then((d) => { if (d.ok) { setCanRegister(!!d.tenantId && !!d.allowRegistration); setSiteUrl(d.websiteUrl || ""); setGoogleOn(!!d.googleEnabled); } }).catch(() => {});
@@ -41,11 +44,27 @@ export default function LoginPage() {
     const d = await r.json();
     setLoading(false);
     if (!d.ok) { setErr(d.error || "Login failed"); return; }
+    if (d.requires2fa) { setTotpStep(true); setTotpCode(""); return; }
     if (remember) localStorage.setItem("cubex-remember", "1");
     else localStorage.removeItem("cubex-remember");
     // Just authenticated — don't make the app's PIN lock re-prompt immediately.
     try { sessionStorage.setItem("cubex-pin-ok", "1"); } catch {}
     window.location.href = d.redirect;
+  }
+
+  async function submitTotp(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(""); setTotpBusy(true);
+    try {
+      const r = await fetch("/api/auth/totp/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: totpCode }) });
+      const d = await r.json();
+      if (!d.ok) { setErr(d.error || "Invalid code"); return; }
+      if (remember) localStorage.setItem("cubex-remember", "1");
+      else localStorage.removeItem("cubex-remember");
+      try { sessionStorage.setItem("cubex-pin-ok", "1"); } catch {}
+      window.location.href = d.redirect;
+    } catch { setErr("Verification failed"); }
+    finally { setTotpBusy(false); }
   }
 
   // Passwordless sign-in with a registered passkey (Face ID / Fingerprint).
@@ -82,6 +101,35 @@ export default function LoginPage() {
 
   const base = "w-full rounded-xl border bg-transparent py-2.5 pl-10 text-sm text-[var(--foreground)] auth-field";
   const altBtn = "auth-alt flex w-full items-center justify-center gap-2 rounded-xl border py-2 text-[13px] font-semibold transition-colors disabled:opacity-60";
+
+  if (totpStep) return (
+    <form onSubmit={submitTotp} className="auth-stagger space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--foreground)" }}>Two-factor auth</h1>
+        <p className="mt-1 text-[13px]" style={{ color: "var(--muted-foreground)" }}>Enter the 6-digit code from your authenticator app.</p>
+      </div>
+      {err && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</p>}
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>Authenticator code</label>
+        <div className="relative">
+          <i className="fa-solid fa-shield-halved pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }} />
+          <input
+            autoFocus type="text" inputMode="numeric" pattern="\d{6}" maxLength={6} required
+            value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            className="w-full rounded-xl border bg-transparent py-2.5 pl-10 pr-3 text-sm tracking-[0.35em] text-[var(--foreground)] auth-field"
+            style={{ borderColor: "var(--border)" }} placeholder="000000" />
+        </div>
+      </div>
+      <button type="submit" disabled={totpBusy || totpCode.length < 6}
+        style={{ background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))` }}
+        className="auth-btn flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+        {totpBusy ? <><i className="fa-solid fa-circle-notch fa-spin" /> Verifying…</> : <>Verify <i className="fa-solid fa-arrow-right text-xs" /></>}
+      </button>
+      <button type="button" onClick={() => { setTotpStep(false); setErr(""); setTotpCode(""); }} className="w-full text-center text-xs hover:underline" style={{ color: "var(--muted-foreground)" }}>
+        <i className="fa-solid fa-arrow-left mr-1 text-[10px]" />Back to login
+      </button>
+    </form>
+  );
 
   return (
     <form onSubmit={submit} className="auth-stagger space-y-3">

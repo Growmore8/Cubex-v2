@@ -94,6 +94,16 @@ export default function ClientMobile({ t }: { t: any }) {
   const [noOpen, setNoOpen] = useState(false);
   const [noForm, setNoForm] = useState<any>({ idx: 0, lots: 0.01, trigger: "", sl: "", tp: "" });
   const [balOpen, setBalOpen] = useState(false);
+
+  // 2FA state
+  const [totpEnabled, setTotpEnabled] = useState(false);
+  const [totpModal, setTotpModal] = useState<"setup" | "disable" | null>(null);
+  const [totpQr, setTotpQr] = useState("");
+  const [totpSecret, setTotpSecret] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [totpBusy, setTotpBusy] = useState(false);
+  const [totpErr, setTotpErr] = useState("");
+  const [totpMsg, setTotpMsg] = useState("");
   const {
     theme, brand, account, accts, accId, pnlOnly, swapEnabled, readOnly, isTrial, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
     selSym, vol, sl, tp, err,
@@ -101,9 +111,11 @@ export default function ClientMobile({ t }: { t: any }) {
     setSelSym, setVol, setSl, setTp, setTf,
     place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr,
     toggleTheme, enablePush, disablePush, addPasskey, openPin, favs, toggleFav, avatarUrl, avatarUploading, uploadAvatar,
-    fmt, csz, pnlOf, dg, markAllNotifsRead, logout, pin,
+    fmt, csz, pnlOf, cSym, fxRate, dg, markAllNotifsRead, logout, pin,
     acctReqModal, setAcctReqModal,
   } = t;
+  const _cSym: string = cSym ?? "$";
+  const _fxRate: number = fxRate ?? 1;
 
   const _mobSymSpreads = (): Record<string, { min: number; max: number; type: string }> => (t as any).symbolSpreads || {};
   const _mobGrpSpread = (): number => (t as any).groupSpread || 0;
@@ -123,6 +135,8 @@ export default function ClientMobile({ t }: { t: any }) {
   const [tradeView, setTradeView] = useState<"positions" | "history">("positions");
   const [mobNews, setMobNews] = useState<any[]>([]);
   const [mobNewsLoading, setMobNewsLoading] = useState(false);
+  const [mobSignals, setMobSignals] = useState<any[]>([]);
+  const [mobSignalsLoaded, setMobSignalsLoaded] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: "", phone: "", country: "" });
   const [profileSaving, setProfileSaving] = useState(false);
@@ -202,7 +216,42 @@ export default function ClientMobile({ t }: { t: any }) {
   useEffect(() => { if (tab === "account" && !myReqsLoaded) loadMyReqs(); }, [tab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const loadMobAlerts = () => { if (!accId) return; fetch(`/api/client/alerts?accountId=${accId}`).then((r) => r.json()).then((r) => { if (r.ok) setMobAlerts(r.alerts || []); }).catch(() => {}); };
   useEffect(() => { loadMobAlerts(); }, [accId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetch("/api/auth/totp/status").then((r) => r.json()).then((d) => { if (d.ok) setTotpEnabled(d.totpEnabled); }).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === "dashboard" && mobNews.length === 0 && !mobNewsLoading) { setMobNewsLoading(true); fetch("/api/client/news?category=forex").then((r) => r.json()).then((d) => { if (d.ok) setMobNews(d.items || []); }).catch(() => {}).finally(() => setMobNewsLoading(false)); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tab === "dashboard" && !mobSignalsLoaded) { fetch("/api/client/signals").then((r) => r.json()).then((d) => { if (d.ok) setMobSignals(d.signals || []); setMobSignalsLoaded(true); }).catch(() => { setMobSignalsLoaded(true); }); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function openTotpSetup() {
+    setTotpErr(""); setTotpMsg(""); setTotpCode(""); setTotpQr(""); setTotpSecret("");
+    setTotpBusy(true);
+    try {
+      const r = await fetch("/api/auth/totp/setup").then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed to start setup");
+      setTotpQr(r.qrDataUrl);
+      setTotpSecret(r.secret);
+      setTotpModal("setup");
+    } catch (e: any) { setTotpErr(e.message || "Failed"); }
+    finally { setTotpBusy(false); }
+  }
+
+  async function confirmTotpEnable() {
+    setTotpErr(""); setTotpBusy(true);
+    try {
+      const r = await fetch("/api/auth/totp/enable", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: totpCode }) }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed");
+      setTotpEnabled(true); setTotpModal(null); setTotpMsg("Two-factor authentication enabled.");
+    } catch (e: any) { setTotpErr(e.message || "Invalid code"); }
+    finally { setTotpBusy(false); }
+  }
+
+  async function confirmTotpDisable() {
+    setTotpErr(""); setTotpBusy(true);
+    try {
+      const r = await fetch("/api/auth/totp/disable", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: totpCode }) }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed");
+      setTotpEnabled(false); setTotpModal(null); setTotpMsg("Two-factor authentication disabled.");
+    } catch (e: any) { setTotpErr(e.message || "Invalid code"); }
+    finally { setTotpBusy(false); }
+  }
+
   const reqRow = (req: any) => {
     const isAcc = req.kind === "ACCOUNT";
     const ic = isAcc ? "fa-circle-plus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";
@@ -214,7 +263,7 @@ export default function ClientMobile({ t }: { t: any }) {
             <i className={"fa-solid text-sm " + ic} style={{ color: col }} />
           </div>
           <div>
-            <div className="text-[12px] font-semibold">{isAcc ? <>New {req.type === "DEMO" ? "Demo" : "Live"} Account <span className="font-normal text-[var(--muted)]">{req.currency}</span></> : <>{req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} <span className="font-bold">${gnum(req.amount, 2)}</span></>}</div>
+            <div className="text-[12px] font-semibold">{isAcc ? <>New {req.type === "DEMO" ? "Demo" : "Live"} Account <span className="font-normal text-[var(--muted)]">{req.currency}</span></> : <>{req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} <span className="font-bold">{_cSym}{gnum(req.amount, 2)}</span></>}</div>
             <div className="text-[10px] text-[var(--muted)]">{isAcc ? `1:${req.leverage}` : (req.method || "—")} · {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : "—"}</div>
           </div>
         </div>
@@ -282,7 +331,28 @@ export default function ClientMobile({ t }: { t: any }) {
   const baselineRef = useRef<Record<string, number>>({});
   const [chartFull, setChartFull] = useState(false);
   const [isTV, setIsTV] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
+  const [nowMsMob, setNowMsMob] = useState(Date.now());
   useEffect(() => { setIsTV(window.location.hostname === "trade.growthcapitalltd.com"); }, []);
+  useEffect(() => {
+    const check = () => { const land = window.innerWidth > window.innerHeight && window.innerWidth > 480; setIsLandscape(land); if (land && tab === "chart") setChartFull(true); };
+    check();
+    window.addEventListener("resize", check);
+    window.addEventListener("orientationchange", check);
+    return () => { window.removeEventListener("resize", check); window.removeEventListener("orientationchange", check); };
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const iv = setInterval(() => setNowMsMob(Date.now()), 30000); return () => clearInterval(iv); }, []);
+  const mobSessions = (() => {
+    const t2 = new Date(nowMsMob).getUTCHours() * 60 + new Date(nowMsMob).getUTCMinutes();
+    const inR = (s: number, e: number) => s < e ? t2 >= s && t2 < e : t2 >= s || t2 < e;
+    return [
+      { n: "TKY", o: inR(0, 9 * 60) },
+      { n: "LON", o: inR(8 * 60, 17 * 60) },
+      { n: "NY",  o: inR(13 * 60, 22 * 60) },
+      { n: "SYD", o: inR(22 * 60, 7 * 60) },
+    ];
+  })();
+  const haptic = (pattern: number | number[] = 40) => { try { navigator.vibrate(pattern); } catch {} };
 
   // capture a session baseline price for % change movers
   useEffect(() => {
@@ -384,7 +454,16 @@ export default function ClientMobile({ t }: { t: any }) {
   const saveModify = async (id: string) => {
     try {
       const body: any = { sl: mSl, tp: mTp };
-      if (mTrail !== "") body.trailingStop = Number(mTrail) || 0;
+      if (mTrail !== "") {
+        const pips = Number(mTrail) || 0;
+        if (pips > 0) {
+          const pos = (positions || []).find((p: any) => p.id === id);
+          const pip = Math.pow(10, -(dg(pos?.symbol ?? "") - 1));
+          body.trailingStop = pips * pip;
+        } else {
+          body.trailingStop = 0;
+        }
+      }
       await fetch("/api/client/orders/" + id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     } catch { }
     setModifyId(null); setExpanded(null);
@@ -434,12 +513,21 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {account && positions && positions.length > 0 && (
               <span className="rounded-full px-2.5 py-1 text-[10px] font-bold tabular-nums" style={{ background: floating >= 0 ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)", color: floating >= 0 ? BUY : SELL, border: `1px solid ${floating >= 0 ? "rgba(22,163,74,0.3)" : "rgba(220,38,38,0.3)"}` }}>
-                {floating >= 0 ? "+" : ""}${fmt(Math.abs(floating))}
+                {(floating >= 0 ? "+" : "-") + _cSym + fmt(Math.abs(floating))}
               </span>
             )}
+            {/* Theme toggle */}
+            <button onClick={() => { haptic(30); toggleTheme && toggleTheme(); }} className="flex h-9 w-9 items-center justify-center rounded-full transition-transform active:scale-90" style={{ background: "var(--soft)", border: "1px solid var(--border)" }} title={theme === "dark" ? "Light mode" : "Dark mode"}>
+              <i className={"fa-solid text-[12px] " + (theme === "dark" ? "fa-sun" : "fa-moon")} style={{ color: "var(--muted)" }} />
+            </button>
+            {/* Price alerts button */}
+            <button onClick={() => { haptic(30); loadMobAlerts(); setMobAlertOpen(true); }} className="relative flex h-9 w-9 items-center justify-center rounded-full transition-transform active:scale-90" style={{ background: "var(--soft)", border: "1px solid var(--border)" }} title="Price Alerts">
+              <i className="fa-solid fa-bullseye text-[13px]" style={{ color: mobAlerts.length > 0 ? GOLD : "var(--muted)" }} />
+              {mobAlerts.filter((a) => a.triggered).length > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: SELL, border: "1.5px solid var(--bg)" }}>{mobAlerts.filter((a) => a.triggered).length}</span>}
+            </button>
             <button onClick={() => { setNotisOpen((o) => !o); if (!notisOpen && unread > 0) fetch("/api/client/notifications", { method: "POST" }).then(() => {}).catch(() => {}); }} className="relative flex h-9 w-9 items-center justify-center rounded-full transition-transform active:scale-90" style={{ background: "var(--soft)", border: "1px solid var(--border)" }}>
               <i className="fa-solid fa-bell text-[13px]" style={{ color: unread > 0 ? GOLD : "var(--muted)" }} />
               {unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: SELL, border: "1.5px solid var(--bg)", boxShadow: `0 0 8px ${SELL}99` }}>{unread > 9 ? "9+" : unread}</span>}
@@ -448,6 +536,17 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
         );
       })()}
+
+      {/* Market sessions bar */}
+      <div className="flex items-center gap-3 overflow-x-auto px-4 py-1.5 text-[9px] font-bold" style={{ borderBottom: "1px solid var(--border)", background: "rgba(0,0,0,0.1)" }}>
+        {mobSessions.map((s) => (
+          <span key={s.n} className="flex items-center gap-1 shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full transition-colors" style={{ background: s.o ? "#16c79a" : "#3b4455" }} />
+            <span style={{ color: s.o ? "#16c79a" : "#4b5563" }}>{s.n}</span>
+          </span>
+        ))}
+        <span className="ml-auto shrink-0 font-mono" style={{ color: "var(--muted)" }}>{new Date(nowMsMob).toUTCString().slice(17, 22)} UTC</span>
+      </div>
 
       {/* Read-only banner */}
       {t.readOnly && (
@@ -600,7 +699,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
                 <div className="relative mt-5">
                   <div className="text-[9px] font-semibold tracking-[0.18em] text-white/55">TOTAL BALANCE</div>
-                  <div className="mt-1 text-[32px] font-extrabold leading-none tracking-tight text-white" style={{ textShadow: "0 2px 14px rgba(0,0,0,0.5)" }}>${fmt(balance)}</div>
+                  <div className="mt-1 text-[32px] font-extrabold leading-none tracking-tight text-white" style={{ textShadow: "0 2px 14px rgba(0,0,0,0.5)" }}>{_cSym}{fmt(balance)}</div>
                   <div className="mt-2 flex items-center gap-2 text-[11px] text-white/75">
                     <span className="font-mono tracking-[0.2em]">{account?.login}</span>
                     <span className="text-white/40">·</span>
@@ -609,8 +708,8 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
                 <div className="relative my-3 h-px" style={{ background: "rgba(255,255,255,0.18)" }} />
                 <div className="relative grid grid-cols-3 gap-2 text-white">
-                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">EQUITY</div><div className="text-[13px] font-bold tabular-nums">${fmt(equity)}</div></div>
-                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE</div><div className="text-[13px] font-bold tabular-nums">${fmt(free)}</div></div>
+                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">EQUITY</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(equity)}</div></div>
+                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(free)}</div></div>
                   <div><div className="text-[8px] tracking-[0.12em] text-white/50">PROFIT</div><div className="text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#5ef2b3" : "#ff9a9a" }}>{floating >= 0 ? "+" : ""}{fmt(floating)}</div></div>
                 </div>
               </div>
@@ -649,7 +748,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   {[1000, 5000, 10000].map((amt) => (
                     <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, var(--card), var(--soft))", border: "1px solid var(--border)" }}>
                       <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#fde7b8,#e0b94e 45%,#b8860b 72%,#fbe9b0)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -2px 3px rgba(0,0,0,0.25), 0 2px 5px rgba(0,0,0,0.28)" }}><i className="fa-solid fa-coins" style={{ color: "#7a5b07", fontSize: 15 }} /></span>
-                      <span className="text-[12px]">${amt.toLocaleString()}</span>
+                      <span className="text-[12px]">{_cSym}{amt.toLocaleString()}</span>
                     </button>
                   ))}
                 </div>
@@ -756,6 +855,42 @@ export default function ClientMobile({ t }: { t: any }) {
               )}
             </div>
 
+            {/* signals above news */}
+            {mobSignalsLoaded && mobSignals.length > 0 && (
+              <div className="glass-card p-3">
+                <div className="mb-2 text-[11px] font-bold tracking-wide"><i className="fa-solid fa-signal mr-1.5" style={{ color: "#2f81f7" }} />ANALYST SIGNALS <span className="ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: "#2f81f722", color: "#2f81f7" }}>{mobSignals.length}</span></div>
+                <div className="space-y-2">
+                  {mobSignals.slice(0, 3).map((sig: any) => {
+                    const isBuy = sig.direction === "BUY";
+                    const dc = isBuy ? "#26a69a" : "#ef5350";
+                    return (
+                      <div key={sig.id} className="rounded-xl border p-2.5" style={{ borderColor: dc + "44", background: dc + "08" }}>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="rounded px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: dc }}>{sig.direction}</span>
+                            <span className="text-[13px] font-bold text-[var(--text)]">{sig.symbol}</span>
+                          </div>
+                          <span className="text-[10px] tabular-nums font-semibold" style={{ color: dc }}>@ {Number(sig.entryPrice).toFixed(5)}</span>
+                        </div>
+                        <div className="flex gap-2 mb-2 text-[10px]" style={{ color: "var(--muted)" }}>
+                          {Number(sig.sl) > 0 && <span>SL <span className="font-semibold" style={{ color: "#ef5350" }}>{Number(sig.sl).toFixed(5)}</span></span>}
+                          {Number(sig.tp) > 0 && <span>TP <span className="font-semibold" style={{ color: "#26a69a" }}>{Number(sig.tp).toFixed(5)}</span></span>}
+                        </div>
+                        {sig.rationale && <div className="mb-2 text-[10px] italic leading-snug" style={{ color: "var(--muted)" }}>{sig.rationale}</div>}
+                        <button
+                          onClick={() => { setSelSym(sig.symbol); setTab("chart"); }}
+                          className="w-full rounded-lg py-1.5 text-[11px] font-semibold text-white"
+                          style={{ background: dc }}
+                        >
+                          <i className={`fa-solid fa-arrow-trend-${isBuy ? "up" : "down"} mr-1`} />Trade This Signal
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* news below market movers */}
             <div className="glass-card p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -771,7 +906,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       <div className="text-[12px] font-semibold leading-snug text-[var(--text)] line-clamp-2">{n.headline}</div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-[var(--muted)]">
                         <span>{n.source}</span><span>·</span>
-                        <span>{n.datetime ? new Date(n.datetime * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}</span>
+                        <span>{n.datetime ? (() => { const ms = Date.now() - n.datetime * 1000; const m = Math.floor(ms / 60000); if (m < 60) return m + "m ago"; const h = Math.floor(m / 60); if (h < 24) return h + "h ago"; return new Date(n.datetime * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" }); })() : ""}</span>
                       </div>
                     </a>
                   ))}
@@ -923,7 +1058,7 @@ export default function ClientMobile({ t }: { t: any }) {
             {/* Full order sheet — slides up from bottom */}
             {orderSheet && (() => {
               const dd = dg(selSym); const sprd = _mobSpreadPips(selSym);
-              const mobMg = price != null ? ((chartVol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0;
+              const mobMg = (price != null ? ((chartVol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0) / _fxRate;
               const doPlace = async (side: "BUY" | "SELL") => {
                 if (mobOrderType === "MARKET") {
                   const trailPips = Number(mobTrail) || 0;
@@ -1000,11 +1135,11 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-[var(--border)] text-center text-[10px]">
                       <div className="border-r border-[var(--border)] py-1.5">
                         <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>Margin</div>
-                        <div className="font-semibold tabular-nums">${fmt(mobMg)}</div>
+                        <div className="font-semibold tabular-nums">{_cSym}{fmt(mobMg)}</div>
                       </div>
                       <div className="border-r border-[var(--border)] py-1.5">
                         <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>Free Margin</div>
-                        <div className="font-semibold tabular-nums" style={{ color: "#22c55e" }}>${fmt(free)}</div>
+                        <div className="font-semibold tabular-nums" style={{ color: "#22c55e" }}>{_cSym}{fmt(free)}</div>
                       </div>
                       <div className="py-1.5">
                         <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</div>
@@ -1124,14 +1259,14 @@ export default function ClientMobile({ t }: { t: any }) {
                     }}
                     onTouchEnd={() => {
                       const dx = swipeX[p.id] ?? 0;
-                      if (dx > 90) { close(p.id); setSwipeX((prev) => { const n = { ...prev }; delete n[p.id]; return n; }); }
+                      if (dx > 90) { haptic([60, 40, 80]); close(p.id); setSwipeX((prev) => { const n = { ...prev }; delete n[p.id]; return n; }); }
                       else setSwipeX((prev) => ({ ...prev, [p.id]: 0 }));
                     }}
                   >
                   {/* Tap the row to open/close trade details (no separate arrow) */}
                   <div onClick={() => setExpanded(open ? null : p.id)} className="flex cursor-pointer select-none items-center justify-between p-3 active:bg-[var(--soft)]">
                     <div>
-                      <div className="text-sm font-bold">{p.symbol} <span className="text-[12px] font-semibold" style={{ color: p.type === "BUY" ? BLUE : SELL }}>{p.type} {p.lots}</span></div>
+                      <div className="text-sm font-bold">{p.symbol} <span className="text-[12px] font-semibold" style={{ color: p.type === "BUY" ? BLUE : SELL }}>{p.type} {p.lots}</span>{p.masterTradeId && <span className="ml-1 rounded px-0.5 text-[8px] font-bold" style={{ background: "#7c3aed22", color: "#7c3aed" }}>COPY</span>}</div>
                       <div className="text-[10px] text-[var(--muted)]">{gnum(Number(p.openPrice), dd)} → {gnum(cur, dd)}</div>
                       {(p.sl > 0 || p.tp > 0 || p.trailingStop > 0) && (
                         <div className="mt-0.5 flex gap-2 text-[9px] font-semibold tabular-nums">
@@ -1156,12 +1291,12 @@ export default function ClientMobile({ t }: { t: any }) {
                         <div><div className="text-[var(--muted)]">S/L</div><div className="font-semibold">{p.sl ? gnum(Number(p.sl), dd) : "—"}</div></div>
                         <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{p.tp ? gnum(Number(p.tp), dd) : "—"}</div></div>
                         <div><div className="text-[var(--muted)]">TYPE</div><div className="font-semibold">{p.type}</div></div>
-                        {Number(p.trailingStop ?? 0) > 0 && <div><div className="text-[var(--muted)]">TRAIL</div><div className="font-semibold" style={{ color: "#f59e0b" }}>{Number(p.trailingStop)}p</div></div>}
+                        {Number(p.trailingStop ?? 0) > 0 && <div><div className="text-[var(--muted)]">TRAIL</div><div className="font-semibold" style={{ color: "#f59e0b" }}>{Math.round(Number(p.trailingStop) / Math.pow(10, -(dd - 1)))}p</div></div>}
                         {swapEnabled && Number(p.commission ?? 0) !== 0 && <div><div className="text-[var(--muted)]">COMM</div><div className="font-semibold" style={{ color: SELL }}>-{fmt(Math.abs(Number(p.commission)))}</div></div>}
                         {swapEnabled && Number(p.swap ?? 0) !== 0 && <div><div className="text-[var(--muted)]">SWAP</div><div className="font-semibold" style={{ color: Number(p.swap) >= 0 ? BUY : SELL }}>{Number(p.swap) >= 0 ? "+" : ""}{fmt(Number(p.swap))}</div></div>}
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2">
-                        <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); setMTrail(p.trailingStop > 0 ? String(p.trailingStop) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-pen mr-1" />Modify</button>
+                        <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); setMTrail(p.trailingStop > 0 ? String(Math.round(Number(p.trailingStop) / Math.pow(10, -(dd - 1)))) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-pen mr-1" />Modify</button>
                         {Number(p.lots) > 0.01 ? (
                           <button onClick={() => { setMobPartial({id: p.id, lots: Number(p.lots), sym: p.symbol}); setMobPartialLots(""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-scissors mr-1" />Partial</button>
                         ) : (
@@ -1339,7 +1474,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       </div>
                       {/* amount */}
                       <div className="shrink-0 text-right">
-                        <div className="text-[15px] font-bold tabular-nums" style={{ color: meta.color }}>{sign}${fmt(amt)}</div>
+                        <div className="text-[15px] font-bold tabular-nums" style={{ color: meta.color }}>{sign}{_cSym}{fmt(amt)}</div>
                       </div>
                     </div>
                   );
@@ -1392,25 +1527,25 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
               <div className="flex items-center justify-between py-1 text-[12px]">
                 <span>{account?.login} {account?.type} <i className="fa-solid fa-circle text-[7px] align-middle" style={{ color: BUY }} /></span>
-                <span className="font-bold" style={{ color: BUY }}>${fmt(balance)}</span>
+                <span className="font-bold" style={{ color: BUY }}>{_cSym}{fmt(balance)}</span>
               </div>
               <div className="my-2 border-t border-[var(--border)]" />
-              <div className="flex items-center justify-between py-1 text-[12px] font-bold"><span>Total Balance</span><span>${fmt(totalBal)}</span></div>
+              <div className="flex items-center justify-between py-1 text-[12px] font-bold"><span>Total Balance</span><span>{_cSym}{fmt(totalBal)}</span></div>
               <div className="mt-2 text-[10px] font-semibold text-[var(--muted)]">ACCOUNT DETAILS</div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Deposit</span><span>${fmt(Number(account?.deposit || 0))}</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Withdrawal</span><span>${fmt(Number(account?.withdrawal || 0))}</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Profit</span><span style={{ color: Number(account?.pnl || 0) >= 0 ? BUY : SELL }}>${fmt(Number(account?.pnl || 0))}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Deposit</span><span>{_cSym}{fmt(Number(account?.deposit || 0))}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Withdrawal</span><span>{_cSym}{fmt(Number(account?.withdrawal || 0))}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Profit</span><span style={{ color: Number(account?.pnl || 0) >= 0 ? BUY : SELL }}>{_cSym}{fmt(Number(account?.pnl || 0))}</span></div>
             </div>
 
             {/* running trade summary */}
             <div className="glass-card p-4">
               <div className="mb-2 text-[11px] font-bold tracking-wide">RUNNING TRADE SUMMARY</div>
               <div className="mb-2 text-[10px] text-[var(--muted)]">Showing: {account?.login} · {account?.type} · {(positions || []).length} open</div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Equity</span><span style={{ color: equity >= balance ? BUY : SELL }}>${fmt(equity)}</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Margin</span><span>${fmt(used)}</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Free Margin</span><span>${fmt(free)}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Equity</span><span style={{ color: equity >= balance ? BUY : SELL }}>{_cSym}{fmt(equity)}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Margin</span><span>{_cSym}{fmt(used)}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Free Margin</span><span>{_cSym}{fmt(free)}</span></div>
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Margin Level</span><span>{level ? level.toFixed(2) : "0.00"}%</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Profit</span><span style={{ color: floating >= 0 ? BUY : SELL }}>${fmt(floating)}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Profit</span><span style={{ color: floating >= 0 ? BUY : SELL }}>{_cSym}{fmt(floating)}</span></div>
             </div>
 
             {/* by direction */}
@@ -1421,13 +1556,13 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div className="text-[11px] font-bold" style={{ color: BUY }}>BUY</div>
                   <div className="mt-1 text-sm font-bold">{sumLots(buyPos).toFixed(2)} lots</div>
                   <div className="text-[10px] text-[var(--muted)]">{buyPos.length} trades</div>
-                  <div className="mt-1 text-[12px] font-semibold" style={{ color: sumPL(buyPos) >= 0 ? BUY : SELL }}>${fmt(sumPL(buyPos))}</div>
+                  <div className="mt-1 text-[12px] font-semibold" style={{ color: sumPL(buyPos) >= 0 ? BUY : SELL }}>{_cSym}{fmt(sumPL(buyPos))}</div>
                 </div>
                 <div className="rounded-xl p-3" style={{ background: "rgba(220,38,38,.1)" }}>
                   <div className="text-[11px] font-bold" style={{ color: SELL }}>SELL</div>
                   <div className="mt-1 text-sm font-bold">{sumLots(sellPos).toFixed(2)} lots</div>
                   <div className="text-[10px] text-[var(--muted)]">{sellPos.length} trades</div>
-                  <div className="mt-1 text-[12px] font-semibold" style={{ color: sumPL(sellPos) >= 0 ? BUY : SELL }}>${fmt(sumPL(sellPos))}</div>
+                  <div className="mt-1 text-[12px] font-semibold" style={{ color: sumPL(sellPos) >= 0 ? BUY : SELL }}>{_cSym}{fmt(sumPL(sellPos))}</div>
                 </div>
               </div>
             </div>
@@ -1445,7 +1580,7 @@ export default function ClientMobile({ t }: { t: any }) {
                         <div className="text-[12px] font-semibold">{sym}</div>
                         <div className="text-[10px] text-[var(--muted)]">{arr.length} trades · {sumLots(arr).toFixed(2)}L · B:{buyL.toFixed(2)} S:{sellL.toFixed(2)}</div>
                       </div>
-                      <div className="text-[12px] font-bold" style={{ color: pl >= 0 ? BUY : SELL }}>${fmt(pl)}</div>
+                      <div className="text-[12px] font-bold" style={{ color: pl >= 0 ? BUY : SELL }}>{_cSym}{fmt(pl)}</div>
                     </div>
                   );
                 })}
@@ -1462,7 +1597,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div className="flex items-center gap-1.5 text-[12px] font-semibold">{a.login}
                       <span className="rounded px-1.5 py-0.5 text-[8px] font-bold" style={{ background: "var(--soft)", color: a.id === accId ? BUY : "var(--muted)" }}>{a.id === accId ? "ACTIVE" : "TAP TO SWITCH"}</span>
                     </div>
-                    <div className="text-[10px] text-[var(--muted)]">${fmt(acctBal(a))} · 1:{a.leverage}</div>
+                    <div className="text-[10px] text-[var(--muted)]">{_cSym}{fmt(acctBal(a))} · 1:{a.leverage}</div>
                   </div>
                   {a.id === accId && <i className="fa-solid fa-circle-check" style={{ color: BUY }} />}
                 </button>
@@ -1480,7 +1615,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div className="flex items-center gap-1.5 text-[12px] font-semibold">{a.login}
                       <span className="rounded px-1.5 py-0.5 text-[8px] font-bold" style={{ background: "var(--soft)", color: a.id === accId ? BUY : "var(--muted)" }}>{a.id === accId ? "ACTIVE" : "TAP TO SWITCH"}</span>
                     </div>
-                    <div className="text-[10px] text-[var(--muted)]">${fmt(acctBal(a))} · 1:{a.leverage}</div>
+                    <div className="text-[10px] text-[var(--muted)]">{_cSym}{fmt(acctBal(a))} · 1:{a.leverage}</div>
                   </div>
                   {a.id === accId && <i className="fa-solid fa-circle-check" style={{ color: BUY }} />}
                 </button>
@@ -1524,6 +1659,18 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div className="h-5 w-5 rounded-full bg-white shadow transition-transform duration-200" style={{ transform: pushEnabled ? "translateX(20px)" : "translateX(0)" }} />
                 </div>
               </button>
+              {/* 2FA */}
+              <button onClick={() => { setTotpErr(""); setTotpMsg(""); setTotpCode(""); if (totpEnabled) setTotpModal("disable"); else openTotpSetup(); }} disabled={totpBusy} className="flex w-full items-center gap-3 py-2.5 text-left disabled:opacity-60">
+                <i className="fa-solid fa-lock" style={{ color: totpEnabled ? BUY : "var(--muted)" }} />
+                <div className="flex-1">
+                  <div className="text-[12px] font-semibold">Authenticator App (2FA)</div>
+                  <div className="text-[10px] text-[var(--muted)]">{totpBusy ? "Loading…" : totpEnabled ? "Enabled — tap to disable" : "Tap to set up Google Authenticator"}</div>
+                </div>
+                <div className="flex h-6 w-11 items-center rounded-full px-0.5 transition-colors duration-200" style={{ background: totpEnabled ? BUY : "var(--border)" }}>
+                  <div className="h-5 w-5 rounded-full bg-white shadow transition-transform duration-200" style={{ transform: totpEnabled ? "translateX(20px)" : "translateX(0)" }} />
+                </div>
+              </button>
+              {totpMsg && <div className="pl-7 text-[10px]" style={{ color: BUY }}>{totpMsg}</div>}
               <button onClick={toggleTheme} className="flex w-full items-center gap-3 py-2.5 text-left">
                 <i className={`fa-solid fa-${theme === "dark" ? "sun" : "moon"} text-[var(--muted)]`} />
                 <div className="flex-1"><div className="text-[12px] font-semibold">{theme === "dark" ? "Light mode" : "Dark mode"}</div></div>
@@ -1600,7 +1747,8 @@ export default function ClientMobile({ t }: { t: any }) {
             const rp = await fetch("/api/client/pending", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ symbol: selSym, side, kind, lots: Number(noOpenVol), price: Number(mobPendingPrice), sl: Number(sl)||0, tp: Number(tp)||0, comment: mobComment||undefined, accountId: accId }) }).then((x) => x.json()).catch(() => ({ok:false}));
             ok = rp.ok; if (ok) (t as any).load?.();
           }
-          if (ok) { setNoOpen(false); setMobTpEnabled(false); setMobSlEnabled(false); }
+          if (ok) { haptic([40, 30, 60]); setNoOpen(false); setMobTpEnabled(false); setMobSlEnabled(false); }
+          else { haptic([80, 40, 80]); }
         };
         const sprd = _mobSpreadPips(selSym);
         return (
@@ -1667,11 +1815,11 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-[var(--border)] text-center text-[10px]">
                   <div className="border-r border-[var(--border)] py-1.5">
                     <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>Margin</div>
-                    <div className="font-semibold tabular-nums">{account ? (() => { const mg = price != null ? ((noOpenVol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0; return "$" + fmt(mg); })() : "$0"}</div>
+                    <div className="font-semibold tabular-nums">{account ? (() => { const mg = (price != null ? ((noOpenVol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0) / _fxRate; return _cSym + fmt(mg); })() : _cSym + "0"}</div>
                   </div>
                   <div className="border-r border-[var(--border)] py-1.5">
                     <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>Free Margin</div>
-                    <div className="font-semibold tabular-nums" style={{ color: "#22c55e" }}>{account ? "$" + fmt(free) : "--"}</div>
+                    <div className="font-semibold tabular-nums" style={{ color: "#22c55e" }}>{account ? _cSym + fmt(free) : "--"}</div>
                   </div>
                   <div className="py-1.5">
                     <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</div>
@@ -1718,16 +1866,16 @@ export default function ClientMobile({ t }: { t: any }) {
       {/* PERSISTENT BALANCE BAR */}
       <button onClick={() => setBalOpen((v: boolean) => !v)} className="glass flex w-full items-center justify-between border-t px-4 py-1.5" style={{ borderColor: "var(--border)", background: theme === "dark" ? "rgba(20,24,34,0.55)" : "var(--panel)" }}>
         <span className="text-[11px] text-[var(--muted)]"><i className="fa-solid fa-briefcase mr-1.5" />Balance <i className={"fa-solid ml-0.5 " + (balOpen ? "fa-chevron-down" : "fa-chevron-up")} /></span>
-        <span className="text-base font-bold tabular-nums" style={{ color: balance >= 0 ? BUY : SELL }}>${fmt(balance)}</span>
+        <span className="text-base font-bold tabular-nums" style={{ color: balance >= 0 ? BUY : SELL }}>{_cSym}{fmt(balance)}</span>
       </button>
       {balOpen && (
         <div className="border-t border-[var(--border)] px-4 py-3" style={{ background: "var(--card)" }}>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-[var(--muted)]">Balance</span><span className="font-semibold tabular-nums">${fmt(balance)}</span></div>
-            <div className="flex justify-between"><span className="text-[var(--muted)]">Equity</span><span className="font-semibold tabular-nums">${fmt(equity)}</span></div>
-            <div className="flex justify-between"><span className="text-[var(--muted)]">Floating P/L</span><span className="font-semibold tabular-nums" style={{ color: floating >= 0 ? BUY : SELL }}>${fmt(floating)}</span></div>
-            <div className="flex justify-between"><span className="text-[var(--muted)]">Used Margin</span><span className="font-semibold tabular-nums">${fmt(used)}</span></div>
-            <div className="flex justify-between"><span className="text-[var(--muted)]">Free Margin</span><span className="font-semibold tabular-nums">${fmt(free)}</span></div>
+            <div className="flex justify-between"><span className="text-[var(--muted)]">Balance</span><span className="font-semibold tabular-nums">{_cSym}{fmt(balance)}</span></div>
+            <div className="flex justify-between"><span className="text-[var(--muted)]">Equity</span><span className="font-semibold tabular-nums">{_cSym}{fmt(equity)}</span></div>
+            <div className="flex justify-between"><span className="text-[var(--muted)]">Floating P/L</span><span className="font-semibold tabular-nums" style={{ color: floating >= 0 ? BUY : SELL }}>{_cSym}{fmt(floating)}</span></div>
+            <div className="flex justify-between"><span className="text-[var(--muted)]">Used Margin</span><span className="font-semibold tabular-nums">{_cSym}{fmt(used)}</span></div>
+            <div className="flex justify-between"><span className="text-[var(--muted)]">Free Margin</span><span className="font-semibold tabular-nums">{_cSym}{fmt(free)}</span></div>
             <div className="flex justify-between"><span className="text-[var(--muted)]">Margin Level</span><span className="font-semibold tabular-nums">{used > 0 ? level.toFixed(1) + "%" : "—"}</span></div>
           </div>
         </div>
@@ -1771,7 +1919,7 @@ export default function ClientMobile({ t }: { t: any }) {
               {(accts || []).filter((a: any) => a.id !== xfer?.fromId).map((a: any) => <option key={a.id} value={a.id}>{a.login} ({a.type})</option>)}
             </select>
             {(() => { const xf = (accts || []).find((a: any) => a.id === (xfer?.fromId || accId)); const av = xf ? (pnlOnly ? Math.max(0, Number(xf.pnl || 0)) : acctBal(xf)) : 0; return (
-              <div className="mb-1 flex items-center justify-between text-[10px]"><span className="text-[var(--muted)]">Available {pnlOnly ? "(profit only)" : "balance"}</span><button type="button" onClick={() => setXfer({ ...(xfer || {}), amount: String(av.toFixed(2)) })} className="font-semibold" style={{ color: "#22d3ee" }}>${fmt(av)} · Use max</button></div>
+              <div className="mb-1 flex items-center justify-between text-[10px]"><span className="text-[var(--muted)]">Available {pnlOnly ? "(profit only)" : "balance"}</span><button type="button" onClick={() => setXfer({ ...(xfer || {}), amount: String(av.toFixed(2)) })} className="font-semibold" style={{ color: "#22d3ee" }}>{_cSym}{fmt(av)} · Use max</button></div>
             ); })()}
             <label className="text-[10px] text-[var(--muted)]">Amount</label>
             <input type="number" inputMode="decimal" value={xfer?.amount || ""} onChange={(e) => setXfer({ ...(xfer || {}), amount: e.target.value })} placeholder="0.00" className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-[12px] text-[var(--text)]" />
@@ -1780,6 +1928,45 @@ export default function ClientMobile({ t }: { t: any }) {
               <button onClick={() => setXferModal(false)} className="flex-1 rounded-lg border border-[var(--border)] py-2 text-[12px]">Cancel</button>
               <button onClick={doTransfer} className="flex-1 rounded-lg py-2 text-[12px] font-semibold text-white" style={{ background: BLUE }}>Transfer</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2FA setup / disable modal */}
+      {totpModal && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => { setTotpModal(null); setTotpErr(""); setTotpCode(""); }}>
+          <div className="w-full max-w-sm rounded-2xl p-5 shadow-2xl" style={{ background: "var(--panel)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            {totpModal === "setup" ? (<>
+              <div className="mb-3 text-base font-bold">Set up Two-Factor Authentication</div>
+              <p className="mb-3 text-[12px]" style={{ color: "var(--muted)" }}>Scan this QR code with Google Authenticator, Authy, or any TOTP app. Then enter the 6-digit code to confirm.</p>
+              {totpQr && <img src={totpQr} alt="QR code" className="mx-auto mb-2 rounded-lg" style={{ width: 160, height: 160 }} />}
+              <div className="mb-3 rounded-lg px-3 py-2 text-center text-[10px] font-mono break-all" style={{ background: "var(--soft)", color: "var(--muted)" }}>{totpSecret}</div>
+              {totpErr && <div className="mb-2 text-[11px]" style={{ color: SELL }}>{totpErr}</div>}
+              <input autoFocus type="text" inputMode="numeric" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="Enter 6-digit code" className="mb-3 w-full rounded-xl border px-3 py-2.5 text-center text-sm tracking-[0.4em]" style={{ borderColor: "var(--border)", background: "var(--soft)", color: "var(--text)" }} />
+              <div className="flex gap-2">
+                <button onClick={() => { setTotpModal(null); setTotpCode(""); setTotpErr(""); }} className="flex-1 rounded-xl py-2.5 text-sm font-semibold" style={{ background: "var(--soft)", color: "var(--muted)" }}>Cancel</button>
+                <button onClick={confirmTotpEnable} disabled={totpBusy || totpCode.length < 6}
+                  className="flex-[2] rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ background: `linear-gradient(135deg, ${BUY}, #15803d)` }}>
+                  {totpBusy ? <i className="fa-solid fa-circle-notch fa-spin" /> : "Enable 2FA"}
+                </button>
+              </div>
+            </>) : (<>
+              <div className="mb-2 text-base font-bold">Disable Two-Factor Authentication</div>
+              <p className="mb-3 text-[12px]" style={{ color: "var(--muted)" }}>Enter the 6-digit code from your authenticator app to confirm.</p>
+              {totpErr && <div className="mb-2 text-[11px]" style={{ color: SELL }}>{totpErr}</div>}
+              <input autoFocus type="text" inputMode="numeric" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="Enter 6-digit code" className="mb-3 w-full rounded-xl border px-3 py-2.5 text-center text-sm tracking-[0.4em]" style={{ borderColor: "var(--border)", background: "var(--soft)", color: "var(--text)" }} />
+              <div className="flex gap-2">
+                <button onClick={() => { setTotpModal(null); setTotpCode(""); setTotpErr(""); }} className="flex-1 rounded-xl py-2.5 text-sm font-semibold" style={{ background: "var(--soft)", color: "var(--muted)" }}>Cancel</button>
+                <button onClick={confirmTotpDisable} disabled={totpBusy || totpCode.length < 6}
+                  className="flex-[2] rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ background: `linear-gradient(135deg, ${SELL}, #b91c1c)` }}>
+                  {totpBusy ? <i className="fa-solid fa-circle-notch fa-spin" /> : "Disable 2FA"}
+                </button>
+              </div>
+            </>)}
           </div>
         </div>
       )}

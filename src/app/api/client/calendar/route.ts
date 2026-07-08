@@ -1,44 +1,61 @@
 import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
-import { prisma } from "@/lib/prisma";
 
-async function getFinnhubKey(): Promise<string> {
+// Forex Factory publish a free public JSON feed updated hourly.
+// Times are US Eastern — convert to UTC so the client can render in local tz.
+function toUtcString(date: string, time: string): string | null {
   try {
-    const rec = await prisma.setting.findUnique({ where: { key: "feeds" } });
-    const v: any = (rec && rec.value) || {};
-    if (typeof v.finnhubKey === "string" && v.finnhubKey.trim()) return v.finnhubKey.trim();
-  } catch {}
-  return process.env.FINNHUB_KEY || "";
+    // date = "Jan 14, 2025", time = "8:30am" | "All Day" | "Tentative"
+    const d = new Date(date + " UTC");
+    if (isNaN(d.getTime())) return null;
+    const Y = d.getUTCFullYear(), Mo = d.getUTCMonth(), D = d.getUTCDate();
+    const lower = (time || "").toLowerCase().trim();
+    if (!lower || lower === "all day" || lower === "tentative") {
+      return `${Y}-${String(Mo + 1).padStart(2, "0")}-${String(D).padStart(2, "0")} 00:00:00`;
+    }
+    const m = lower.match(/^(\d{1,2}):(\d{2})(am|pm)$/);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    if (m[3] === "pm" && h !== 12) h += 12;
+    if (m[3] === "am" && h === 12) h = 0;
+    // ET→UTC: EDT (Apr–Oct) = +4h, EST (Nov–Mar) = +5h
+    h += Mo >= 3 && Mo <= 9 ? 4 : 5;
+    const dt = new Date(Date.UTC(Y, Mo, D, h, min, 0));
+    return dt.toISOString().slice(0, 19).replace("T", " ");
+  } catch { return null; }
 }
 
-export async function GET(req: Request) {
+const FF_URLS = [
+  "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+  "https://nfs.faireconomy.media/ff_calendar_nextweek.json",
+];
+
+export async function GET() {
   const s = await requireClient();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-
-  const token = await getFinnhubKey();
-  if (!token) return NextResponse.json({ ok: true, events: [] }); // no key configured
-
-  const url = new URL(req.url);
-  const from = url.searchParams.get("from") || new Date().toISOString().slice(0, 10);
-  const to   = url.searchParams.get("to")   || new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10);
-
   try {
-    const r = await fetch(
-      `https://finnhub.io/api/v1/calendar/economic?from=${from}&to=${to}&token=${token}`,
-      { next: { revalidate: 1800 } } // cache 30 min
+    const results = await Promise.allSettled(
+      FF_URLS.map((u) => fetch(u, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 3600 } }).then((r) => r.json()))
     );
-    if (!r.ok) return NextResponse.json({ ok: true, events: [] });
-    const data = await r.json();
-    const events = (data.economicCalendar || []).map((e: any) => ({
-      time:     e.time || "",
-      country:  e.country || "",
-      event:    e.event || "",
-      impact:   e.impact || "",
-      actual:   e.actual ?? null,
-      estimate: e.estimate ?? null,
-      prev:     e.prev ?? null,
-      unit:     e.unit || "",
-    }));
+    const events: any[] = [];
+    for (const r of results) {
+      if (r.status !== "fulfilled" || !Array.isArray(r.value)) continue;
+      for (const ev of r.value) {
+        events.push({
+          time:     toUtcString(ev.date, ev.time),
+          impact:   (ev.impact || "").toLowerCase(),
+          event:    ev.title || "",
+          country:  ev.country || "",
+          actual:   ev.actual && ev.actual !== "" ? ev.actual : null,
+          estimate: ev.forecast && ev.forecast !== "" ? ev.forecast : null,
+          prev:     ev.previous && ev.previous !== "" ? ev.previous : null,
+          unit:     "",
+        });
+      }
+    }
+    // Sort chronologically; null times (all-day) sort to start of their date.
+    events.sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
     return NextResponse.json({ ok: true, events });
   } catch {
     return NextResponse.json({ ok: true, events: [] });

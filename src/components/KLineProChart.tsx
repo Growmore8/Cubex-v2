@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { registerOverlay, init as klineInit } from "klinecharts";
 import TVChart, { type ChartPosition } from "./TVChart";
@@ -146,6 +146,107 @@ function historyLimit(tfStr: string): number {
   return 800;
 }
 
+// ─── Drawing persistence helpers (module-level, no component state needed) ───
+const DRAW_KEY = (sym: string) => `cx-draw:${sym}`;
+
+function saveUserDrawings(kChart: any, sym: string) {
+  try {
+    const overlays: any[] = kChart.getOverlays?.() ?? [];
+    const user = overlays.filter(
+      (o) =>
+        o.name !== "cubeXLine" &&
+        Array.isArray(o.points) &&
+        o.points.length > 0 &&
+        o.points.every((p: any) => p != null && p.value != null),
+    );
+    if (user.length > 0) {
+      localStorage.setItem(DRAW_KEY(sym), JSON.stringify(user.map((o) => ({ name: o.name, points: o.points }))));
+    } else {
+      localStorage.removeItem(DRAW_KEY(sym));
+    }
+  } catch {}
+}
+
+function clearUserDrawings(kChart: any) {
+  try {
+    const overlays: any[] = kChart.getOverlays?.() ?? [];
+    for (const o of overlays) {
+      if (o.name !== "cubeXLine") {
+        try { kChart.removeOverlay?.({ id: o.id }); } catch {}
+      }
+    }
+  } catch {}
+}
+
+function loadUserDrawings(kChart: any, sym: string) {
+  try {
+    const raw = localStorage.getItem(DRAW_KEY(sym));
+    if (!raw) return;
+    const items: Array<{ name: string; points: any[] }> = JSON.parse(raw);
+    for (const item of items) {
+      kChart.createOverlay?.({ name: item.name, points: item.points, lock: false, zLevel: 5 });
+    }
+  } catch {}
+}
+
+// ─── Drawing toolbar tool definitions ─────────────────────────────────────────
+const DRAW_TOOLS = [
+  {
+    id: "none",
+    label: "Select (Esc)",
+    icon: (
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+        <path d="M14.082 2.182a.5.5 0 0 1 .103.557L8.528 15.467a.5.5 0 0 1-.917-.007L5.57 10.694.803 8.652a.5.5 0 0 1-.006-.916l12.728-5.657a.5.5 0 0 1 .557.103z" />
+      </svg>
+    ),
+  },
+  {
+    id: "horizontalStraightLine",
+    label: "Horizontal Line",
+    icon: (
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeLinecap="round">
+        <line x1="1" y1="8" x2="15" y2="8" strokeWidth="1.8" />
+        <circle cx="8" cy="8" r="1.7" fill="currentColor" stroke="none" />
+      </svg>
+    ),
+  },
+  {
+    id: "straightLine",
+    label: "Trend Line",
+    icon: (
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeLinecap="round">
+        <line x1="2" y1="13" x2="14" y2="3" strokeWidth="1.8" />
+        <circle cx="2" cy="13" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="14" cy="3" r="1.5" fill="currentColor" stroke="none" />
+      </svg>
+    ),
+  },
+  {
+    id: "fibRetrace",
+    label: "Fibonacci Retracement",
+    icon: (
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeLinecap="round">
+        <line x1="1.5" y1="3"    x2="14.5" y2="3"    strokeWidth="1.4" />
+        <line x1="1.5" y1="6.5"  x2="14.5" y2="6.5"  strokeWidth="1.1" strokeOpacity="0.65" />
+        <line x1="1.5" y1="9.5"  x2="14.5" y2="9.5"  strokeWidth="1.1" strokeOpacity="0.65" />
+        <line x1="1.5" y1="13"   x2="14.5" y2="13"   strokeWidth="1.4" />
+        <line x1="2.5" y1="3"    x2="2.5"  y2="13"   strokeWidth="1" strokeOpacity="0.5" />
+        <line x1="13.5" y1="3"   x2="13.5" y2="13"   strokeWidth="1" strokeOpacity="0.5" />
+      </svg>
+    ),
+  },
+  {
+    id: "parallelStraightLine",
+    label: "Parallel Channel",
+    icon: (
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeLinecap="round">
+        <line x1="2" y1="10.5" x2="14" y2="5.5" strokeWidth="1.8" />
+        <line x1="2" y1="13"   x2="14" y2="8"   strokeWidth="1.8" />
+      </svg>
+    ),
+  },
+];
+
 // ─── KlineCharts Pro chart (all non-TV domains) ──────────────────────────────
 function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, showDrawingTools, positions, spreadPips }: Props) {
   const containerRef    = useRef<HTMLDivElement>(null);
@@ -160,6 +261,11 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
   const positionsRef   = useRef(positions); positionsRef.current = positions;
   const spreadRef      = useRef(spreadPips ?? 0); spreadRef.current = spreadPips ?? 0;
   const digitsRef      = useRef(digits); digitsRef.current = digits;
+  const symbolRef      = useRef(symbol); symbolRef.current = symbol;
+
+  // Drawing toolbar state
+  const [activeTool, setActiveTool] = useState("none");
+  const [chartReady, setChartReady] = useState(false);
 
   // ── Chart init ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -255,12 +361,12 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
       mainIndicators: [],
       subIndicators: [],
       datafeed,
-      drawingBarVisible: showDrawingTools ?? !bare,
-      ...({ periodBarVisible: false, timezoneBarVisible: false, indicatorBarVisible: showDrawingTools ?? false } as any),
+      // Custom floating toolbar replaces the built-in drawing bar
+      drawingBarVisible: false,
+      ...({ periodBarVisible: false, timezoneBarVisible: false, indicatorBarVisible: false } as any),
       styles: {
         candle: {
           tooltip: {
-            // Only show OHLC values when the user hovers/crosses the chart, not always
             showRule: "follow_cross",
             showType: "standard",
           },
@@ -273,13 +379,13 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
     // KlineChartPro renders via SolidJS which calls klinecharts init() inside onMount
     // (asynchronous). After ~300ms that sets the k-line-chart-id attribute on the inner
     // element. klineInit(el) then returns the existing instance from its instances Map.
-    // We call drawOverlaysRef so positions are drawn without waiting for a price tick.
     const resolveTimer = setTimeout(() => {
       if (!kChartRef.current && containerRef.current) {
         const el = containerRef.current.querySelector("[k-line-chart-id]") as HTMLElement | null;
         if (el) kChartRef.current = klineInit(el);
       }
       drawOverlaysRef.current();
+      setChartReady(true);
     }, 400);
 
     return () => {
@@ -288,6 +394,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
       if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
       chartRef.current = null;
       kChartRef.current = null;
+      setChartReady(false);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -311,16 +418,13 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
   // ── Position / SL / TP / spread overlays (MT5 style) ────────────────────────
   useEffect(() => {
     const doDrawOverlays = () => {
-      // klinecharts sets k-line-chart-id on the inner element inside its own onMount.
-      // klineInit(el) returns the cached instance from the instances Map — giving us
-      // the real chart API with createOverlay / removeOverlay (not on KLineChartPro).
       if (!kChartRef.current && containerRef.current) {
         const el = containerRef.current.querySelector("[k-line-chart-id]") as HTMLElement | null;
         if (el) kChartRef.current = klineInit(el);
       }
       const kChart = kChartRef.current; if (!kChart) return;
 
-      // Remove old overlays
+      // Remove old position overlays
       for (const id of overlayIdsRef.current) {
         try { kChart.removeOverlay({ id }); } catch {}
       }
@@ -365,7 +469,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
         if (p.tp && p.tp > 0) addLine(p.tp,  "#10b981", 1, "dashed", `TP${tkt}  ${fmt(p.tp)}`,  fmt(p.tp));
       }
 
-      // Spread ask line — round to avoid float garbage (e.g. 7.000000000000360 → 7)
+      // Spread ask line
       if (spreadRef.current > 0 && lastBarRef.current) {
         const pip      = Math.pow(10, -dg);
         const spPips   = Math.round(spreadRef.current * 100) / 100;
@@ -378,12 +482,157 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
     doDrawOverlays();
   }, [positions, symbol, digits, spreadPips]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Drawing save / load on symbol change ─────────────────────────────────────
+  useEffect(() => {
+    if (!chartReady) return;
+    const kChart = kChartRef.current; if (!kChart) return;
+    // Clear any stale drawings left from previous symbol and load saved ones for this symbol
+    clearUserDrawings(kChart);
+    loadUserDrawings(kChart, symbol);
+    return () => {
+      // Save before symbol changes or component unmounts
+      if (kChartRef.current) saveUserDrawings(kChartRef.current, symbol);
+    };
+  }, [chartReady, symbol]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Drawing tool activation ───────────────────────────────────────────────────
+  const handleToolClick = useCallback((toolId: string) => {
+    const kChart = kChartRef.current; if (!kChart) return;
+    const sym = symbolRef.current;
+
+    if (toolId === "clear") {
+      clearUserDrawings(kChart);
+      try { localStorage.removeItem(DRAW_KEY(sym)); } catch {}
+      setActiveTool("none");
+      return;
+    }
+
+    setActiveTool(toolId);
+    if (toolId === "none") return;
+
+    // Starts klinecharts interactive drawing mode — user clicks chart to place points
+    kChartRef.current?.createOverlay?.({ name: toolId, lock: false, zLevel: 5 });
+
+    // Save after a generous delay (covers single-click H-lines and two-click trend/fib)
+    setTimeout(() => {
+      if (kChartRef.current) saveUserDrawings(kChartRef.current, sym);
+    }, 600);
+  }, []);
+
+  // Escape key cancels active drawing tool
+  useEffect(() => {
+    if (activeTool === "none") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveTool("none");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeTool]);
+
+  // Show toolbar on all non-bare chart instances (bare = mobile compact view)
+  const showToolbar = !bare;
+
+  // ── Toolbar styling (derived from theme prop) ────────────────────────────────
+  const tb = {
+    bg:       theme === "dark" ? "rgba(14,16,24,0.90)"       : "rgba(255,255,255,0.93)",
+    border:   theme === "dark" ? "rgba(255,255,255,0.09)"    : "rgba(0,0,0,0.11)",
+    btnColor: theme === "dark" ? "rgba(185,195,215,0.85)"    : "rgba(50,60,80,0.75)",
+    btnActive:   "#2962ff",
+    btnActiveBg: "rgba(41,98,255,0.16)",
+    btnActiveBorder: "rgba(41,98,255,0.45)",
+    clearColor: theme === "dark" ? "rgba(248,100,100,0.80)"  : "rgba(200,30,30,0.75)",
+    sep:      theme === "dark" ? "rgba(255,255,255,0.09)"    : "rgba(0,0,0,0.09)",
+  };
+
   return (
-    <div
-      ref={containerRef}
-      className={!showDrawingTools && bare ? "kline-bare" : ""}
-      style={{ position: "absolute", inset: 0, overflow: "hidden" }}
-    />
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      {/* KlineCharts Pro mounts here */}
+      <div
+        ref={containerRef}
+        className={!showDrawingTools && bare ? "kline-bare" : ""}
+        style={{ position: "absolute", inset: 0 }}
+      />
+
+      {/* Custom floating drawing toolbar */}
+      {showToolbar && (
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            left: 8,
+            zIndex: 20,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            padding: "4px",
+            background: tb.bg,
+            border: `1px solid ${tb.border}`,
+            borderRadius: 7,
+            backdropFilter: "blur(10px)",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.22)",
+          }}
+        >
+          {DRAW_TOOLS.map((tool) => {
+            const active = activeTool === tool.id;
+            return (
+              <button
+                key={tool.id}
+                title={tool.label}
+                onClick={() => handleToolClick(tool.id)}
+                style={{
+                  width: 30,
+                  height: 30,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: active ? tb.btnActiveBg : "transparent",
+                  color: active ? tb.btnActive : tb.btnColor,
+                  border: `1px solid ${active ? tb.btnActiveBorder : "transparent"}`,
+                  borderRadius: 5,
+                  cursor: "pointer",
+                  outline: "none",
+                  padding: 0,
+                  flexShrink: 0,
+                  transition: "background 0.1s, color 0.1s, border-color 0.1s",
+                }}
+              >
+                {tool.icon}
+              </button>
+            );
+          })}
+
+          {/* Separator before clear button */}
+          <div style={{ height: 1, margin: "1px 0", background: tb.sep }} />
+
+          {/* Clear all drawings */}
+          <button
+            title="Clear All Drawings"
+            onClick={() => handleToolClick("clear")}
+            style={{
+              width: 30,
+              height: 30,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "transparent",
+              color: tb.clearColor,
+              border: "1px solid transparent",
+              borderRadius: 5,
+              cursor: "pointer",
+              outline: "none",
+              padding: 0,
+              flexShrink: 0,
+              transition: "background 0.1s",
+            }}
+          >
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+              <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+              <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

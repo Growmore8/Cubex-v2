@@ -105,9 +105,11 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     setWAmount(""); setWAddress(""); setWNote(""); setBankAcctNo(""); setBankName(""); setIfsc(""); setMsg("Withdrawal request submitted"); load();
   }
 
+  const [kycDocType, setKycDocType] = useState("Passport");
+
   async function uploadKyc(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setMsg("");
-    const fd = new FormData(e.target as HTMLFormElement); fd.set("docType", "Identity & Address");
+    const fd = new FormData(e.target as HTMLFormElement); fd.set("docType", kycDocType);
     const r = await fetch("/api/client/kyc", { method: "POST", body: fd });
     const d = await r.json(); if (!d.ok) { setErr(d.error || "Upload failed"); return; }
     (e.target as HTMLFormElement).reset(); setMsg("Submitted for review"); load();
@@ -247,12 +249,18 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
         {st === "APPROVED" && <div className="flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-700"><i className="fa-solid fa-circle-check" /> Your identity is verified.</div>}
         {st === "PENDING" && <div className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700"><i className="fa-solid fa-clock" /> Your documents are under review.</div>}
         {st === "REJECTED" && <div className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700"><i className="fa-solid fa-circle-xmark mr-1" /> Your KYC was rejected{latest?.note ? ": " + latest.note : ""}. Please upload again.</div>}
-        {canUpload && (<form onSubmit={uploadKyc} className="space-y-2">
+        {canUpload && (<form onSubmit={uploadKyc} className="space-y-3">
+          <div>
+            <div className="mb-1 text-xs font-medium text-[var(--muted)]">Document Type <span className="text-red-500">*</span></div>
+            <select className={input} value={kycDocType} onChange={(e) => setKycDocType(e.target.value)}>
+              {["Passport", "National ID", "Driver's License", "Residence Permit"].map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><div className="mb-1 text-xs font-medium text-[var(--muted)]">Identity Document <span className="text-red-500">*</span></div><input className={input} type="file" name="file" accept="image/*,application/pdf" required /></div>
+            <div><div className="mb-1 text-xs font-medium text-[var(--muted)]">ID Front <span className="text-red-500">*</span></div><input className={input} type="file" name="file" accept="image/*,application/pdf" required /></div>
             <div><div className="mb-1 text-xs font-medium text-[var(--muted)]">Address Proof <span className="text-red-500">*</span></div><input className={input} type="file" name="back" accept="image/*,application/pdf" required /></div>
           </div>
-          <p className="text-xs text-[var(--muted)]">Upload a clear photo/scan of your identity document and a proof of address.</p>
+          <p className="text-xs text-[var(--muted)]">Upload a clear photo/scan of your ID (front) and a recent utility bill or bank statement as address proof.</p>
           <button className="ui-btn ui-btn-primary px-4 py-2 text-sm">Submit for review</button>
         </form>)}
       </div>);

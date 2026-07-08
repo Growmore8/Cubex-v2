@@ -5,6 +5,8 @@ import { audit } from "@/lib/audit";
 import { assertCan } from "@/lib/perms";
 import { Prisma } from "@prisma/client";
 import { notify, notifyStaff } from "@/services/notification.service";
+import { sendUserMail } from "@/lib/tenant-mail";
+import { depositWithdrawalEmail } from "@/lib/email-templates";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,11 +33,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await audit(s.tenantId as string, "payment." + status.toLowerCase(), rec.kind + " " + rec.amount + " " + (rec.method || ""), s.email || "admin");
     // Notify the client of the decision
     try {
-      const acc = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true, login: true, managerId: true } });
+      const acc = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true, login: true, managerId: true, name: true } });
       const t = rec.kind === "DEPOSIT" ? "Deposit" : "Withdrawal";
       if (acc?.userId) {
         const msg = `${t} of ${rec.amount} ${approve ? "approved ✓" : "rejected"}`;
         await notify(s.tenantId as string, acc.userId, `${t} ${approve ? "Approved" : "Rejected"}`, msg, "FUNDS").catch(() => {});
+        // Email notification
+        sendUserMail(s.tenantId as string, acc.userId,
+          `${t} ${approve ? "Approved" : "Rejected"} – $${rec.amount}`,
+          (brand) => depositWithdrawalEmail(brand, {
+            holderName: (acc as any).name || acc.login,
+            kind: rec.kind as "DEPOSIT" | "WITHDRAWAL",
+            amount: rec.amount as any,
+            method: (rec as any).method,
+            status: approve ? "APPROVED" : "REJECTED",
+            login: acc.login,
+          })
+        ).catch(() => {});
       }
       // Confirmation to staff + superadmin that the request was actioned.
       notifyStaff(s.tenantId as string, { title: `${t} ${approve ? "approved" : "rejected"} — ${acc?.login || ""}`, body: `${rec.amount} ${rec.method || ""} by ${s.email || "admin"}`, type: "FUNDS" }, acc?.managerId).catch(() => {});

@@ -3,6 +3,8 @@ import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { notify } from "@/services/notification.service";
+import { sendUserMail } from "@/lib/tenant-mail";
+import { kycStatusEmail } from "@/lib/email-templates";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,6 +28,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         reverse: ["KYC Re-review", "Your KYC needs to be re-submitted. Please upload your documents again."],
       };
       const m = map[b.action]; if (m) await notify(doc.account.tenantId, doc.account.userId, m[0], m[1], "NOTICE").catch(() => {});
+      // Email on approve / reject (not reverse — reverse just prompts re-upload via in-app)
+      if (b.action === "approve" || b.action === "reject") {
+        sendUserMail(doc.account.tenantId, doc.account.userId,
+          b.action === "approve" ? "KYC Verified – Identity Confirmed" : "KYC Update – Action Required",
+          (brand) => kycStatusEmail(brand, {
+            holderName: (doc.account as any).name || "Valued Client",
+            status: b.action === "approve" ? "APPROVED" : "REJECTED",
+            note: b.note || null,
+          })
+        ).catch(() => {});
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (e: any) {

@@ -22,19 +22,28 @@ export default function AdminKycPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [flashErr, setFlashErr] = useState("");
 
-  async function review(id: string, status: string) {
+  async function review(id: string, action: "approve" | "reject") {
     const doc = docs.find((d) => d.id === id);
     const label = doc ? `${doc.account?.login} — ${doc.docType}` : id;
-    const verb = status === "APPROVED" ? "Approve" : "Reject";
-    if (!window.confirm(`${verb} KYC for ${label}?`)) return;
-    setBusy(id + status);
+    if (action === "reject" && !note[id]?.trim()) { setFlashErr("Enter a rejection reason before rejecting"); return; }
+    if (!window.confirm(`${action === "approve" ? "Approve" : "Reject"} KYC for ${label}?`)) return;
+    setBusy(id + action);
     const r = await fetch("/api/admin/kyc/" + id, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, note: note[id] || "" }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, note: note[id] || "" }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
     setBusy(null);
     if (!r.ok) { setFlashErr(r.error || "Update failed"); return; }
     setFlashErr("");
+    load();
+  }
+
+  async function deleteDoc(id: string) {
+    const doc = docs.find((d) => d.id === id);
+    if (!window.confirm(`Delete KYC document for ${doc?.account?.login}?`)) return;
+    setBusy(id + "DEL");
+    await fetch("/api/admin/kyc/" + id, { method: "DELETE" }).then((x) => x.json()).catch(() => {});
+    setBusy(null);
     load();
   }
 
@@ -53,19 +62,23 @@ export default function AdminKycPage() {
       <div className="ui-card overflow-x-auto p-0">
         <table className="w-full text-sm">
           <thead className="border-b bg-gray-50 text-left text-gray-600">
-            <tr><Sth k="account" label="Account" /><Sth k="type" label="Type" /><th className="px-3 py-2">File</th><Sth k="status" label="Status" /><th className="px-3 py-2">Note</th><th className="px-3 py-2 text-right">Action</th></tr>
+            <tr><Sth k="account" label="Account" /><Sth k="type" label="Type" /><th className="px-3 py-2">Documents</th><Sth k="status" label="Status" /><th className="px-3 py-2">Note / Reason</th><th className="px-3 py-2 text-right">Action</th></tr>
           </thead>
           <tbody>
             {docs.length === 0 ? <tr><td className="px-3 py-4" colSpan={6}>No documents.</td></tr> : sorted.map((d) => (
               <tr key={d.id} className="ui-row border-b last:border-0">
                 <td className="px-3 py-2">{d.account.login} <span className="text-gray-500">{d.account.name}</span></td>
                 <td className="px-3 py-2">{d.docType}</td>
-                <td className="px-3 py-2"><a className="text-blue-600 underline transition-colors duration-200" href={"/api/files/kyc/" + d.id} target="_blank" rel="noreferrer">View</a></td>
+                <td className="px-3 py-2 space-x-2">
+                  <a className="text-blue-600 underline transition-colors duration-200" href={"/api/files/kyc/" + d.id} target="_blank" rel="noreferrer">Front</a>
+                  {d.backUrl && <a className="text-blue-600 underline transition-colors duration-200" href={"/api/files/kyc/" + d.id + "?side=back"} target="_blank" rel="noreferrer">Back</a>}
+                </td>
                 <td className="px-3 py-2"><span className={badge(d.status)}>{d.status}</span></td>
-                <td className="px-3 py-2"><input className="ui-input px-2 py-1 text-xs" placeholder="reason" value={note[d.id] || ""} onChange={(e) => setNote({ ...note, [d.id]: e.target.value })} /></td>
+                <td className="px-3 py-2"><input className="ui-input px-2 py-1 text-xs" placeholder="rejection reason" value={note[d.id] || ""} onChange={(e) => setNote({ ...note, [d.id]: e.target.value })} /></td>
                 <td className="px-3 py-2 text-right space-x-2">
-                  <button disabled={!!busy} className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-green-600 disabled:opacity-40" onClick={() => review(d.id, "APPROVED")}>{busy === d.id + "APPROVED" ? <i className="fa-solid fa-circle-notch fa-spin" /> : "Approve"}</button>
-                  <button disabled={!!busy} className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-red-600 disabled:opacity-40" onClick={() => review(d.id, "REJECTED")}>{busy === d.id + "REJECTED" ? <i className="fa-solid fa-circle-notch fa-spin" /> : "Reject"}</button>
+                  <button disabled={!!busy} className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-green-600 disabled:opacity-40" onClick={() => review(d.id, "approve")}>{busy === d.id + "approve" ? <i className="fa-solid fa-circle-notch fa-spin" /> : "Approve"}</button>
+                  <button disabled={!!busy} className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-red-600 disabled:opacity-40" onClick={() => review(d.id, "reject")}>{busy === d.id + "reject" ? <i className="fa-solid fa-circle-notch fa-spin" /> : "Reject"}</button>
+                  <button disabled={!!busy} className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-gray-400 disabled:opacity-40" onClick={() => deleteDoc(d.id)}>{busy === d.id + "DEL" ? <i className="fa-solid fa-circle-notch fa-spin" /> : <i className="fa-solid fa-trash-can" />}</button>
                 </td>
               </tr>
             ))}

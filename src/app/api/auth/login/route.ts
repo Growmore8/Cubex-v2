@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { authenticate } from "@/services/auth.service";
-import { signSession, SESSION_COOKIE, signDeviceToken, DEVICE_COOKIE } from "@/lib/jwt";
+import { signSession, SESSION_COOKIE, signDeviceToken, DEVICE_COOKIE, signTotpPending, TOTP_PENDING_COOKIE } from "@/lib/jwt";
 import { ROLE_HOME } from "@/config/roles";
 import { audit } from "@/lib/audit";
 import { notifyStaff, notifySuperAdmins } from "@/services/notification.service";
@@ -22,6 +22,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Too many attempts. Please wait a minute." }, { status: 429 });
     }
     const session = await authenticate(host, email, password, ip, h.get("user-agent") || undefined);
+
+    // 2FA: password verified but TOTP code still needed — issue short-lived pending cookie.
+    if (session.totpRequired) {
+      const pending = await signTotpPending(session.sub, !!remember);
+      const res = NextResponse.json({ ok: true, requires2fa: true });
+      res.cookies.set(TOTP_PENDING_COOKIE, pending, {
+        httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
+        path: "/", maxAge: 60 * 5,
+      });
+      return res;
+    }
+
     audit(session.tenantId, "auth.login", `${session.role} "${session.name}" logged in` + (ip ? ` (${ip})` : ""), session.email, session.role as any);
     // Realtime login notifications + sound:
     //  CLIENT  -> tenant admins + owning manager + superadmins

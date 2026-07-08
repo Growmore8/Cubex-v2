@@ -3,6 +3,7 @@ import { getClientSession } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { getDisabledSetFor } from "@/services/symbolPerms.service";
 import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
+import { getAccountFxRate } from "@/lib/prices";
 
 export async function GET(req: Request) {
   const { session: s, suspended } = await getClientSession();
@@ -113,9 +114,14 @@ export async function GET(req: Request) {
   const pnlOnly = await getFundsPnlOnly(s.tenantId!).catch(() => false);
   const withdrawable = account ? withdrawableBalance(account as any, pnlOnly) : 0;
 
+  // FX rate: USD per 1 unit of account currency (e.g. EURUSD for EUR accounts).
+  // Sent to the client so live floating P&L can be displayed in account currency.
+  const fxRate = account ? await getAccountFxRate(account.currency as string).catch(() => 1) : 1;
+
   return NextResponse.json({
     ok: true,
     kycVerified,
+    fxRate,
     brand,
     swapEnabled: !!(brand as any).swapEnabled,
     pnlOnly,
@@ -136,7 +142,9 @@ export async function GET(req: Request) {
       id: t.id.toString(), ticket: t.ticket.toString(), symbol: t.symbol, type: t.type,
       lots: Number(t.lots), openPrice: Number(t.openPrice), sl: Number(t.sl), tp: Number(t.tp),
       commission: Number((t as any).commission ?? 0), swap: Number((t as any).swap ?? 0),
-      comment: (t as any).comment || null, trailingStop: Number((t as any).trailingStop ?? 0), openedAt: t.openedAt,
+      comment: (t as any).comment || null, trailingStop: Number((t as any).trailingStop ?? 0),
+      masterTradeId: (t as any).masterTradeId ? String((t as any).masterTradeId) : null,
+      openedAt: t.openedAt,
     })) : [],
     history: account ? account.history.map((h) => ({
       id: h.id.toString(), ticket: h.ticket.toString(), symbol: h.symbol, side: h.side, lots: Number(h.lots),

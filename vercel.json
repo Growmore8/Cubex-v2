@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/internal/swap-rollover",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron/stopout",
+      "schedule": "* * * * *"
+    }
+  ]
+}

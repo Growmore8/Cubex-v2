@@ -38,6 +38,7 @@ model Tenant {
   groups       TradeGroup[]
   counters     Counter[]
   auditLogs    AuditLog[]
+  signals      Signal[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
@@ -89,6 +90,8 @@ model User {
   lastSeenAt      DateTime?
   lastDevice      String?
   activeSession   String?
+  totpSecret      String?
+  totpEnabled     Boolean    @default(false)
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   accounts        Account[]  @relation("AccountOwner")
@@ -146,8 +149,10 @@ model Account {
   kyc             KycDocument[]
   paymentRequests PaymentRequest[]
   pendingOrders   PendingOrder[]
-  symbolOverrides AccountSymbolOverride[]
-  priceAlerts     PriceAlert[]
+  symbolOverrides     AccountSymbolOverride[]
+  priceAlerts         PriceAlert[]
+  copyMasterRelations CopyRelation[]     @relation("CopyMaster")
+  copyFollowerRelations CopyRelation[]   @relation("CopyFollower")
   expiresAt       DateTime?          // DEMO only: set to createdAt+30d; null = never expires (LIVE)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
@@ -178,10 +183,12 @@ model Trade {
   commission    Decimal  @default(0) @db.Decimal(18, 2)
   swap          Decimal  @default(0) @db.Decimal(18, 2)
   comment       String?
+  masterTradeId BigInt?  // set on follower trades; null on master or standalone trades
   openedAt      DateTime @default(now())
   createdAt     DateTime @default(now())
   @@index([accountId])
   @@index([symbol])
+  @@index([masterTradeId])
 }
 model TradeHistory {
   id          BigInt      @id @default(autoincrement())
@@ -204,6 +211,21 @@ model TradeHistory {
   closedAt    DateTime    @default(now())
   @@index([accountId])
   @@index([closedAt])
+}
+model CopyRelation {
+  id            String   @id @default(uuid())
+  tenantId      String
+  masterAccId   String
+  followerAccId String
+  ratio         Decimal  @default(1.0) @db.Decimal(6, 4) // lot multiplier: 0.5 = follower opens half lots
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  masterAcc     Account  @relation("CopyMaster",   fields: [masterAccId],   references: [id], onDelete: Cascade)
+  followerAcc   Account  @relation("CopyFollower", fields: [followerAccId], references: [id], onDelete: Cascade)
+  @@unique([masterAccId, followerAccId])
+  @@index([tenantId])
+  @@index([masterAccId])
+  @@index([followerAccId])
 }
 model FinancialHistory {
   id          BigInt   @id @default(autoincrement())
@@ -511,6 +533,22 @@ model FeedErrorLog {
   message   String
   ts        DateTime @default(now())
 }
+
+model Signal {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  symbol     String
+  direction  Side
+  entryPrice Decimal  @db.Decimal(18, 5)
+  sl         Decimal  @default(0) @db.Decimal(18, 5)
+  tp         Decimal  @default(0) @db.Decimal(18, 5)
+  rationale  String?
+  active     Boolean  @default(true)
+  createdBy  String
+  createdAt  DateTime @default(now())
+  @@index([tenantId, active])
+}
 enum Role {
   SUPERADMIN
   ADMIN
@@ -562,6 +600,8 @@ enum CloseReason {
   TP
   SL
   MC
+  STOP_OUT
+  COPY
 }
 enum FinType {
   DEPOSIT

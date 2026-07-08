@@ -37,3 +37,10 @@ export function gsign(v: unknown): string {
   if (!isFinite(n)) return "-";
   return (n >= 0 ? "+" : "") + gnum(n, 2);
 }
+
+// Currency symbol for the account's base currency.
+export function currencySymbol(currency?: string | null): string {
+  if (currency === "EUR") return "€";
+  if (currency === "GBP") return "£";
+  return "$";
+}

@@ -8,12 +8,13 @@ import toast from "react-hot-toast";
 import WalletPanel from "@/components/WalletPanel";
 import ClientSplash from "@/components/ClientSplash";
 import { SymIcon } from "@/lib/symIcon";
-import { titleCaseName, gnum, gmoney } from "@/lib/format";
+import { titleCaseName, gnum, gmoney, currencySymbol } from "@/lib/format";
 import { COUNTRIES } from "@/config/countries";
 import { iconForNotification } from "@/lib/notif";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
 import ClientMobile from "@/components/ClientMobile";
+import DomPanel from "@/components/DomPanel";
 
 // ADSS palette (matches the admin desk) — fixed, not tenant colour.
 const DARK: any = { "--bg": "#0a0d12", "--panel": "#11151d", "--border": "#1c2330", "--text": "#e7ecf3", "--muted": "#8a93a6", "--soft": "#151b25", "--accent": "#16c79a" };
@@ -66,6 +67,7 @@ export default function ClientTerminal() {
   const [symbolSpreads, setSymbolSpreads] = useState<Record<string, { min: number; max: number; type: string }>>({});
   const [groupSpread, setGroupSpread] = useState(0);
   const [accountSpreadMarkup, setAccountSpreadMarkup] = useState(0);
+  const [fxRate, setFxRate] = useState(1); // USD per 1 unit of account currency (1.0 for USD)
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
@@ -113,7 +115,10 @@ export default function ClientTerminal() {
   const [alertModal, setAlertModal] = useState(false);
   const [alertForm, setAlertForm] = useState({ condition: "ABOVE", price: "", note: "" });
   const loadAlerts = () => fetch("/api/client/alerts?accountId=" + (accIdRef.current || "")).then((r) => r.json()).then((d) => { if (d.ok) { setAlerts(d.alerts); setAlertsLoaded(true); } }).catch(() => {});
+  useEffect(() => { if (accId) loadAlerts(); }, [accId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [rightTab, setRightTab] = useState("TRADE");
+  const [signals, setSignals] = useState<any[]>([]);
+  const [signalsLoaded, setSignalsLoaded] = useState(false);
   const [calendar, setCalendar] = useState<any[]>([]);
   const [calendarLoaded, setCalendarLoaded] = useState(false);
   const [calImpact, setCalImpact] = useState<"all" | "high" | "medium" | "low">("all");
@@ -159,27 +164,69 @@ export default function ClientTerminal() {
   const [dragging, setDragging] = useState(false);
   const [favs, setFavs] = useState<string[]>([]);
   const [news, setNews] = useState<any[]>([]);
+  const [newsLoaded, setNewsLoaded] = useState(false);
   const [indicators, setIndicators] = useState<string[]>([]);
   function toggleInd(id: string) { setIndicators((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]); }
   const [domOpen, setDomOpen] = useState(false);
   const [analyticsRange, setAnalyticsRange] = useState<"today" | "week" | "month" | "all">("all");
   const alertsRef = useRef<any[]>([]);
   useEffect(() => { alertsRef.current = alerts; }, [alerts]);
+  const pendingRef = useRef<any[]>([]);
+  useEffect(() => { pendingRef.current = pending; }, [pending]);
   const [histRange, setHistRange] = useState<"all" | "today" | "week" | "month">("all");
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => { const iv = setInterval(() => setNowMs(Date.now()), 10000); return () => clearInterval(iv); }, []);
+  const [symInfoOpen, setSymInfoOpen] = useState(false);
   // Per-table column sort (1st click asc, 2nd desc, 3rd clears).
   const [sortBy, setSortBy] = useState<Record<string, { k: string; d: 1 | -1 }>>({});
   const toggleSort = (tbl: string, k: string) => setSortBy((s) => { const cur = s[tbl]; if (!cur || cur.k !== k) return { ...s, [tbl]: { k, d: 1 } }; if (cur.d === 1) return { ...s, [tbl]: { k, d: -1 } }; const n = { ...s }; delete n[tbl]; return n; });
   const sortRows = (tbl: string, rows: any[], acc: Record<string, (r: any) => any>) => { const cfg = sortBy[tbl]; if (!cfg || !acc[cfg.k]) return rows; const get = acc[cfg.k]; return [...rows].sort((a, b) => { const va = get(a), vb = get(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; if (typeof va === "number" && typeof vb === "number") return (va - vb) * cfg.d; return String(va).localeCompare(String(vb), undefined, { numeric: true }) * cfg.d; }); };
   const Sth = ({ tbl, k, label, align, cls }: { tbl: string; k: string; label: any; align?: "right"; cls?: string }) => { const cfg = sortBy[tbl]; const active = !!cfg && cfg.k === k; return (<th className={(cls || "px-2 py-1 font-normal") + (align === "right" ? " text-right" : " text-left") + " cursor-pointer select-none"} onClick={() => toggleSort(tbl, k)}><span className={"inline-flex items-center gap-1 " + (align === "right" ? "flex-row-reverse" : "")}>{label}<i className={"fa-solid text-[8px] " + (active ? (cfg!.d === 1 ? "fa-arrow-up-long" : "fa-arrow-down-long") : "fa-sort")} style={{ opacity: active ? 1 : 0.3 }} /></span></th>); };
-  useEffect(() => { if (rightTab === "NEWS" && news.length === 0) { fetch("/api/client/news?category=forex").then((r) => r.json()).then((dd) => { if (dd.ok) setNews(dd.items || []); }).catch(() => {}); } }, [rightTab]);
+  useEffect(() => { if (rightTab === "NEWS" && !newsLoaded) { fetch("/api/client/news?category=forex").then((r) => r.json()).then((dd) => { if (dd.ok) { setNews(dd.items || []); setNewsLoaded(true); } }).catch(() => { setNewsLoaded(true); }); } }, [rightTab, newsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (rightTab === "CALENDAR" && !calendarLoaded) { fetch("/api/client/calendar").then((r) => r.json()).then((dd) => { if (dd.ok) { setCalendar(dd.events || []); setCalendarLoaded(true); } }).catch(() => {}); } }, [rightTab, calendarLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (rightTab === "SIGNALS" && !signalsLoaded) { fetch("/api/client/signals").then((r) => r.json()).then((dd) => { if (dd.ok) { setSignals(dd.signals || []); setSignalsLoaded(true); } }).catch(() => { setSignalsLoaded(true); }); } }, [rightTab, signalsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { fetch("/api/client/avatar").then((r) => r.json()).then((d) => { if (d.ok) setAvatarUrl(d.avatarUrl || ""); }).catch(() => {}); }, []);
+  useEffect(() => { fetch("/api/auth/totp/status").then((r) => r.json()).then((d) => { if (d.ok) setDeskTotpEnabled(d.totpEnabled); }).catch(() => {}); }, []);
+  async function deskOpenTotpSetup() {
+    setDeskTotpErr(""); setDeskTotpCode(""); setDeskTotpQr(""); setDeskTotpSecret(""); setDeskTotpBusy(true);
+    try {
+      const r = await fetch("/api/auth/totp/setup").then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed");
+      setDeskTotpQr(r.qrDataUrl); setDeskTotpSecret(r.secret); setDeskTotpModal("setup");
+    } catch (e: any) { setDeskTotpErr(e.message || "Failed"); }
+    finally { setDeskTotpBusy(false); }
+  }
+  async function deskConfirmTotpEnable() {
+    setDeskTotpErr(""); setDeskTotpBusy(true);
+    try {
+      const r = await fetch("/api/auth/totp/enable", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: deskTotpCode }) }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed");
+      setDeskTotpEnabled(true); setDeskTotpModal(null);
+    } catch (e: any) { setDeskTotpErr(e.message || "Invalid code"); }
+    finally { setDeskTotpBusy(false); }
+  }
+  async function deskConfirmTotpDisable() {
+    setDeskTotpErr(""); setDeskTotpBusy(true);
+    try {
+      const r = await fetch("/api/auth/totp/disable", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: deskTotpCode }) }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed");
+      setDeskTotpEnabled(false); setDeskTotpModal(null);
+    } catch (e: any) { setDeskTotpErr(e.message || "Invalid code"); }
+    finally { setDeskTotpBusy(false); }
+  }
   async function uploadAvatar(e: any) { const file = e.target.files && e.target.files[0]; if (!file) return; setAvatarUploading(true); const fd = new FormData(); fd.append("file", file); const r = await fetch("/api/client/avatar", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); setAvatarUploading(false); if (r.ok && r.avatarUrl) setAvatarUrl(r.avatarUrl); else setErr(r.error || "Avatar upload failed"); }
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
+  const [deskTotpEnabled, setDeskTotpEnabled] = useState(false);
+  const [deskTotpModal, setDeskTotpModal] = useState<"setup" | "disable" | null>(null);
+  const [deskTotpQr, setDeskTotpQr] = useState("");
+  const [deskTotpSecret, setDeskTotpSecret] = useState("");
+  const [deskTotpCode, setDeskTotpCode] = useState("");
+  const [deskTotpBusy, setDeskTotpBusy] = useState(false);
+  const [deskTotpErr, setDeskTotpErr] = useState("");
   const [profileForm, setProfileForm] = useState({ name: "", phone: "", country: "" });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileErr, setProfileErr] = useState("");
@@ -225,7 +272,7 @@ export default function ClientTerminal() {
       if (d.code === "TENANT_SUSPENDED") { setTenantSuspended(true); setDataReady(true); return; }
       setErr(d.error || "Failed"); return;
     }
-    setAccount(d.account); setKycVerified(!!d.kycVerified); setSwapEnabled(d.swapEnabled !== false); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); setPnlOnly(!!d.pnlOnly); if (d.brand) setBrand(d.brand); if (d.symbolSpreads) setSymbolSpreads(d.symbolSpreads); if (d.groupSpread != null) setGroupSpread(Number(d.groupSpread)); if (d.accountSpreadMarkup != null) setAccountSpreadMarkup(Number(d.accountSpreadMarkup));
+    setAccount(d.account); setKycVerified(!!d.kycVerified); setSwapEnabled(d.swapEnabled !== false); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); setPnlOnly(!!d.pnlOnly); if (d.brand) setBrand(d.brand); if (d.symbolSpreads) setSymbolSpreads(d.symbolSpreads); if (d.groupSpread != null) setGroupSpread(Number(d.groupSpread)); if (d.accountSpreadMarkup != null) setAccountSpreadMarkup(Number(d.accountSpreadMarkup)); if (d.fxRate != null) setFxRate(Number(d.fxRate) || 1);
     (d.symbols || []).forEach((s: any) => { DIGITS[s.symbol] = s.digits; });
     if (!selSymRef.current && d.symbols.length) setSelSym((d.symbols.find((s: any) => s.symbol === "BTCUSD") || d.symbols[0]).symbol);
     fetch("/api/client/accounts").then((r) => r.json()).then((ad) => { if (ad.ok) { setAccts(ad.accounts || []); if (!accIdRef.current && ad.accounts && ad.accounts.length) { accIdRef.current = ad.accounts[0].id; setAccId(ad.accounts[0].id); } } }).catch((e) => console.warn("[client] accounts fetch failed", e));
@@ -458,8 +505,8 @@ export default function ClientTerminal() {
   async function saveTpSl() {
     if (!tpSlEdit) return;
     const val = parseFloat(tpSlEdit.val);
-    // Validate SL/TP direction before sending
-    if (!isNaN(val) && val > 0) {
+    // Validate SL/TP direction before sending (trailing stop is in pips — skip price check)
+    if (!isNaN(val) && val > 0 && tpSlEdit.field !== "trailingStop") {
       const pos = positions.find((p: any) => p.id === tpSlEdit.id);
       if (pos) {
         const curPx = prices[pos.symbol] ?? Number(pos.openPrice);
@@ -473,7 +520,12 @@ export default function ClientTerminal() {
         }
       }
     }
-    const body: any = { [tpSlEdit.field]: isNaN(val) ? 0 : val };
+    let sendVal: number = isNaN(val) ? 0 : val;
+    if (tpSlEdit.field === "trailingStop" && sendVal > 0) {
+      const pos = positions.find((p: any) => p.id === tpSlEdit.id);
+      if (pos) sendVal = sendVal * Math.pow(10, -(dg(pos.symbol) - 1));
+    }
+    const body: any = { [tpSlEdit.field]: sendVal };
     const r = await fetch("/api/client/orders/" + tpSlEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json();
     setTpSlEdit(null);
@@ -515,7 +567,7 @@ export default function ClientTerminal() {
     if (!amt || amt <= 0) return;
     const r = await fetch("/api/client/topup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accIdRef.current, amount: amt }) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { setErr(r.error || "Top-up failed"); return; }
-    pushToast({ title: `Demo balance topped up $${amt.toLocaleString()}`, type: "FUNDS" }); load();
+    pushToast({ title: `Demo balance topped up ${cSym}${amt.toLocaleString()}`, type: "FUNDS" }); load();
   }
 
   function exportCSV(type: "positions" | "history") {
@@ -523,7 +575,7 @@ export default function ClientTerminal() {
       const headers = ["Ticket","Symbol","Type","Lots","Open Price","Current","SL","TP","Commission","Swap","P/L","Opened At"];
       const rows = positions.map((p: any) => {
         const cur = prices[p.symbol] ?? p.openPrice;
-        const pl  = pnlOf(p, cur, csz(p.symbol));
+        const pl  = pnlOfAcc(p, cur, csz(p.symbol));
         return [p.ticket ?? "", p.symbol, p.type, p.lots, p.openPrice, cur, p.sl || "", p.tp || "", p.commission || 0, p.swap || 0, pl.toFixed(2), new Date(p.openedAt).toLocaleString()];
       });
       const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -541,15 +593,62 @@ export default function ClientTerminal() {
     const al = alertsRef.current;
     if (!al.length) return;
     const hit = al.filter((a) => {
+      if (a.triggered) return false; // server already fired this alert; don't double-email
       const p = prices[a.symbol]; if (!p) return false;
       return a.condition === "ABOVE" ? p >= Number(a.price) : p <= Number(a.price);
     });
     if (!hit.length) return;
     hit.forEach((a) => {
       pushToast({ title: `Alert: ${a.symbol} ${a.condition === "ABOVE" ? "≥" : "≤"} ${a.price}`, body: a.note || undefined, type: "NOTICE" });
-      fetch("/api/client/alerts?id=" + a.id, { method: "DELETE" }).catch(() => {});
+      fetch("/api/client/alerts?id=" + a.id + "&fire=1", { method: "DELETE" }).catch(() => {});
     });
     setAlerts((prev) => prev.filter((x) => !hit.find((h) => h.id === x.id)));
+  }, [prices]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pending order trigger + expiry — checked on every price update
+  useEffect(() => {
+    const orders = pendingRef.current;
+    if (!orders.length) return;
+    // Expire orders whose GTC deadline has passed
+    const now = Date.now();
+    const expired = orders.filter((o: any) => o.expiresAt && new Date(o.expiresAt).getTime() < now);
+    if (expired.length) {
+      setPending((prev) => prev.filter((x: any) => !expired.find((e: any) => e.id === x.id)));
+      expired.forEach((o: any) => {
+        fetch("/api/client/pending/" + o.id + "/execute", { method: "POST" }).catch(() => {});
+      });
+    }
+    const hit = orders.filter((o: any) => {
+      const bid = prices[o.symbol]; if (bid == null) return false;
+      const ask = bid + _spreadPx(o.symbol);
+      const trig = Number(o.price);
+      if (o.kind === "LIMIT" && o.side === "BUY")        return ask <= trig;
+      if (o.kind === "STOP"  && o.side === "BUY")        return ask >= trig;
+      if (o.kind === "LIMIT" && o.side === "SELL")       return bid >= trig;
+      if (o.kind === "STOP"  && o.side === "SELL")       return bid <= trig;
+      if (o.kind === "STOP_LIMIT" && o.side === "BUY")  return ask >= trig;
+      if (o.kind === "STOP_LIMIT" && o.side === "SELL") return bid <= trig;
+      return false;
+    });
+    if (!hit.length) return;
+    setPending((prev) => prev.filter((x: any) => !hit.find((h: any) => h.id === x.id)));
+    hit.forEach((o: any) => {
+      fetch("/api/client/pending/" + o.id + "/execute", { method: "POST" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.ok) {
+            if (d.stopLimitConverted) {
+              pushToast({ title: `${o.symbol} STOP_LIMIT triggered — limit order placed @ ${o.stopLimit}`, type: "TRADE" });
+            } else {
+              pushToast({ title: `${o.kind} ${o.side} ${o.symbol} executed`, type: "TRADE" });
+            }
+          } else {
+            if (!d.expired) pushToast({ title: d.error || `${o.symbol} order failed`, type: "NOTICE" });
+          }
+          load();
+        })
+        .catch(() => {});
+    });
   }, [prices]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcuts: F9=new order, Ctrl+F=search, Escape=close overlays
@@ -585,16 +684,19 @@ export default function ClientTerminal() {
   }
   const catMap: Record<string, string> = Object.fromEntries(symbols.map((s) => [s.symbol, s.category || "forex"]));
   function csz(sym: string) { return contractFor(catMap[sym] || "forex", sym); }
-  const floating = positions.reduce((s, p) => s + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
+  // Account-currency P&L wrapper: divides USD result by fxRate so all live P&L is in account currency.
+  const pnlOfAcc = (p: any, price: number, cs: number) => pnlOf(p, price, cs) / fxRate;
+  const floating = positions.reduce((s, p) => s + pnlOfAcc(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
   const balance = account ? account.deposit - account.withdrawal + account.credit + account.bonus + account.pnl : 0;
   const equity = balance + floating;
   const used = account ? (() => {
-    // hedged (net) margin: net BUY−SELL lots per symbol, charge margin on |net| only
+    // hedged (net) margin: net BUY−SELL lots per symbol, charge margin on |net| only.
+    // usedMargin() returns USD; divide by fxRate to display in account currency.
     const net: Record<string, number> = {};
     for (const p of positions) net[p.symbol] = (net[p.symbol] || 0) + (p.type === "BUY" ? 1 : -1) * Number(p.lots);
     let m = 0;
     for (const s in net) { const nl = Math.abs(net[s]); if (nl < 1e-9) continue; const pr = prices[s] ?? (positions.find((p) => p.symbol === s)?.openPrice ?? 0); let mg = (nl * csz(s) * pr) / account.leverage; if (/JPY$/i.test(s)) mg = mg / 100; m += mg; }
-    return m;
+    return m / fxRate;
   })() : 0;
   const free = equity - used;
   const level = used > 0 ? (equity / used) * 100 : 0;
@@ -609,6 +711,21 @@ export default function ClientTerminal() {
   }, [level]); // eslint-disable-line react-hooks/exhaustive-deps
   const price = prices[selSym];
   const d = dg(selSym);
+  // Market sessions (UTC windows)
+  const sessions = (() => {
+    const utcH = new Date(nowMs).getUTCHours();
+    const utcM = new Date(nowMs).getUTCMinutes();
+    const t = utcH * 60 + utcM;
+    const inRange = (s: number, e: number) => s < e ? t >= s && t < e : t >= s || t < e;
+    return [
+      { name: "TKY", open: inRange(0, 9 * 60) },
+      { name: "LON", open: inRange(8 * 60, 17 * 60) },
+      { name: "NY",  open: inRange(13 * 60, 22 * 60) },
+      { name: "SYD", open: inRange(22 * 60, 7 * 60) },
+    ];
+  })();
+  const utcTime = new Date(nowMs).toUTCString().slice(17, 22);
+  const pipVal = (vol * 1) / fxRate; // $1/pip/lot model in account currency
   // Effective spread the client pays — matches MT5 model and server execution exactly.
   // bid = ask − spreadPips × pip (same formula used by server.js for TP/SL/MC/pending).
   // FIXED: sym.min pips always constant.
@@ -632,8 +749,9 @@ export default function ClientTerminal() {
   // Works for both FIXED and FLOATING — spread source differs, derivation is identical.
   const ask = (price ?? 0) + _spreadPx(selSym);
   const bid = price ?? 0;
-  const margin = price != null ? ((vol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0;
+  const margin = (price != null ? ((vol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0) / fxRate;
   const fmt = (v: number) => gmoney(v);
+  const cSym = currencySymbol(account?.currency);
   const groups: Record<string, any[]> = {};
   const mwq = mwSearch.trim().toLowerCase();
   symbols.filter((s) => !mwq || (s.symbol + " " + (s.display || "")).toLowerCase().includes(mwq)).forEach((s) => { const c = s.category || "other"; (groups[c] || (groups[c] = [])).push(s); });
@@ -646,7 +764,7 @@ export default function ClientTerminal() {
   // and the 3s branding minimum has passed, then the app mounts.
   if (!splashGone) return <ClientSplash brand={splashBrand || brand} theme={theme} hiding={booted} />;
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, swapEnabled, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, accountSpreadMarkup, prices, liveSpreadPips, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, avatarUploading, uploadAvatar, fmt, csz, pnlOf, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, swapEnabled, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, accountSpreadMarkup, prices, liveSpreadPips, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, avatarUploading, uploadAvatar, fmt, csz, pnlOf: pnlOfAcc, cSym, fxRate, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
   if (tenantSuspended) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 text-center px-6" style={{ background: "#0f172a", color: "#94a3b8" }}>
@@ -800,8 +918,8 @@ export default function ClientTerminal() {
               <div className="mb-1 text-[8px] font-semibold uppercase tracking-wide text-[var(--muted)]">Account — {curAcct?.login} · {curAcct?.type}</div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                 {[
-                  ["Balance", "$" + fmt(balance), BUY],
-                  ["Equity", "$" + fmt(equity), undefined],
+                  ["Balance", cSym + fmt(balance), BUY],
+                  ["Equity", cSym + fmt(equity), undefined],
                   ["Leverage", "1:" + (account?.leverage || 100), undefined],
                   ["Currency", account?.currency || "USD", undefined],
                 ].map(([k, v, c]) => (
@@ -871,6 +989,10 @@ export default function ClientTerminal() {
                   <i className={"fa-solid " + item.icon} style={{ width: 14, textAlign: "center", color: "var(--muted)" }} />{item.label}
                 </button>
               ))}
+              <button onClick={() => { setDeskTotpErr(""); setDeskTotpCode(""); if (deskTotpEnabled) { setDeskTotpModal("disable"); } else { deskOpenTotpSetup(); } }} disabled={deskTotpBusy} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-[var(--soft)] disabled:opacity-50">
+                <i className="fa-solid fa-lock" style={{ width: 14, textAlign: "center", color: deskTotpEnabled ? BUY : "var(--muted)" }} />
+                {deskTotpBusy ? "Loading…" : deskTotpEnabled ? "2FA Enabled — click to disable" : "Set up Authenticator App (2FA)"}
+              </button>
             </div>
 
             {/* logout */}
@@ -881,6 +1003,41 @@ export default function ClientTerminal() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Desktop 2FA setup / disable modal */}
+      {deskTotpModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => { setDeskTotpModal(null); setDeskTotpErr(""); setDeskTotpCode(""); }}>
+          <div className="ui-pop w-full max-w-sm rounded-2xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            {deskTotpModal === "setup" ? (<>
+              <div className="mb-2 font-semibold">Set up Two-Factor Authentication</div>
+              <p className="mb-3 text-[11px] text-[var(--muted)]">Scan this QR code with Google Authenticator or Authy, then enter the 6-digit code to confirm.</p>
+              {deskTotpQr && <img src={deskTotpQr} alt="QR code" className="mx-auto mb-2 rounded-lg" style={{ width: 160, height: 160 }} />}
+              <div className="mb-3 rounded-lg px-3 py-2 text-center text-[10px] font-mono break-all" style={{ background: "var(--soft)", color: "var(--muted)" }}>{deskTotpSecret}</div>
+              {deskTotpErr && <div className="mb-2 text-[11px]" style={{ color: SELL }}>{deskTotpErr}</div>}
+              <input autoFocus type="text" inputMode="numeric" maxLength={6} value={deskTotpCode} onChange={(e) => setDeskTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000" className="mb-3 w-full rounded-xl border px-3 py-2.5 text-center text-sm tracking-[0.4em]" style={{ borderColor: "var(--border)", background: "var(--soft)", color: "var(--text)" }} />
+              <div className="flex gap-2">
+                <button onClick={() => { setDeskTotpModal(null); setDeskTotpCode(""); setDeskTotpErr(""); }} className="flex-1 rounded-xl border py-2.5 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
+                <button onClick={deskConfirmTotpEnable} disabled={deskTotpBusy || deskTotpCode.length < 6} className="flex-[2] rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ background: BUY }}>
+                  {deskTotpBusy ? "Verifying…" : "Enable 2FA"}
+                </button>
+              </div>
+            </>) : (<>
+              <div className="mb-2 font-semibold">Disable Two-Factor Authentication</div>
+              <p className="mb-3 text-[11px] text-[var(--muted)]">Enter the 6-digit code from your authenticator app to confirm.</p>
+              {deskTotpErr && <div className="mb-2 text-[11px]" style={{ color: SELL }}>{deskTotpErr}</div>}
+              <input autoFocus type="text" inputMode="numeric" maxLength={6} value={deskTotpCode} onChange={(e) => setDeskTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000" className="mb-3 w-full rounded-xl border px-3 py-2.5 text-center text-sm tracking-[0.4em]" style={{ borderColor: "var(--border)", background: "var(--soft)", color: "var(--text)" }} />
+              <div className="flex gap-2">
+                <button onClick={() => { setDeskTotpModal(null); setDeskTotpCode(""); setDeskTotpErr(""); }} className="flex-1 rounded-xl border py-2.5 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
+                <button onClick={deskConfirmTotpDisable} disabled={deskTotpBusy || deskTotpCode.length < 6} className="flex-[2] rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ background: SELL }}>
+                  {deskTotpBusy ? "Verifying…" : "Disable 2FA"}
+                </button>
+              </div>
+            </>)}
+          </div>
+        </div>
       )}
 
       {profileModal && (
@@ -968,7 +1125,7 @@ export default function ClientTerminal() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" style={{ color: "var(--muted)" }}>Spread</span></div>
+          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" title="Spread in points" style={{ color: "var(--muted)", fontSize: 8 }}>Sprd</span></div>
             {favs.length > 0 && (
               <div>
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
@@ -1001,30 +1158,74 @@ export default function ClientTerminal() {
           <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">{(() => { const pos = [
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-          ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} spreadPips={_spreadPips(selSym)} onSymbolChange={(sm) => setSelSym(sm)} />; })()}</div>
+          ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} spreadPips={_spreadPips(selSym)} onSymbolChange={(sm) => setSelSym(sm)} />; })()}
+          {oneClick && price != null && (
+            <div style={{ position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)", zIndex: 30, display: "flex", gap: 5, alignItems: "center", pointerEvents: "auto" }}>
+              <button
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); quickTrade(selSym, "SELL"); }}
+                title={`Sell ${vol}L ${selSym} at market`}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "5px 14px", borderRadius: 5, background: "#f23645", color: "#fff", border: "1px solid rgba(0,0,0,0.15)", cursor: "pointer", outline: "none", minWidth: 76, boxShadow: "0 2px 10px rgba(242,54,69,0.4)", lineHeight: 1, userSelect: "none" }}
+              >
+                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.08em", opacity: 0.82 }}>SELL</span>
+                <span style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", margin: "2px 0" }}>{gnum(bid, d)}</span>
+                <span style={{ fontSize: 8, opacity: 0.65 }}>{vol}L</span>
+              </button>
+              <button
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); quickTrade(selSym, "BUY"); }}
+                title={`Buy ${vol}L ${selSym} at market`}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "5px 14px", borderRadius: 5, background: "#2962ff", color: "#fff", border: "1px solid rgba(0,0,0,0.15)", cursor: "pointer", outline: "none", minWidth: 76, boxShadow: "0 2px 10px rgba(41,98,255,0.4)", lineHeight: 1, userSelect: "none" }}
+              >
+                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.08em", opacity: 0.82 }}>BUY</span>
+                <span style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", margin: "2px 0" }}>{gnum(ask, d)}</span>
+                <span style={{ fontSize: 8, opacity: 0.65 }}>{vol}L</span>
+              </button>
+            </div>
+          )}
+          </div>
         </div>
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
         <aside className="relative flex flex-col border-l border-[var(--border)] bg-[var(--panel)]" style={{ width: rtW }}>
           {/* Right panel header: symbol info + alert bell + 1-click toggle */}
+          {symInfoOpen && (
+            <>
+              <div className="fixed inset-0 z-[80]" onClick={() => setSymInfoOpen(false)} />
+              <div className="absolute right-2 top-10 z-[90] w-52 overflow-hidden rounded-xl border text-[10px] shadow-xl" style={{ background: "var(--panel)", borderColor: "var(--border)" }}>
+                <div className="border-b px-3 py-2 font-semibold" style={{ borderColor: "var(--border)", color: "var(--text)" }}>{selSym} — Contract Spec</div>
+                {[
+                  ["Contract Size", csz(selSym).toLocaleString() + " units"],
+                  ["Digits", String(d)],
+                  ["Spread", Math.round(_spreadPips(selSym)) + " pts"],
+                  ["Pip Value", cSym + fmt(pipVal) + " / pip / lot"],
+                  ["Margin (1 lot)", cSym + fmt(((price ?? 0) * csz(selSym)) / (account?.leverage || 100) / (/JPY$/i.test(selSym) ? 100 : 1) / fxRate)],
+                  ["Leverage", "1:" + (account?.leverage || 100)],
+                ].map(([k, v]) => (
+                  <div key={k as string} className="flex items-center justify-between border-b px-3 py-1.5 last:border-0" style={{ borderColor: "var(--border)" }}>
+                    <span style={{ color: "var(--muted)" }}>{k}</span>
+                    <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2" style={{ background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent)" }}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide" style={{ color: "var(--text)" }}><i className="fa-solid fa-bolt text-[10px]" style={{ color: "#2f81f7" }} />NEW ORDER</div>
             <div className="flex items-center gap-1.5">
-              <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "var(--soft)", color: "#2f81f7" }}>{selSym}</span>
+              <button onClick={() => setSymInfoOpen((v) => !v)} title="Contract specification" className="rounded-md px-1.5 py-0.5 text-[10px] font-bold hover:opacity-80 transition-opacity" style={{ background: "var(--soft)", color: "#2f81f7" }}>{selSym} <i className="fa-solid fa-circle-info text-[8px] opacity-60 ml-0.5" /></button>
               {price != null && <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{gnum(price, d)}</span>}
               <button title={oneClick ? "One-click trading ON — click to disable" : "One-click trading OFF — click to enable"} onClick={toggleOneClick} className="rounded px-1.5 py-0.5 text-[9px] font-bold border transition-colors" style={oneClick ? { background: "#2f81f722", borderColor: "#2f81f7", color: "#2f81f7" } : { borderColor: "var(--border)", color: "var(--muted)" }}>
                 <i className="fa-solid fa-bolt mr-0.5" />1-Click
               </button>
-              <button title="Price Alerts" onClick={() => { if (!alertsLoaded) loadAlerts(); setAlertModal(true); }} className="rounded p-1 text-[11px]" style={{ color: alerts.filter((a) => a.symbol === selSym).length > 0 ? "#f59e0b" : "var(--muted)" }}>
+              <button title="Price Alerts" onClick={() => setAlertModal(true)} className="rounded p-1 text-[11px]" style={{ color: alerts.length > 0 ? "#f59e0b" : "var(--muted)" }}>
                 <i className="fa-solid fa-bell" />
               </button>
             </div>
           </div>
-          {/* Tab bar: TRADE | NEWS | CALENDAR | ANALYTICS | DOM */}
+          {/* Tab bar: TRADE | SIGNALS | NEWS | CALENDAR | ANALYTICS | DOM */}
           <div className="flex shrink-0 border-b border-[var(--border)]">
-            {(["TRADE", "NEWS", "CALENDAR", "ANALYTICS"] as const).map((t) => (
+            {(["TRADE", "SIGNALS", "NEWS", "CALENDAR", "ANALYTICS"] as const).map((t) => (
               <button key={t} onClick={() => setRightTab(t)} className="flex-1 py-1.5 text-[9px] font-semibold uppercase tracking-wide transition-colors" style={rightTab === t ? { color: "#2f81f7", borderBottom: "2px solid #2f81f7" } : { color: "var(--muted)" }}>
-                {t === "TRADE" ? <><i className="fa-solid fa-arrow-right-arrow-left mr-1" />Trade</> : t === "NEWS" ? <><i className="fa-solid fa-newspaper mr-1" />News</> : t === "CALENDAR" ? <><i className="fa-solid fa-calendar-days mr-1" />Cal</> : <><i className="fa-solid fa-chart-bar mr-1" />Stats</>}
+                {t === "TRADE" ? <><i className="fa-solid fa-arrow-right-arrow-left mr-1" />Trade</> : t === "SIGNALS" ? <><i className="fa-solid fa-signal mr-1" />Signals{signals.length > 0 && <span className="ml-0.5 rounded-full px-1 text-[8px] font-bold" style={{ background: "#2f81f722", color: "#2f81f7" }}>{signals.length}</span>}</> : t === "NEWS" ? <><i className="fa-solid fa-newspaper mr-1" />News</> : t === "CALENDAR" ? <><i className="fa-solid fa-calendar-days mr-1" />Cal</> : <><i className="fa-solid fa-chart-bar mr-1" />Stats</>}
               </button>
             ))}
             <button onClick={() => setDomOpen((v) => !v)} title="Depth of Market" className="px-2 py-1.5 text-[9px] font-semibold uppercase tracking-wide transition-colors" style={{ color: domOpen ? "#2f81f7" : "var(--muted)", borderBottom: domOpen ? "2px solid #2f81f7" : "2px solid transparent" }}>
@@ -1033,12 +1234,80 @@ export default function ClientTerminal() {
           </div>
           {/* Scrollable form area */}
           <div className="min-h-0 flex-1 overflow-auto">
-          {rightTab === "NEWS" ? (
+          {rightTab === "SIGNALS" ? (
             <div className="p-2 text-[11px]">
-              {news.length === 0 ? <div className="p-6 text-center text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-1" />Loading news…</div> : news.map((n: any) => (
+              {!signalsLoaded ? (
+                <div className="p-6 text-center text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-1" />Loading signals…</div>
+              ) : signals.length === 0 ? (
+                <div className="p-8 text-center">
+                  <i className="fa-solid fa-signal mb-2 block text-2xl" style={{ color: "var(--muted)" }} />
+                  <div className="text-[var(--muted)]">No active signals.</div>
+                  <div className="mt-1 text-[10px]" style={{ color: "var(--muted)" }}>Your analyst will publish signals here.</div>
+                </div>
+              ) : signals.map((sig: any) => {
+                const isBuy = sig.direction === "BUY";
+                const dirColor = isBuy ? BUY : SELL;
+                const ageMs = Date.now() - new Date(sig.createdAt).getTime();
+                const ageStr = ageMs < 3600000 ? Math.floor(ageMs / 60000) + "m ago" : ageMs < 86400000 ? Math.floor(ageMs / 3600000) + "h ago" : Math.floor(ageMs / 86400000) + "d ago";
+                return (
+                  <div key={sig.id} className="mb-2 rounded-xl border p-2.5" style={{ borderColor: dirColor + "44", background: dirColor + "08" }}>
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: dirColor }}>{sig.direction}</span>
+                        <span className="font-semibold text-[var(--text)]">{sig.symbol}</span>
+                      </div>
+                      <span className="text-[9px]" style={{ color: "var(--muted)" }}>{ageStr}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 mb-1.5">
+                      <div className="text-center rounded py-1" style={{ background: "var(--soft)" }}>
+                        <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>Entry</div>
+                        <div className="text-[10px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{Number(sig.entryPrice).toFixed(5)}</div>
+                      </div>
+                      <div className="text-center rounded py-1" style={{ background: "var(--soft)" }}>
+                        <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>SL</div>
+                        <div className="text-[10px] font-bold tabular-nums" style={{ color: Number(sig.sl) > 0 ? SELL : "var(--muted)" }}>{Number(sig.sl) > 0 ? Number(sig.sl).toFixed(5) : "—"}</div>
+                      </div>
+                      <div className="text-center rounded py-1" style={{ background: "var(--soft)" }}>
+                        <div className="text-[8px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>TP</div>
+                        <div className="text-[10px] font-bold tabular-nums" style={{ color: Number(sig.tp) > 0 ? BUY : "var(--muted)" }}>{Number(sig.tp) > 0 ? Number(sig.tp).toFixed(5) : "—"}</div>
+                      </div>
+                    </div>
+                    {sig.rationale && <div className="mb-1.5 text-[10px] italic" style={{ color: "var(--muted)" }}>{sig.rationale}</div>}
+                    <button
+                      onClick={() => {
+                        setSelSym(sig.symbol);
+                        setSl(Number(sig.sl) > 0 ? String(Number(sig.sl).toFixed(5)) : "");
+                        setTp(Number(sig.tp) > 0 ? String(Number(sig.tp).toFixed(5)) : "");
+                        setRightTab("TRADE");
+                      }}
+                      className="w-full rounded-lg py-1.5 text-[11px] font-semibold text-white transition-opacity hover:opacity-90"
+                      style={{ background: dirColor }}
+                    >
+                      <i className={`fa-solid fa-arrow-trend-${isBuy ? "up" : "down"} mr-1`} />Trade This Signal
+                    </button>
+                  </div>
+                );
+              })}
+              {signalsLoaded && signals.length > 0 && (
+                <button onClick={() => { setSignalsLoaded(false); }} className="mt-1 w-full rounded border border-[var(--border)] py-1 text-[9px]" style={{ color: "var(--muted)" }}>
+                  <i className="fa-solid fa-rotate-right mr-1" />Refresh
+                </button>
+              )}
+            </div>
+          ) : rightTab === "NEWS" ? (
+            <div className="p-2 text-[11px]">
+              {!newsLoaded ? (
+                <div className="p-6 text-center text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-1" />Loading news…</div>
+              ) : news.length === 0 ? (
+                <div className="p-6 text-center text-[var(--muted)]">No news available.</div>
+              ) : news.map((n: any) => (
                 <a key={n.id} href={n.url} target="_blank" rel="noreferrer" className="block border-b border-[var(--border)] px-1 py-2 hover:bg-[var(--soft)]">
                   <div className="font-medium text-[var(--text)]">{n.headline}</div>
-                  <div className="mt-0.5 text-[10px] text-[var(--muted)]">{n.source} - {new Date(n.datetime * 1000).toLocaleString()}</div>
+                  <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--muted)]">
+                    <span>{n.source}</span>
+                    <span>·</span>
+                    <span>{(() => { const ms = Date.now() - n.datetime * 1000; const m = Math.floor(ms / 60000); if (m < 60) return m + "m ago"; const h = Math.floor(m / 60); if (h < 24) return h + "h ago"; return Math.floor(h / 24) + "d ago"; })()}</span>
+                  </div>
                 </a>
               ))}
             </div>
@@ -1062,16 +1331,21 @@ export default function ClientTerminal() {
                   const timeStr = dt ? dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "";
                   const impColor = ev.impact === "high" ? "#ef4444" : ev.impact === "medium" ? "#f97316" : ev.impact === "low" ? "#22c55e" : "var(--muted)";
                   const showDate = dateStr !== lastDate; lastDate = dateStr;
+                  const isToday = dt ? dt.toDateString() === new Date().toDateString() : false;
+                  const isFuture = dt ? dt.getTime() > Date.now() : false;
+                  const minutesUntil = dt && isFuture ? Math.floor((dt.getTime() - Date.now()) / 60000) : null;
+                  const timeUntil = minutesUntil != null ? (minutesUntil < 60 ? minutesUntil + "m" : Math.floor(minutesUntil / 60) + "h " + (minutesUntil % 60) + "m") : null;
                   return (
                     <div key={i}>
-                      {showDate && <div className="border-b border-[var(--border)] bg-[var(--soft)] px-2 py-1 text-[9px] font-bold text-[var(--muted)] uppercase tracking-wide">{dateStr}</div>}
-                      <div className="flex items-start gap-2 border-b border-[var(--border)] px-2 py-1.5">
+                      {showDate && <div className="border-b border-[var(--border)] px-2 py-1 text-[9px] font-bold uppercase tracking-wide" style={{ background: isToday ? "rgba(22,199,154,0.1)" : "var(--soft)", color: isToday ? "var(--accent)" : "var(--muted)", borderLeft: isToday ? "3px solid var(--accent)" : undefined }}>{isToday ? "▸ TODAY — " : ""}{dateStr}</div>}
+                      <div className="flex items-start gap-2 border-b border-[var(--border)] px-2 py-1.5" style={{ background: isToday && isFuture ? "rgba(22,199,154,0.04)" : undefined }}>
                         <div className="mt-0.5 w-3 shrink-0 h-3 rounded-full" style={{ background: impColor }} title={ev.impact} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-medium text-[var(--text)]">{ev.event}</div>
                           <div className="mt-0.5 flex items-center gap-2 text-[9px] text-[var(--muted)]">
                             <span className="rounded bg-[var(--soft)] px-1 py-0.5 font-bold">{ev.country}</span>
                             <span>{timeStr}</span>
+                            {timeUntil && <span className="rounded px-1 py-0.5 font-semibold" style={{ background: "rgba(22,199,154,0.12)", color: "var(--accent)" }}>in {timeUntil}</span>}
                             {ev.actual != null && <span style={{ color: "#22c55e" }}>A: {ev.actual}{ev.unit}</span>}
                             {ev.estimate != null && <span>F: {ev.estimate}{ev.unit}</span>}
                             {ev.prev != null && <span>P: {ev.prev}{ev.unit}</span>}
@@ -1176,8 +1450,9 @@ export default function ClientTerminal() {
 
               {/* Volume + quick-lot buttons in one bordered block */}
               <div className="overflow-hidden rounded-lg border border-[var(--border)]">
-                <div className="border-b border-[var(--border)] px-2 py-1">
+                <div className="border-b border-[var(--border)] px-2 py-1 flex items-center justify-between">
                   <span className="text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Volume (Lots)</span>
+                  {price != null && <span className="text-[8px] tabular-nums" style={{ color: "var(--muted)" }}>{(vol * csz(selSym)).toLocaleString()} units</span>}
                 </div>
                 <div className="flex items-center gap-1 px-1.5 py-1.5">
                   <button onClick={() => setVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] transition-colors hover:bg-[var(--soft)] hover:text-[var(--text)] active:scale-95">−</button>
@@ -1232,19 +1507,27 @@ export default function ClientTerminal() {
                 <input type="text" maxLength={128} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="" className="h-7 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[10px] text-[var(--text)] outline-none" />
               </div>
 
-              {/* Info block: Margin / Free Margin / Spread */}
+              {/* Info block: Margin / Free Margin / Spread / Pip Value */}
               <div className="overflow-hidden rounded-lg border border-[var(--border)] text-[9px]">
                 <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1">
                   <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Margin Required</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{margin ? "$" + fmt(margin) : "$0.00"}</span>
+                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{cSym + (margin ? fmt(margin) : "0.00")}</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1">
                   <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Free Margin</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "#22c55e" }}>{account ? "$" + fmt(free) : "--"}</span>
+                  <span className="font-semibold tabular-nums" style={{ color: "#22c55e" }}>{account ? cSym + fmt(free) : "--"}</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1">
+                  <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Pip Value</span>
+                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{cSym}{fmt(pipVal)}<span style={{ color: "var(--muted)", fontWeight: 400 }}>/pip</span></span>
+                </div>
+                <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1">
+                  <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</span>
+                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_spreadPips(selSym))} <span style={{ color: "var(--muted)", fontWeight: 400 }}>pts</span></span>
                 </div>
                 <div className="flex items-center justify-between px-2.5 py-1">
-                  <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_spreadPips(selSym))}</span>
+                  <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Contract Size</span>
+                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{csz(selSym).toLocaleString()}</span>
                 </div>
               </div>
 
@@ -1257,12 +1540,15 @@ export default function ClientTerminal() {
           {/* SELL | SPRD | BUY — always visible, outside scroll area */}
           {rightTab === "TRADE" && (
             <div className="shrink-0 border-t border-[var(--border)] p-2">
-              <div className="flex items-stretch gap-1.5">
+              <div className="flex items-stretch gap-1">
                 <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#ff6b78,#e0394a 70%,#b9293a)" }}>
                   <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down text-[8px]" />Sell</span>
                   <span className="text-[14px] tabular-nums">{bid != null ? gnum(bid, d) : "…"}</span>
                 </button>
-
+                <div className="flex flex-col items-center justify-center gap-0.5 px-1.5 shrink-0">
+                  <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--muted)" }}>{_spreadPips(selSym) > 0 ? Math.round(_spreadPips(selSym)) : "—"}</span>
+                  <span className="text-[7px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>pts</span>
+                </div>
                 <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)" }}>
                   <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up text-[8px]" />Buy</span>
                   <span className="text-[14px] tabular-nums">{ask != null ? gnum(ask, d) : "…"}</span>
@@ -1272,66 +1558,21 @@ export default function ClientTerminal() {
           )}
 
           {/* DOM — Depth of Market floating panel inside the aside */}
-          {domOpen && (() => {
-            if (!price) return null;
-            const spPx = _spreadPx(selSym);
-            const pipSz = Math.pow(10, -(d - 1));
-            const LEVELS = 6;
-            const asks: { px: number; vol: number }[] = [];
-            const bids: { px: number; vol: number }[] = [];
-            for (let i = 0; i < LEVELS; i++) {
-              const apx = ask + i * pipSz;
-              const bpx = bid - i * pipSz;
-              // Deterministic synthetic volume (reproducible per price level)
-              const av = Math.round(10 + Math.abs(Math.sin((apx * 10000) + i * 7)) * 90);
-              const bv = Math.round(10 + Math.abs(Math.sin((bpx * 10000) + i * 13)) * 90);
-              asks.push({ px: apx, vol: av });
-              bids.push({ px: bpx, vol: bv });
-            }
-            const totalAsk = asks.reduce((s, r) => s + r.vol, 0);
-            const totalBid = bids.reduce((s, r) => s + r.vol, 0);
-            const maxVol = Math.max(...asks.map((r) => r.vol), ...bids.map((r) => r.vol));
-            const row = (r: { px: number; vol: number }, side: "ask" | "bid", cumVol: number) => {
-              const pct = (r.vol / maxVol) * 100;
-              const col = side === "ask" ? SELL : BUY;
-              return (
-                <button key={r.px} onClick={() => { setPendingPrice(r.px.toFixed(d)); setOrderType(side === "ask" ? "LIMIT" : "STOP"); setRightTab("TRADE"); }}
-                  className="group relative flex w-full items-center justify-between px-2 py-[3px] text-[9px] font-mono tabular-nums hover:brightness-105"
-                  style={{ background: `linear-gradient(${side === "ask" ? "to right" : "to left"}, color-mix(in srgb, ${col} 18%, transparent) ${pct}%, transparent ${pct}%)` }}>
-                  <span style={{ color: col }}>{gnum(r.px, d)}</span>
-                  <span style={{ color: "var(--muted)" }}>{r.vol}</span>
-                  <span style={{ color: "var(--muted)" }}>{cumVol}</span>
-                </button>
-              );
-            };
-            let cumAsk = 0, cumBid = 0;
-            return (
-              <div className="absolute inset-x-0 bottom-[72px] z-30 mx-1.5 rounded-xl border border-[var(--border)] shadow-2xl" style={{ background: "var(--panel)" }}>
-                <div className="flex items-center justify-between border-b border-[var(--border)] px-2 py-1">
-                  <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Depth of Market — {selSym}</span>
-                  <button onClick={() => setDomOpen(false)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark text-[10px]" /></button>
-                </div>
-                <div className="grid grid-cols-3 border-b border-[var(--border)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
-                  <span>Price</span><span className="text-center">Vol</span><span className="text-right">Total</span>
-                </div>
-                <div className="flex flex-col-reverse">
-                  {asks.map((r) => { cumAsk += r.vol; return row(r, "ask", cumAsk); })}
-                </div>
-                <div className="flex items-center justify-between border-y border-[var(--border)] bg-[var(--soft)] px-2 py-1">
-                  <span className="text-[10px] font-bold" style={{ color: SELL }}>{gnum(ask, d)}</span>
-                  <span className="text-[9px]" style={{ color: "var(--muted)" }}>Spread {Math.round(_spreadPips(selSym))}</span>
-                  <span className="text-[10px] font-bold" style={{ color: BUY }}>{gnum(bid, d)}</span>
-                </div>
-                <div>
-                  {bids.map((r) => { cumBid += r.vol; return row(r, "bid", cumBid); })}
-                </div>
-                <div className="grid grid-cols-2 border-t border-[var(--border)] px-2 py-1 text-[8px]">
-                  <span style={{ color: SELL }}>Ask Vol: {totalAsk}</span>
-                  <span className="text-right" style={{ color: BUY }}>Bid Vol: {totalBid}</span>
-                </div>
-              </div>
-            );
-          })()}
+          {domOpen && price != null && (
+            <DomPanel
+              symbol={selSym}
+              bid={bid}
+              ask={ask}
+              spreadPips={_spreadPips(selSym)}
+              digits={d}
+              onClose={() => setDomOpen(false)}
+              onRowClick={(px, side) => {
+                setPendingPrice(px.toFixed(d));
+                setOrderType(side === "ask" ? "LIMIT" : "STOP");
+                setRightTab("TRADE");
+              }}
+            />
+          )}
         </aside>
       </div>
 
@@ -1347,10 +1588,10 @@ export default function ClientTerminal() {
         return (
           <div className="border-y border-[var(--border)] bg-[var(--panel)]" style={{ color: "#facc15" }}>
             <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-1.5 text-[11px] font-bold">
-              <span>Balance: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(balance) : "--"}</span></span>
-              <span>Equity: <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? "$" + fmt(equity) : "--"}</span></span>
-              <span>Margin: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(used) : "--"}</span></span>
-              <span>Free Margin: <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? "$" + fmt(free) : "--"}</span></span>
+              <span>Balance: <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(balance) : "--"}</span></span>
+              <span>Equity: <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? cSym + fmt(equity) : "--"}</span></span>
+              <span>Margin: <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(used) : "--"}</span></span>
+              <span>Free Margin: <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? cSym + fmt(free) : "--"}</span></span>
               <span className="flex items-center gap-1.5">
                 Margin Level:
                 <span className="font-mono font-bold" style={{ color: mlColor }}>{account && level ? level.toFixed(1) + "%" : "--"}</span>
@@ -1360,7 +1601,16 @@ export default function ClientTerminal() {
                   </span>
                 )}
               </span>
-              <span>Profit: <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+$" : "-$") + fmt(Math.abs(floating)) : "--"}</span></span>
+              <span>Profit: <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+" : "-") + cSym + fmt(Math.abs(floating)) : "--"}</span></span>
+              <span className="ml-auto flex items-center gap-2.5">
+                {sessions.map((s) => (
+                  <span key={s.name} className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.open ? "#16c79a" : "#4b5563" }} />
+                    <span className="text-[9px] font-bold" style={{ color: s.open ? "#16c79a" : "#4b5563" }}>{s.name}</span>
+                  </span>
+                ))}
+                <span className="text-[9px] font-mono" style={{ color: "var(--muted)" }}>{utcTime} UTC</span>
+              </span>
             </div>
           </div>
         );
@@ -1370,10 +1620,11 @@ export default function ClientTerminal() {
 
       <div className="flex shrink-0 flex-col bg-[var(--panel)]" style={{ height: tbH }}>
         <div className="flex items-center gap-1 border-b border-[var(--border)] px-2">
-          <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length}{pending.length ? <span className="ml-1 rounded-full px-1.5 text-[9px]" style={{ background: "rgba(90,169,255,0.2)", color: "#5aa9ff" }}>{pending.length} pending</span> : ""}</button>
+          <button onClick={() => setBotTab("positions")} className={tab(botTab === "positions")} style={botTab === "positions" ? { color: BUY } : undefined}>Positions {positions.length > 0 && <span className="ml-0.5 rounded px-1 text-[9px]" style={{ background: "rgba(38,166,154,0.15)", color: BUY }}>{positions.length}</span>}</button>
+          <button onClick={() => setBotTab("pending")} className={tab(botTab === "pending")} style={botTab === "pending" ? { color: "#5aa9ff" } : undefined}>Pending {pending.length > 0 && <span className="ml-0.5 rounded px-1 text-[9px]" style={{ background: "rgba(90,169,255,0.15)", color: "#5aa9ff" }}>{pending.length}</span>}</button>
           <button onClick={() => setBotTab("history")} className={tab(botTab === "history")} style={botTab === "history" ? { color: BUY } : undefined}>History</button>
           <button onClick={() => setBotTab("summary")} className={tab(botTab === "summary")} style={botTab === "summary" ? { color: BUY } : undefined}>Summary</button>
-          <button onClick={() => setBotTab("requests")} className={tab(botTab === "requests")} style={botTab === "requests" ? { color: BUY } : undefined}>My Requests</button>
+          <button onClick={() => setBotTab("requests")} className={tab(botTab === "requests")} style={botTab === "requests" ? { color: BUY } : undefined}>Requests</button>
           <div className="ml-auto flex items-center gap-1 pr-1">
             {botTab === "positions" && positions.length > 0 && (
               <button title="Export positions as CSV" onClick={() => exportCSV("positions")} className="flex items-center gap-1 rounded border border-[var(--border)] px-2 py-0.5 text-[9px] font-semibold" style={{ color: "var(--muted)" }}>
@@ -1402,7 +1653,7 @@ export default function ClientTerminal() {
                 {!dataReady ? <tr><td colSpan={14} className="px-2 py-3 text-center text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-2" />Loading…</td></tr> : positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={14}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
                   <tr key={p.id} className="border-t border-[var(--border)] cursor-context-menu" title={p.comment || undefined} onContextMenu={(e) => { e.preventDefault(); setPosCtx({ x: e.clientX, y: e.clientY, pos: p }); }}>
                     <td className="px-2 py-1 text-[var(--muted)] tabular-nums">{p.ticket ? String(p.ticket) : "—"}</td>
-                    <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span></td>
+                    <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span>{p.masterTradeId && <span className="ml-1 rounded px-0.5 text-[8px] font-bold" style={{ background: "#7c3aed22", color: "#7c3aed" }}>COPY</span>}</td>
                     <td className="px-2 py-1 text-[var(--muted)]">{new Date(p.openedAt).toLocaleDateString()}</td>
                     <td className="px-2 py-1 text-right">{p.lots}</td><td className="px-2 py-1 text-right">{gnum(p.openPrice, dg(p.symbol))}</td>
                     <td className="px-2 py-1 text-right tabular-nums" style={{ color: cdir > 0 ? "#16c784" : cdir < 0 ? "#e05260" : "var(--text)", transition: "color 0.3s ease" }}>{gnum(cur, dg(p.symbol))}</td>
@@ -1424,21 +1675,21 @@ export default function ClientTerminal() {
                       )}
                     </td>
                     {/* Trailing stop inline edit */}
-                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "trailingStop", val: p.trailingStop ? String(p.trailingStop) : "" }); }} title="Trailing stop (pips). Click to edit. 0 = off." style={{ cursor: "pointer" }}>
+                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "trailingStop", val: p.trailingStop > 0 ? String(Math.round(p.trailingStop / Math.pow(10, -(dg(p.symbol) - 1)))) : "" }); }} title="Trailing stop (pips). Click to edit. 0 = off." style={{ cursor: "pointer" }}>
                       {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "trailingStop" ? (
                         <input type="number" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "trailingStop", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-16 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#f59e0b", color: "#f59e0b" }} onClick={(e) => e.stopPropagation()} />
                       ) : (
-                        <span style={{ color: p.trailingStop > 0 ? "#f59e0b" : "var(--muted)" }}>{p.trailingStop > 0 ? p.trailingStop + "p" : <span className="text-[9px]">off</span>}</span>
+                        <span style={{ color: p.trailingStop > 0 ? "#f59e0b" : "var(--muted)" }}>{p.trailingStop > 0 ? Math.round(p.trailingStop / Math.pow(10, -(dg(p.symbol) - 1))) + "p" : <span className="text-[9px]">off</span>}</span>
                       )}
                     </td>
                     {/* Commission, Swap and Gross P/L — shown only when swap enabled */}
                     {swapEnabled && <>
-                      <td className="px-2 py-1 text-right" style={{ color: Number(p.commission) !== 0 ? SELL : "var(--muted)" }}>{Number(p.commission) !== 0 ? "-$" + fmt(Math.abs(Number(p.commission))) : "0.00"}</td>
-                      <td className="px-2 py-1 text-right" style={{ color: Number(p.swap) !== 0 ? SELL : "var(--muted)" }}>{Number(p.swap) !== 0 ? (Number(p.swap) >= 0 ? "+$" : "-$") + fmt(Math.abs(Number(p.swap))) : "0.00"}</td>
-                      <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+$" : "-$") + fmt(Math.abs(pl))}</td>
+                      <td className="px-2 py-1 text-right" style={{ color: Number(p.commission) !== 0 ? SELL : "var(--muted)" }}>{Number(p.commission) !== 0 ? "-" + cSym + fmt(Math.abs(Number(p.commission))) : "0.00"}</td>
+                      <td className="px-2 py-1 text-right" style={{ color: Number(p.swap) !== 0 ? SELL : "var(--muted)" }}>{Number(p.swap) !== 0 ? (Number(p.swap) >= 0 ? "+" : "-") + cSym + fmt(Math.abs(Number(p.swap))) : "0.00"}</td>
+                      <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+" : "-") + cSym + fmt(Math.abs(pl))}</td>
                     </>}
                     {/* Net P/L = gross + swap - commission (or just gross when swap disabled) */}
-                    {(() => { const net = swapEnabled ? pl + Number(p.swap) - Number(p.commission) : pl; return <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+$" : "-$") + fmt(Math.abs(net))}</td>; })()}
+                    {(() => { const net = swapEnabled ? pl + Number(p.swap) - Number(p.commission) : pl; return <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+" : "-") + cSym + fmt(Math.abs(net))}</td>; })()}
                     <td className="px-2 py-1 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {Number(p.lots) > 0.01 ? <button title="Partial close" style={{ color: "var(--muted)" }} onClick={() => setPartialClose({ id: p.id, sym: p.symbol, lots: Number(p.lots), closeLots: "" })} className="text-[9px] px-1">½</button> : <span title="Min lot — cannot partial close" className="text-[9px] px-1 opacity-20 cursor-not-allowed">½</span>}
@@ -1449,16 +1700,19 @@ export default function ClientTerminal() {
               </tbody>
             </table>
           )}
-          {botTab === "positions" && pending.length > 0 && (
+          {botTab === "pending" && pending.length === 0 && (
+            <div className="flex h-full items-center justify-center py-8 text-[11px] italic" style={{ color: "var(--muted)" }}>No pending orders.</div>
+          )}
+          {botTab === "pending" && pending.length > 0 && (
             <table className="w-full text-[10px]">
               <thead>
-                <tr><th colSpan={9} className="border-t-2 px-2 pb-1 pt-2 text-left text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#5aa9ff", borderColor: "rgba(90,169,255,0.35)" }}><i className="fa-regular fa-clock mr-1" />Pending Orders ({pending.length}) — waiting to trigger</th></tr>
+                <tr><th colSpan={9} className="border-b px-2 pb-1 pt-2 text-left text-[9px] font-semibold uppercase tracking-wide" style={{ color: "#5aa9ff", borderColor: "rgba(90,169,255,0.35)" }}><i className="fa-regular fa-clock mr-1" />Pending Orders ({pending.length}) — waiting to trigger</th></tr>
                 <tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">Order</th><th className="px-2 py-1 font-normal">Type</th><th className="px-2 py-1 font-normal text-right">Lots</th><th className="px-2 py-1 font-normal text-right">Trigger</th><th className="px-2 py-1 font-normal text-right">Current</th><th className="px-2 py-1 font-normal text-right">Distance</th><th className="px-2 py-1 font-normal text-right">SL</th><th className="px-2 py-1 font-normal text-right">TP</th><th className="px-2 py-1 font-normal text-right"></th></tr>
               </thead>
               <tbody>
                 {pending.map((o: any) => {
                   const d = dg(o.symbol); const trig = Number(o.price); const cur = prices[o.symbol]; const dist = cur != null ? Math.abs(trig - cur) : null;
-                  const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : "Stop"); const c = o.side === "BUY" ? "#5aa9ff" : SELL;
+                  const label = (o.side === "BUY" ? "Buy" : "Sell") + " " + (o.kind === "LIMIT" ? "Limit" : o.kind === "STOP_LIMIT" ? "Stop Limit" : "Stop"); const c = o.side === "BUY" ? "#5aa9ff" : SELL;
                   const isEditing = pendEdit?.id === o.id;
                   if (isEditing) return (
                   <tr key={o.id} className="border-t border-[var(--border)]" style={{ background: "rgba(90,169,255,0.13)" }}>
@@ -1520,9 +1774,9 @@ export default function ClientTerminal() {
                     <td className="px-2 py-1"><span style={{ color: rc, fontWeight: r !== "MANUAL" ? 600 : "normal" }}>{r === "MANUAL" ? "—" : r}</span></td>
                     {swapEnabled && <>
                       <td className="px-2 py-1 text-right" style={{ color: Number(h.swap) !== 0 ? (Number(h.swap) >= 0 ? BUY : SELL) : "var(--muted)" }}>{Number(h.swap) !== 0 ? (Number(h.swap) >= 0 ? "+" : "") + fmt(Number(h.swap)) : "—"}</td>
-                      <td className="px-2 py-1 text-right" style={{ color: Number(h.commission) > 0 ? SELL : "var(--muted)" }}>{Number(h.commission) > 0 ? "-$" + fmt(Number(h.commission)) : "—"}</td>
+                      <td className="px-2 py-1 text-right" style={{ color: Number(h.commission) > 0 ? SELL : "var(--muted)" }}>{Number(h.commission) > 0 ? "-" + cSym + fmt(Number(h.commission)) : "—"}</td>
                     </>}
-                    <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+$" : "-$") + fmt(Math.abs(net))}</td>
+                    <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+" : "-") + cSym + fmt(Math.abs(net))}</td>
                   </tr>); })}
               </tbody>
             </table>
@@ -1531,15 +1785,15 @@ export default function ClientTerminal() {
             // By direction
             const buys = positions.filter((p) => p.type === "BUY");
             const sells = positions.filter((p) => p.type === "SELL");
-            const buyPnl = buys.reduce((a: number, p: any) => a + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
-            const sellPnl = sells.reduce((a: number, p: any) => a + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
+            const buyPnl = buys.reduce((a: number, p: any) => a + pnlOfAcc(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
+            const sellPnl = sells.reduce((a: number, p: any) => a + pnlOfAcc(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
             const buyLots = buys.reduce((a: number, p: any) => a + Number(p.lots), 0);
             const sellLots = sells.reduce((a: number, p: any) => a + Number(p.lots), 0);
             // By symbol
             const symMap: Record<string, { buy: number; sell: number; lots: number; pnl: number }> = {};
             for (const p of positions) {
               const s = p.symbol; if (!symMap[s]) symMap[s] = { buy: 0, sell: 0, lots: 0, pnl: 0 };
-              const pl = pnlOf(p, prices[s] ?? p.openPrice, csz(s));
+              const pl = pnlOfAcc(p, prices[s] ?? p.openPrice, csz(s));
               symMap[s].lots += Number(p.lots); symMap[s].pnl += pl;
               if (p.type === "BUY") symMap[s].buy += Number(p.lots);
               else symMap[s].sell += Number(p.lots);
@@ -1548,7 +1802,7 @@ export default function ClientTerminal() {
             return (
               <div className="p-3 text-[10px]">
                 <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {([["BALANCE", fmt(balance), "var(--text)"], ["EQUITY", fmt(equity), "var(--text)"], ["FLOATING P/L", fmt(floating), floating >= 0 ? BUY : SELL], ["CLOSED P/L", fmt(Number(account?.pnl || 0)), Number(account?.pnl || 0) >= 0 ? BUY : SELL], ["DEPOSITS", fmt(Number(account?.deposit || 0)), BUY], ["WITHDRAWALS", "-" + fmt(Number(account?.withdrawal || 0)), SELL], ["FREE MARGIN", fmt(free), "var(--text)"], ["MARGIN LEVEL", level ? level.toFixed(1) + "%" : "—", GOLD]] as [string, string, string][]).map(([k, v, c]) => (
+                  {([["BALANCE", cSym + fmt(balance), "var(--text)"], ["EQUITY", cSym + fmt(equity), "var(--text)"], ["FLOATING P/L", (floating >= 0 ? "+" : "-") + cSym + fmt(Math.abs(floating)), floating >= 0 ? BUY : SELL], ["CLOSED P/L", (Number(account?.pnl || 0) >= 0 ? "+" : "-") + cSym + fmt(Math.abs(Number(account?.pnl || 0))), Number(account?.pnl || 0) >= 0 ? BUY : SELL], ["DEPOSITS", cSym + fmt(Number(account?.deposit || 0)), BUY], ["WITHDRAWALS", "-" + cSym + fmt(Number(account?.withdrawal || 0)), SELL], ["FREE MARGIN", cSym + fmt(free), "var(--text)"], ["MARGIN LEVEL", level ? level.toFixed(1) + "%" : "—", GOLD]] as [string, string, string][]).map(([k, v, c]) => (
                     <div key={k} className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{k}</div><div className="mt-1 text-sm font-bold tabular-nums" style={{ color: c }}>{v}</div></div>
                   ))}
                 </div>
@@ -1561,19 +1815,19 @@ export default function ClientTerminal() {
                         <td className="py-1 pr-3 font-semibold" style={{ color: BUY }}>BUY</td>
                         <td className="py-1 pr-3 text-right">{buys.length}</td>
                         <td className="py-1 pr-3 text-right">{buyLots.toFixed(2)}</td>
-                        <td className="py-1 text-right font-semibold" style={{ color: buyPnl >= 0 ? BUY : SELL }}>{(buyPnl >= 0 ? "+$" : "-$") + fmt(Math.abs(buyPnl))}</td>
+                        <td className="py-1 text-right font-semibold" style={{ color: buyPnl >= 0 ? BUY : SELL }}>{(buyPnl >= 0 ? "+" : "-") + cSym + fmt(Math.abs(buyPnl))}</td>
                       </tr>
                       <tr className="border-t border-[var(--border)]">
                         <td className="py-1 pr-3 font-semibold" style={{ color: SELL }}>SELL</td>
                         <td className="py-1 pr-3 text-right">{sells.length}</td>
                         <td className="py-1 pr-3 text-right">{sellLots.toFixed(2)}</td>
-                        <td className="py-1 text-right font-semibold" style={{ color: sellPnl >= 0 ? BUY : SELL }}>{(sellPnl >= 0 ? "+$" : "-$") + fmt(Math.abs(sellPnl))}</td>
+                        <td className="py-1 text-right font-semibold" style={{ color: sellPnl >= 0 ? BUY : SELL }}>{(sellPnl >= 0 ? "+" : "-") + cSym + fmt(Math.abs(sellPnl))}</td>
                       </tr>
                       <tr className="border-t-2 border-[var(--border)]">
                         <td className="py-1 pr-3 font-semibold">Total</td>
                         <td className="py-1 pr-3 text-right">{positions.length}</td>
                         <td className="py-1 pr-3 text-right">{(buyLots + sellLots).toFixed(2)}</td>
-                        <td className="py-1 text-right font-semibold" style={{ color: floating >= 0 ? BUY : SELL }}>{(floating >= 0 ? "+$" : "-$") + fmt(Math.abs(floating))}</td>
+                        <td className="py-1 text-right font-semibold" style={{ color: floating >= 0 ? BUY : SELL }}>{(floating >= 0 ? "+" : "-") + cSym + fmt(Math.abs(floating))}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1590,7 +1844,7 @@ export default function ClientTerminal() {
                             <td className="py-1 pr-3 text-right" style={{ color: BUY }}>{v.buy > 0 ? v.buy.toFixed(2) : "—"}</td>
                             <td className="py-1 pr-3 text-right" style={{ color: SELL }}>{v.sell > 0 ? v.sell.toFixed(2) : "—"}</td>
                             <td className="py-1 pr-3 text-right">{v.lots.toFixed(2)}</td>
-                            <td className="py-1 text-right font-semibold" style={{ color: v.pnl >= 0 ? BUY : SELL }}>{(v.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(v.pnl))}</td>
+                            <td className="py-1 text-right font-semibold" style={{ color: v.pnl >= 0 ? BUY : SELL }}>{(v.pnl >= 0 ? "+" : "-") + cSym + fmt(Math.abs(v.pnl))}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1629,7 +1883,7 @@ export default function ClientTerminal() {
                               {isAcc ? `New ${r.type === "DEMO" ? "Demo" : "Live"} Account` : r.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"}
                             </span>
                           </td>
-                          <td className="px-2 py-1 text-right font-semibold tabular-nums">{isAcc ? <span className="text-[var(--muted)]">1:{r.leverage}</span> : "$" + gmoney(r.amount)}</td>
+                          <td className="px-2 py-1 text-right font-semibold tabular-nums">{isAcc ? <span className="text-[var(--muted)]">1:{r.leverage}</span> : cSym + gmoney(r.amount)}</td>
                           <td className="px-2 py-1 text-[var(--muted)]">{isAcc ? r.currency : (r.method || "—")}</td>
                           <td className="px-2 py-1">
                             <span className="rounded-full px-2 py-0.5 text-[9px] font-semibold" style={{ background: r.status === "APPROVED" ? "rgba(22,163,74,0.15)" : r.status === "REJECTED" ? "rgba(220,38,38,0.15)" : "rgba(240,180,41,0.15)", color: r.status === "APPROVED" ? BUY : r.status === "REJECTED" ? SELL : GOLD }}>{r.status}</span>
@@ -1763,19 +2017,28 @@ export default function ClientTerminal() {
         <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setAlertModal(false)}>
           <div className="w-80 rounded-xl border p-5" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
-              <div className="text-[13px] font-bold">Price Alerts — {selSym}</div>
+              <div className="text-[13px] font-bold">Price Alerts</div>
               <button onClick={() => setAlertModal(false)} className="text-[var(--muted)]"><i className="fa-solid fa-xmark" /></button>
             </div>
-            <div className="mb-3 space-y-1">
-              {alerts.filter((a) => a.symbol === selSym).length === 0 && <div className="text-[10px]" style={{ color: "var(--muted)" }}>No alerts for {selSym}</div>}
-              {alerts.filter((a) => a.symbol === selSym).map((a) => (
+            <div className="mb-3 max-h-48 overflow-y-auto space-y-1">
+              {alerts.length === 0 && <div className="text-[10px]" style={{ color: "var(--muted)" }}>No active alerts</div>}
+              {alerts.map((a) => (
                 <div key={a.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-1.5 text-[10px]">
-                  <span>{a.condition} {a.price}{a.note ? ` — ${a.note}` : ""}</span>
-                  <button onClick={async () => { await fetch("/api/client/alerts?id=" + a.id, { method: "DELETE" }); loadAlerts(); }} className="ml-2 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-trash-can text-[9px]" /></button>
+                  <span className="flex items-center gap-1.5 min-w-0 truncate">
+                    <span className="font-semibold text-[9px]" style={{ color: "var(--muted)" }}>{a.symbol}</span>
+                    <span>{a.condition} {a.price}{a.note ? ` — ${a.note}` : ""}</span>
+                    {a.triggered && <span className="rounded px-1 py-0.5 text-[8px] font-bold" style={{ background: "#f59e0b22", color: "#f59e0b" }}>TRIGGERED</span>}
+                  </span>
+                  <span className="flex items-center gap-1 ml-2 shrink-0">
+                    {a.triggered && (
+                      <button title="Re-arm" onClick={async () => { await fetch("/api/client/alerts?id=" + a.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ triggered: false }) }); loadAlerts(); }} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-rotate-right text-[9px]" /></button>
+                    )}
+                    <button onClick={async () => { await fetch("/api/client/alerts?id=" + a.id, { method: "DELETE" }); loadAlerts(); }} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-trash-can text-[9px]" /></button>
+                  </span>
                 </div>
               ))}
             </div>
-            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Add Alert</div>
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Add Alert — {selSym}</div>
             <div className="flex gap-2 mb-2">
               {["ABOVE", "BELOW"].map((c) => (
                 <button key={c} onClick={() => setAlertForm((f) => ({ ...f, condition: c }))} className="flex-1 rounded py-1 text-[10px] font-semibold border" style={{ background: alertForm.condition === c ? "var(--accent)" : "transparent", color: alertForm.condition === c ? "#fff" : "var(--muted)", borderColor: "var(--border)" }}>{c}</button>

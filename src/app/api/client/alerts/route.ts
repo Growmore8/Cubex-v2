@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
+import { sendUserMail } from "@/lib/tenant-mail";
+import { priceAlertEmail } from "@/lib/email-templates";
 
 async function getAccount(s: any, accountId?: string) {
   if (accountId) {
@@ -43,6 +45,28 @@ export async function DELETE(req: Request) {
   const s = await requireClient(); if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   const url = new URL(req.url);
   const id = url.searchParams.get("id"); if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  const fired = url.searchParams.get("fire") === "1";
+
+  // If fired=1 fetch the alert before deleting so we can email the user
+  let alertSnap: any = null;
+  if (fired) {
+    alertSnap = await prisma.priceAlert.findFirst({ where: { id, account: { tenantId: s.tenantId!, userId: s.sub } }, include: { account: true } });
+  }
+
   await prisma.priceAlert.deleteMany({ where: { id, account: { tenantId: s.tenantId!, userId: s.sub } } });
+
+  if (fired && alertSnap && s.sub) {
+    sendUserMail(s.tenantId!, s.sub,
+      `Price Alert Triggered – ${alertSnap.symbol}`,
+      (brand) => priceAlertEmail(brand, {
+        holderName: (alertSnap.account as any)?.name || "Trader",
+        symbol: alertSnap.symbol,
+        condition: alertSnap.condition as "ABOVE" | "BELOW",
+        targetPrice: Number(alertSnap.price),
+        note: alertSnap.note,
+      })
+    ).catch(() => {});
+  }
+
   return NextResponse.json({ ok: true });
 }
