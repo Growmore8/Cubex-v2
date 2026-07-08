@@ -1264,7 +1264,9 @@ export default function AdminDeskPage() {
                     {presets.map(([k, lbl]) => <button key={k} onClick={() => { setHfPreset(k); setHfFrom(""); setHfTo(""); }} className="rounded px-2 py-0.5" style={hfPreset === k ? { background: "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{lbl}</button>)}
                     <span className="ml-1 text-[var(--muted)]">From</span><input type="date" value={hfFrom} onChange={(e) => { setHfFrom(e.target.value); setHfPreset("ALL"); }} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]" />
                     <span className="text-[var(--muted)]">To</span><input type="date" value={hfTo} onChange={(e) => { setHfTo(e.target.value); setHfPreset("ALL"); }} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]" />
-                    <span className="text-[var(--muted)]">Type</span><select value={hfType} onChange={(e) => setHfType(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All</option><option value="BUY">Buy</option><option value="SELL">Sell</option></select>{Object.keys(histSel).filter((k) => histSel[k]).length > 0 && <button onClick={delHistBulk} className="ml-auto rounded px-2 py-0.5" style={{ background: SELL, color: "#1a0606" }}>Delete Selected ({Object.keys(histSel).filter((k) => histSel[k]).length})</button>}
+                    <span className="text-[var(--muted)]">Type</span><select value={hfType} onChange={(e) => setHfType(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All</option><option value="BUY">Buy</option><option value="SELL">Sell</option></select>
+                    <a href={"/api/admin/export/trades?" + new URLSearchParams(Object.fromEntries([["accountId", selAcc?.id || ""], hfFrom ? ["from", hfFrom] : ["",""], hfTo ? ["to", hfTo] : ["",""]].filter(([k]) => k))).toString()} download className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 font-semibold" style={{ background: BUY + "22", color: BUY, border: "1px solid " + BUY + "44" }} title="Export filtered trades as CSV"><i className="fa-solid fa-download" /> Export CSV</a>
+                    {Object.keys(histSel).filter((k) => histSel[k]).length > 0 && <button onClick={delHistBulk} className="rounded px-2 py-0.5" style={{ background: SELL, color: "#1a0606" }}>Delete Selected ({Object.keys(histSel).filter((k) => histSel[k]).length})</button>}
                   </div>
                   {/* (Period summary moved up into the toolbox tab bar) */}
                   <div className="flex-1 overflow-auto">
@@ -1308,14 +1310,114 @@ export default function AdminDeskPage() {
                 </div>
               );
             })()}
-            {tab === "summary" && !selAcc && (
-              <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>Please select an account first.</div>
-            )}
+            {tab === "summary" && !selAcc && (() => {
+              // Platform-wide P&L report using aggregated account data
+              const liveClients = clients.filter((c: any) => c.type === "LIVE");
+              const demoClients = clients.filter((c: any) => c.type === "DEMO");
+              const totalDep = clients.reduce((a: number, c: any) => a + Number(c.deposit || 0), 0);
+              const totalWd  = clients.reduce((a: number, c: any) => a + Number(c.withdrawal || 0), 0);
+              const totalPnl = clients.reduce((a: number, c: any) => a + Number(c.pnl || 0), 0);
+              const totalCredit = clients.reduce((a: number, c: any) => a + Number(c.credit || 0) + Number(c.bonus || 0), 0);
+              // Commission + swap from recent history (limited to 150 loaded rows)
+              const tradePnl = history.filter((h: any) => h.kind === "TRADE");
+              const grossComm = tradePnl.reduce((a: number, h: any) => a + Number(h.commission || 0), 0);
+              const grossSwap = tradePnl.reduce((a: number, h: any) => a + Math.abs(Number(h.swap || 0)), 0);
+              // Symbol breakdown from recent history
+              const symVol: Record<string, { lots: number; pnl: number; trades: number }> = {};
+              tradePnl.forEach((h: any) => {
+                if (!h.symbol || h.symbol === "-") return;
+                if (!symVol[h.symbol]) symVol[h.symbol] = { lots: 0, pnl: 0, trades: 0 };
+                symVol[h.symbol].lots  += Number(h.lots || 0);
+                symVol[h.symbol].pnl   += Number(h.pnl || 0);
+                symVol[h.symbol].trades++;
+              });
+              const topSyms = Object.entries(symVol).sort((a, b) => b[1].lots - a[1].lots).slice(0, 8);
+              // Group breakdown
+              const grpMap: Record<string, { dep: number; pnl: number; cnt: number }> = {};
+              clients.forEach((c: any) => {
+                const gname = c.group?.name || "Ungrouped";
+                if (!grpMap[gname]) grpMap[gname] = { dep: 0, pnl: 0, cnt: 0 };
+                grpMap[gname].dep += Number(c.deposit || 0) - Number(c.withdrawal || 0);
+                grpMap[gname].pnl += Number(c.pnl || 0);
+                grpMap[gname].cnt++;
+              });
+              const grpRows = Object.entries(grpMap).sort((a, b) => b[1].dep - a[1].dep);
+              const sc = (label: string, val: number, col?: string) => (
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5">
+                  <div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{label}</div>
+                  <div className="mt-1 text-base font-bold tabular-nums" style={{ color: col || (val >= 0 ? BUY : SELL) }}>{val >= 0 ? "+" : ""}{gnum(val, 2)}</div>
+                </div>
+              );
+              const thc = "px-2 py-1.5 text-left text-[10px] font-semibold" as const;
+              const tdc = "px-2 py-1.5 text-[11px] border-b border-[color-mix(in_srgb,var(--border)_38%,transparent)] tabular-nums" as const;
+              return (
+                <div className="h-full overflow-auto p-3 text-[11px]">
+                  {/* Top stat cards */}
+                  <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Accounts</div><div className="mt-1 text-base font-bold">{liveClients.length} Live · <span style={{ color: "var(--muted)" }}>{demoClients.length} Demo</span></div></div>
+                    {sc("Total Deposits", totalDep, BUY)}
+                    {sc("Total Withdrawals", -totalWd, SELL)}
+                    {sc("Net Deposits", totalDep - totalWd, "var(--text)")}
+                    {sc("Realized P/L", totalPnl)}
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Credit / Bonus</div><div className="mt-1 text-base font-bold tabular-nums" style={{ color: "var(--accent)" }}>{gnum(totalCredit, 2)}</div></div>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Comm (recent)</div><div className="mt-1 text-base font-bold tabular-nums" style={{ color: BUY }}>{gnum(grossComm, 2)}</div></div>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Swap (recent)</div><div className="mt-1 text-base font-bold tabular-nums" style={{ color: "var(--text)" }}>{gnum(grossSwap, 2)}</div></div>
+                  </div>
+                  <div className="flex gap-3">
+                    {/* Group breakdown */}
+                    <div className="flex-1 overflow-auto rounded-xl border border-[var(--border)]">
+                      <div className="border-b border-[var(--border)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted)" }}>By Group</div>
+                      <table className="w-full border-collapse">
+                        <thead><tr style={{ background: "var(--soft)" }}><th className={thc} style={{ color: "var(--muted)" }}>Group</th><th className={thc + " text-right"} style={{ color: "var(--muted)" }}>Accounts</th><th className={thc + " text-right"} style={{ color: "var(--muted)" }}>Net Deposits</th><th className={thc + " text-right"} style={{ color: "var(--muted)" }}>P/L</th></tr></thead>
+                        <tbody>
+                          {grpRows.map(([name, g]) => (
+                            <tr key={name}>
+                              <td className={tdc + " font-medium"}>{name}</td>
+                              <td className={tdc + " text-right"}>{g.cnt}</td>
+                              <td className={tdc + " text-right"}>{gnum(g.dep, 2)}</td>
+                              <td className={tdc + " text-right"} style={{ color: g.pnl >= 0 ? BUY : SELL }}>{g.pnl >= 0 ? "+" : ""}{gnum(g.pnl, 2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Top symbols (from recent history) */}
+                    {topSyms.length > 0 && (
+                      <div className="w-56 shrink-0 overflow-auto rounded-xl border border-[var(--border)]">
+                        <div className="border-b border-[var(--border)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Top Symbols (recent)</div>
+                        <table className="w-full border-collapse">
+                          <thead><tr style={{ background: "var(--soft)" }}><th className={thc} style={{ color: "var(--muted)" }}>Symbol</th><th className={thc + " text-right"} style={{ color: "var(--muted)" }}>Lots</th><th className={thc + " text-right"} style={{ color: "var(--muted)" }}>P/L</th></tr></thead>
+                          <tbody>
+                            {topSyms.map(([sym, d]) => (
+                              <tr key={sym}>
+                                <td className={tdc + " font-mono font-semibold"}>{sym}</td>
+                                <td className={tdc + " text-right"}>{d.lots.toFixed(2)}</td>
+                                <td className={tdc + " text-right"} style={{ color: d.pnl >= 0 ? BUY : SELL }}>{d.pnl >= 0 ? "+" : ""}{gnum(d.pnl, 2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 text-[9px]" style={{ color: "var(--muted)" }}>
+                    <i className="fa-solid fa-circle-info mr-1" />Deposits/withdrawals/P&amp;L are platform totals from all accounts. Commission &amp; swap figures are based on the most recent {tradePnl.length} closed trades loaded.
+                    <a href="/api/admin/export/trades" download className="ml-3 font-semibold" style={{ color: BUY }}><i className="fa-solid fa-download mr-1" />Export all trades (CSV)</a>
+                  </div>
+                </div>
+              );
+            })()}
             {tab === "summary" && selAcc && (
-              <div className="grid grid-cols-2 gap-2 p-3 text-[11px] sm:grid-cols-4">
-                {([["TOTAL DEPOSITS", fmt(Number(selAcc?.deposit || 0)), BUY], ["TOTAL WITHDRAWALS", "-" + fmt(Number(selAcc?.withdrawal || 0)), SELL], ["NET DEPOSITS", fmt(Number(selAcc?.deposit || 0) - Number(selAcc?.withdrawal || 0)), "var(--text)"], ["CREDIT/BONUS", fmt(Number(selAcc?.credit || 0) + Number(selAcc?.bonus || 0)), BUY], ["CLOSED TRADE P/L", fmt(Number(selAcc?.pnl || 0)), Number(selAcc?.pnl || 0) >= 0 ? BUY : SELL], ["CURRENT BALANCE", fmt(balance), "var(--text)"], ["MC LEVEL", Number(selAcc?.mcLevel || 0) > 0 ? selAcc?.mcLevel + "%" : "Off", GOLD], ["NET BALANCE", fmt(equity), "var(--accent)"]] as [string, string, string][]).map(([k, v, c]) => (
-                  <div key={k as string} className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{k}</div><div className="mt-1 text-base font-bold tabular-nums" style={{ color: c }}>{v}</div></div>
-                ))}
+              <div className="p-3">
+                <div className="grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+                  {([["TOTAL DEPOSITS", fmt(Number(selAcc?.deposit || 0)), BUY], ["TOTAL WITHDRAWALS", "-" + fmt(Number(selAcc?.withdrawal || 0)), SELL], ["NET DEPOSITS", fmt(Number(selAcc?.deposit || 0) - Number(selAcc?.withdrawal || 0)), "var(--text)"], ["CREDIT/BONUS", fmt(Number(selAcc?.credit || 0) + Number(selAcc?.bonus || 0)), BUY], ["CLOSED TRADE P/L", fmt(Number(selAcc?.pnl || 0)), Number(selAcc?.pnl || 0) >= 0 ? BUY : SELL], ["CURRENT BALANCE", fmt(balance), "var(--text)"], ["MC LEVEL", Number(selAcc?.mcLevel || 0) > 0 ? selAcc?.mcLevel + "%" : "Off", GOLD], ["NET BALANCE", fmt(equity), "var(--accent)"]] as [string, string, string][]).map(([k, v, c]) => (
+                    <div key={k as string} className="rounded-xl border border-[var(--border)] bg-[var(--soft)] px-3 py-2.5"><div className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">{k}</div><div className="mt-1 text-base font-bold tabular-nums" style={{ color: c }}>{v}</div></div>
+                  ))}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <a href={"/api/desk/statement?accountId=" + selAcc.id} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold text-white" style={{ background: "#ef4444" }}><i className="fa-solid fa-file-pdf" /> PDF Statement</a>
+                  <a href={"/api/admin/export/trades?accountId=" + selAcc.id} download className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold" style={{ background: BUY + "22", color: BUY, border: "1px solid " + BUY + "44" }}><i className="fa-solid fa-download" /> Export Trades CSV</a>
+                </div>
               </div>
             )}
             {tab === "clients" && (() => {
@@ -1433,7 +1535,8 @@ export default function AdminDeskPage() {
                     {AUDIT_CATS.map((c) => (
                       <button key={c} onClick={() => setAuditCat(c)} className="rounded px-2 py-0.5" style={auditCat === c ? { background: AUDIT_COL[c] || "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{c}</button>
                     ))}
-                    <span className="ml-auto text-[var(--muted)]">{auditRows.length} entries</span>
+                    <span className="text-[var(--muted)]">{auditRows.length} entries</span>
+                    <a href={"/api/admin/export/audit" + (auditCat !== "ALL" ? "?category=" + auditCat : "")} download className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-[10px]" style={{ background: BUY + "22", color: BUY, border: "1px solid " + BUY + "44" }} title="Export audit log as CSV"><i className="fa-solid fa-download" /> Export CSV</a>
                   </div>
                   <div className="flex-1 overflow-auto px-2 py-1">
                     {auditRows.length === 0 ? <div className="py-4 text-center text-[var(--muted)]">No activity.</div> : auditRows.slice(0, 150).map((l) => {

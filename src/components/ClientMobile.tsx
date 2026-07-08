@@ -656,6 +656,15 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
             )}
 
+            {/* Statement download */}
+            {accId && (
+              <div className="flex items-center justify-end gap-2">
+                <a href={"/api/client/statement?accountId=" + accId} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-semibold" style={{ background: "#ef444422", color: "#ef4444", border: "1px solid #ef444433" }}>
+                  <i className="fa-solid fa-file-pdf text-[10px]" /> Download Statement
+                </a>
+              </div>
+            )}
+
             {/* Equity curve — cumulative trade P/L */}
             {(() => {
               const tradePL = (history || []).filter((h: any) => h.kind === "TRADE" || !h.kind);
