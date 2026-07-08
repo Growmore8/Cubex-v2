@@ -308,7 +308,7 @@ export default function ManagerDashboard() {
                           <td className={tdc}><span className="rounded px-1.5 py-0.5 text-[9px] font-bold" style={{ background: c.type === "LIVE" ? BUY + "22" : "var(--soft)", color: c.type === "LIVE" ? BUY : "var(--muted)" }}>{c.type}</span></td>
                           <td className={tdc + " text-right"}>${gmoney(bal)}</td>
                           <td className={tdc + " text-right"}>${gmoney(equity)}</td>
-                          <td className={tdc + " text-right font-semibold"} style={{ color: pnl >= 0 ? BUY : SELL }}>{pnl >= 0 ? "+" : ""}${gmoney(Math.abs(pnl))}</td>
+                          <td className={tdc + " text-right"}><span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums" style={{ background: pnl >= 0 ? "rgba(38,166,154,0.13)" : "rgba(239,83,80,0.13)", color: pnl >= 0 ? BUY : SELL }}>{(pnl >= 0 ? "+" : "") + "$" + gmoney(Math.abs(pnl))}</span></td>
                           <td className={tdc}>{c.group?.name || <span style={{ color: "var(--muted)" }}>—</span>}</td>
                           <td className={tdc}>
                             <div className="flex items-center gap-1.5">

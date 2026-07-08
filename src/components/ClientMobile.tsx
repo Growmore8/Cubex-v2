@@ -816,40 +816,58 @@ export default function ClientMobile({ t }: { t: any }) {
             })()}
 
             {/* market movers */}
-            <div className="glass-card p-3">
-              <div className="mb-2 flex items-center justify-between">
+            <div className="glass-card overflow-hidden p-0">
+              <div className="flex items-center justify-between px-3 pt-3 pb-2">
                 <div className="text-[11px] font-bold tracking-wide"><i className="fa-solid fa-arrow-trend-up mr-1.5" style={{ color: BUY }} />MARKET MOVERS</div>
-                <span className="text-[9px] text-[var(--muted)]">LIVE</span>
+                <span className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: "rgba(38,166,154,0.12)", color: BUY }}>LIVE</span>
               </div>
-              {!movers.any ? <div className="py-4 text-center text-[11px] text-[var(--muted)]">Waiting for live prices…</div> : (
-                <div className="space-y-3">
-                  <div>
-                    <div className="mb-1 text-[9px] font-semibold text-[var(--muted)]">TOP GAINERS</div>
-                    {movers.gainers.map((s: any) => {
-                      const p = s.pct;
-                      return (
-                        <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
-                          <SymIcon symbol={s.symbol} size={26} />
-                          <div className="w-24 shrink-0 text-left"><div className="truncate text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price != null ? gnum(s.price, dg(s.symbol)) : "…"}</div></div>
-                          <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={true} /></div>
-                          <span className="w-[52px] shrink-0 text-right text-[12px] font-semibold tabular-nums" style={{ color: BUY }}>{(p >= 0 ? "+" : "") + p.toFixed(2)}%</span>
-                        </button>
-                      );
-                    })}
+              {!movers.any ? <div className="px-3 pb-4 text-center text-[11px] text-[var(--muted)]">Waiting for live prices…</div> : (
+                <div>
+                  {/* Gainers */}
+                  <div className="border-t px-3 py-2" style={{ borderColor: "rgba(38,166,154,0.2)", background: "rgba(38,166,154,0.04)" }}>
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <i className="fa-solid fa-arrow-up text-[8px]" style={{ color: BUY }} />
+                      <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: BUY }}>Top Gainers</span>
+                    </div>
+                    {movers.gainers.length === 0
+                      ? <div className="py-2 text-center text-[10px] text-[var(--muted)]">No gainers yet</div>
+                      : movers.gainers.map((s: any) => {
+                        const p = s.pct;
+                        return (
+                          <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 mb-1 transition-colors active:bg-[var(--soft)]" style={{ background: "rgba(38,166,154,0.06)" }}>
+                            <SymIcon symbol={s.symbol} size={28} />
+                            <div className="min-w-0 flex-1 text-left">
+                              <div className="truncate text-[12px] font-bold">{s.display || s.symbol}</div>
+                              <div className="text-[10px] tabular-nums" style={{ color: "var(--muted)" }}>{s.price != null ? gnum(s.price, dg(s.symbol)) : "…"}</div>
+                            </div>
+                            <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={true} /></div>
+                            <span className="shrink-0 rounded-lg px-2.5 py-1 text-[13px] font-bold tabular-nums" style={{ background: "rgba(38,166,154,0.15)", color: BUY }}>+{p.toFixed(2)}%</span>
+                          </button>
+                        );
+                      })}
                   </div>
-                  <div>
-                    <div className="mb-1 text-[9px] font-semibold text-[var(--muted)]">TOP LOSERS</div>
-                    {movers.losers.map((s: any) => {
-                      const p = s.pct;
-                      return (
-                        <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 transition-colors active:bg-[var(--soft)]">
-                          <SymIcon symbol={s.symbol} size={26} />
-                          <div className="w-24 shrink-0 text-left"><div className="truncate text-[12px] font-semibold">{s.display || s.symbol}</div><div className="text-[10px] tabular-nums text-[var(--muted)]">{s.price != null ? gnum(s.price, dg(s.symbol)) : "…"}</div></div>
-                          <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={false} /></div>
-                          <span className="w-[52px] shrink-0 text-right text-[12px] font-semibold tabular-nums" style={{ color: SELL }}>{p.toFixed(2)}%</span>
-                        </button>
-                      );
-                    })}
+                  {/* Losers */}
+                  <div className="border-t px-3 py-2" style={{ borderColor: "rgba(239,83,80,0.2)", background: "rgba(239,83,80,0.04)" }}>
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <i className="fa-solid fa-arrow-down text-[8px]" style={{ color: SELL }} />
+                      <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: SELL }}>Top Losers</span>
+                    </div>
+                    {movers.losers.length === 0
+                      ? <div className="py-2 text-center text-[10px] text-[var(--muted)]">No losers yet</div>
+                      : movers.losers.map((s: any) => {
+                        const p = s.pct;
+                        return (
+                          <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 mb-1 transition-colors active:bg-[var(--soft)]" style={{ background: "rgba(239,83,80,0.06)" }}>
+                            <SymIcon symbol={s.symbol} size={28} />
+                            <div className="min-w-0 flex-1 text-left">
+                              <div className="truncate text-[12px] font-bold">{s.display || s.symbol}</div>
+                              <div className="text-[10px] tabular-nums" style={{ color: "var(--muted)" }}>{s.price != null ? gnum(s.price, dg(s.symbol)) : "…"}</div>
+                            </div>
+                            <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={false} /></div>
+                            <span className="shrink-0 rounded-lg px-2.5 py-1 text-[13px] font-bold tabular-nums" style={{ background: "rgba(239,83,80,0.15)", color: SELL }}>{p.toFixed(2)}%</span>
+                          </button>
+                        );
+                      })}
                   </div>
                 </div>
               )}

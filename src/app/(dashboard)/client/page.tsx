@@ -1735,8 +1735,8 @@ export default function ClientTerminal() {
                     <td className="px-2 py-1 text-right font-semibold tabular-nums">{gnum(trig, d)}</td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">{cur != null ? gnum(cur, d) : "…"}</td>
                     <td className="px-2 py-1 text-right text-[var(--muted)]">{dist != null ? gnum(dist, d) : "—"}</td>
-                    <td className="px-2 py-1 text-right text-[var(--muted)]">{o.sl ? gnum(o.sl, d) : "-"}</td>
-                    <td className="px-2 py-1 text-right text-[var(--muted)]">{o.tp ? gnum(o.tp, d) : "-"}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: o.sl ? "#ef5350" : "var(--muted)" }}>{o.sl ? gnum(o.sl, d) : "—"}</td>
+                    <td className="px-2 py-1 text-right" style={{ color: o.tp ? "#10b981" : "var(--muted)" }}>{o.tp ? gnum(o.tp, d) : "—"}</td>
                     <td className="px-2 py-1 text-right flex items-center gap-1.5 justify-end">
                       <button title="Edit order" style={{ color: "#5aa9ff" }} onClick={() => setPendEdit({ id: o.id, price: String(trig), sl: o.sl ? String(Number(o.sl)) : "", tp: o.tp ? String(Number(o.tp)) : "" })}><i className="fa-solid fa-pen text-[9px]" /></button>
                       <button title="Cancel order" style={{ color: SELL }} onClick={() => cancelPending(o.id)}><i className="fa-solid fa-xmark" /></button>

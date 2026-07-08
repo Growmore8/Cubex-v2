@@ -1178,7 +1178,7 @@ export default function AdminDeskPage() {
               const tSelIds = accOpen.filter((p) => tradeSel[p.id]).map((p) => p.id);
               const odt = (p: any) => { const v = p.openTime || p.openedAt || p.createdAt || p.time; return v ? new Date(v).toLocaleString() : "-"; };
               const oid = (p: any) => p.ticket ?? p.orderId ?? p.order ?? p.id;
-              const thc = "px-2 py-1.5 text-left font-semibold text-[var(--text)]";
+              const thc = "px-2 py-1.5 text-left text-[9px] font-bold uppercase tracking-wide text-[var(--muted)] whitespace-nowrap";
               return (
                 <table className="w-full border-collapse text-[10px] [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-1.5 [&_th]:px-1.5">
                   <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
@@ -1215,7 +1215,7 @@ export default function AdminDeskPage() {
                           <td className="px-2 py-1">{p.symbol}</td>
                           <td className="px-2 py-1">
                             {isEditing ? <select className="rounded border bg-[var(--soft)] border-[var(--border)] text-[var(--text)] text-[9px] px-1 py-0.5" value={ei("type", p.type)} onChange={(e) => setIe("type", e.target.value)}><option>BUY</option><option>SELL</option></select>
-                              : <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type}</span>}
+                              : <span className="rounded px-1.5 py-0.5 text-[9px] font-bold" style={{ background: (p.type === "BUY" ? BUY : SELL) + "22", color: p.type === "BUY" ? BUY : SELL }}>{p.type}</span>}
                           </td>
                           <td className="px-2 py-1 text-right">
                             {isEditing ? <input type="number" step="0.01" min="0.01" className={tInp} value={ei("lots", p.lots)} onChange={(e) => setIe("lots", e.target.value)} /> : p.lots}
@@ -1302,7 +1302,7 @@ export default function AdminDeskPage() {
             )}
             {tab === "history" && (() => {
               if (!selAcc) return <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>Please select an account first.</div>;
-              const thc = "px-2 py-1.5 text-left font-semibold text-[var(--text)]";
+              const thc = "px-2 py-1.5 text-left text-[9px] font-bold uppercase tracking-wide text-[var(--muted)] whitespace-nowrap";
               const presets: [string, string][] = [["ALL", "All Time"], ["TODAY", "Today"], ["WEEK", "This Week"], ["MONTH", "This Month"]];
               const hdt = (h: any) => h.closeTime || h.closedAt || h.closeDate || h.createdAt || h.date || h.time;
               const inRange = (h: any) => {
@@ -1491,7 +1491,7 @@ export default function AdminDeskPage() {
                 if (cliQ) { const q = cliQ.toLowerCase(); if (!((c.login || "").toLowerCase().includes(q) || (c.name || "").toLowerCase().includes(q) || ((c.user?.email || c.email || "").toLowerCase().includes(q)))) return false; }
                 return true;
               });
-              const thc = "px-2 py-1.5 text-left font-semibold text-[var(--text)] whitespace-nowrap";
+              const thc = "px-2 py-1.5 text-left text-[9px] font-bold uppercase tracking-wide text-[var(--muted)] whitespace-nowrap";
               return (
                 <div className="flex h-full flex-col text-[10px]">
                   <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-2 py-1">
@@ -1538,6 +1538,10 @@ export default function AdminDeskPage() {
                             const email = c.user?.email || c.email || "-";
                             const lastIp = c.user?.lastLoginIp || "-";
                             const bal = balOf(c);
+                            const accPos = open.filter((p: any) => p.accountLogin === c.login || p.accountId === c.id);
+                            const accFl = accPos.reduce((s: number, p: any) => s + pnlOf(p, prices[p.symbol] ?? Number(p.openPrice), csz(p.symbol)), 0);
+                            const accUsed = accPos.reduce((s: number, p: any) => { const pr = prices[p.symbol] ?? Number(p.openPrice); const m = (Number(p.lots) * csz(p.symbol) * pr) / (Number(c.leverage) || 100); return s + (/JPY$/i.test(p.symbol) ? m / (pr || 1) : m); }, 0);
+                            const accMl = accUsed > 0 ? ((bal + accFl) / accUsed) * 100 : null;
                             const statusLabel = c.deactivated ? "Inactive" : c.locked ? "Locked" : "Active";
                             const statusCol = c.deactivated ? GOLD : c.locked ? SELL : BUY;
                             const kycApproved = c.type === "LIVE" && c.kycStatus === "APPROVED";
@@ -1563,7 +1567,10 @@ export default function AdminDeskPage() {
                                   {kycPending && <span className="ml-1 rounded px-1 py-0.5 text-[8px] font-bold" style={{ background: GOLD + "22", color: GOLD }} title="KYC Pending"><i className="fa-solid fa-clock mr-0.5" />KYC</span>}
                                   {kycRejected && <span className="ml-1 rounded px-1 py-0.5 text-[8px] font-bold" style={{ background: SELL + "22", color: SELL }} title="KYC Rejected"><i className="fa-solid fa-xmark mr-0.5" />KYC</span>}
                                 </td>
-                                <td className="px-2 py-1 text-right" style={{ color: bal >= 0 ? BUY : SELL }}>{bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="px-2 py-1 text-right" style={{ color: bal >= 0 ? BUY : SELL }}>
+                                  {bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {accMl != null && <span className="ml-1.5 inline-block h-2 w-2 rounded-full align-middle" title={`Margin Level: ${accMl.toFixed(0)}%`} style={{ background: accMl >= 200 ? "#22c55e" : accMl >= 100 ? "#f59e0b" : "#ef4444", boxShadow: accMl < 100 ? "0 0 5px #ef444480" : accMl < 200 ? "0 0 4px #f59e0b60" : "0 0 4px #22c55e60" }} />}
+                                </td>
                                 <td className="px-2 py-1 text-center">{(() => { const on = presenceOnline(c.user?.lastSeenAt); const ls = c.user?.lastSeenAt ? new Date(c.user.lastSeenAt).toLocaleString() : "never"; return <span title={on ? "Online" : "Last seen " + ls} className={"inline-block h-2 w-2 rounded-full " + (on ? "bg-green-400" : "bg-gray-600")} style={on ? { boxShadow: "0 0 5px #4ade80" } : undefined} />; })()}</td>
                                 <td className="px-2 py-1 text-[var(--muted)]">{lastIp}</td>
                                 <td className="px-2 py-1" style={{ color: statusCol }}>{statusLabel}</td>
