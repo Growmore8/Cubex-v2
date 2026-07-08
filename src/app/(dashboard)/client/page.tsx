@@ -158,7 +158,7 @@ export default function ClientTerminal() {
   const [notiOpen, setNotiOpen] = useState(false);
   const [acctSwitchOpen, setAcctSwitchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [mwW, setMwW] = useState(260);
+  const [mwW, setMwW] = useState(295);
   const [rtW, setRtW] = useState(280);
   const [tbH, setTbH] = useState(200);
   const [dragging, setDragging] = useState(false);
@@ -1173,28 +1173,6 @@ export default function ClientTerminal() {
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
           ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} spreadPips={_spreadPips(selSym)} onSymbolChange={(sm) => setSelSym(sm)} />; })()}
-          {oneClick && price != null && (
-            <div style={{ position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)", zIndex: 30, display: "flex", gap: 5, alignItems: "center", pointerEvents: "auto" }}>
-              <button
-                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); quickTrade(selSym, "SELL"); }}
-                title={`Sell ${vol}L ${selSym} at market`}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "5px 14px", borderRadius: 5, background: "#f23645", color: "#fff", border: "1px solid rgba(0,0,0,0.15)", cursor: "pointer", outline: "none", minWidth: 76, boxShadow: "0 2px 10px rgba(242,54,69,0.4)", lineHeight: 1, userSelect: "none" }}
-              >
-                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.08em", opacity: 0.82 }}>SELL</span>
-                <span style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", margin: "2px 0" }}>{gnum(bid, d)}</span>
-                <span style={{ fontSize: 8, opacity: 0.65 }}>{vol}L</span>
-              </button>
-              <button
-                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); quickTrade(selSym, "BUY"); }}
-                title={`Buy ${vol}L ${selSym} at market`}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "5px 14px", borderRadius: 5, background: "#2962ff", color: "#fff", border: "1px solid rgba(0,0,0,0.15)", cursor: "pointer", outline: "none", minWidth: 76, boxShadow: "0 2px 10px rgba(41,98,255,0.4)", lineHeight: 1, userSelect: "none" }}
-              >
-                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.08em", opacity: 0.82 }}>BUY</span>
-                <span style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", margin: "2px 0" }}>{gnum(ask, d)}</span>
-                <span style={{ fontSize: 8, opacity: 0.65 }}>{vol}L</span>
-              </button>
-            </div>
-          )}
           </div>
         </div>
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
@@ -1439,7 +1417,7 @@ export default function ClientTerminal() {
                 <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Order Type</div>
                 <div className="flex overflow-hidden rounded-lg border border-[var(--border)]">
                   {(["MARKET", "LIMIT", "STOP", "STOP_LIMIT"] as const).map((t) => (
-                    <button key={t} onClick={() => { setOrderType(t); if (t !== "MARKET" && !pendingPrice && price != null) setPendingPrice(price.toFixed(d)); }} className="flex-1 py-1.5 text-[9px] font-semibold transition-colors" style={orderType === t ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }}>{t.replace("_", " ")}</button>
+                    <button key={t} onClick={() => { setOrderType(t); if (t !== "MARKET" && !pendingPrice && price != null) setPendingPrice(price.toFixed(d)); }} className="flex-1 py-1.5 text-[9px] font-bold transition-colors" style={orderType === t ? { background: "var(--accent)", color: "#fff" } : { color: "var(--muted)" }}>{t.replace("_", " ")}</button>
                   ))}
                 </div>
               </div>
@@ -1480,19 +1458,25 @@ export default function ClientTerminal() {
                 </div>
               </div>
 
-              {/* TP + SL — always visible inputs */}
-              <div className="grid grid-cols-2 gap-1.5">
-                <div>
-                  <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "#10b981" }}>Take Profit</div>
-                  <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="" className="h-7 w-full rounded-lg border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)] text-center" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
+              {/* Stop Loss — MT5 style: full-width, prominent red border */}
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "#e0394a" }}><i className="fa-solid fa-shield-halved mr-1 text-[8px]" />Stop Loss</span>
+                  {sl && <button onClick={() => setSl("")} className="text-[8px]" style={{ color: "var(--muted)" }}>Clear</button>}
                 </div>
-                <div>
-                  <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "#e0394a" }}>Stop Loss</div>
-                  <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="" className="h-7 w-full rounded-lg border px-2 text-[10px] tabular-nums text-[var(--text)] outline-none bg-[var(--bg)] text-center" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
-                </div>
+                <input type="number" value={sl} onChange={(e) => setSl(e.target.value)} placeholder="0.00000" className="h-9 w-full rounded-lg border-2 bg-[var(--bg)] px-3 text-center text-[13px] font-bold tabular-nums text-[var(--text)] outline-none transition-colors" style={{ borderColor: sl ? "#e0394a" : "var(--border)" }} />
               </div>
 
-              {/* R/R ratio + position size hint */}
+              {/* Take Profit — MT5 style: full-width, prominent green border */}
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "#10b981" }}><i className="fa-solid fa-flag-checkered mr-1 text-[8px]" />Take Profit</span>
+                  {tp && <button onClick={() => setTp("")} className="text-[8px]" style={{ color: "var(--muted)" }}>Clear</button>}
+                </div>
+                <input type="number" value={tp} onChange={(e) => setTp(e.target.value)} placeholder="0.00000" className="h-9 w-full rounded-lg border-2 bg-[var(--bg)] px-3 text-center text-[13px] font-bold tabular-nums text-[var(--text)] outline-none transition-colors" style={{ borderColor: tp ? "#10b981" : "var(--border)" }} />
+              </div>
+
+              {/* R/R + P&L estimate — only when both SL and TP are set */}
               {(() => {
                 const ref = orderType === "MARKET" ? (price ?? 0) : (Number(pendingPrice) || (price ?? 0));
                 const pipSz = Math.pow(10, -(dg(selSym) - 1));
@@ -1500,50 +1484,49 @@ export default function ClientTerminal() {
                 const slPips = sl && ref ? Math.abs(Number(sl) - ref) / pipSz : 0;
                 if (!tpPips && !slPips) return null;
                 const rr = slPips > 0 && tpPips > 0 ? tpPips / slPips : null;
-                const estTP = tpPips > 0 ? tpPips * vol * 1 : null; // $1/pip/lot approx
-                const estSL = slPips > 0 ? slPips * vol * 1 : null;
+                const estTP = tpPips > 0 ? tpPips * vol : null;
+                const estSL = slPips > 0 ? slPips * vol : null;
                 return (
-                  <div className="flex items-center justify-between rounded-lg bg-[var(--soft)] px-2 py-1 text-[9px]">
-                    {rr != null && <span style={{ color: rr >= 1 ? "#22c55e" : "#f97316" }}>R/R {rr.toFixed(2)}</span>}
-                    {estTP != null && <span style={{ color: "#10b981" }}>TP ≈ +{fmt(estTP)}</span>}
-                    {estSL != null && <span style={{ color: "#e0394a" }}>SL ≈ −{fmt(estSL)}</span>}
+                  <div className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[9px] font-semibold" style={{ background: "var(--soft)" }}>
+                    {rr != null && <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: rr >= 1 ? "#22c55e22" : "#f9731622", color: rr >= 1 ? "#22c55e" : "#f97316" }}>R:R {rr.toFixed(2)}</span>}
+                    {estTP != null && <span style={{ color: "#10b981" }}>TP +{fmt(estTP)}</span>}
+                    {estSL != null && <span style={{ color: "#e0394a" }}>SL -{fmt(estSL)}</span>}
                   </div>
                 );
               })()}
 
-              {/* Trailing Stop (market orders only) + Comment */}
-              {orderType === "MARKET" && (
-                <div>
-                  <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Trailing Stop (pips, 0 = off)</div>
-                  <input type="number" min="0" step="1" value={trail} onChange={(e) => setTrail(e.target.value)} placeholder="0" className="h-7 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[10px] tabular-nums text-[var(--text)] outline-none text-center" />
+              {/* Advanced settings (trailing stop + comment) — collapsed */}
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide select-none" style={{ color: "var(--muted)" }}>
+                  <i className="fa-solid fa-chevron-right text-[7px] transition-transform group-open:rotate-90" />Advanced
+                </summary>
+                <div className="mt-1.5 space-y-1.5">
+                  {orderType === "MARKET" && (
+                    <div>
+                      <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Trailing Stop (pips, 0 = off)</div>
+                      <input type="number" min="0" step="1" value={trail} onChange={(e) => setTrail(e.target.value)} placeholder="0" className="h-7 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[10px] tabular-nums text-[var(--text)] outline-none text-center" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Comment (optional)</div>
+                    <input type="text" maxLength={128} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="" className="h-7 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[10px] text-[var(--text)] outline-none" />
+                  </div>
                 </div>
-              )}
-              <div>
-                <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Comment (optional)</div>
-                <input type="text" maxLength={128} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="" className="h-7 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[10px] text-[var(--text)] outline-none" />
-              </div>
+              </details>
 
-              {/* Info block: Margin / Free Margin / Spread / Pip Value */}
-              <div className="overflow-hidden rounded-lg border border-[var(--border)] text-[9px]">
-                <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1">
-                  <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Margin Required</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{cSym + (margin ? fmt(margin) : "0.00")}</span>
+              {/* Compact 3-col info bar: Margin / Pip Value / Free Margin */}
+              <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-[var(--border)] text-[9px]" style={{ background: "var(--border)" }}>
+                <div className="flex flex-col items-center py-1.5" style={{ background: "var(--soft)" }}>
+                  <span style={{ color: "var(--muted)" }}>Margin</span>
+                  <span className="mt-0.5 font-bold tabular-nums" style={{ color: "var(--text)" }}>{cSym}{margin ? fmt(margin) : "0.00"}</span>
                 </div>
-                <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1">
-                  <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Free Margin</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "#22c55e" }}>{account ? cSym + fmt(free) : "--"}</span>
+                <div className="flex flex-col items-center py-1.5" style={{ background: "var(--soft)" }}>
+                  <span style={{ color: "var(--muted)" }}>Pip Val</span>
+                  <span className="mt-0.5 font-bold tabular-nums" style={{ color: "var(--text)" }}>{cSym}{fmt(pipVal)}</span>
                 </div>
-                <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1">
-                  <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Pip Value</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{cSym}{fmt(pipVal)}<span style={{ color: "var(--muted)", fontWeight: 400 }}>/pip</span></span>
-                </div>
-                <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1">
-                  <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Spread</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{Math.round(_spreadPips(selSym))} <span style={{ color: "var(--muted)", fontWeight: 400 }}>pts</span></span>
-                </div>
-                <div className="flex items-center justify-between px-2.5 py-1">
-                  <span className="uppercase tracking-wide" style={{ color: "var(--muted)" }}>Contract Size</span>
-                  <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>{csz(selSym).toLocaleString()}</span>
+                <div className="flex flex-col items-center py-1.5" style={{ background: "var(--soft)" }}>
+                  <span style={{ color: "var(--muted)" }}>Free Mrg</span>
+                  <span className="mt-0.5 font-bold tabular-nums" style={{ color: "#22c55e" }}>{account ? cSym + fmt(free) : "--"}</span>
                 </div>
               </div>
 
@@ -1792,7 +1775,7 @@ export default function ClientTerminal() {
                       <td className="px-2 py-1 text-right" style={{ color: Number(h.swap) !== 0 ? (Number(h.swap) >= 0 ? BUY : SELL) : "var(--muted)" }}>{Number(h.swap) !== 0 ? (Number(h.swap) >= 0 ? "+" : "") + fmt(Number(h.swap)) : "—"}</td>
                       <td className="px-2 py-1 text-right" style={{ color: Number(h.commission) > 0 ? SELL : "var(--muted)" }}>{Number(h.commission) > 0 ? "-" + cSym + fmt(Number(h.commission)) : "—"}</td>
                     </>}
-                    <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+" : "-") + cSym + fmt(Math.abs(net))}</td>
+                    <td className="px-2 py-0.5 text-right"><span className="inline-block rounded px-2 py-0.5 font-bold tabular-nums text-[11px]" style={{ background: net >= 0 ? "rgba(38,166,154,0.13)" : "rgba(239,83,80,0.13)", color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+" : "-") + cSym + fmt(Math.abs(net))}</span></td>
                   </tr>); })}
               </tbody>
             </table>

@@ -410,9 +410,7 @@ export default function ManagerDashboard() {
                           <td className={tdc}>{Number(h.lots).toFixed(2)}</td>
                           <td className={tdc + " text-right"}>{gnum(h.openPrice, d)}</td>
                           <td className={tdc + " text-right"}>{gnum(h.closePrice, d)}</td>
-                          <td className={tdc + " text-right font-semibold"} style={{ color: pnl >= 0 ? BUY : SELL }}>
-                            {pnl >= 0 ? "+" : ""}${gmoney(Math.abs(pnl))}
-                          </td>
+                          <td className={tdc + " text-right"}><span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums" style={{ background: pnl >= 0 ? "rgba(38,166,154,0.13)" : "rgba(239,83,80,0.13)", color: pnl >= 0 ? BUY : SELL }}>{(pnl >= 0 ? "+" : "") + "$" + gmoney(Math.abs(pnl))}</span></td>
                           <td className={tdc + " text-[10px]"} style={{ color: "var(--muted)" }}>{h.closeReason || "—"}</td>
                           <td className={tdc} style={{ color: "var(--muted)" }}>{h.closedAt ? new Date(h.closedAt).toLocaleString() : "—"}</td>
                         </tr>
