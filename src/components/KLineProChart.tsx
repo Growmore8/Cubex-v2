@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import { registerOverlay, init as klineInit } from "klinecharts";
+import { registerOverlay, init as klineInit, ActionType } from "klinecharts";
 import TVChart, { type ChartPosition } from "./TVChart";
 import "@klinecharts/pro/dist/klinecharts-pro.css";
 import { KLineChartPro } from "@klinecharts/pro";
@@ -390,7 +390,20 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
     const resolveTimer = setTimeout(() => {
       if (!kChartRef.current && containerRef.current) {
         const el = containerRef.current.querySelector("[k-line-chart-id]") as HTMLElement | null;
-        if (el) kChartRef.current = klineInit(el);
+        if (el) {
+          kChartRef.current = klineInit(el);
+          try {
+            kChartRef.current.subscribeAction(ActionType.OnCrosshairChange, (data: any) => {
+              if (data?.kLineData) {
+                const d = data.kLineData;
+                onCandleRef.current?.({ open: d.open, high: d.high, low: d.low, close: d.close });
+              } else if (lastBarRef.current) {
+                const lb = lastBarRef.current;
+                onCandleRef.current?.({ open: lb.open, high: lb.high, low: lb.low, close: lb.close });
+              }
+            });
+          } catch {}
+        }
       }
       drawOverlaysRef.current();
       setChartReady(true);
