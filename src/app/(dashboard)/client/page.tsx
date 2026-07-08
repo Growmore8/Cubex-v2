@@ -117,7 +117,7 @@ export default function ClientTerminal() {
   const [alertForm, setAlertForm] = useState({ condition: "ABOVE", price: "", note: "" });
   const loadAlerts = () => fetch("/api/client/alerts?accountId=" + (accIdRef.current || "")).then((r) => r.json()).then((d) => { if (d.ok) { setAlerts(d.alerts); setAlertsLoaded(true); } }).catch(() => {});
   useEffect(() => { if (accId) loadAlerts(); }, [accId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [rightTab, setRightTab] = useState("TRADE");
+  const [rightTab, setRightTab] = useState<"TRADE"|"SIGNALS"|"NEWS"|"CALENDAR"|"ANALYTICS"|"DOM">("TRADE");
   const [signals, setSignals] = useState<any[]>([]);
   const [signalsLoaded, setSignalsLoaded] = useState(false);
   const [calendar, setCalendar] = useState<any[]>([]);
@@ -170,7 +170,6 @@ export default function ClientTerminal() {
   function toggleInd(id: string) { setIndicators((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]); }
   const [dailyOpen, setDailyOpen] = useState<Record<string, number>>({});
   const dailyOpenRef = useRef<Record<string, number>>({});
-  const [domOpen, setDomOpen] = useState(false);
   const [analyticsRange, setAnalyticsRange] = useState<"today" | "week" | "month" | "all">("all");
   const alertsRef = useRef<any[]>([]);
   useEffect(() => { alertsRef.current = alerts; }, [alerts]);
@@ -1227,36 +1226,33 @@ export default function ClientTerminal() {
           </div>
           {/* Tab bar: TRADE | SIGNALS | NEWS | CALENDAR | ANALYTICS | DOM */}
           <div className="flex shrink-0 border-b border-[var(--border)]">
-            {(["TRADE", "SIGNALS", "NEWS", "CALENDAR", "ANALYTICS"] as const).map((t) => (
+            {(["TRADE", "SIGNALS", "NEWS", "CALENDAR", "ANALYTICS", "DOM"] as const).map((t) => (
               <button key={t} onClick={() => setRightTab(t)} className="flex-1 py-1.5 text-[9px] font-semibold uppercase tracking-wide transition-colors" style={rightTab === t ? { color: "#2f81f7", borderBottom: "2px solid #2f81f7" } : { color: "var(--muted)" }}>
-                {t === "TRADE" ? <><i className="fa-solid fa-arrow-right-arrow-left" /></> : t === "SIGNALS" ? <span className="relative"><i className="fa-solid fa-signal" />{signals.length > 0 && <span className="absolute -top-1 -right-1.5 rounded-full px-[3px] text-[7px] font-bold leading-tight" style={{ background: "#2f81f7", color: "#fff" }}>{signals.length}</span>}</span> : t === "NEWS" ? <i className="fa-solid fa-newspaper" /> : t === "CALENDAR" ? <i className="fa-solid fa-calendar-days" /> : <i className="fa-solid fa-chart-bar" />}
-                <span className="block text-[7px] mt-0.5 leading-none">{t === "TRADE" ? "Trade" : t === "SIGNALS" ? "Signals" : t === "NEWS" ? "News" : t === "CALENDAR" ? "Cal" : "Stats"}</span>
+                {t === "TRADE" ? <i className="fa-solid fa-arrow-right-arrow-left" /> : t === "SIGNALS" ? <span className="relative"><i className="fa-solid fa-signal" />{signals.length > 0 && <span className="absolute -top-1 -right-1.5 rounded-full px-[3px] text-[7px] font-bold leading-tight" style={{ background: "#2f81f7", color: "#fff" }}>{signals.length}</span>}</span> : t === "NEWS" ? <i className="fa-solid fa-newspaper" /> : t === "CALENDAR" ? <i className="fa-solid fa-calendar-days" /> : t === "ANALYTICS" ? <i className="fa-solid fa-chart-bar" /> : <i className="fa-solid fa-table-list" />}
+                <span className="block text-[7px] mt-0.5 leading-none">{t === "TRADE" ? "Trade" : t === "SIGNALS" ? "Signals" : t === "NEWS" ? "News" : t === "CALENDAR" ? "Cal" : t === "ANALYTICS" ? "Stats" : "DOM"}</span>
               </button>
             ))}
-            <button onClick={() => setDomOpen((v) => !v)} title="Depth of Market" className="px-2 py-1.5 text-[9px] font-semibold uppercase tracking-wide transition-colors" style={{ color: domOpen ? "#2f81f7" : "var(--muted)", borderBottom: domOpen ? "2px solid #2f81f7" : "2px solid transparent" }}>
-              <i className="fa-solid fa-table-list" />
-              <span className="block text-[7px] mt-0.5 leading-none">DOM</span>
-            </button>
           </div>
           {/* Scrollable form area */}
           <div className="min-h-0 flex-1 overflow-auto">
-          {domOpen && price != null && (
-            <DomPanel
-              symbol={selSym}
-              bid={bid}
-              ask={ask}
-              spreadPips={_spreadPips(selSym)}
-              digits={d}
-              onClose={() => setDomOpen(false)}
-              onRowClick={(px, side) => {
-                setPendingPrice(px.toFixed(d));
-                setOrderType(side === "ask" ? "LIMIT" : "STOP");
-                setRightTab("TRADE");
-                setDomOpen(false);
-              }}
-            />
-          )}
-          {rightTab === "SIGNALS" ? (
+          {rightTab === "DOM" ? (
+            price != null ? (
+              <DomPanel
+                symbol={selSym}
+                bid={bid}
+                ask={ask}
+                spreadPips={_spreadPips(selSym)}
+                digits={d}
+                onRowClick={(px, side) => {
+                  setPendingPrice(px.toFixed(d));
+                  setOrderType(side === "ask" ? "LIMIT" : "STOP");
+                  setRightTab("TRADE");
+                }}
+              />
+            ) : (
+              <div className="p-6 text-center text-[11px]" style={{ color: "var(--muted)" }}>Select a symbol to view DOM.</div>
+            )
+          ) : rightTab === "SIGNALS" ? (
             <div className="p-2 text-[11px]">
               {!signalsLoaded ? (
                 <div className="p-6 text-center text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-1" />Loading signals…</div>
@@ -1564,8 +1560,8 @@ export default function ClientTerminal() {
           )}
           </div>
 
-          {/* SELL | SPRD | BUY — always visible, outside scroll area */}
-          {rightTab === "TRADE" && (
+          {/* SELL | SPRD | BUY — visible on TRADE and DOM tabs */}
+          {(rightTab === "TRADE" || rightTab === "DOM") && (
             <div className="shrink-0 border-t border-[var(--border)] p-2">
               <div className="flex items-stretch gap-1">
                 <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#ff6b78,#e0394a 70%,#b9293a)" }}>

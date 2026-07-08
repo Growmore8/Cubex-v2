@@ -20,11 +20,10 @@ interface Props {
   ask:        number;
   spreadPips: number;
   digits:     number;
-  onClose:    () => void;
   onRowClick: (price: number, side: "ask" | "bid") => void;
 }
 
-export default function DomPanel({ symbol, bid, ask, spreadPips, digits, onClose, onRowClick }: Props) {
+export default function DomPanel({ symbol, bid, ask, spreadPips, digits, onRowClick }: Props) {
   const [seed, setSeed] = useState(() => Math.floor(Date.now() / 1500));
   useEffect(() => {
     const iv = setInterval(() => setSeed((s) => s + 1), 1500);
@@ -76,13 +75,10 @@ export default function DomPanel({ symbol, bid, ask, spreadPips, digits, onClose
       style={{ background: "var(--panel)" }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1.5">
+      <div className="border-b border-[var(--border)] px-2.5 py-1.5">
         <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
           <i className="fa-solid fa-table-list mr-1" />DOM — {symbol}
         </span>
-        <button onClick={onClose} className="rounded transition-colors hover:text-[var(--text)]" style={{ color: "var(--muted)" }}>
-          <i className="fa-solid fa-xmark text-[10px]" />
-        </button>
       </div>
 
       {/* Column headers */}
