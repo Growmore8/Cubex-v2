@@ -129,6 +129,7 @@ export default function ClientTerminal() {
   });
   useEffect(() => { if (botTab === "requests" && !myReqsLoaded) loadMyReqs(); }, [botTab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const [tpSlEdit, setTpSlEdit] = useState<{ id: string; field: "tp" | "sl" | "trailingStop"; val: string } | null>(null);
+  const [posCtx, setPosCtx] = useState<{ x: number; y: number; pos: any } | null>(null);
   const [err, setErr] = useState("");
   const [pinLock, setPinLock] = useState(false);
   const [pinHasPin, setPinHasPin] = useState(false);
@@ -865,6 +866,23 @@ export default function ClientTerminal() {
       )}
 
       <div className="flex min-h-0 flex-1">
+        {posCtx && (() => { const p = posCtx.pos; const pl = pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)); const net = swapEnabled ? pl + Number(p.swap) - Number(p.commission) : pl; return (<>
+          <div className="fixed inset-0 z-[80]" onClick={() => setPosCtx(null)} onContextMenu={(e) => { e.preventDefault(); setPosCtx(null); }} />
+          <div className="ui-pop fixed z-[90] min-w-[180px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] py-1 text-[12px] shadow-xl" style={{ left: posCtx.x, top: posCtx.y }}>
+            <div className="border-b border-[var(--border)] px-3 py-1.5">
+              <div className="text-[11px] font-bold" style={{ color: "var(--text)" }}>{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type}</span></div>
+              <div className="text-[10px]" style={{ color: "var(--muted)" }}>#{p.ticket} · {p.lots}L · <span style={{ color: net >= 0 ? BUY : SELL }}>{net >= 0 ? "+" : ""}{fmt(net)}</span></div>
+            </div>
+            <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" style={{ color: SELL }} onClick={() => { close(p.id); setPosCtx(null); }}><i className="fa-solid fa-xmark mr-2" />Close Position</button>
+            {Number(p.lots) > 0.01 && <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setPartialClose({ id: p.id, sym: p.symbol, lots: Number(p.lots), closeLots: "" }); setPosCtx(null); }}><i className="fa-solid fa-scissors mr-2 text-[10px]" />Partial Close</button>}
+            <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setTpSlEdit({ id: p.id, field: "tp", val: p.tp ? String(p.tp) : "" }); setBotTab("positions"); setPosCtx(null); }}><i className="fa-solid fa-arrow-up mr-2 text-[10px]" style={{ color: "#10b981" }} />{p.tp ? "Modify TP" : "Add TP"}</button>
+            <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setTpSlEdit({ id: p.id, field: "sl", val: p.sl ? String(p.sl) : "" }); setBotTab("positions"); setPosCtx(null); }}><i className="fa-solid fa-arrow-down mr-2 text-[10px]" style={{ color: "#f43f5e" }} />{p.sl ? "Modify SL" : "Add SL"}</button>
+            <div className="border-t border-[var(--border)] mt-1">
+              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { setSelSym(p.symbol); setPosCtx(null); }}><i className="fa-solid fa-chart-line mr-2 text-[10px]" />Open Chart</button>
+              <button className="block w-full px-3 py-1.5 text-left hover:bg-[var(--soft)]" onClick={() => { if (navigator.clipboard) navigator.clipboard.writeText(String(p.ticket)); setPosCtx(null); }}><i className="fa-regular fa-copy mr-2 text-[10px]" />Copy Ticket #{p.ticket}</button>
+            </div>
+          </div>
+        </>); })()}
         {ctx && (<>
             <div className="fixed inset-0 z-[80]" onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
             <div className="ui-pop fixed z-[90] min-w-[150px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] py-1 text-[12px] shadow-lg" style={{ left: ctx.x, top: ctx.y }}>
@@ -1065,14 +1083,30 @@ export default function ClientTerminal() {
           {level < 100 ? `MARGIN CALL — Level ${level.toFixed(1)}%. Positions may be closed immediately.` : `Low margin warning — Level ${level.toFixed(1)}%. Reduce exposure or add funds.`}
         </div>
       )}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] font-bold" style={{ color: "#facc15" }}>
-        <span>Balance: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(balance) : "--"}</span></span>
-        <span>Equity: <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? "$" + fmt(equity) : "--"}</span></span>
-        <span>Margin: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(used) : "--"}</span></span>
-        <span>Free Margin: <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? "$" + fmt(free) : "--"}</span></span>
-        <span>Margin Level: <span className="font-mono font-bold" style={{ color: !account || !level ? "var(--muted)" : level >= 200 ? "#22c55e" : level >= 150 ? "#facc15" : level >= 100 ? "#f97316" : SELL }}>{account && level ? level.toFixed(1) + "%" : "--"}</span></span>
-        <span>Profit: <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+$" : "-$") + fmt(Math.abs(floating)) : "--"}</span></span>
-      </div>
+      {(() => {
+        const mlColor = !account || !level ? "#4b5563" : level >= 200 ? "#22c55e" : level >= 150 ? "#facc15" : level >= 100 ? "#f97316" : "#ef4444";
+        const mlPct   = Math.min((level / 500) * 100, 100); // bar fills at 500% level
+        return (
+          <div className="border-y border-[var(--border)] bg-[var(--panel)]" style={{ color: "#facc15" }}>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-1.5 text-[11px] font-bold">
+              <span>Balance: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(balance) : "--"}</span></span>
+              <span>Equity: <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? "$" + fmt(equity) : "--"}</span></span>
+              <span>Margin: <span className="font-mono font-bold text-[var(--text)]">{account ? "$" + fmt(used) : "--"}</span></span>
+              <span>Free Margin: <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? "$" + fmt(free) : "--"}</span></span>
+              <span className="flex items-center gap-1.5">
+                Margin Level:
+                <span className="font-mono font-bold" style={{ color: mlColor }}>{account && level ? level.toFixed(1) + "%" : "--"}</span>
+                {account && used > 0 && (
+                  <span className="inline-flex h-[6px] w-[64px] overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
+                    <span className="h-full rounded-full transition-all duration-500" style={{ width: mlPct + "%", background: mlColor }} />
+                  </span>
+                )}
+              </span>
+              <span>Profit: <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+$" : "-$") + fmt(Math.abs(floating)) : "--"}</span></span>
+            </div>
+          </div>
+        );
+      })()}
 
       <div onMouseDown={dragY} className="h-1 cursor-row-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
@@ -1096,7 +1130,7 @@ export default function ClientTerminal() {
               <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right" title="Trailing Stop (pips)">Trail</th>{swapEnabled && <><th className="px-2 py-1 font-normal text-right">Commission</th><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /></>}<Sth tbl="pos" k="pnl" label={swapEnabled ? "Net P/L" : "P/L"} align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
               <tbody>
                 {positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={14}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
-                  <tr key={p.id} className="border-t border-[var(--border)]" title={p.comment || undefined}>
+                  <tr key={p.id} className="border-t border-[var(--border)] cursor-context-menu" title={p.comment || undefined} onContextMenu={(e) => { e.preventDefault(); setPosCtx({ x: e.clientX, y: e.clientY, pos: p }); }}>
                     <td className="px-2 py-1 text-[var(--muted)] tabular-nums">{p.ticket ? String(p.ticket) : "—"}</td>
                     <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span></td>
                     <td className="px-2 py-1 text-[var(--muted)]">{new Date(p.openedAt).toLocaleDateString()}</td>
