@@ -256,9 +256,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
       subIndicators: [],
       datafeed,
       drawingBarVisible: showDrawingTools ?? !bare,
-      periodBarVisible: false,
-      timezoneBarVisible: false,
-      indicatorBarVisible: showDrawingTools ?? false,
+      ...({ periodBarVisible: false, timezoneBarVisible: false, indicatorBarVisible: showDrawingTools ?? false } as any),
       styles: {
         candle: {
           tooltip: {
