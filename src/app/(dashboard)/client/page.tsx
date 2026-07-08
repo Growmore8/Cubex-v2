@@ -167,6 +167,8 @@ export default function ClientTerminal() {
   const [newsLoaded, setNewsLoaded] = useState(false);
   const [indicators, setIndicators] = useState<string[]>([]);
   function toggleInd(id: string) { setIndicators((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]); }
+  const [dailyOpen, setDailyOpen] = useState<Record<string, number>>({});
+  const dailyOpenRef = useRef<Record<string, number>>({});
   const [domOpen, setDomOpen] = useState(false);
   const [analyticsRange, setAnalyticsRange] = useState<"today" | "week" | "month" | "all">("all");
   const alertsRef = useRef<any[]>([]);
@@ -328,6 +330,10 @@ export default function ClientTerminal() {
       if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
       prevRef.current[symbol] = price;
       pP[symbol] = price;
+      if (!dailyOpenRef.current[symbol] && price > 0) {
+        dailyOpenRef.current[symbol] = price;
+        setDailyOpen((prev2) => prev2[symbol] ? prev2 : { ...prev2, [symbol]: price });
+      }
       // Compute live exchange spread from real ask vs exchange bid for FLOATING display
       if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
         const d = DIGITS[symbol] ?? 2;
@@ -342,8 +348,14 @@ export default function ClientTerminal() {
     // open positions show their last P&L immediately.
     socket.on("prices", (snap: Record<string, number>) => {
       if (snap && typeof snap === "object") {
-        for (const k in snap) prevRef.current[k] = snap[k];
-        startTransition(() => setPrices((pp) => ({ ...snap, ...pp })));
+        for (const k in snap) {
+          prevRef.current[k] = snap[k];
+          if (!dailyOpenRef.current[k] && snap[k] > 0) dailyOpenRef.current[k] = snap[k];
+        }
+        startTransition(() => {
+          setPrices((pp) => ({ ...snap, ...pp }));
+          setDailyOpen((prev) => { const n = { ...prev }; let changed = false; for (const k in snap) { if (!n[k] && snap[k] > 0) { n[k] = snap[k]; changed = true; } } return changed ? n : prev; });
+        });
       }
     });
     const flushIv = setInterval(flush, 80);
@@ -1125,28 +1137,30 @@ export default function ClientTerminal() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" title="Spread in points" style={{ color: "var(--muted)", fontSize: 8 }}>Sprd</span></div>
+          <div className="flex-1 overflow-auto px-1 pb-2 text-[10px]"><div className="sticky top-0 z-10 grid grid-cols-[minmax(72px,1fr)_58px_58px_26px_40px] bg-[var(--panel)] px-2 py-1 text-[10px] font-bold text-[var(--text)]"><span>Symbol</span><span className="text-right pr-1">Bid</span><span className="text-right pr-1">Ask</span><span className="text-right pr-1" title="Spread in points" style={{ color: "var(--muted)", fontSize: 8 }}>Sprd</span><span className="text-right pr-1" title="% change from session open" style={{ color: "var(--muted)", fontSize: 8 }}>%Chg</span></div>
             {favs.length > 0 && (
               <div>
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
-                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; return (
-                  <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
+                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; const dOpen = dailyOpen[s.symbol]; const pct = dOpen && p ? ((p - dOpen) / dOpen) * 100 : null; return (
+                  <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_58px_58px_26px_40px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
                     <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: spDir !== 0 ? 700 : 500, color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)", transition: "color 0.55s ease-out" }}>{sp > 0 ? Math.round(sp * 10) : "\u2014"}</span>
+                    <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: 600, color: pct == null ? "var(--muted)" : pct > 0 ? "#16c784" : pct < 0 ? "#e05260" : "var(--muted)" }}>{pct == null ? "\u2014" : (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%"}</span>
                   </div>); })}
               </div>
             )}
             {orderedGroups.map(([c, list]) => (
               <div key={c}>
                 <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
-                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; return (
-                  <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_64px_64px_30px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
+                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; const dOpen = dailyOpen[s.symbol]; const pct = dOpen && p ? ((p - dOpen) / dOpen) * 100 : null; return (
+                  <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_58px_58px_26px_40px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
                     <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: spDir !== 0 ? 700 : 500, color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)", transition: "color 0.55s ease-out" }}>{sp > 0 ? Math.round(sp * 10) : "\u2014"}</span>
+                    <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: 600, color: pct == null ? "var(--muted)" : pct > 0 ? "#16c784" : pct < 0 ? "#e05260" : "var(--muted)" }}>{pct == null ? "\u2014" : (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%"}</span>
                   </div>); })}
               </div>
             ))}
@@ -1225,11 +1239,13 @@ export default function ClientTerminal() {
           <div className="flex shrink-0 border-b border-[var(--border)]">
             {(["TRADE", "SIGNALS", "NEWS", "CALENDAR", "ANALYTICS"] as const).map((t) => (
               <button key={t} onClick={() => setRightTab(t)} className="flex-1 py-1.5 text-[9px] font-semibold uppercase tracking-wide transition-colors" style={rightTab === t ? { color: "#2f81f7", borderBottom: "2px solid #2f81f7" } : { color: "var(--muted)" }}>
-                {t === "TRADE" ? <><i className="fa-solid fa-arrow-right-arrow-left mr-1" />Trade</> : t === "SIGNALS" ? <><i className="fa-solid fa-signal mr-1" />Signals{signals.length > 0 && <span className="ml-0.5 rounded-full px-1 text-[8px] font-bold" style={{ background: "#2f81f722", color: "#2f81f7" }}>{signals.length}</span>}</> : t === "NEWS" ? <><i className="fa-solid fa-newspaper mr-1" />News</> : t === "CALENDAR" ? <><i className="fa-solid fa-calendar-days mr-1" />Cal</> : <><i className="fa-solid fa-chart-bar mr-1" />Stats</>}
+                {t === "TRADE" ? <><i className="fa-solid fa-arrow-right-arrow-left" /></> : t === "SIGNALS" ? <span className="relative"><i className="fa-solid fa-signal" />{signals.length > 0 && <span className="absolute -top-1 -right-1.5 rounded-full px-[3px] text-[7px] font-bold leading-tight" style={{ background: "#2f81f7", color: "#fff" }}>{signals.length}</span>}</span> : t === "NEWS" ? <i className="fa-solid fa-newspaper" /> : t === "CALENDAR" ? <i className="fa-solid fa-calendar-days" /> : <i className="fa-solid fa-chart-bar" />}
+                <span className="block text-[7px] mt-0.5 leading-none">{t === "TRADE" ? "Trade" : t === "SIGNALS" ? "Signals" : t === "NEWS" ? "News" : t === "CALENDAR" ? "Cal" : "Stats"}</span>
               </button>
             ))}
             <button onClick={() => setDomOpen((v) => !v)} title="Depth of Market" className="px-2 py-1.5 text-[9px] font-semibold uppercase tracking-wide transition-colors" style={{ color: domOpen ? "#2f81f7" : "var(--muted)", borderBottom: domOpen ? "2px solid #2f81f7" : "2px solid transparent" }}>
-              <i className="fa-solid fa-table-list mr-1" />DOM
+              <i className="fa-solid fa-table-list" />
+              <span className="block text-[7px] mt-0.5 leading-none">DOM</span>
             </button>
           </div>
           {/* Scrollable form area */}
@@ -1587,21 +1603,21 @@ export default function ClientTerminal() {
         const mlPct   = Math.min((level / 500) * 100, 100); // bar fills at 500% level
         return (
           <div className="border-y border-[var(--border)] bg-[var(--panel)]" style={{ color: "#facc15" }}>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-1.5 text-[11px] font-bold">
-              <span>Balance: <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(balance) : "--"}</span></span>
-              <span>Equity: <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? cSym + fmt(equity) : "--"}</span></span>
-              <span>Margin: <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(used) : "--"}</span></span>
-              <span>Free Margin: <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? cSym + fmt(free) : "--"}</span></span>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 px-3 py-1.5 text-[10px] font-semibold">
+              <span className="flex items-center gap-1"><i className="fa-solid fa-wallet text-[8px] opacity-50" /><span style={{ color: "var(--muted)" }}>Bal</span> <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(balance) : "--"}</span></span>
+              <span className="flex items-center gap-1"><i className="fa-solid fa-scale-balanced text-[8px] opacity-50" /><span style={{ color: "var(--muted)" }}>Eq</span> <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? cSym + fmt(equity) : "--"}</span></span>
+              <span className="flex items-center gap-1"><i className="fa-solid fa-lock text-[8px] opacity-50" /><span style={{ color: "var(--muted)" }}>Mrg</span> <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(used) : "--"}</span></span>
+              <span className="flex items-center gap-1"><i className="fa-solid fa-unlock text-[8px] opacity-50" /><span style={{ color: "var(--muted)" }}>Free</span> <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? cSym + fmt(free) : "--"}</span></span>
               <span className="flex items-center gap-1.5">
-                Margin Level:
+                <span style={{ color: "var(--muted)" }}>Lvl</span>
                 <span className="font-mono font-bold" style={{ color: mlColor }}>{account && level ? level.toFixed(1) + "%" : "--"}</span>
                 {account && used > 0 && (
-                  <span className="inline-flex h-[6px] w-[64px] overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
+                  <span className="inline-flex h-[5px] w-[48px] overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
                     <span className="h-full rounded-full transition-all duration-500" style={{ width: mlPct + "%", background: mlColor }} />
                   </span>
                 )}
               </span>
-              <span>Profit: <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+" : "-") + cSym + fmt(Math.abs(floating)) : "--"}</span></span>
+              <span className="flex items-center gap-1"><i className="fa-solid fa-chart-line text-[8px] opacity-50" /><span style={{ color: "var(--muted)" }}>P/L</span> <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+" : "-") + cSym + fmt(Math.abs(floating)) : "--"}</span></span>
               <span className="ml-auto flex items-center gap-2.5">
                 {sessions.map((s) => (
                   <span key={s.name} className="flex items-center gap-1">
@@ -1661,7 +1677,7 @@ export default function ClientTerminal() {
                       {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "tp" ? (
                         <input type="text" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "tp", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-20 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#10b981", color: "#10b981" }} onClick={(e) => e.stopPropagation()} />
                       ) : (
-                        <span style={{ color: p.tp ? "#10b981" : "var(--muted)" }}>{p.tp ? gnum(p.tp, dg(p.symbol)) : <span className="text-[9px]">+ TP</span>}</span>
+                        <span style={{ color: p.tp ? "#10b981" : "var(--muted)" }}>{p.tp ? gnum(p.tp, dg(p.symbol)) : "—"}</span>
                       )}
                     </td>
                     <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "sl", val: p.sl ? String(p.sl) : "" }); }} title={p.trailingStop > 0 ? "Trailing Stop active — SL auto-adjusts" : "Click to edit SL"} style={{ cursor: "pointer" }}>
@@ -1670,7 +1686,7 @@ export default function ClientTerminal() {
                       ) : (
                         <span style={{ color: p.sl ? "#f43f5e" : "var(--muted)" }}>
                           {p.trailingStop > 0 && <span className="mr-0.5 rounded px-0.5 text-[8px] font-bold" style={{ background: "#f59e0b22", color: "#f59e0b" }}>TSL</span>}
-                          {p.sl ? gnum(p.sl, dg(p.symbol)) : <span className="text-[9px]">+ SL</span>}
+                          {p.sl ? gnum(p.sl, dg(p.symbol)) : "—"}
                         </span>
                       )}
                     </td>
@@ -1679,7 +1695,7 @@ export default function ClientTerminal() {
                       {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "trailingStop" ? (
                         <input type="number" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "trailingStop", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-16 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#f59e0b", color: "#f59e0b" }} onClick={(e) => e.stopPropagation()} />
                       ) : (
-                        <span style={{ color: p.trailingStop > 0 ? "#f59e0b" : "var(--muted)" }}>{p.trailingStop > 0 ? Math.round(p.trailingStop / Math.pow(10, -(dg(p.symbol) - 1))) + "p" : <span className="text-[9px]">off</span>}</span>
+                        <span style={{ color: p.trailingStop > 0 ? "#f59e0b" : "var(--muted)" }}>{p.trailingStop > 0 ? Math.round(p.trailingStop / Math.pow(10, -(dg(p.symbol) - 1))) + "p" : "—"}</span>
                       )}
                     </td>
                     {/* Commission, Swap and Gross P/L — shown only when swap enabled */}
@@ -1689,7 +1705,7 @@ export default function ClientTerminal() {
                       <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+" : "-") + cSym + fmt(Math.abs(pl))}</td>
                     </>}
                     {/* Net P/L = gross + swap - commission (or just gross when swap disabled) */}
-                    {(() => { const net = swapEnabled ? pl + Number(p.swap) - Number(p.commission) : pl; return <td className="px-2 py-1 text-right font-semibold" style={{ color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+" : "-") + cSym + fmt(Math.abs(net))}</td>; })()}
+                    {(() => { const net = swapEnabled ? pl + Number(p.swap) - Number(p.commission) : pl; return <td className="px-1 py-0.5 text-right"><span className="inline-block rounded px-2 py-0.5 font-bold tabular-nums text-[11px]" style={{ background: net >= 0 ? "rgba(38,166,154,0.13)" : "rgba(239,83,80,0.13)", color: net >= 0 ? BUY : SELL }}>{(net >= 0 ? "+" : "-") + cSym + fmt(Math.abs(net))}</span></td>; })()}
                     <td className="px-2 py-1 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {Number(p.lots) > 0.01 ? <button title="Partial close" style={{ color: "var(--muted)" }} onClick={() => setPartialClose({ id: p.id, sym: p.symbol, lots: Number(p.lots), closeLots: "" })} className="text-[9px] px-1">½</button> : <span title="Min lot — cannot partial close" className="text-[9px] px-1 opacity-20 cursor-not-allowed">½</span>}

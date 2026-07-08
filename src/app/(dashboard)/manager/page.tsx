@@ -118,12 +118,16 @@ export default function ManagerDashboard() {
     !histSearch || h.symbol?.toLowerCase().includes(histSearch.toLowerCase()) || h.accountLogin?.includes(histSearch)
   );
 
-  function kpi(label: string, value: string, sub?: string, color?: string) {
+  function kpi(label: string, value: string, sub?: string, color?: string, icon?: string) {
     return (
-      <div className="rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
-        <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{label}</div>
-        <div className="mt-1 text-[20px] font-bold tabular-nums" style={{ color: color || "var(--text)" }}>{value}</div>
-        {sub && <div className="mt-0.5 text-[10px]" style={{ color: "var(--muted)" }}>{sub}</div>}
+      <div className="rounded-xl border p-3 relative overflow-hidden" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
+        {color && <div className="absolute inset-y-0 left-0 w-1 rounded-l-xl" style={{ background: color }} />}
+        <div className="mb-2 flex items-center gap-2">
+          {icon && <span className="flex h-6 w-6 items-center justify-center rounded-md text-[10px]" style={{ background: color ? `${color}18` : "var(--soft)", color: color || "var(--muted)" }}><i className={"fa-solid " + icon} /></span>}
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{label}</span>
+        </div>
+        <div className="text-[22px] font-bold tabular-nums leading-none" style={{ color: color || "var(--text)" }}>{value}</div>
+        {sub && <div className="mt-1 text-[10px]" style={{ color: "var(--muted)" }}>{sub}</div>}
       </div>
     );
   }
@@ -169,11 +173,11 @@ export default function ManagerDashboard() {
         {tab === "Overview" && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {kpi("My Clients", clients.length.toString(), onlineClients + " online now")}
-              {kpi("Open Positions", activePositions.toString(), "across all accounts")}
-              {kpi("Total Balance", "$" + gmoney(totalBalance), "deposits + credits")}
-              {kpi("Float P&L", (floatPnl >= 0 ? "+" : "") + "$" + gmoney(Math.abs(floatPnl)), "on open positions", floatPnl >= 0 ? BUY : SELL)}
-              {kpi("Pending Requests", pendingReqs.toString(), "awaiting approval", pendingReqs > 0 ? "#f97316" : undefined)}
+              {kpi("My Clients", clients.length.toString(), onlineClients + " online now", "#2f81f7", "fa-users")}
+              {kpi("Open Positions", activePositions.toString(), "across all accounts", "#f59e0b", "fa-chart-line")}
+              {kpi("Total Balance", "$" + gmoney(totalBalance), "deposits + credits", "#8b5cf6", "fa-wallet")}
+              {kpi("Float P&L", (floatPnl >= 0 ? "+" : "") + "$" + gmoney(Math.abs(floatPnl)), "on open positions", floatPnl >= 0 ? BUY : SELL, "fa-arrow-trend-up")}
+              {kpi("Pending Requests", pendingReqs.toString(), "awaiting approval", pendingReqs > 0 ? "#f97316" : undefined, "fa-clock")}
             </div>
 
             {/* Live positions mini-table */}
@@ -210,8 +214,8 @@ export default function ManagerDashboard() {
                             <td className={tdc}>{Number(p.lots).toFixed(2)}</td>
                             <td className={tdc + " text-right"}>{gnum(p.openPrice, dg(p.symbol))}</td>
                             <td className={tdc + " text-right"}>{price != null ? gnum(price, dg(p.symbol)) : "—"}</td>
-                            <td className={tdc + " text-right font-semibold"} style={{ color: pl == null ? "var(--muted)" : pl >= 0 ? BUY : SELL }}>
-                              {pl != null ? (pl >= 0 ? "+" : "") + "$" + gmoney(Math.abs(pl)) : "—"}
+                            <td className={tdc + " text-right"}>
+                              {pl != null ? <span className="inline-block rounded px-2 py-0.5 text-[10px] font-bold tabular-nums" style={{ background: pl >= 0 ? "rgba(38,166,154,0.13)" : "rgba(239,83,80,0.13)", color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+" : "") + "$" + gmoney(Math.abs(pl))}</span> : <span style={{ color: "var(--muted)" }}>—</span>}
                             </td>
                           </tr>
                         );

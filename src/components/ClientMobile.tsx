@@ -942,18 +942,22 @@ export default function ClientMobile({ t }: { t: any }) {
                 return (
                   <div key={s.symbol} className="rounded-xl border bg-[var(--card)] p-3" style={{ borderColor: dr > 0 ? BUY : dr < 0 ? SELL : "var(--border)", transition: "border-color 0.4s ease" }}>
                     {/* Double-tap the info row to open this symbol's chart */}
+                    {(() => { const pct = pctOf(s.symbol); return (
                     <div className="mb-2 flex select-none items-center justify-between" onDoubleClick={() => { setSelSym(s.symbol); setTab("chart"); }}>
                       <div className="flex items-center gap-2">
                         <button onClick={() => toggleFav(s.symbol)} style={{ color: isFav ? GOLD : "var(--muted)" }}><i className={isFav ? "fa-solid fa-star" : "fa-regular fa-star"} /></button>
                         <SymIcon symbol={s.symbol} size={20} />
-                        <button onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="text-sm font-bold underline-offset-2 active:underline">{s.display || s.symbol}</button>
-                        {dr !== 0 && <i className={"fa-solid " + (dr > 0 ? "fa-caret-up" : "fa-caret-down")} style={{ fontSize: 11, color: dr > 0 ? BUY : SELL }} />}
+                        <div>
+                          <button onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="text-sm font-bold underline-offset-2 active:underline">{s.display || s.symbol}</button>
+                          <div className="text-[9px] font-semibold" style={{ color: pct > 0 ? BUY : pct < 0 ? SELL : "var(--muted)" }}>{pct !== 0 ? (pct >= 0 ? "▲" : "▼") + " " + (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%" : "—"}</div>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Sparkline data={hist} up={upTrend} />
-                        <span className="text-[10px] text-[var(--muted)]">Spread: {Math.round(spread)}</span>
+                        <span className="text-[9px] text-[var(--muted)]">Sprd: {Math.round(spread)}</span>
                       </div>
                     </div>
+                    ); })()}
                     <div className="grid grid-cols-3 items-center gap-2">
                       <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "SELL"); }} className="rounded-lg py-2 text-center text-white" style={{ background: SELLBTN }}>
                         <div className="text-[10px] opacity-80">SELL</div><div className="text-sm font-bold tabular-nums">{sBid != null ? gnum(sBid, dd) : "…"}</div>
@@ -1276,8 +1280,8 @@ export default function ClientMobile({ t }: { t: any }) {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right text-sm font-bold" style={{ color: plv >= 0 ? BUY : SELL }}>{(plv >= 0 ? "+" : "") + fmt(plv)}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums" style={{ background: plv >= 0 ? "rgba(22,163,74,0.13)" : "rgba(220,38,38,0.13)", color: plv >= 0 ? BUY : SELL }}>{(plv >= 0 ? "+" : "") + _cSym + fmt(plv)}</span>
                       <button onClick={(e) => { e.stopPropagation(); close(p.id); }} className="flex h-7 w-7 items-center justify-center rounded-full border" style={{ borderColor: SELL, color: SELL }}><i className="fa-solid fa-xmark" /></button>
                     </div>
                   </div>

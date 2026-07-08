@@ -1231,7 +1231,7 @@ export default function AdminDeskPage() {
                             <input type="number" step="0.00001" className={tInp} placeholder="0" value={ei("tp", p.tp ? Number(p.tp).toFixed(dg(p.symbol)) : "")} onChange={(e) => { setIe("tp", e.target.value); }} />
                           </td>
                           <td className="px-2 py-1 text-right">{pxFmt(p.symbol, cur)}</td>
-                          <td className="px-2 py-1 text-right" style={{ color: pl >= 0 ? BUY : SELL }}>{gnum(pl, 2)}</td>
+                          <td className="px-1 py-0.5 text-right"><span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums" style={{ background: pl >= 0 ? "rgba(38,166,154,0.13)" : "rgba(239,83,80,0.13)", color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+" : "") + gnum(pl, 2)}</span></td>
                           {swapEnabled && <><td className="px-2 py-1 text-right" style={{ color: Number(p.swap ?? 0) >= 0 ? BUY : SELL }} title="Accumulated swap">{Number(p.swap ?? 0) !== 0 ? gnum(Number(p.swap), 2) : "—"}</td>
                           <td className="px-2 py-1 text-right" style={{ color: SELL }} title="Commission charged">{Number(p.commission ?? 0) !== 0 ? gnum(Number(p.commission), 2) : "—"}</td></>}
                           <td className="px-2 py-1 text-right whitespace-nowrap">
@@ -1655,26 +1655,40 @@ export default function AdminDeskPage() {
                 if (used === 0) return false;
                 return (eq / used) * 100 < 150;
               }).length;
-              const statCard = (icon: string, label: string, value: string | number, color?: string, sub?: string) => (
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3">
-                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
-                    <i className={"fa-solid " + icon} style={{ width: 12, textAlign: "center" }} />{label}
+              const todayTrades = history.filter((h: any) => { const d = h.closeTime || h.closedAt; if (!d) return false; return new Date(d).toDateString() === new Date().toDateString(); });
+              const todayPnl = todayTrades.reduce((s: number, h: any) => s + Number(h.pnl ?? 0), 0);
+              const statCard = (icon: string, label: string, value: string | number, color?: string, sub?: string, accent?: string) => (
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 relative overflow-hidden">
+                  {accent && <div className="absolute inset-y-0 left-0 w-1 rounded-l-xl" style={{ background: accent }} />}
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg text-[11px]" style={{ background: (color || accent) ? `${color || accent}18` : "var(--soft)", color: color || accent || "var(--muted)" }}>
+                      <i className={"fa-solid " + icon} />
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{label}</span>
                   </div>
-                  <div className="text-[18px] font-bold tabular-nums" style={{ color: color || "var(--text)" }}>{value}</div>
-                  {sub && <div className="mt-0.5 text-[10px]" style={{ color: "var(--muted)" }}>{sub}</div>}
+                  <div className="text-[22px] font-bold tabular-nums leading-none" style={{ color: color || "var(--text)" }}>{value}</div>
+                  {sub && <div className="mt-1 text-[10px]" style={{ color: "var(--muted)" }}>{sub}</div>}
                 </div>
               );
               return (
-                <div className="grid grid-cols-4 gap-2 p-2 2xl:grid-cols-6">
-                  {statCard("fa-users", "Total Accounts", totalClients, undefined, `${liveClients} Live · ${demoClients} Demo`)}
-                  {statCard("fa-chart-line", "Open Positions", totalPositions)}
-                  {statCard("fa-dollar-sign", "Total Floating P/L", (totalFloating >= 0 ? "+" : "") + gnum(totalFloating, 2), totalFloating >= 0 ? BUY : SELL)}
-                  {statCard("fa-arrow-down-to-bracket", "Total Deposits", gnum(totalDeposits, 2), BUY)}
-                  {statCard("fa-arrow-up-from-bracket", "Total Withdrawals", gnum(totalWithdrawals, 2), SELL)}
-                  {statCard("fa-wallet", "Total Equity", gnum(totalEquity, 2), totalEquity >= 0 ? BUY : SELL, "Across all accounts")}
-                  {statCard("fa-triangle-exclamation", "Near Margin Call", nearMC, nearMC > 0 ? SELL : "var(--muted)", "Accounts below 150% margin level")}
-                  {statCard("fa-layer-group", "Client Groups", tradeGroups.length, undefined, tradeGroups.map((g: any) => g.name).join(", ") || "None")}
-                  {statCard("fa-bars-progress", "Live Trades Today", history.filter((h: any) => { const d = h.closeTime || h.closedAt; if (!d) return false; return new Date(d).toDateString() === new Date().toDateString(); }).length, undefined, "Closed today")}
+                <div className="space-y-2 p-2">
+                  <div className="grid grid-cols-4 gap-2 2xl:grid-cols-6">
+                    {statCard("fa-users", "Total Accounts", totalClients, undefined, `${liveClients} Live · ${demoClients} Demo`, "#2f81f7")}
+                    {statCard("fa-chart-line", "Open Positions", totalPositions, undefined, `${gnum(totalFloating, 2)} floating P/L`, "#f59e0b")}
+                    {statCard("fa-dollar-sign", "Floating P/L", (totalFloating >= 0 ? "+" : "") + gnum(totalFloating, 2), totalFloating >= 0 ? BUY : SELL, "All open positions", totalFloating >= 0 ? BUY : SELL)}
+                    {statCard("fa-arrow-down-to-bracket", "Total Deposits", gnum(totalDeposits, 2), BUY, undefined, BUY)}
+                    {statCard("fa-arrow-up-from-bracket", "Total Withdrawals", gnum(totalWithdrawals, 2), SELL, undefined, SELL)}
+                    {statCard("fa-wallet", "Total Equity", gnum(totalEquity, 2), totalEquity >= 0 ? BUY : SELL, "Net across all accounts", totalEquity >= 0 ? BUY : SELL)}
+                    {statCard("fa-triangle-exclamation", "Near Margin Call", nearMC, nearMC > 0 ? SELL : "var(--muted)", "Below 150% margin level", nearMC > 0 ? SELL : undefined)}
+                    {statCard("fa-bars-progress", "Closed Today", todayTrades.length, undefined, (todayPnl >= 0 ? "+" : "") + gnum(todayPnl, 2) + " net P/L", "#8b5cf6")}
+                    {statCard("fa-layer-group", "Trade Groups", tradeGroups.length, undefined, tradeGroups.map((g: any) => g.name).join(", ") || "None")}
+                  </div>
+                  {nearMC > 0 && (
+                    <div className="flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold animate-pulse" style={{ borderColor: `${SELL}40`, background: `${SELL}0d`, color: SELL }}>
+                      <i className="fa-solid fa-triangle-exclamation" />
+                      {nearMC} account{nearMC > 1 ? "s" : ""} near margin call — check the Positions tab immediately
+                    </div>
+                  )}
                 </div>
               );
             })()}
