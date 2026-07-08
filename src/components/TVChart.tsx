@@ -53,7 +53,7 @@ function loadScript(): Promise<void> {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TVChart({
   symbol, tf, theme, digits = 5,
-  positions, symbols, bare, showDrawingTools, onSymbolChange, spreadPips,
+  positions, symbols, bare, showDrawingTools, onSymbolChange, onCandleUpdate, spreadPips,
 }: {
   symbol: string;
   tf: string;
@@ -64,6 +64,7 @@ export default function TVChart({
   bare?: boolean;
   showDrawingTools?: boolean;
   onSymbolChange?: (sym: string) => void;
+  onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
   spreadPips?: number;
 }) {
   const containerRef   = useRef<HTMLDivElement>(null);
@@ -75,6 +76,7 @@ export default function TVChart({
   const isReadyRef     = useRef(false);
   const symbolsRef     = useRef(symbols); symbolsRef.current = symbols;
   const onSymRef       = useRef(onSymbolChange); onSymRef.current = onSymbolChange;
+  const onCandleRef    = useRef(onCandleUpdate); onCandleRef.current = onCandleUpdate;
   const spreadRef      = useRef(spreadPips ?? 0); spreadRef.current = spreadPips ?? 0;
   const digitsRef      = useRef(digits); digitsRef.current = digits;
   const positionsRef   = useRef(positions); positionsRef.current = positions;
@@ -262,7 +264,11 @@ export default function TVChart({
           const bars: Bar[] = firstDataRequest
             ? mapped
             : mapped.filter((b: Bar) => b.time >= from * 1000 && b.time <= to * 1000);
-          if (bars.length) lastBarRef.current = bars[bars.length - 1];
+          if (bars.length) {
+            lastBarRef.current = bars[bars.length - 1];
+            const lb = lastBarRef.current;
+            onCandleRef.current?.({ open: lb.open, high: lb.high, low: lb.low, close: lb.close });
+          }
           onHistory(bars, { noData: bars.length === 0 });
         } catch (e: any) { onError(e.message || "candles fetch failed"); }
       },
@@ -300,6 +306,7 @@ export default function TVChart({
             };
             lastBarRef.current = updated;
             cb(updated);
+            onCandleRef.current?.({ open: updated.open, high: updated.high, low: updated.low, close: updated.close });
           } else {
             const open = lastBarRef.current?.close ?? price;
             const newBar: Bar = {
@@ -310,6 +317,7 @@ export default function TVChart({
             };
             lastBarRef.current = newBar;
             cb(newBar);
+            onCandleRef.current?.({ open: newBar.open, high: newBar.high, low: newBar.low, close: newBar.close });
           }
         });
       },

@@ -72,7 +72,7 @@ export default function DomPanel({ symbol, bid, ask, spreadPips, digits, onClose
 
   return (
     <div
-      className="absolute inset-x-0 bottom-[72px] z-30 mx-1.5 overflow-hidden rounded-xl border border-[var(--border)] shadow-2xl"
+      className="overflow-hidden border-b border-[var(--border)]"
       style={{ background: "var(--panel)" }}
     >
       {/* Header */}

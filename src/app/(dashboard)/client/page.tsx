@@ -86,6 +86,7 @@ export default function ClientTerminal() {
   }
   const [selSym, setSelSym] = useState("");
   const [tf, setTf] = useState("1M");
+  const [ohlc, setOhlc] = useState<{ open: number; high: number; low: number; close: number } | null>(null);
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP" | "STOP_LIMIT">("MARKET");
   const [ordIdx, setOrdIdx] = useState(0); // selected order kind (app-style grid)
   const [walletModal, setWalletModal] = useState<null | "deposit" | "withdraw" | "kyc">(null);
@@ -1171,10 +1172,19 @@ export default function ClientTerminal() {
         <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
         <div className="flex min-w-0 flex-1 flex-col">
+          {/* OHLC strip — left-aligned, above chart */}
+          {ohlc && (
+            <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-3 py-1" style={{ background: "var(--panel)", fontSize: 10 }}>
+              <span className="font-semibold" style={{ color: "var(--muted)" }}>O <span className="tabular-nums font-bold" style={{ color: "var(--text)" }}>{ohlc.open.toFixed(d)}</span></span>
+              <span className="font-semibold" style={{ color: "var(--muted)" }}>H <span className="tabular-nums font-bold" style={{ color: "#26a69a" }}>{ohlc.high.toFixed(d)}</span></span>
+              <span className="font-semibold" style={{ color: "var(--muted)" }}>L <span className="tabular-nums font-bold" style={{ color: "#ef5350" }}>{ohlc.low.toFixed(d)}</span></span>
+              <span className="font-semibold" style={{ color: "var(--muted)" }}>C <span className="tabular-nums font-bold" style={{ color: ohlc.close >= ohlc.open ? "#26a69a" : "#ef5350" }}>{ohlc.close.toFixed(d)}</span></span>
+            </div>
+          )}
           <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">{(() => { const pos = [
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-          ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} spreadPips={_spreadPips(selSym)} onSymbolChange={(sm) => setSelSym(sm)} />; })()}
+          ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} spreadPips={_spreadPips(selSym)} onSymbolChange={(sm) => { setSelSym(sm); setOhlc(null); }} onCandleUpdate={(bar) => setOhlc(bar)} />; })()}
           </div>
         </div>
         <div onMouseDown={(e) => dragX(e, "rt")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
@@ -1230,6 +1240,22 @@ export default function ClientTerminal() {
           </div>
           {/* Scrollable form area */}
           <div className="min-h-0 flex-1 overflow-auto">
+          {domOpen && price != null && (
+            <DomPanel
+              symbol={selSym}
+              bid={bid}
+              ask={ask}
+              spreadPips={_spreadPips(selSym)}
+              digits={d}
+              onClose={() => setDomOpen(false)}
+              onRowClick={(px, side) => {
+                setPendingPrice(px.toFixed(d));
+                setOrderType(side === "ask" ? "LIMIT" : "STOP");
+                setRightTab("TRADE");
+                setDomOpen(false);
+              }}
+            />
+          )}
           {rightTab === "SIGNALS" ? (
             <div className="p-2 text-[11px]">
               {!signalsLoaded ? (
@@ -1558,22 +1584,6 @@ export default function ClientTerminal() {
             </div>
           )}
 
-          {/* DOM — Depth of Market floating panel inside the aside */}
-          {domOpen && price != null && (
-            <DomPanel
-              symbol={selSym}
-              bid={bid}
-              ask={ask}
-              spreadPips={_spreadPips(selSym)}
-              digits={d}
-              onClose={() => setDomOpen(false)}
-              onRowClick={(px, side) => {
-                setPendingPrice(px.toFixed(d));
-                setOrderType(side === "ask" ? "LIMIT" : "STOP");
-                setRightTab("TRADE");
-              }}
-            />
-          )}
         </aside>
       </div>
 

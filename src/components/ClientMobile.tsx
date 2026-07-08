@@ -1247,6 +1247,7 @@ export default function ClientMobile({ t }: { t: any }) {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold tabular-nums" style={{ color: plv >= 0 ? BUY : SELL }}>{(plv >= 0 ? "+" : "") + _cSym + fmt(plv)}</span>
                       <button onClick={(e) => { e.stopPropagation(); close(p.id); }} className="flex h-7 w-7 items-center justify-center rounded-full border" style={{ borderColor: SELL, color: SELL }}><i className="fa-solid fa-xmark" /></button>
                     </div>
                   </div>

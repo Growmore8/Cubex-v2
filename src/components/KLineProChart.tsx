@@ -20,6 +20,7 @@ interface Props {
   bare?: boolean;
   showDrawingTools?: boolean;
   onSymbolChange?: (sym: string) => void;
+  onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
   spreadPips?: number;
 }
 
@@ -248,7 +249,7 @@ const DRAW_TOOLS = [
 ];
 
 // ─── KlineCharts Pro chart (all non-TV domains) ──────────────────────────────
-function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, showDrawingTools, positions, spreadPips }: Props) {
+function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, showDrawingTools, positions, spreadPips, onCandleUpdate }: Props) {
   const containerRef    = useRef<HTMLDivElement>(null);
   const chartRef        = useRef<KLineChartPro | null>(null);
   const kChartRef       = useRef<any>(null);           // raw klinecharts instance (has createOverlay)
@@ -262,6 +263,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
   const spreadRef      = useRef(spreadPips ?? 0); spreadRef.current = spreadPips ?? 0;
   const digitsRef      = useRef(digits); digitsRef.current = digits;
   const symbolRef      = useRef(symbol); symbolRef.current = symbol;
+  const onCandleRef    = useRef(onCandleUpdate); onCandleRef.current = onCandleUpdate;
 
   // Drawing toolbar state
   const [activeTool, setActiveTool] = useState("none");
@@ -299,7 +301,11 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
           const bars = d.candles.map((c: any) => ({
             timestamp: c.time * 1000, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume ?? 0,
           }));
-          if (bars.length) lastBarRef.current = bars[bars.length - 1];
+          if (bars.length) {
+            lastBarRef.current = bars[bars.length - 1];
+            const lb = bars[bars.length - 1];
+            onCandleRef.current?.({ open: lb.open, high: lb.high, low: lb.low, close: lb.close });
+          }
           return bars;
         } catch { return []; }
       },
@@ -329,6 +335,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
             };
             lastBarRef.current = updated;
             cb(updated);
+            onCandleRef.current?.({ open: updated.open, high: updated.high, low: updated.low, close: updated.close });
           } else {
             const open = lastBarRef.current?.close ?? price;
             const newBar = {
@@ -338,6 +345,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
             };
             lastBarRef.current = newBar;
             cb(newBar);
+            onCandleRef.current?.({ open: newBar.open, high: newBar.high, low: newBar.low, close: newBar.close });
           }
         });
       },
