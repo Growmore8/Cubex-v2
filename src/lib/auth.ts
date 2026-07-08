@@ -19,6 +19,11 @@ function beat(userId: string) {
   const now = Date.now();
   if (now - (lastBeat.get(userId) || 0) < 45000) return;
   lastBeat.set(userId, now);
+  // Prune map when it grows large (one entry per user, never auto-deleted otherwise).
+  if (lastBeat.size > 5000) {
+    const sorted = [...lastBeat.entries()].sort((a, b) => a[1] - b[1]);
+    for (const [k] of sorted.slice(0, 1000)) lastBeat.delete(k);
+  }
   prisma.user.update({ where: { id: userId }, data: { lastSeenAt: new Date() } }).catch(() => {});
 }
 

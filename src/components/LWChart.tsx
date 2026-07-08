@@ -196,7 +196,6 @@ function LWChart({
   const seriesRef = useRef<any>(null);
   const barsRef = useRef<any[]>([]);
   const askLineRef = useRef<any>(null);
-  const bidLineRef = useRef<any>(null);
   const spreadPipsRef = useRef(spreadPips ?? 0);
   spreadPipsRef.current = spreadPips ?? 0;
   // TradingView-style OHLC legend (updated via ref, no re-render) + right-click menu
@@ -301,7 +300,6 @@ function LWChart({
     seriesRef.current = series;
     // Bid / Ask price lines (MT5 style) — created once, updated on each tick via ref
     askLineRef.current = series.createPriceLine({ price: 0, color: "#2196F3", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "Ask" });
-    bidLineRef.current = series.createPriceLine({ price: 0, color: "#ef5350", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "Bid" });
     // a recreated chart loses prior drawings/indicators — drop the stale refs
     hlineRefs.current = []; trendRefs.current = []; smaRef.current = null; emaRef.current = null; psarRef.current = null; markersRef.current = null; sigMarkersRef.current = null; ribbonRefs.current = []; trendStart.current = null;
     // Click handler for H-Line / Trend drawing tools
@@ -404,14 +402,7 @@ function LWChart({
     } else if (!cdl && markersRef.current) {
       try { markersRef.current.setMarkers([]); } catch {}
     }
-    // Sub-pane data sync (charts managed by their own effects)
-    if (rsi && rsiSeriesRef.current) { try { rsiSeriesRef.current.setData(computeRSI(barsRef.current, cfgRef.current?.rsi || 14)); } catch {} }
-    if (macd && macdLineRef.current) { const { macd: ml, signal: sl, hist: hl } = computeMACD(barsRef.current, cfgRef.current?.macdF || 12, cfgRef.current?.macdS || 26, cfgRef.current?.macdSig || 9); try { macdLineRef.current.setData(ml); macdSignalRef.current?.setData(sl); macdHistRef.current?.setData(hl); } catch {} }
-    if (stoch && stochKRef.current) { const { k, d } = computeStoch(barsRef.current); try { stochKRef.current.setData(k); stochDRef.current?.setData(d); } catch {} }
-    if (atr && atrSeriesRef.current) { try { atrSeriesRef.current.setData(computeATR(barsRef.current)); } catch {} }
-    if (adx && adxSeriesRef.current) { try { adxSeriesRef.current.setData(computeADX(barsRef.current)); } catch {} }
-    // Keep onBarsLoaded fresh so seed() triggers indicator recompute after async bar load
-    onBarsLoaded.current = () => {
+    const recomputeFromBars = () => {
       if (smaRef.current) { try { smaRef.current.setData(computeMA(barsRef.current, cfgRef.current?.ma || 20, false)); } catch {} }
       if (emaRef.current) { try { emaRef.current.setData(computeMA(barsRef.current, cfgRef.current?.ma || 20, true)); } catch {} }
       if (bbMidRef.current) { const { mid, upper, lower } = computeBB(barsRef.current, cfgRef.current?.bb || 20); try { bbMidRef.current.setData(mid); bbUpRef.current?.setData(upper); bbLoRef.current?.setData(lower); } catch {} }
@@ -425,6 +416,8 @@ function LWChart({
       if (atrSeriesRef.current) { try { atrSeriesRef.current.setData(computeATR(barsRef.current)); } catch {} }
       if (adxSeriesRef.current) { try { adxSeriesRef.current.setData(computeADX(barsRef.current)); } catch {} }
     };
+    recomputeFromBars(); // sync all active indicator series after any state change
+    onBarsLoaded.current = recomputeFromBars; // re-run when bars reload (symbol/tf change)
   }, [sma, ema, bb, rsi, macd, psar, cdl, sig, ribbon, stoch, atr, adx, symbol, tf, theme, digits, drawN, cfgKey]);
 
   // RSI sub-pane chart (separate LW instance below main chart)
@@ -671,7 +664,6 @@ function LWChart({
           askLineRef.current?.applyOptions(spPx > 0
             ? { price: close + spPx, color: "#2196F3", axisLabelVisible: true }
             : { price: close, color: "transparent", axisLabelVisible: false });
-          bidLineRef.current?.applyOptions({ price: close, color: "transparent", axisLabelVisible: false });
         } catch {}
         if (!hoveringRef.current) fmtLegRef.current(barsRef.current[barsRef.current.length - 1]);
       } catch { /* out-of-order tick during a reseed — ignore */ }
@@ -718,8 +710,8 @@ function LWChart({
   const bord = theme === "dark" ? "#242a38" : "#e2e8f0";
   const panelBg = theme === "dark" ? "rgba(14,18,28,0.96)" : "rgba(246,248,252,0.97)";
   // Drawing + indicator buttons, shared between the left sidebar (mobile) and the
-  // top header bar (desktop, when topTools is set).
-  const toolBtns = (
+  // Shared drawing tool buttons — used in both the sidebar (toolBtns) and floating toolbar (drawBtns).
+  const drawingBtns = (
     <>
       <button style={tbV(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line">
         <i className="fa-solid fa-minus" style={{ fontSize: 12 }} />
@@ -735,6 +727,12 @@ function LWChart({
           <i className="fa-solid fa-trash-can" style={{ fontSize: 11 }} />
         </button>
       )}
+    </>
+  );
+  // Full tool sidebar: drawing tools + indicator toggles (mobile / default sidebar).
+  const toolBtns = (
+    <>
+      {drawingBtns}
       <button style={{ ...tbV(sma), fontSize: 9, fontWeight: 700 }} onClick={() => setSma((v) => !v)} title="SMA 20">SMA</button>
       <button style={{ ...tbV(ema), fontSize: 9, fontWeight: 700 }} onClick={() => setEma((v) => !v)} title="EMA 20">EMA</button>
       <button style={{ ...tbV(bb), fontSize: 8, fontWeight: 700 }} onClick={() => setBb((v) => !v)} title="Bollinger Bands (20,2)">BB</button>
@@ -742,26 +740,8 @@ function LWChart({
       <button style={{ ...tbV(macd), fontSize: 7, fontWeight: 700 }} onClick={() => setMacd((v) => !v)} title="MACD (12,26,9)">MACD</button>
     </>
   );
-  // Drawing tools only (H-line / trend / clear) — shown as a floating toolbar on the
-  // chart for desktop, where indicators live in the page header (`ind` controlled).
-  const drawBtns = (
-    <>
-      <button style={tbV(tool === "hline")} onClick={() => setTool(tool === "hline" ? "none" : "hline")} title="Horizontal line">
-        <i className="fa-solid fa-minus" style={{ fontSize: 12 }} />
-      </button>
-      <button style={tbV(tool === "trend")} onClick={() => setTool(tool === "trend" ? "none" : "trend")} title="Trend line">
-        <i className="fa-solid fa-arrow-trend-up" style={{ fontSize: 12 }} />
-      </button>
-      <button style={tbV(tool === "erase")} onClick={() => setTool(tool === "erase" ? "none" : "erase")} title="Erase one (click a line)">
-        <i className="fa-solid fa-eraser" style={{ fontSize: 12 }} />
-      </button>
-      {(drawN > 0 || hlineRefs.current.length > 0 || trendRefs.current.length > 0) && (
-        <button style={tbV(false)} onClick={clearDrawings} title="Clear all drawings">
-          <i className="fa-solid fa-trash-can" style={{ fontSize: 11 }} />
-        </button>
-      )}
-    </>
-  );
+  // Drawing tools only — floating toolbar on desktop when indicators are in the page header.
+  const drawBtns = drawingBtns;
   return (
     <>
     <div style={{ display: "flex", flexDirection: "row", height: "100%", width: "100%" }}>

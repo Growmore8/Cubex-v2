@@ -183,15 +183,11 @@ export default function TVChart({
             await makeLine(p.tp,       "TP", `${tkt}  ${fmt(p.tp)}`,  "#10b981", "#10b981", 2, 1);
         }
 
-        // Ask spread line (dotted gray)
+        // Ask spread line — same createPositionLine as positions for consistent Y-axis box
         if (spreadRef.current > 0 && lastBarRef.current && drawSeqRef.current === seq) {
           const spPips   = Math.round(spreadRef.current * 100) / 100;
           const askPrice = lastBarRef.current.close + spPips * Math.pow(10, -dg);
-          await addShape(askPrice, {
-            linecolor: "#6b7280", linewidth: 1, linestyle: 1,
-            showLabel: true, text: `Ask +${spPips}p  ${fmt(askPrice)}`,
-            textcolor: "#9ca3af", fillBackground: false,
-          });
+          await makeLine(askPrice, "Ask", `+${spPips}p  ${fmt(askPrice)}`, "#6b7280", "#6b7280", 2, 1);
         }
       } catch {}
     }, 150);

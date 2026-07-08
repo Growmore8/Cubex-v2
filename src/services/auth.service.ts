@@ -1,3 +1,4 @@
+import { randomInt, randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, hashPassword } from "@/lib/auth";
 import { resolveTenant } from "@/lib/tenant";
@@ -14,7 +15,7 @@ import type { SessionPayload } from "@/types";
 import type { Role } from "@/config/roles";
 
 function makeCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(randomInt(100_000, 1_000_000)); // crypto-secure 6-digit OTP
 }
 
 export async function authenticate(host: string | null, email: string, password: string, ip?: string, ua?: string): Promise<SessionPayload> {
@@ -66,7 +67,7 @@ export async function authenticate(host: string | null, email: string, password:
   // Single-device enforcement for staff roles: issue a fresh session id that
   // supersedes any previous login. CLIENT may use multiple devices.
   const isStaff = user.role === "ADMIN" || user.role === "MANAGER" || user.role === "SUPERADMIN";
-  const sid = isStaff ? Math.random().toString(36).slice(2) + Date.now().toString(36) : undefined;
+  const sid = isStaff ? randomBytes(16).toString("hex") : undefined;
 
   await prisma.user.update({
     where: { id: user.id },
@@ -291,7 +292,7 @@ export async function sendForgotPassword(host: string | null, email: string): Pr
   // Use the user's CANONICAL login email for the link + recipient, so the reset
   // page (which looks the user up by email) resolves correctly.
   const target = user.email;
-  const token = makeCode() + makeCode(); // 12-digit reset token
+  const token = randomBytes(16).toString("hex"); // 32-char hex, crypto-secure
   await (prisma.user.update as any)({ where: { id: user.id }, data: { emailToken: "reset:" + token } });
   // Build the link from the domain the user is actually on (request host), then
   // the tenant's custom domain — so every tenant's reset email points back to a

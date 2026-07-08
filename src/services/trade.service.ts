@@ -54,9 +54,12 @@ export async function assertMargin(account: any, newTrade: { symbol: string; typ
 }
 
 async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SELL", account: any) {
-  const ask = await getPrice(symbol);
+  // Both calls are independent — run in parallel to save ~10ms per market order.
+  const [ask, symRow] = await Promise.all([
+    getPrice(symbol),
+    prisma.symbol.findFirst({ where: { tenantId, symbol }, select: { digits: true, spreadType: true, commissionPerLot: true, swapLong: true, swapShort: true } }).catch(() => null),
+  ]);
   if (ask == null) throw new Error("No price for " + symbol);
-  const symRow = await prisma.symbol.findFirst({ where: { tenantId, symbol }, select: { digits: true, spreadType: true, commissionPerLot: true, swapLong: true, swapShort: true } }).catch(() => null);
   const digits = symRow?.digits ?? 5;
   const pip = pipForDigits(digits);
   const adminPips = await getSpreadPips(tenantId, symbol, (account as any).groupId, account.id);

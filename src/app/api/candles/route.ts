@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rateLimit";
 
 // Feed keys — module-level cache (30s TTL) to avoid a DB round-trip on every candle request
 let _feedCache: { v: { td: string; fh: string; mv: string; primary: string }; t: number } | null = null;
@@ -27,7 +28,7 @@ const INTERVAL: Record<string, string> = {
   "1M": "1min", "5M": "5min", "15M": "15min", "30M": "30min", "1H": "1h", "4H": "4h", "1D": "1day", "1W": "1week",
 };
 // Finnhub candle resolution (forex/stock) — used for symbols with an OANDA feed.
-const FH_RES: Record<string, string> = { "1M": "1", "5M": "5", "15M": "15", "30M": "30", "1H": "60", "4H": "60", "1D": "D" };
+const FH_RES: Record<string, string> = { "1M": "1", "5M": "5", "15M": "15", "30M": "30", "1H": "60", "4H": "60", "1D": "D", "1W": "W" };
 
 // Massive REST API — Polygon.io-compatible aggregate bars
 // Forex/metals: C:EURUSD  |  Crypto: X:BTCUSD
@@ -101,6 +102,10 @@ function cacheTtl(tf:string){ return CACHE_TTL[tf] ?? 120000; }
 export async function GET(req: Request) {
   const s = await getSession();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  // Prevent a single user from burning third-party API quota (TD/FH/Massive).
+  if (!rateLimit(`candles:${s.sub}`, 120, 60_000)) {
+    return NextResponse.json({ ok: false, error: "Too many requests" }, { status: 429 });
+  }
   const url = new URL(req.url);
   const symbol = url.searchParams.get("symbol") || "";
   const tf = url.searchParams.get("tf") || "1M";
@@ -192,7 +197,15 @@ export async function GET(req: Request) {
 
   for (const fn of order) {
     const candles = await fn();
-    if (candles && candles.length) { candleCache.set(ckey, { t: Date.now(), candles }); return NextResponse.json({ ok: true, candles }); }
+    if (candles && candles.length) {
+      candleCache.set(ckey, { t: Date.now(), candles });
+      // Evict oldest 200 entries when the cache exceeds 800 to prevent unbounded growth.
+      if (candleCache.size > 800) {
+        const oldest = [...candleCache.keys()].slice(0, 200);
+        for (const k of oldest) candleCache.delete(k);
+      }
+      return NextResponse.json({ ok: true, candles });
+    }
   }
   return NextResponse.json({ ok: false, error: "No data", candles: [] });
 }
