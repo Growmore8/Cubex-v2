@@ -149,12 +149,12 @@ export default function TVChart({
               .setQuantityTextColor("#fff");
             linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
           } catch {
-            // fallback: horizontal_line shape with label text
+            // fallback: horizontal_line shape — solid opaque colored label box
             await addShape(price, {
               linecolor: lineColor, linewidth: lineWidth, linestyle: lineStyle,
               showLabel: true, text: qty + (body ? "  " + body : ""),
               textcolor: "#fff",
-              fillBackground: lineStyle === 0, backgroundColor: bg, backgroundTransparency: 30,
+              fillBackground: true, backgroundColor: bg, backgroundTransparency: 0,
             });
           }
         };
@@ -183,11 +183,11 @@ export default function TVChart({
             await makeLine(p.tp,       "TP", `${tkt}  ${fmt(p.tp)}`,  "#10b981", "#10b981", 2, 1);
         }
 
-        // Ask spread line — same createPositionLine as positions for consistent Y-axis box
+        // Ask spread line — teal, matches standard ask-price color
         if (spreadRef.current > 0 && lastBarRef.current && drawSeqRef.current === seq) {
           const spPips   = Math.round(spreadRef.current * 100) / 100;
           const askPrice = lastBarRef.current.close + spPips * Math.pow(10, -dg);
-          await makeLine(askPrice, "Ask", `+${spPips}p  ${fmt(askPrice)}`, "#6b7280", "#6b7280", 2, 1);
+          await makeLine(askPrice, "Ask", `+${spPips}p  ${fmt(askPrice)}`, "#26a69a", "#26a69a", 2, 1);
         }
       } catch {}
     }, 150);
@@ -281,12 +281,12 @@ export default function TVChart({
         sock.on("tick", ({ symbol: sym, price, real }: any) => {
           if (sym !== symbolInfo.name || price == null) return;
           const cb = realtimeCbRef.current; if (!cb) return;
-          // Spike filter: reject any tick that moves >5% from the last close.
+          // Spike filter: reject any tick that moves >2% from the last close.
           // Bad feed ticks (e.g. a zero or extreme outlier) permanently stretch
           // the candle's high/low, causing huge wicks. 5% catches bad data while
           // allowing legitimate sharp moves in crypto.
           if (lastBarRef.current && lastBarRef.current.close > 0) {
-            if (Math.abs(price - lastBarRef.current.close) / lastBarRef.current.close > 0.05) return;
+            if (Math.abs(price - lastBarRef.current.close) / lastBarRef.current.close > 0.02) return;
           }
           const truePrice = real ?? price;
           const barTimeMs = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
@@ -340,6 +340,7 @@ export default function TVChart({
       "show_chart_property_page",  // hide settings gear — use Indicators for all options
       "display_market_status",
       "create_volume_indicator_by_default", // prevent Volume sub-pane from auto-adding
+      "popup_hints",                         // suppress "Press and hold to see chart values" mobile popup
       // NOTE: tradingview_logo intentionally NOT disabled — Section 3.2 of the
       // Free Advanced Charts Agreement requires TradingView branding to remain visible.
     ];

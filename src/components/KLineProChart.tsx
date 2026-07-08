@@ -38,17 +38,20 @@ function ensureOverlay() {
       totalStep: 1,
       needDefaultPointFigure: false,
       needDefaultXAxisFigure: false,
-      needDefaultYAxisFigure: false, // custom Y-axis label via createYAxisFigures
-      // Draw the horizontal price line across the chart
+      needDefaultYAxisFigure: false,
+      // Horizontal price line + body label box at right edge of chart (MT5/TV reference style)
       createPointFigures({ overlay, coordinates, bounding }: any) {
         const d = (overlay.extendData ?? {}) as {
-          color?: string; lineWidth?: number; lineStyle?: string;
+          color?: string; lineWidth?: number; lineStyle?: string; label?: string;
         };
         const color     = d.color     ?? "#2962ff";
         const lineWidth = d.lineWidth ?? 1;
         const lineStyle = d.lineStyle ?? "solid";
+        const label     = d.label     ?? "";
         const y = (coordinates[0]?.y ?? 0) as number;
-        return [
+        const fSize = 11;
+        const boxH  = fSize + 8;
+        const figures: any[] = [
           {
             type: "line",
             ignoreEvent: true,
@@ -56,29 +59,48 @@ function ensureOverlay() {
             styles: { style: lineStyle, size: lineWidth, color },
           },
         ];
+        if (label) {
+          const boxW = Math.round(label.length * fSize * 0.58) + 14;
+          const boxX = bounding.width - boxW - 2;
+          figures.push(
+            {
+              type: "rect",
+              ignoreEvent: true,
+              attrs: { x: boxX, y: y - boxH / 2, width: boxW, height: boxH },
+              styles: { style: "fill", color, borderColor: color, borderSize: 0, borderRadius: 2 },
+            },
+            {
+              type: "text",
+              ignoreEvent: true,
+              attrs: { x: boxX + 6, y, text: label, align: "left", baseline: "middle" },
+              styles: { color: "#fff", size: fSize, family: "monospace", weight: "600" },
+            }
+          );
+        }
+        return figures;
       },
-      // Draw colored label box on right Y-axis (MT5 style — matches reference)
+      // Separate price box directly on the Y-axis scale (like TV position line price tag)
       createYAxisFigures({ overlay, coordinates }: any) {
-        const d = (overlay.extendData ?? {}) as { label?: string; color?: string };
-        const color = d.color ?? "#2962ff";
-        const label = d.label ?? "";
+        const d = (overlay.extendData ?? {}) as { priceLabel?: string; color?: string };
+        const color      = d.color      ?? "#2962ff";
+        const priceLabel = d.priceLabel ?? "";
         const y = (coordinates[0]?.y ?? 0) as number;
-        if (!label) return [];
-        const fSize = 10;
-        const boxH  = fSize + 6;
-        const approxW = label.length * fSize * 0.62 + 10;
+        if (!priceLabel) return [];
+        const fSize = 11;
+        const boxH  = fSize + 8;
+        const boxW  = Math.round(priceLabel.length * fSize * 0.58) + 14;
         return [
           {
             type: "rect",
             ignoreEvent: true,
-            attrs: { x: 0, y: y - boxH / 2, width: approxW, height: boxH },
+            attrs: { x: 0, y: y - boxH / 2, width: boxW, height: boxH },
             styles: { style: "fill", color, borderColor: color, borderSize: 0, borderRadius: 2 },
           },
           {
             type: "text",
             ignoreEvent: true,
-            attrs: { x: 4, y, text: label, align: "left", baseline: "middle" },
-            styles: { color: "#fff", size: fSize, family: "monospace", weight: "bold" },
+            attrs: { x: 6, y, text: priceLabel, align: "left", baseline: "middle" },
+            styles: { color: "#fff", size: fSize, family: "monospace", weight: "600" },
           },
         ];
       },
@@ -186,9 +208,9 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
         sock.on("tick", ({ symbol: tickSym, price }: any) => {
           if (tickSym !== sym.ticker || price == null) return;
           const cb = callbackRef.current; if (!cb) return;
-          // Spike filter: reject ticks >5% from last close (bad feed outliers)
+          // Spike filter: reject ticks >2% from last close (bad feed outliers)
           if (lastBarRef.current && lastBarRef.current.close > 0) {
-            if (Math.abs(price - lastBarRef.current.close) / lastBarRef.current.close > 0.05) return;
+            if (Math.abs(price - lastBarRef.current.close) / lastBarRef.current.close > 0.02) return;
           }
           const barTsMs = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
 
@@ -234,6 +256,9 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
       subIndicators: [],
       datafeed,
       drawingBarVisible: showDrawingTools ?? !bare,
+      periodBarVisible: false,
+      timezoneBarVisible: false,
+      indicatorBarVisible: showDrawingTools ?? false,
       styles: {
         candle: {
           tooltip: {
@@ -309,7 +334,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
       const addLine = (
         price: number, color: string,
         lineWidth: number, lineStyle: string,
-        label: string,
+        label: string, priceLabel: string,
       ) => {
         try {
           const id = kChart.createOverlay({
@@ -317,7 +342,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
             lock: true,
             visible: true,
             points: [{ value: price }],
-            extendData: { label, color, lineWidth, lineStyle },
+            extendData: { label, priceLabel, color, lineWidth, lineStyle },
             styles: { line: { color, size: lineWidth, style: lineStyle } },
           });
           if (id) overlayIdsRef.current.push(Array.isArray(id) ? id[0] : id);
@@ -334,12 +359,12 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
           : "";
 
         if (isPend) {
-          addLine(p.openPrice, color, 1, "dashed", `${p.kind} ${p.type}${tkt}  ${fmt(p.openPrice)}`);
+          addLine(p.openPrice, color, 1, "dashed", `${p.kind} ${p.type}${tkt}  ${fmt(p.openPrice)}`, fmt(p.openPrice));
         } else {
-          addLine(p.openPrice, color, 2, "solid", `${p.type}${tkt}${pnlStr}  ${fmt(p.openPrice)}`);
+          addLine(p.openPrice, color, 2, "solid", `${p.type}${tkt}${pnlStr}  ${fmt(p.openPrice)}`, fmt(p.openPrice));
         }
-        if (p.sl && p.sl > 0) addLine(p.sl,  "#f43f5e", 1, "dashed", `SL${tkt}  ${fmt(p.sl)}`);
-        if (p.tp && p.tp > 0) addLine(p.tp,  "#10b981", 1, "dashed", `TP${tkt}  ${fmt(p.tp)}`);
+        if (p.sl && p.sl > 0) addLine(p.sl,  "#f43f5e", 1, "dashed", `SL${tkt}  ${fmt(p.sl)}`,  fmt(p.sl));
+        if (p.tp && p.tp > 0) addLine(p.tp,  "#10b981", 1, "dashed", `TP${tkt}  ${fmt(p.tp)}`,  fmt(p.tp));
       }
 
       // Spread ask line — round to avoid float garbage (e.g. 7.000000000000360 → 7)
@@ -347,7 +372,7 @@ function KlineChartInternal({ symbol, tf, theme, digits = 2, symbols, bare, show
         const pip      = Math.pow(10, -dg);
         const spPips   = Math.round(spreadRef.current * 100) / 100;
         const askPrice = lastBarRef.current.close + spPips * pip;
-        addLine(askPrice, "#6b7280", 1, "dotted", `Ask +${spPips}p  ${fmt(askPrice)}`);
+        addLine(askPrice, "#26a69a", 1, "dotted", `Ask +${spPips}p  ${fmt(askPrice)}`, fmt(askPrice));
       }
     };
 
