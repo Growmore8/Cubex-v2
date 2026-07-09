@@ -203,7 +203,6 @@ export default function ClientMobile({ t }: { t: any }) {
   const [tfPickerOpen, setTfPickerOpen] = useState(false);
   const chartWrapRef = useRef<HTMLDivElement>(null);
   const [isTV, setIsTV] = useState(false);
-  const [fsMode, setFsMode] = useState(false);
   useEffect(() => { setIsTV(window.location.hostname === "trade.growthcapitalltd.com"); }, []);
   const [countdown, setCountdown] = useState("");
   useEffect(() => {
@@ -970,7 +969,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
         {/* ───────── CHART ───────── */}
         <KeepAlive active={tab === "chart"}>{(
-          <div ref={chartWrapRef} className={fsMode ? "" : "flex h-full flex-col"} style={fsMode ? { position: "fixed", inset: 0, zIndex: 999, display: "flex", flexDirection: "column", background: "var(--bg)", paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" } : undefined}>
+          <div ref={chartWrapRef} className="flex h-full flex-col">
             {/* MT5-style slim toolbar — symbol / TF / fullscreen for both LW and TV */}
             <div className="relative flex h-11 shrink-0 items-center border-b border-[var(--border)] bg-[var(--panel)] px-1">
               {/* Symbol picker */}
@@ -985,19 +984,15 @@ export default function ClientMobile({ t }: { t: any }) {
                 {tf} <span style={{ fontSize: 8, opacity: 0.7 }}>▼</span>
               </button>
               <div style={{ width: 2 }} />
-              {/* Indicators */}
-              <button onClick={() => { setCfgSheet(true); setTfPickerOpen(false); }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title="Indicators">
-                <svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.75">
-                  <line x1="0" y1="4" x2="16" y2="4" /><line x1="0" y1="10" x2="16" y2="10" />
-                  <circle cx="4" cy="4" r="2.2" fill="var(--panel)" /><circle cx="11" cy="10" r="2.2" fill="var(--panel)" />
-                </svg>
-              </button>
-              {/* Fullscreen — CSS-based, works on iOS */}
-              <button onClick={() => { setTfPickerOpen(false); setFsMode((f) => !f); }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title={fsMode ? "Exit fullscreen" : "Fullscreen"}>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.75">
-                  {fsMode ? <path d="M5 1v4H1M13 5h-4V1M9 13v-4h4M1 9h4v4" /> : <path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" />}
-                </svg>
-              </button>
+              {/* Indicators — only shown for LW chart; TV chart uses its own native OHLC legend + built-in fullscreen */}
+              {!isTV && (
+                <button onClick={() => { setCfgSheet(true); setTfPickerOpen(false); }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title="Indicators">
+                  <svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.75">
+                    <line x1="0" y1="4" x2="16" y2="4" /><line x1="0" y1="10" x2="16" y2="10" />
+                    <circle cx="4" cy="4" r="2.2" fill="var(--panel)" /><circle cx="11" cy="10" r="2.2" fill="var(--panel)" />
+                  </svg>
+                </button>
+              )}
               {/* TF picker dropdown */}
               {tfPickerOpen && (
                 <div className="absolute left-0 right-0 top-full z-50 flex items-center gap-1 border-b border-[var(--border)] px-2 py-2" style={{ background: "var(--panel)" }}>

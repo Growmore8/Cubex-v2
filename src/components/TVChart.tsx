@@ -5,6 +5,11 @@ import { io, type Socket } from "socket.io-client";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Bar = { time: number; open: number; high: number; low: number; close: number; volume: number };
 
+export type TVChartActions = {
+  openIndicators: () => void;
+  setChartType: (type: number) => void;
+};
+
 export type ChartPosition = {
   id: string;
   ticket?: string | number;
@@ -53,7 +58,7 @@ function loadScript(): Promise<void> {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TVChart({
   symbol, tf, theme, digits = 5,
-  positions, symbols, bare, showDrawingTools, onSymbolChange, onCandleUpdate, spreadPips,
+  positions, symbols, bare, showDrawingTools, chartType, onSymbolChange, onCandleUpdate, onActionsReady, spreadPips,
 }: {
   symbol: string;
   tf: string;
@@ -63,8 +68,10 @@ export default function TVChart({
   symbols?: Sym[];
   bare?: boolean;
   showDrawingTools?: boolean;
+  chartType?: number;
   onSymbolChange?: (sym: string) => void;
   onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
+  onActionsReady?: (actions: TVChartActions) => void;
   spreadPips?: number;
 }) {
   const containerRef   = useRef<HTMLDivElement>(null);
@@ -77,7 +84,9 @@ export default function TVChart({
   const symbolsRef     = useRef(symbols); symbolsRef.current = symbols;
   const symbolRef      = useRef(symbol);   // tracks current platform symbol — used to revert TV-native searches
   const onSymRef       = useRef(onSymbolChange); onSymRef.current = onSymbolChange;
-  const onCandleRef    = useRef(onCandleUpdate); onCandleRef.current = onCandleUpdate;
+  const onCandleRef       = useRef(onCandleUpdate); onCandleRef.current = onCandleUpdate;
+  const onActionsReadyRef = useRef(onActionsReady); onActionsReadyRef.current = onActionsReady;
+  const chartTypeRef      = useRef(chartType);
   const spreadRef      = useRef(spreadPips ?? 0); spreadRef.current = spreadPips ?? 0;
   const digitsRef      = useRef(digits); digitsRef.current = digits;
   const positionsRef   = useRef(positions); positionsRef.current = positions;
@@ -424,6 +433,22 @@ export default function TVChart({
           } catch {}
         });
       } catch {}
+
+      // Apply initial chart type if provided
+      if (chartTypeRef.current !== undefined) {
+        try { widget.activeChart().setChartType(chartTypeRef.current); } catch {}
+      }
+
+      // Expose actions to parent (admin toolbar "Indicators" button + candle type dropdown)
+      onActionsReadyRef.current?.({
+        openIndicators: () => {
+          try { widget.executeActionById("insertIndicator"); } catch {}
+        },
+        setChartType: (type: number) => {
+          chartTypeRef.current = type;
+          try { widget.activeChart().setChartType(type); } catch {}
+        },
+      });
     };
     // v32+: chartReady() returns Promise and ignores arguments
     // older: onChartReady(cb) accepts a callback

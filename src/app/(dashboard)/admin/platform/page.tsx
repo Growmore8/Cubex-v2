@@ -126,6 +126,8 @@ export default function AdminDeskPage() {
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
   const [selSym, setSelSym] = useState("");
   const [tf, setTf] = useState("1M");
+  const [chartType, setChartTypeState] = useState(1); // 1=Candlestick, 0=Bars, 2=Line, 8=Heiken-Ashi, 9=Hollow
+  const chartActionsRefs = useRef<Record<number, import("@/components/KLineProChart").TVChartActions>>({});
 const [selAcc, setSelAcc] = useState<any>(null);
   const [lot, setLot] = useState(0.01);
   // Instant reflection: whenever the client list reloads (after a trade close,
@@ -783,12 +785,12 @@ const [selAcc, setSelAcc] = useState<any>(null);
     const tradeBtnBorder = dk ? "rgba(255,255,255,0.12)"   : "var(--border)";
     const tradeBtnColor  = dk ? "#9aa6bf"                  : "var(--muted)";
     if (!showOC) return (
-      <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute bottom-8 left-[72px] z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: tradeBtnBg, border: `1px solid ${tradeBtnBorder}`, color: tradeBtnColor }} title="Show buy/sell">
+      <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute top-2 left-2 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: tradeBtnBg, border: `1px solid ${tradeBtnBorder}`, color: tradeBtnColor }} title="Show buy/sell">
         <i className="fa-solid fa-bolt" /> Trade
       </button>
     );
     return (
-    <div className="absolute bottom-8 left-[72px] z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: stripBg, border: `1px solid ${stripBorder}`, backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
+    <div className="absolute top-2 left-2 z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: stripBg, border: `1px solid ${stripBorder}`, backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
       <button onClick={() => place(sym, "SELL")} className="flex flex-col items-center rounded-xl px-4 py-1.5 font-bold shadow-md transition-all hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", minWidth: 72, lineHeight: 1.2, boxShadow: `0 6px 16px -6px ${SELLBTN}aa` }}>
         <span style={{ fontSize: 13, letterSpacing: "0.02em" }}>Sell</span>
         <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{bid}</span>
@@ -1066,7 +1068,40 @@ const [selAcc, setSelAcc] = useState<any>(null);
         </>)}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center gap-1 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
+          {/* Platform toolbar: Symbol Filter | Timeframe | Candle Type | Indicators | chart tabs */}
+          <div className="flex items-center gap-1.5 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
+            {/* Symbol Filter */}
+            <select value={openCharts[activeChart] || ""} onChange={(e) => { const v = e.target.value; if (v) { setTile(v); } }} className="h-6 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 text-[11px] outline-none" style={{ color: "var(--text)", minWidth: 90, maxWidth: 130 }}>
+              {(() => {
+                const symGroups: Record<string, typeof symbols> = {};
+                symbols.forEach((s) => { const cat = s.category || "other"; (symGroups[cat] || (symGroups[cat] = [])).push(s); });
+                const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "agriculture", "other"];
+                return Object.entries(symGroups).sort((a, b) => { const ia = CAT_ORDER.indexOf(a[0]); const ib = CAT_ORDER.indexOf(b[0]); return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib); }).map(([cat, syms]) => (
+                  <optgroup key={cat} label={cat.charAt(0).toUpperCase() + cat.slice(1)}>
+                    {syms.map((s) => <option key={s.symbol} value={s.symbol}>{s.display || s.symbol}</option>)}
+                  </optgroup>
+                ));
+              })()}
+            </select>
+            <div className="h-4 w-px bg-[var(--border)]" />
+            {/* Timeframe */}
+            <select value={tf} onChange={(e) => setTf(e.target.value)} className="h-6 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 text-[11px] outline-none" style={{ color: "var(--text)" }}>
+              {TFS.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            {/* Candle Type */}
+            <select value={chartType} onChange={(e) => { const v = Number(e.target.value); setChartTypeState(v); Object.values(chartActionsRefs.current).forEach((a) => a.setChartType(v)); }} className="h-6 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 text-[11px] outline-none" style={{ color: "var(--text)" }}>
+              <option value={1}>Candles</option>
+              <option value={0}>Bars</option>
+              <option value={2}>Line</option>
+              <option value={8}>Heiken Ashi</option>
+              <option value={9}>Hollow</option>
+            </select>
+            {/* Indicators */}
+            <button onClick={() => { chartActionsRefs.current[activeChart]?.openIndicators(); }} className="flex h-6 items-center gap-1 rounded border border-[var(--border)] px-2 text-[11px] hover:bg-[var(--soft)]" style={{ color: "var(--muted)" }} title="Indicators">
+              <i className="fa-solid fa-chart-line" style={{ fontSize: 10 }} /><span>Indicators</span>
+            </button>
+            <div className="h-4 w-px bg-[var(--border)]" />
+            {/* Chart tabs */}
             <div className="flex flex-1 items-center gap-1 overflow-auto">
               {openCharts.map((s, i) => (
                 <span key={s + "-" + i} onClick={() => setActive(i)} className="flex cursor-pointer items-center gap-1 rounded border px-2 py-0.5" style={i === activeChart ? { borderColor: "var(--accent)", color: "var(--text)" } : { borderColor: "var(--border)", color: "var(--muted)" }}>
@@ -1084,7 +1119,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 {(() => { const pos = [
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread; return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
+                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread; return <KLineProChart bare symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} chartType={chartType} onActionsReady={(actions) => { chartActionsRefs.current[i] = actions; }} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
               </div>
             ))}
           </div>

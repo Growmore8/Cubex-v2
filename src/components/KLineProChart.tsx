@@ -2,12 +2,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { registerOverlay, init as klineInit, ActionType } from "klinecharts";
-import TVChart, { type ChartPosition } from "./TVChart";
+import TVChart, { type ChartPosition, type TVChartActions } from "./TVChart";
 import LWChart from "./LWChart";
 import "@klinecharts/pro/dist/klinecharts-pro.css";
 import { KLineChartPro } from "@klinecharts/pro";
 
-export type { ChartPosition };
+export type { ChartPosition, TVChartActions };
 
 type Sym = { symbol: string; category?: string; digits?: number; display?: string };
 
@@ -20,8 +20,10 @@ interface Props {
   positions?: ChartPosition[];
   bare?: boolean;
   showDrawingTools?: boolean;
+  chartType?: number;
   onSymbolChange?: (sym: string) => void;
   onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
+  onActionsReady?: (actions: TVChartActions) => void;
   spreadPips?: number;
 }
 
@@ -671,7 +673,7 @@ export default function KLineProChart(props: Props) {
   }
 
   if (hostname === TV_DOMAIN) {
-    return <TVChart {...props} />;
+    return <TVChart {...props} chartType={props.chartType} onActionsReady={props.onActionsReady} />;
   }
 
   // Non-licensed domains: use open-source Lightweight Charts
