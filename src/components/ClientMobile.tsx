@@ -51,7 +51,7 @@ function LotStepper({ vol, setVol, small }: { vol: number; setVol: (v: number) =
   return (
     <div className="flex flex-col items-center">
       <div className="flex items-center gap-1.5">
-        <button onPointerDown={(e) => { e.preventDefault(); stepDown(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>−</button>
+        <button onPointerDown={(e) => { e.preventDefault(); stepDown(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 26 : 34, height: small ? 26 : 34, touchAction: "manipulation" }}>−</button>
         <input
           type="number"
           inputMode="decimal"
@@ -63,11 +63,11 @@ function LotStepper({ vol, setVol, small }: { vol: number; setVol: (v: number) =
           onBlur={e => commit(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } }}
           className="rounded-lg border border-[var(--border)] bg-[var(--soft)] text-center font-semibold tabular-nums text-[var(--text)]"
-          style={{ width: small ? 54 : 62, height: small ? 30 : 34, fontSize: small ? 12 : 13 }}
+          style={{ width: small ? 46 : 62, height: small ? 26 : 34, fontSize: small ? 11 : 13 }}
         />
-        <button onPointerDown={(e) => { e.preventDefault(); stepUp(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 30 : 34, height: small ? 30 : 34, touchAction: "manipulation" }}>+</button>
+        <button onPointerDown={(e) => { e.preventDefault(); stepUp(); }} className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--soft)] text-base font-semibold" style={{ width: small ? 26 : 34, height: small ? 26 : 34, touchAction: "manipulation" }}>+</button>
       </div>
-      <span className="mt-0.5 text-[9px] text-[var(--muted)]">Lots</span>
+      {!small && <span className="mt-0.5 text-[9px] text-[var(--muted)]">Lots</span>}
     </div>
   );
 }
@@ -920,44 +920,29 @@ export default function ClientMobile({ t }: { t: any }) {
                 <button key={c} onPointerDown={() => startTransition(() => setQcat(c))} className="whitespace-nowrap pb-1 font-semibold" style={{ color: qcat === c ? BLUE : "var(--muted)", borderBottom: qcat === c ? `2px solid ${BLUE}` : "2px solid transparent", touchAction: "manipulation" }}>{c}</button>
               ))}
             </div>
-            <div className="space-y-2.5">
+            <div className="space-y-1.5">
               {quoteList.length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No symbols.</div> : quoteList.map((s: any) => {
                 const dd = dg(s.symbol); const p = prices[s.symbol]; const isFav = (favs || []).includes(s.symbol);
                 const spPips = _mobSpreadPips(s.symbol);
                 const spPx = spPips * Math.pow(10, -(dd - 1));
                 const sAsk = p; const sBid = p != null ? p - spPx : null;
-                const spread = spPips;
                 const dr = dirs?.[s.symbol] || 0;
-                const hist = sparkRef.current[s.symbol];
-                const upTrend = hist && hist.length >= 2 ? hist[hist.length - 1] >= hist[0] : dr >= 0;
+                const pct = pctOf(s.symbol);
                 return (
-                  <div key={s.symbol} className="rounded-xl border bg-[var(--card)] p-3" style={{ borderColor: dr > 0 ? BUY : dr < 0 ? SELL : "var(--border)", transition: "border-color 0.4s ease" }}>
-                    {/* Double-tap the info row to open this symbol's chart */}
-                    {(() => { const pct = pctOf(s.symbol); return (
-                    <div className="mb-2 flex select-none items-center justify-between" onDoubleClick={() => { setSelSym(s.symbol); setTab("chart"); }}>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => toggleFav(s.symbol)} style={{ color: isFav ? GOLD : "var(--muted)" }}><i className={isFav ? "fa-solid fa-star" : "fa-regular fa-star"} /></button>
-                        <SymIcon symbol={s.symbol} size={20} />
-                        <div>
-                          <button onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="text-sm font-bold underline-offset-2 active:underline">{s.display || s.symbol}</button>
-                          <div className="text-[9px] font-semibold" style={{ color: pct > 0 ? BUY : pct < 0 ? SELL : "var(--muted)" }}>{pct !== 0 ? (pct >= 0 ? "▲" : "▼") + " " + (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%" : "—"}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Sparkline data={hist} up={upTrend} />
-                        <span className="text-[9px] text-[var(--muted)]">Sprd: {Math.round(spread)}</span>
-                      </div>
+                  <div key={s.symbol} className="flex items-center gap-1.5 rounded-lg border bg-[var(--card)] px-2 py-1.5" style={{ borderColor: dr > 0 ? BUY : dr < 0 ? SELL : "var(--border)", transition: "border-color 0.4s ease" }}>
+                    <button onClick={() => toggleFav(s.symbol)} style={{ color: isFav ? GOLD : "var(--muted)", fontSize: 11, flexShrink: 0 }}><i className={isFav ? "fa-solid fa-star" : "fa-regular fa-star"} /></button>
+                    <SymIcon symbol={s.symbol} size={16} />
+                    <div className="flex min-w-0 flex-1 flex-col" onDoubleClick={() => { setSelSym(s.symbol); setTab("chart"); }}>
+                      <button onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="block truncate text-left text-[11px] font-bold leading-tight">{s.display || s.symbol}</button>
+                      <div className="text-[9px] font-semibold leading-tight" style={{ color: pct > 0 ? BUY : pct < 0 ? SELL : "var(--muted)" }}>{pct !== 0 ? (pct >= 0 ? "▲" : "▼") + " " + (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%" : "—"}</div>
                     </div>
-                    ); })()}
-                    <div className="grid grid-cols-3 items-center gap-2">
-                      <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "SELL"); }} className="rounded-lg py-2 text-center text-white" style={{ background: SELLBTN }}>
-                        <div className="text-[10px] opacity-80">SELL</div><div className="text-sm font-bold tabular-nums">{sBid != null ? gnum(sBid, dd) : "…"}</div>
-                      </button>
-                      <LotStepper vol={vol} setVol={setVol} small />
-                      <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "BUY"); }} className="rounded-lg py-2 text-center text-white" style={{ background: BUYBTN }}>
-                        <div className="text-[10px] opacity-80">BUY</div><div className="text-sm font-bold tabular-nums">{sAsk != null ? gnum(sAsk, dd) : "…"}</div>
-                      </button>
-                    </div>
+                    <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "SELL"); }} className="rounded-md px-2 py-1 text-center text-white" style={{ background: SELLBTN, flexShrink: 0 }}>
+                      <div className="text-[8px] opacity-80">SELL</div><div className="text-[11px] font-bold tabular-nums">{sBid != null ? gnum(sBid, dd) : "…"}</div>
+                    </button>
+                    <LotStepper vol={vol} setVol={setVol} small />
+                    <button onClick={() => { setSelSym(s.symbol); quickTrade(s.symbol, "BUY"); }} className="rounded-md px-2 py-1 text-center text-white" style={{ background: BUYBTN, flexShrink: 0 }}>
+                      <div className="text-[8px] opacity-80">BUY</div><div className="text-[11px] font-bold tabular-nums">{sAsk != null ? gnum(sAsk, dd) : "…"}</div>
+                    </button>
                   </div>
                 );
               })}
