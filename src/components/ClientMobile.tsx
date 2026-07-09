@@ -755,14 +755,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     <span className="text-[12px] font-bold tabular-nums" style={{ color: col }}>{lastV >= 0 ? "+" : ""}{fmt(lastV)}</span>
                   </div>
                   <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ height: 56, display: "block" }}>
-                    <defs>
-                      <linearGradient id="mob-eq-fill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={col} stopOpacity="0.28" />
-                        <stop offset="100%" stopColor={col} stopOpacity="0.02" />
-                      </linearGradient>
-                    </defs>
                     <line x1="0" y1={py(0)} x2={W} y2={py(0)} stroke="var(--border)" strokeWidth="0.8" strokeDasharray="4,4" />
-                    <path d={fillPath} fill="url(#mob-eq-fill)" />
                     <path d={linePath} fill="none" stroke={col} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
                     <circle cx={px(pts.length - 1)} cy={py(lastV)} r="3" fill={col} />
                   </svg>
@@ -784,7 +777,7 @@ export default function ClientMobile({ t }: { t: any }) {
               {!movers.any ? <div className="px-3 pb-4 text-center text-[11px] text-[var(--muted)]">Waiting for live prices…</div> : (
                 <div>
                   {/* Gainers */}
-                  <div className="border-t px-3 py-2" style={{ borderColor: "rgba(38,166,154,0.2)", background: "rgba(38,166,154,0.04)" }}>
+                  <div className="border-t px-3 py-2" style={{ borderColor: "var(--border)" }}>
                     <div className="mb-1.5 flex items-center gap-1.5">
                       <i className="fa-solid fa-arrow-up text-[8px]" style={{ color: BUY }} />
                       <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: BUY }}>Top Gainers</span>
@@ -794,20 +787,20 @@ export default function ClientMobile({ t }: { t: any }) {
                       : movers.gainers.map((s: any) => {
                         const p = s.pct;
                         return (
-                          <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 mb-1 transition-colors active:bg-[var(--soft)]" style={{ background: "rgba(38,166,154,0.06)" }}>
+                          <button key={"g" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 mb-1 transition-colors active:bg-[var(--soft)]">
                             <SymIcon symbol={s.symbol} size={28} />
                             <div className="min-w-0 flex-1 text-left">
                               <div className="truncate text-[12px] font-bold">{s.display || s.symbol}</div>
                               <div className="text-[10px] tabular-nums" style={{ color: "var(--muted)" }}>{s.price != null ? gnum(s.price, dg(s.symbol)) : "…"}</div>
                             </div>
                             <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={true} /></div>
-                            <span className="shrink-0 rounded-lg px-2.5 py-1 text-[13px] font-bold tabular-nums" style={{ background: "rgba(38,166,154,0.15)", color: BUY }}>+{p.toFixed(2)}%</span>
+                            <span className="shrink-0 rounded-lg px-2.5 py-1 text-[13px] font-bold tabular-nums" style={{ color: BUY }}>+{p.toFixed(2)}%</span>
                           </button>
                         );
                       })}
                   </div>
                   {/* Losers */}
-                  <div className="border-t px-3 py-2" style={{ borderColor: "rgba(239,83,80,0.2)", background: "rgba(239,83,80,0.04)" }}>
+                  <div className="border-t px-3 py-2" style={{ borderColor: "var(--border)" }}>
                     <div className="mb-1.5 flex items-center gap-1.5">
                       <i className="fa-solid fa-arrow-down text-[8px]" style={{ color: SELL }} />
                       <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: SELL }}>Top Losers</span>
@@ -817,14 +810,14 @@ export default function ClientMobile({ t }: { t: any }) {
                       : movers.losers.map((s: any) => {
                         const p = s.pct;
                         return (
-                          <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 mb-1 transition-colors active:bg-[var(--soft)]" style={{ background: "rgba(239,83,80,0.06)" }}>
+                          <button key={"l" + s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 mb-1 transition-colors active:bg-[var(--soft)]">
                             <SymIcon symbol={s.symbol} size={28} />
                             <div className="min-w-0 flex-1 text-left">
                               <div className="truncate text-[12px] font-bold">{s.display || s.symbol}</div>
                               <div className="text-[10px] tabular-nums" style={{ color: "var(--muted)" }}>{s.price != null ? gnum(s.price, dg(s.symbol)) : "…"}</div>
                             </div>
                             <div className="flex flex-1 justify-center"><Sparkline data={sparkRef.current[s.symbol]} up={false} /></div>
-                            <span className="shrink-0 rounded-lg px-2.5 py-1 text-[13px] font-bold tabular-nums" style={{ background: "rgba(239,83,80,0.15)", color: SELL }}>{p.toFixed(2)}%</span>
+                            <span className="shrink-0 rounded-lg px-2.5 py-1 text-[13px] font-bold tabular-nums" style={{ color: SELL }}>{p.toFixed(2)}%</span>
                           </button>
                         );
                       })}
