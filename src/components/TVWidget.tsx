@@ -5,11 +5,6 @@ import { useEffect, useRef } from "react";
 // The licensed Advanced Charting Library is restricted to trade.growthcapitalltd.com
 // per the domain license agreement. All other tenant domains use this free public widget
 // which loads from TradingView's own CDN and uses TradingView's own market data.
-//
-// Limitations vs the licensed library:
-//   • Uses TV's public market data — NOT the broker's MT5 data feed
-//   • No custom position / SL / TP overlays
-//   • Symbol must resolve in TradingView's public symbol database
 
 // Map internal TF strings to TradingView widget intervals
 const TF_MAP: Record<string, string> = {
@@ -18,7 +13,6 @@ const TF_MAP: Record<string, string> = {
 };
 
 // Best-effort mapping from MT5-style symbol names to TradingView public symbols.
-// TV's resolver handles most major pairs; metals and indices need explicit prefixes.
 function toTVSymbol(sym: string): string {
   const s = sym.toUpperCase().replace(/[^A-Z0-9]/g, "");
   // Metals
@@ -40,15 +34,35 @@ function toTVSymbol(sym: string): string {
   if (s === "UKOIL" || s === "BRENT") return "TVC:UKOIL";
   // Natural gas
   if (s === "NATGAS" || s === "NATURALGAS") return "TVC:NATURALGAS";
-  // Standard 6-char forex pairs — FX_IDC provides real-time quotes without exchange fees
-  if (s.length === 6) return "FX_IDC:" + s;
-  // Crypto: common pairs against USD
-  const cryptoBases = ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "DOGE", "LTC", "DOT", "LINK", "AVAX", "MATIC", "UNI", "ATOM", "FIL", "TRX", "SHIB"];
+  // Standard 6-char forex pairs
+  if (s.length === 6 && /^[A-Z]+$/.test(s)) return "FX_IDC:" + s;
+  // Crypto: common pairs against USD/USDT
+  const cryptoBases = ["BTC","ETH","BNB","SOL","XRP","ADA","DOGE","LTC","DOT","LINK","AVAX","MATIC","UNI","ATOM","FIL","TRX","SHIB"];
   for (const base of cryptoBases) {
     if (s === base + "USD" || s === base + "USDT") return "BINANCE:" + base + "USDT";
   }
-  // Fallback: pass as-is and let TV's resolver handle it
   return s;
+}
+
+let _tvScriptLoaded = false;
+let _tvScriptCallbacks: (() => void)[] = [];
+
+function loadTVScript(cb: () => void) {
+  if (_tvScriptLoaded) { cb(); return; }
+  _tvScriptCallbacks.push(cb);
+  if (_tvScriptCallbacks.length > 1) return; // already loading
+  const s = document.createElement("script");
+  s.src = "https://s3.tradingview.com/tv.js";
+  s.async = true;
+  s.onload = () => {
+    _tvScriptLoaded = true;
+    _tvScriptCallbacks.forEach((fn) => fn());
+    _tvScriptCallbacks = [];
+  };
+  s.onerror = () => {
+    _tvScriptCallbacks = [];
+  };
+  document.head.appendChild(s);
 }
 
 interface Props {
@@ -57,62 +71,50 @@ interface Props {
   theme: "dark" | "light";
 }
 
-let _widgetSeq = 0;
-
 export default function TVWidget({ symbol, tf, theme }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef    = useRef<any>(null);
+  const cancelRef    = useRef(false);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    const tvSym    = toTVSymbol(symbol);
-    const interval = TF_MAP[tf] || "D";
-    const id       = "tvw_" + (++_widgetSeq);
+    cancelRef.current = false;
 
-    // Clear previous content
-    containerRef.current.innerHTML = "";
-    widgetRef.current = null;
+    loadTVScript(() => {
+      if (cancelRef.current || !containerRef.current) return;
 
-    const inner = document.createElement("div");
-    inner.id = id;
-    inner.style.cssText = "position:absolute;inset:0;";
-    containerRef.current.appendChild(inner);
+      const TV = (window as any).TradingView;
+      if (!TV || typeof TV.widget !== "function") return;
 
-    const init = () => {
-      if (!containerRef.current || !(window as any).TradingView) return;
-      widgetRef.current = new (window as any).TradingView.widget({
-        autosize:         true,
-        symbol:           tvSym,
-        interval,
-        timezone:         "Etc/UTC",
-        theme:            theme === "dark" ? "dark" : "light",
-        style:            "1",   // 1 = Candlestick
-        locale:           "en",
-        toolbar_bg:       theme === "dark" ? "#0f1117" : "#f0f3fa",
-        enable_publishing: false,
+      // Destroy previous widget instance
+      try { widgetRef.current?.remove?.(); } catch {}
+      widgetRef.current = null;
+      containerRef.current.innerHTML = "";
+
+      const inner = document.createElement("div");
+      inner.style.cssText = "position:absolute;inset:0;width:100%;height:100%;";
+      containerRef.current.appendChild(inner);
+
+      widgetRef.current = new TV.widget({
+        container:          inner,
+        autosize:           true,
+        symbol:             toTVSymbol(symbol),
+        interval:           TF_MAP[tf] || "D",
+        timezone:           "Etc/UTC",
+        theme:              theme === "dark" ? "dark" : "light",
+        style:              "1",
+        locale:             "en",
+        toolbar_bg:         theme === "dark" ? "#0f1117" : "#f0f3fa",
+        enable_publishing:  false,
         allow_symbol_change: true,
-        container_id:     id,
-        hide_top_toolbar: false,
-        save_image:       false,
+        hide_top_toolbar:   false,
+        save_image:         false,
       });
-    };
-
-    if ((window as any).TradingView?.widget) {
-      // Script already loaded by a previous mount
-      init();
-    } else {
-      const script = document.createElement("script");
-      script.src   = "https://s3.tradingview.com/tv.js";
-      script.async = true;
-      script.onload = init;
-      document.head.appendChild(script);
-    }
+    });
 
     return () => {
-      if (widgetRef.current) {
-        try { widgetRef.current.remove?.(); } catch {}
-        widgetRef.current = null;
-      }
+      cancelRef.current = true;
+      try { widgetRef.current?.remove?.(); } catch {}
+      widgetRef.current = null;
       if (containerRef.current) containerRef.current.innerHTML = "";
     };
   }, [symbol, tf, theme]);
