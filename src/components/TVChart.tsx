@@ -237,7 +237,7 @@ export default function TVChart({
         const dg  = sym?.digits ?? digits;
         setTimeout(() => onResolve({
           name, full_name: name, ticker: name, exchange: "",
-          description: "",
+          description: "​",
           type: sym?.category || "forex",
           session: "24x7", timezone: "Etc/UTC",
           minmov: 1, pricescale: Math.pow(10, dg),
@@ -342,6 +342,7 @@ export default function TVChart({
       "display_market_status",              // forex is 24/7; "market closed" banner would be misleading
       "create_volume_indicator_by_default", // volume is meaningless for OTC forex; keep sub-pane clean
       "popup_hints",                        // suppress long-press tooltip popup on mobile
+      "timeframes_toolbar",                 // hide the bottom period quick-select bar (5y 1y 3m …)
       // NOTE: tradingview_logo intentionally NOT disabled — the charting library
       // license requires TradingView branding to remain visible.
     ];

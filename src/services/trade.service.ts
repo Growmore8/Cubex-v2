@@ -61,21 +61,25 @@ export async function assertMargin(account: any, newTrade: { symbol: string; typ
 
 async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SELL", account: any) {
   // Both calls are independent — run in parallel to save ~10ms per market order.
-  const [ask, symRow] = await Promise.all([
+  // getPrice returns the MT5-model BID price (Redis "price:SYMBOL").
+  const [rawBid, symRow] = await Promise.all([
     getPrice(symbol),
     prisma.symbol.findFirst({ where: { tenantId, symbol }, select: { digits: true, spreadType: true, commissionPerLot: true, swapLong: true, swapShort: true } }).catch(() => null),
   ]);
-  if (ask == null) throw new Error("No price for " + symbol);
+  if (rawBid == null) throw new Error("No price for " + symbol);
   const digits = symRow?.digits ?? 5;
   const pip = pipForDigits(digits);
   const adminPips = await getSpreadPips(tenantId, symbol, (account as any).groupId, account.id);
+  // MT5 model: SELL executes at BID (raw feed price), BUY executes at ASK = BID + spread.
   let bid: number;
   if (symRow?.spreadType === "FLOATING") {
     const rb = await getRealBid(symbol);
-    bid = rb != null && rb > 0 && rb < ask ? Math.max(0, rb - adminPips * pip) : ask;
+    // Use real exchange BID when available and sane; fall back to display BID.
+    bid = rb != null && rb > 0 && rb < rawBid + adminPips * pip ? rb : rawBid;
   } else {
-    bid = Math.max(0, ask - adminPips * pip);
+    bid = rawBid;
   }
+  const ask = rawBid + adminPips * pip;
   return { ask, bid, symRow };
 }
 

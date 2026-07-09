@@ -968,7 +968,8 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── CHART ───────── */}
         <KeepAlive active={tab === "chart"}>{(
           <div ref={chartWrapRef} className="flex h-full flex-col">
-            {/* MT5-style slim toolbar — symbol / TF / fullscreen for both LW and TV */}
+            {/* Custom symbol / TF toolbar — only for LW chart; TV has its own native header */}
+            {!isTV && (
             <div className="relative flex h-11 shrink-0 items-center border-b border-[var(--border)] bg-[var(--panel)] px-1">
               {/* Symbol picker */}
               <button onPointerDown={(e) => { e.preventDefault(); setSymSearch(""); setSymPickerOpen(true); setTfPickerOpen(false); }} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5" style={{ touchAction: "manipulation" }}>
@@ -982,15 +983,13 @@ export default function ClientMobile({ t }: { t: any }) {
                 {tf} <span style={{ fontSize: 8, opacity: 0.7 }}>▼</span>
               </button>
               <div style={{ width: 2 }} />
-              {/* Indicators — only shown for LW chart; TV chart uses its own native OHLC legend + built-in fullscreen */}
-              {!isTV && (
-                <button onClick={() => { setCfgSheet(true); setTfPickerOpen(false); }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title="Indicators">
-                  <svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.75">
-                    <line x1="0" y1="4" x2="16" y2="4" /><line x1="0" y1="10" x2="16" y2="10" />
-                    <circle cx="4" cy="4" r="2.2" fill="var(--panel)" /><circle cx="11" cy="10" r="2.2" fill="var(--panel)" />
-                  </svg>
-                </button>
-              )}
+              {/* Indicators button */}
+              <button onClick={() => { setCfgSheet(true); setTfPickerOpen(false); }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title="Indicators">
+                <svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.75">
+                  <line x1="0" y1="4" x2="16" y2="4" /><line x1="0" y1="10" x2="16" y2="10" />
+                  <circle cx="4" cy="4" r="2.2" fill="var(--panel)" /><circle cx="11" cy="10" r="2.2" fill="var(--panel)" />
+                </svg>
+              </button>
               {/* TF picker dropdown */}
               {tfPickerOpen && (
                 <div className="absolute left-0 right-0 top-full z-50 flex items-center gap-1 border-b border-[var(--border)] px-2 py-2" style={{ background: "var(--panel)" }}>
@@ -1002,6 +1001,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               )}
             </div>
+            )}
             {/* Indicator settings bottom sheet (periods) — opened from full-screen */}
             {cfgSheet && (
               <>
