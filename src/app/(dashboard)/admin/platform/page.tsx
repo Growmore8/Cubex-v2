@@ -768,12 +768,12 @@ const [selAcc, setSelAcc] = useState<any>(null);
   // MT5 model: price = BID. ask = price + spread. FLOATING uses live exchange spread.
   const ocStrip = (sym: string) => { const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1)); const isFloat = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING"; const cfgPips = adminSymSpreads[sym] || 0; const liveSp = liveSpreadPips[sym]; const spPips = isFloat ? (liveSp != null && liveSp > 0 ? liveSp : cfgPips) : cfgPips; const spPx = spPips * pip; const ask = p != null ? gnum(p + spPx, d) : "..."; const bid = p != null ? gnum(p, d) : "...";
     if (!showOC) return (
-      <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute left-16 top-12 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
+      <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute bottom-8 left-[72px] z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: "rgba(9,12,18,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#9aa6bf" }} title="Show buy/sell">
         <i className="fa-solid fa-bolt" /> Trade
       </button>
     );
     return (
-    <div className="absolute left-16 top-12 z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "rgba(9,12,18,0.90)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
+    <div className="absolute bottom-8 left-[72px] z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "rgba(9,12,18,0.90)", border: "1px solid rgba(255,255,255,0.10)", backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
       <button onClick={() => place(sym, "SELL")} className="flex flex-col items-center rounded-xl px-4 py-1.5 font-bold shadow-md transition-all hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", minWidth: 72, lineHeight: 1.2, boxShadow: `0 6px 16px -6px ${SELLBTN}aa` }}>
         <span style={{ fontSize: 13, letterSpacing: "0.02em" }}>Sell</span>
         <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{bid}</span>
@@ -1648,21 +1648,24 @@ const [selAcc, setSelAcc] = useState<any>(null);
               const todayTrades = history.filter((h: any) => { const d = h.closeTime || h.closedAt; if (!d) return false; return new Date(d).toDateString() === new Date().toDateString(); });
               const todayPnl = todayTrades.reduce((s: number, h: any) => s + Number(h.pnl ?? 0), 0);
               const statCard = (icon: string, label: string, value: string | number, color?: string, sub?: string, accent?: string) => (
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 relative overflow-hidden">
-                  {accent && <div className="absolute inset-y-0 left-0 w-1 rounded-l-xl" style={{ background: accent }} />}
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg text-[11px]" style={{ background: (color || accent) ? `${color || accent}18` : "var(--soft)", color: color || accent || "var(--muted)" }}>
-                      <i className={"fa-solid " + icon} />
-                    </span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>{label}</span>
+                <div className="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)]" style={{ minWidth: 0 }}>
+                  {accent && <div className="absolute inset-y-0 left-0 w-[3px]" style={{ background: accent }} />}
+                  <div className="pointer-events-none absolute right-0 top-0 h-full w-16 opacity-40" style={{ background: accent ? `radial-gradient(ellipse at 100% 40%, ${accent}28 0%, transparent 70%)` : undefined }} />
+                  <div className="p-3">
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px]" style={{ background: (color || accent) ? `${color || accent}18` : "var(--soft)", color: color || accent || "var(--muted)" }}>
+                        <i className={"fa-solid " + icon} />
+                      </span>
+                      <span className="truncate text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>{label}</span>
+                    </div>
+                    <div className="truncate text-[19px] font-extrabold tabular-nums leading-none" style={{ color: color || "var(--text)" }}>{value}</div>
+                    {sub && <div className="mt-1 truncate text-[9px]" style={{ color: "var(--muted)" }}>{sub}</div>}
                   </div>
-                  <div className="text-[22px] font-bold tabular-nums leading-none" style={{ color: color || "var(--text)" }}>{value}</div>
-                  {sub && <div className="mt-1 text-[10px]" style={{ color: "var(--muted)" }}>{sub}</div>}
                 </div>
               );
               return (
                 <div className="space-y-2 p-2">
-                  <div className="grid grid-cols-4 gap-2 2xl:grid-cols-6">
+                  <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
                     {statCard("fa-users", "Total Accounts", totalClients, undefined, `${liveClients} Live · ${demoClients} Demo`, "#2f81f7")}
                     {statCard("fa-chart-line", "Open Positions", totalPositions, undefined, `${gnum(totalFloating, 2)} floating P/L`, "#f59e0b")}
                     {statCard("fa-dollar-sign", "Floating P/L", (totalFloating >= 0 ? "+" : "") + gnum(totalFloating, 2), totalFloating >= 0 ? BUY : SELL, "All open positions", totalFloating >= 0 ? BUY : SELL)}
@@ -1674,9 +1677,9 @@ const [selAcc, setSelAcc] = useState<any>(null);
                     {statCard("fa-layer-group", "Trade Groups", tradeGroups.length, undefined, tradeGroups.map((g: any) => g.name).join(", ") || "None")}
                   </div>
                   {nearMC > 0 && (
-                    <div className="flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold animate-pulse" style={{ borderColor: `${SELL}40`, background: `${SELL}0d`, color: SELL }}>
+                    <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-semibold" style={{ borderColor: `${SELL}40`, background: `${SELL}0d`, color: SELL }}>
                       <i className="fa-solid fa-triangle-exclamation" />
-                      {nearMC} account{nearMC > 1 ? "s" : ""} near margin call — check the Positions tab immediately
+                      {nearMC} account{nearMC > 1 ? "s" : ""} near margin call — check Positions immediately
                     </div>
                   )}
                 </div>
@@ -1935,7 +1938,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
               );
 
               return (
-                <div className="flex h-full flex-col gap-2 overflow-hidden">
+                <div className="flex h-full flex-col gap-2 overflow-auto p-1">
                   {/* Active risk alert banners */}
                   {(inDanger > 0 || inWarning > 0) && (
                     <div className="flex shrink-0 flex-col gap-1">
@@ -2200,95 +2203,135 @@ const [selAcc, setSelAcc] = useState<any>(null);
               if (tabState.signals && adminSignals.length === 0) loadSignals();
               const activeSignals = adminSignals.filter((s) => s.active);
               const closedSignals = adminSignals.filter((s) => !s.active);
+              // Build category-grouped symbol options (like market watch)
+              const sigCats = Array.from(new Set(adminSymbols.map((s: any) => (s.category || "forex").toLowerCase()))).sort() as string[];
+              const fld = "w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1.5 text-[11px] text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors";
               return (
-                <div className="flex h-full gap-4 overflow-auto p-2">
-                  {/* Publish form */}
-                  <div className="flex w-80 shrink-0 flex-col gap-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Publish New Signal</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <div className="mb-1 text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Symbol</div>
-                        <input value={sigForm.symbol} onChange={(e) => setSigForm((f) => ({ ...f, symbol: e.target.value.toUpperCase() }))} placeholder="EURUSD" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
-                      </div>
-                      <div>
-                        <div className="mb-1 text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Direction</div>
-                        <div className="flex rounded border border-[var(--border)] overflow-hidden text-[11px] font-semibold">
-                          <button onClick={() => setSigForm((f) => ({ ...f, direction: "BUY" }))} className="flex-1 py-1.5 transition-colors" style={{ background: sigForm.direction === "BUY" ? BUY : "var(--bg)", color: sigForm.direction === "BUY" ? "#fff" : "var(--muted)" }}>BUY</button>
-                          <button onClick={() => setSigForm((f) => ({ ...f, direction: "SELL" }))} className="flex-1 py-1.5 transition-colors" style={{ background: sigForm.direction === "SELL" ? SELL : "var(--bg)", color: sigForm.direction === "SELL" ? "#fff" : "var(--muted)" }}>SELL</button>
+                <div className="flex h-full gap-3 overflow-auto p-2">
+                  {/* ─ Publish form panel ─ */}
+                  <div className="flex w-[300px] shrink-0 flex-col gap-0 rounded-xl border border-[var(--border)] bg-[var(--panel)] overflow-hidden">
+                    {/* Panel header */}
+                    <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2.5" style={{ background: "color-mix(in srgb, var(--accent) 6%, transparent)" }}>
+                      <span className="flex h-6 w-6 items-center justify-center rounded-md text-[10px]" style={{ background: "rgba(22,199,154,0.15)", color: "var(--accent)" }}>
+                        <i className="fa-solid fa-signal" />
+                      </span>
+                      <span className="text-[11px] font-bold tracking-wide" style={{ color: "var(--text)" }}>Publish New Signal</span>
+                    </div>
+                    <div className="flex flex-1 flex-col gap-3 overflow-auto p-3">
+                      {/* Symbol + Direction row */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="mb-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Symbol</div>
+                          <select value={sigForm.symbol} onChange={(e) => setSigForm((f) => ({ ...f, symbol: e.target.value }))} className={fld} style={{ color: sigForm.symbol ? "var(--text)" : "var(--muted)" }}>
+                            <option value="">Select…</option>
+                            {sigCats.map((cat) => (
+                              <optgroup key={cat} label={cat.charAt(0).toUpperCase() + cat.slice(1)}>
+                                {adminSymbols.filter((s: any) => (s.category || "forex").toLowerCase() === cat).map((s: any) => (
+                                  <option key={s.symbol} value={s.symbol}>{s.symbol}{s.display && s.display !== s.symbol ? ` · ${s.display}` : ""}</option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <div className="mb-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Direction</div>
+                          <div className="flex h-[30px] overflow-hidden rounded-lg border border-[var(--border)] text-[11px] font-bold">
+                            <button onClick={() => setSigForm((f) => ({ ...f, direction: "BUY" }))} className="flex-1 transition-colors" style={{ background: sigForm.direction === "BUY" ? BUY : "var(--bg)", color: sigForm.direction === "BUY" ? "#fff" : "var(--muted)" }}>BUY</button>
+                            <button onClick={() => setSigForm((f) => ({ ...f, direction: "SELL" }))} className="flex-1 transition-colors" style={{ background: sigForm.direction === "SELL" ? SELL : "var(--bg)", color: sigForm.direction === "SELL" ? "#fff" : "var(--muted)" }}>SELL</button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[["Entry Price", "entryPrice"], ["Stop Loss", "sl"], ["Take Profit", "tp"]].map(([label, key]) => (
-                        <div key={key}>
-                          <div className="mb-1 text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>{label}</div>
-                          <input type="number" step="any" value={(sigForm as any)[key]} onChange={(e) => setSigForm((f) => ({ ...f, [key]: e.target.value }))} placeholder="0.00000" className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+                      {/* Price fields */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {([["Entry Price", "entryPrice"], ["Stop Loss", "sl"], ["Take Profit", "tp"]] as const).map(([label, key]) => (
+                          <div key={key}>
+                            <div className="mb-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: key === "sl" ? "#f43f5e" : key === "tp" ? BUY : "var(--muted)" }}>{label}</div>
+                            <input type="number" step="any" value={(sigForm as any)[key]} onChange={(e) => setSigForm((f) => ({ ...f, [key]: e.target.value }))} placeholder="0.00000" className={fld} />
+                          </div>
+                        ))}
+                      </div>
+                      {/* Rationale */}
+                      <div>
+                        <div className="mb-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Rationale (optional)</div>
+                        <textarea rows={2} value={sigForm.rationale} onChange={(e) => setSigForm((f) => ({ ...f, rationale: e.target.value }))} placeholder="e.g. Bullish breakout above 1.0850 resistance…" className={fld + " resize-none"} />
+                      </div>
+                      {sigMsg && (
+                        <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: sigMsg.ok ? `${BUY}18` : `${SELL}18`, color: sigMsg.ok ? BUY : SELL }}>
+                          <i className={"fa-solid " + (sigMsg.ok ? "fa-circle-check" : "fa-circle-xmark")} />
+                          {sigMsg.text}
                         </div>
-                      ))}
+                      )}
+                      <button
+                        disabled={sigSending || !sigForm.symbol.trim() || !sigForm.entryPrice}
+                        onClick={async () => {
+                          setSigSending(true); setSigMsg(null);
+                          const r = await fetch("/api/admin/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sigForm.symbol.trim(), direction: sigForm.direction, entryPrice: parseFloat(sigForm.entryPrice), sl: parseFloat(sigForm.sl) || 0, tp: parseFloat(sigForm.tp) || 0, rationale: sigForm.rationale.trim() || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
+                          setSigSending(false);
+                          if (r.ok) { setSigMsg({ ok: true, text: "Signal published to all clients" }); setSigForm({ symbol: "", direction: "BUY", entryPrice: "", sl: "", tp: "", rationale: "" }); loadSignals(); }
+                          else setSigMsg({ ok: false, text: r.error || "Failed" });
+                        }}
+                        className="rounded-lg py-2 text-[11px] font-bold text-white shadow-md transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
+                        style={{ background: sigForm.direction === "BUY" ? `linear-gradient(90deg, ${BUY}, #1565c0)` : `linear-gradient(90deg, ${SELL}, #b71c1c)`, boxShadow: `0 4px 12px -4px ${sigForm.direction === "BUY" ? BUY : SELL}88` }}
+                      >
+                        <i className="fa-solid fa-satellite-dish mr-1.5" />{sigSending ? "Publishing…" : `Publish ${sigForm.direction} Signal`}
+                      </button>
                     </div>
-                    <div>
-                      <div className="mb-1 text-[9px] font-semibold uppercase" style={{ color: "var(--muted)" }}>Rationale (optional)</div>
-                      <textarea rows={3} value={sigForm.rationale} onChange={(e) => setSigForm((f) => ({ ...f, rationale: e.target.value }))} placeholder="e.g. Bullish breakout above 1.0850 resistance…" className="w-full resize-none rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px] text-[var(--text)] outline-none focus:border-[var(--accent)]" />
-                    </div>
-                    {sigMsg && <div className="text-[11px]" style={{ color: sigMsg.ok ? BUY : SELL }}>{sigMsg.text}</div>}
-                    <button
-                      disabled={sigSending || !sigForm.symbol.trim() || !sigForm.entryPrice}
-                      onClick={async () => {
-                        setSigSending(true); setSigMsg(null);
-                        const r = await fetch("/api/admin/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sigForm.symbol.trim(), direction: sigForm.direction, entryPrice: parseFloat(sigForm.entryPrice), sl: parseFloat(sigForm.sl) || 0, tp: parseFloat(sigForm.tp) || 0, rationale: sigForm.rationale.trim() || undefined }) }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
-                        setSigSending(false);
-                        if (r.ok) { setSigMsg({ ok: true, text: "✓ Signal published to all clients" }); setSigForm({ symbol: "", direction: "BUY", entryPrice: "", sl: "", tp: "", rationale: "" }); loadSignals(); }
-                        else setSigMsg({ ok: false, text: r.error || "Failed" });
-                      }}
-                      className="rounded py-2 text-[11px] font-semibold text-white disabled:opacity-50"
-                      style={{ background: sigForm.direction === "BUY" ? BUY : SELL }}
-                    >
-                      <i className="fa-solid fa-signal mr-1.5" />{sigSending ? "Publishing…" : `Publish ${sigForm.direction} Signal`}
-                    </button>
                   </div>
-                  {/* Signal list */}
-                  <div className="flex min-w-0 flex-1 flex-col border-l border-[var(--border)] pl-4 gap-3 overflow-auto">
-                    <div>
-                      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Active Signals <span className="ml-1 rounded-full px-1.5 py-0.5 text-[9px]" style={{ background: BUY + "22", color: BUY }}>{activeSignals.length}</span></div>
-                      {activeSignals.length === 0 ? (
-                        <div className="text-[11px] italic" style={{ color: "var(--muted)" }}>No active signals. Publish one using the form.</div>
-                      ) : activeSignals.map((sig: any) => (
-                        <div key={sig.id} className="mb-2 rounded border border-[var(--border)] bg-[var(--soft)] px-3 py-2 text-[11px]">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="rounded px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: sig.direction === "BUY" ? BUY : SELL }}>{sig.direction}</span>
-                              <span className="font-semibold">{sig.symbol}</span>
-                              <span className="tabular-nums text-[10px]" style={{ color: "var(--muted)" }}>@ {Number(sig.entryPrice).toFixed(5)}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button title="Close signal" onClick={async () => { await fetch("/api/admin/signals/" + sig.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active: false }) }); loadSignals(); }} className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: "var(--border)", color: "var(--muted)" }}>Close</button>
-                              <button title="Delete" onClick={async () => { await fetch("/api/admin/signals/" + sig.id, { method: "DELETE" }); loadSignals(); }} className="rounded p-1 text-[10px]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
-                            </div>
-                          </div>
-                          <div className="mt-1 flex gap-3 text-[10px]" style={{ color: "var(--muted)" }}>
-                            {Number(sig.sl) > 0 && <span>SL: <span className="font-semibold tabular-nums" style={{ color: SELL }}>{Number(sig.sl).toFixed(5)}</span></span>}
-                            {Number(sig.tp) > 0 && <span>TP: <span className="font-semibold tabular-nums" style={{ color: BUY }}>{Number(sig.tp).toFixed(5)}</span></span>}
-                            <span className="ml-auto">{new Date(sig.createdAt).toLocaleString()}</span>
-                          </div>
-                          {sig.rationale && <div className="mt-1 text-[10px] italic" style={{ color: "var(--muted)" }}>{sig.rationale}</div>}
-                        </div>
-                      ))}
-                    </div>
-                    {closedSignals.length > 0 && (
-                      <div>
-                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Closed / Expired</div>
-                        {closedSignals.slice(0, 10).map((sig: any) => (
-                          <div key={sig.id} className="mb-1.5 rounded border border-[var(--border)] px-3 py-1.5 text-[11px] opacity-50">
+
+                  {/* ─ Signal list panel ─ */}
+                  <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-auto">
+                    {/* Active */}
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2" style={{ background: `${BUY}08` }}>
+                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text)" }}>Active Signals</span>
+                        <span className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: `${BUY}22`, color: BUY }}>{activeSignals.length}</span>
+                      </div>
+                      <div className="p-2">
+                        {activeSignals.length === 0 ? (
+                          <div className="py-4 text-center text-[11px] italic" style={{ color: "var(--muted)" }}>No active signals. Publish one using the form.</div>
+                        ) : activeSignals.map((sig: any) => (
+                          <div key={sig.id} className="mb-2 last:mb-0 rounded-lg border border-[var(--border)] px-3 py-2 text-[11px]" style={{ background: "var(--soft)" }}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <span className="rounded px-2 py-0.5 text-[9px] font-bold text-white" style={{ background: sig.direction === "BUY" ? BUY : SELL }}>{sig.direction}</span>
-                                <span>{sig.symbol}</span>
+                                <span className="rounded-md px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: sig.direction === "BUY" ? BUY : SELL }}>{sig.direction}</span>
+                                <span className="font-bold">{sig.symbol}</span>
+                                <span className="tabular-nums" style={{ color: "var(--muted)" }}>@ {Number(sig.entryPrice).toFixed(5)}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button title="Close signal" onClick={async () => { await fetch("/api/admin/signals/" + sig.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active: false }) }); loadSignals(); }} className="rounded-md px-2 py-0.5 text-[9px] font-semibold transition-colors hover:opacity-80" style={{ background: "var(--border)", color: "var(--text)" }}>Close</button>
+                                <button title="Delete" onClick={async () => { await fetch("/api/admin/signals/" + sig.id, { method: "DELETE" }); loadSignals(); }} className="flex h-6 w-6 items-center justify-center rounded-md text-[10px] transition-opacity hover:opacity-80" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
+                              </div>
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap gap-3 text-[10px]">
+                              {Number(sig.sl) > 0 && <span className="flex items-center gap-1"><span style={{ color: "var(--muted)" }}>SL</span> <span className="font-semibold tabular-nums" style={{ color: SELL }}>{Number(sig.sl).toFixed(5)}</span></span>}
+                              {Number(sig.tp) > 0 && <span className="flex items-center gap-1"><span style={{ color: "var(--muted)" }}>TP</span> <span className="font-semibold tabular-nums" style={{ color: BUY }}>{Number(sig.tp).toFixed(5)}</span></span>}
+                              <span className="ml-auto" style={{ color: "var(--muted)" }}>{new Date(sig.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                            </div>
+                            {sig.rationale && <div className="mt-1 text-[10px] italic" style={{ color: "var(--muted)" }}>{sig.rationale}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Closed */}
+                    {closedSignals.length > 0 && (
+                      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] overflow-hidden">
+                        <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Closed / Expired</span>
+                          <span className="rounded-full px-2 py-0.5 text-[9px]" style={{ background: "var(--soft)", color: "var(--muted)" }}>{closedSignals.length}</span>
+                        </div>
+                        <div className="p-2">
+                          {closedSignals.slice(0, 10).map((sig: any) => (
+                            <div key={sig.id} className="mb-1.5 last:mb-0 flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-3 py-1.5 text-[11px] opacity-50">
+                              <div className="flex items-center gap-2">
+                                <span className="rounded px-1.5 py-0.5 text-[9px] font-bold text-white" style={{ background: sig.direction === "BUY" ? BUY : SELL }}>{sig.direction}</span>
+                                <span className="font-semibold">{sig.symbol}</span>
                                 <span className="tabular-nums text-[10px]" style={{ color: "var(--muted)" }}>@ {Number(sig.entryPrice).toFixed(5)}</span>
+                                <span className="text-[10px]" style={{ color: "var(--muted)" }}>{new Date(sig.createdAt).toLocaleDateString()}</span>
                               </div>
                               <button onClick={async () => { await fetch("/api/admin/signals/" + sig.id, { method: "DELETE" }); loadSignals(); }} className="rounded p-1 text-[10px]" style={{ color: SELL }}><i className="fa-solid fa-trash" /></button>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

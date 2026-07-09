@@ -341,7 +341,7 @@ export default function TVChart({
       "pine_script_editor_aspect_ratio",
       "publish_study",
       "share_study_templates",
-      // header_symbol_search re-enabled — TV search uses our datafeed (platform symbols only)
+      "header_symbol_search",   // symbol text stays but search icon removed — platform has own pickers
       "symbol_search_hot_key",
       "timeframes_toolbar",
       // legend_widget intentionally re-enabled — TV shows OHLC natively (left side on client, top-right on admin via CSS)
