@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen } from "@/lib/perms";
-import { getPrice, getBid as getRealBid } from "@/lib/prices";
+import { getPrice } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
 import { pnlFor, validateSlTp, usedMargin } from "@/lib/trademath";
@@ -70,15 +70,11 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
   const digits = symRow?.digits ?? 5;
   const pip = pipForDigits(digits);
   const adminPips = await getSpreadPips(tenantId, symbol, (account as any).groupId, account.id);
-  // MT5 model: SELL executes at BID (raw feed price), BUY executes at ASK = BID + spread.
-  let bid: number;
-  if (symRow?.spreadType === "FLOATING") {
-    const rb = await getRealBid(symbol);
-    // Use real exchange BID when available and sane; fall back to display BID.
-    bid = rb != null && rb > 0 && rb < rawBid + adminPips * pip ? rb : rawBid;
-  } else {
-    bid = rawBid;
-  }
+  // MT5 model: SELL executes at BID = rawBid (live display price from feed).
+  // BUY executes at ASK = BID + configured spread.
+  // getRealBid is intentionally not used here — it stores a stale exchange bid
+  // in Redis with no freshness guarantee, causing executions at outdated prices.
+  const bid = rawBid;
   const ask = rawBid + adminPips * pip;
   return { ask, bid, symRow };
 }
