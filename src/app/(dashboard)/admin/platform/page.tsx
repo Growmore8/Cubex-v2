@@ -167,6 +167,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [layout, setLayout] = useState(1);
   const [openCharts, setOpenCharts] = useState<string[]>([]);
   const [activeChart, setActiveChart] = useState(0);
+  const [showBuySell, setShowBuySell] = useState(true);
+  const ohlcElsRef = useRef<Record<number, HTMLDivElement | null>>({});
 
   const [panels, setPanels] = useState<{ nav: boolean; mw: boolean; toolbox: boolean }>({ nav: true, mw: true, toolbox: true });
   const [ticket, setTicket] = useState<string | null>(null);
@@ -670,6 +672,17 @@ const [selAcc, setSelAcc] = useState<any>(null);
     setSymOv({ acc, disabled, q: "" });
   }
 
+  function switchLayout(l: number) {
+    setLayout(l);
+    if (l > 1) {
+      setOpenCharts((prev) => {
+        if (prev.length >= l) return prev;
+        const existing = new Set(prev);
+        const fills = symbols.filter((s) => !existing.has(s.symbol)).slice(0, l - prev.length).map((s) => s.symbol);
+        return [...prev, ...fills];
+      });
+    }
+  }
   function setActive(i: number) { setActiveChart(i); if (openCharts[i]) setSelSym(openCharts[i]); }
   function setTile(sym: string) { setOpenCharts((prev) => { if (prev.length === 0) return [sym]; const n = prev.slice(); n[activeChart] = sym; return n; }); setSelSym(sym); }
   // User picked a symbol inside a specific chart tile's dropdown → switch that tile.
@@ -819,9 +832,9 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 {topMenu === "charts" && (<><div className="fixed inset-0 z-40" onClick={closeTm} />
                   <div className={panel} style={panelStyle}>
                     {dHead("Layout")}
-                    {dItem(() => setLayout(1), "fa-square", "Single Chart", undefined, layout === 1)}
-                    {dItem(() => setLayout(2), "fa-table-columns", "Split (1 | 1)", undefined, layout === 2)}
-                    {dItem(() => setLayout(4), "fa-table-cells-large", "Grid (4 Charts)", undefined, layout === 4)}
+                    {dItem(() => switchLayout(1), "fa-square", "Single Chart", undefined, layout === 1)}
+                    {dItem(() => switchLayout(2), "fa-table-columns", "Split (1 | 1)", undefined, layout === 2)}
+                    {dItem(() => switchLayout(4), "fa-table-cells-large", "Grid (4 Charts)", undefined, layout === 4)}
                     {dDivider}
                     {dHead("Timeframe")}
                     <div className="flex flex-wrap gap-1 px-3 py-1">
@@ -1026,7 +1039,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
         </>)}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Chart tabs row \u2014 open symbol tabs with \u00d7 close */}
+          {/* Chart tabs row \u2014 open symbol tabs with \u00d7 close + add button */}
           <div className="flex items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1" style={{ scrollbarWidth: "none" }}>
             {openCharts.map((sym, i) => (
               <div key={sym + i} onClick={() => setActive(i)} className="flex shrink-0 cursor-pointer items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold select-none" style={{ background: i === activeChart ? "rgba(41,98,255,0.15)" : "transparent", color: i === activeChart ? "var(--accent)" : "var(--muted)", border: `1px solid ${i === activeChart ? "rgba(41,98,255,0.3)" : "transparent"}` }}>
@@ -1034,11 +1047,18 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 <button onClick={(e) => { e.stopPropagation(); removeChart(i); }} className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] hover:bg-[var(--soft)]" style={{ color: "var(--muted)", lineHeight: 1 }}>{"\u00d7"}</button>
               </div>
             ))}
+            {symbols.some((s) => !openCharts.includes(s.symbol)) && (
+              <button onClick={() => { const next = symbols.find((s) => !openCharts.includes(s.symbol)); if (next) addChart(next.symbol); }} className="flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] font-bold hover:bg-[var(--soft)] select-none" style={{ color: "var(--muted)" }} title="Add chart">
+                + Add
+              </button>
+            )}
           </div>
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
               <div key={"tile" + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
-                {/* Buy/Sell overlay \u2014 top-left of chart tile */}
+                {/* OHLC legend \u2014 top-right of chart tile (below TV header) via DOM ref, updated by onCandleUpdate */}
+                <div ref={(el) => { ohlcElsRef.current[i] = el; }} style={{ position: "absolute", top: 50, right: 68, zIndex: 10, fontFamily: "monospace", fontSize: 11, fontWeight: 600, pointerEvents: "none", whiteSpace: "nowrap", color: theme === "dark" ? "#9aa6bf" : "#475569", textShadow: theme === "dark" ? "0 1px 2px rgba(0,0,0,0.6)" : "none" }} />
+                {/* Buy/Sell overlay \u2014 top-left, positioned below TV header (~38px) + left sidebar (~40px) */}
                 {(() => {
                   const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1));
                   const isFloatO = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING";
@@ -1046,22 +1066,46 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   const bid = p != null ? gnum(p, d) : "\u2014";
                   const ask = p != null ? gnum(p + spO * pip, d) : "\u2014";
                   return (
-                    <div style={{ position: "absolute", top: 8, left: 8, zIndex: 10, display: "flex", gap: 4, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => place(sym, "SELL")} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
-                        Sell <span className="font-mono text-[10px]">{bid}</span>
-                      </button>
-                      <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} onClick={(e) => e.stopPropagation()} className="w-14 rounded border text-center font-mono text-[11px]" style={{ background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", padding: "2px 4px", outline: "none", backdropFilter: "blur(4px)" }} title="Lots" />
-                      <button onClick={() => place(sym, "BUY")} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
-                        Buy <span className="font-mono text-[10px]">{ask}</span>
-                      </button>
+                    <div style={{ position: "absolute", top: 50, left: 50, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+                      {showBuySell ? (
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <button onClick={() => place(sym, "SELL")} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.35)" }}>
+                            Sell <span className="font-mono text-[10px]">{bid}</span>
+                          </button>
+                          <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} onClick={(e) => e.stopPropagation()} className="w-14 rounded border text-center font-mono text-[11px]" style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", padding: "2px 4px", outline: "none" }} title="Lots" />
+                          <button onClick={() => place(sym, "BUY")} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.35)" }}>
+                            Buy <span className="font-mono text-[10px]">{ask}</span>
+                          </button>
+                          <button onClick={() => setShowBuySell(false)} title="Hide trade panel" className="flex h-5 w-5 items-center justify-center rounded" style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.6)", fontSize: 9, border: "1px solid rgba(255,255,255,0.12)" }}>
+                            <i className="fa-solid fa-chevron-left" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setShowBuySell(true)} title="Show trade panel" className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}>
+                          <i className="fa-solid fa-chart-line text-[9px]" /> Trade
+                        </button>
+                      )}
                     </div>
                   );
                 })()}
-                {(() => { const pos = [
-                  ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
-                  ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread;
-                return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
+                {(() => {
+                  const pos = [
+                    ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
+                    ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
+                  ];
+                  const isFloatSym = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING";
+                  const cfgSp = adminSymSpreads[sym] || 0; const liveSp = liveSpreadPips[sym];
+                  const spPips = (isFloatSym ? (liveSp != null && liveSp > 0 ? liveSp : cfgSp) : cfgSp) + deskExtraSpread;
+                  const tileIdx = i;
+                  const tileSym = sym;
+                  const handleCandleUpdate = (b: { open: number; high: number; low: number; close: number }) => {
+                    const el = ohlcElsRef.current[tileIdx]; if (!el) return;
+                    const dd = dg(tileSym); const ch = b.close - b.open, pct = b.open ? (ch / b.open) * 100 : 0;
+                    const col = ch >= 0 ? "#26a69a" : "#ef5350";
+                    el.innerHTML = `<span style="opacity:.6">O</span><span style="color:${col}">${gnum(b.open, dd)}</span> <span style="opacity:.6">H</span><span style="color:${col}">${gnum(b.high, dd)}</span> <span style="opacity:.6">L</span><span style="color:${col}">${gnum(b.low, dd)}</span> <span style="opacity:.6">C</span><span style="color:${col}">${gnum(b.close, dd)}</span> <span style="color:${col}">${ch >= 0 ? "+" : ""}${gnum(ch, dd)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)</span>`;
+                  };
+                  return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} showBuiltinOHLC={false} onCandleUpdate={handleCandleUpdate} />;
+                })()}
               </div>
             ))}
           </div>

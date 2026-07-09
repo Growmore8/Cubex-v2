@@ -58,7 +58,7 @@ function loadScript(): Promise<void> {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TVChart({
   symbol, tf, theme, digits = 5,
-  positions, symbols, bare, showDrawingTools, chartType, onSymbolChange, onCandleUpdate, onActionsReady, spreadPips,
+  positions, symbols, bare, showDrawingTools, chartType, onSymbolChange, onCandleUpdate, onActionsReady, spreadPips, onFullscreenRequest, showBuiltinOHLC,
 }: {
   symbol: string;
   tf: string;
@@ -73,6 +73,10 @@ export default function TVChart({
   onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
   onActionsReady?: (actions: TVChartActions) => void;
   spreadPips?: number;
+  /** When provided: replaces TV's native fullscreen button with a custom one that fires this callback. Use for CSS fullscreen on iOS where requestFullscreen() is unsupported. */
+  onFullscreenRequest?: () => void;
+  /** When false: hides TV's native OHLC legend (use when the parent renders its own OHLC overlay). Default: true. */
+  showBuiltinOHLC?: boolean;
 }) {
   const containerRef   = useRef<HTMLDivElement>(null);
   const widgetRef      = useRef<any>(null);
@@ -86,6 +90,8 @@ export default function TVChart({
   const onSymRef       = useRef(onSymbolChange); onSymRef.current = onSymbolChange;
   const onCandleRef       = useRef(onCandleUpdate); onCandleRef.current = onCandleUpdate;
   const onActionsReadyRef = useRef(onActionsReady); onActionsReadyRef.current = onActionsReady;
+  const onFullscreenReqRef = useRef(onFullscreenRequest); onFullscreenReqRef.current = onFullscreenRequest;
+  const showBuiltinOHLCRef = useRef(showBuiltinOHLC); showBuiltinOHLCRef.current = showBuiltinOHLC;
   const chartTypeRef      = useRef(chartType);
   const spreadRef      = useRef(spreadPips ?? 0); spreadRef.current = spreadPips ?? 0;
   const digitsRef      = useRef(digits); digitsRef.current = digits;
@@ -182,11 +188,14 @@ export default function TVChart({
             : "";
 
           if (isPend) {
-            // Pending order: dashed line, quantity = order type, body = ticket + price
-            await makeLine(p.openPrice, `${p.kind} ${p.type}`, `${tkt}  ${fmt(p.openPrice)}`, color, color, 2, 1);
+            // Pending order: dashed line — kind + type in left box, ticket in right box
+            const kindLabel = `${p.kind ?? ""} ${p.type}`.trim();
+            await makeLine(p.openPrice, kindLabel, tkt || fmt(p.openPrice), color, color, 2, 1);
           } else {
-            // Open position: solid thick line, quantity = BUY/SELL, body = ticket + P&L + price
-            await makeLine(p.openPrice, p.type, `${tkt}${pnlStr}  ${fmt(p.openPrice)}`, color, color, 0, 2);
+            // Open position: #BUY / #SELL in left box (matches LW chart style), ticket + P&L in right box
+            const qtyLabel = tkt ? `#${p.type}` : p.type;
+            const bodyLabel = tkt ? `${p.ticket}${pnlStr}` : `${Number(p.lots).toFixed(2)}${pnlStr}`;
+            await makeLine(p.openPrice, qtyLabel, bodyLabel, color, color, 0, 2);
           }
           // SL/TP: thin dashed lines with colored Y-axis boxes
           if (p.sl && p.sl > 0)
@@ -346,6 +355,9 @@ export default function TVChart({
       // NOTE: tradingview_logo intentionally NOT disabled — the charting library
       // license requires TradingView branding to remain visible.
     ];
+    // When parent supplies onFullscreenRequest, replace TV's native fullscreen button (which
+    // uses requestFullscreen() and fails silently on iOS Safari) with our own button.
+    if (onFullscreenReqRef.current) disabledFeatures.push("header_fullscreen_button");
     if (bare) {
       disabledFeatures.push("header_toolbar", "header_indicators", "header_chart_type", "header_resolutions");
       if (!showDrawingTools) disabledFeatures.push("left_toolbar");
@@ -363,18 +375,13 @@ export default function TVChart({
       autosize:   true,
       fullscreen: false,
       toolbar_bg: theme === "dark" ? "#0f1117" : "#f0f3fa",
-      overrides: theme === "dark" ? {
-        // No background override — let TV's "Dark" theme control the canvas color
-        // so changeTheme("Light") actually switches the background (custom overrides persist
-        // across changeTheme calls and would keep the canvas dark in light mode).
-        "paneProperties.vertGridProperties.color": "rgba(255,255,255,0.04)",
-        "paneProperties.horzGridProperties.color": "rgba(255,255,255,0.04)",
-        "paneProperties.legendProperties.showSeriesTitle": false,
-      } : {
-        "paneProperties.vertGridProperties.color": "rgba(0,0,0,0.04)",
-        "paneProperties.horzGridProperties.color": "rgba(0,0,0,0.04)",
-        "paneProperties.legendProperties.showSeriesTitle": false,
-      },
+      overrides: (() => {
+        const ohlcOn = showBuiltinOHLCRef.current !== false;
+        const base = theme === "dark"
+          ? { "paneProperties.vertGridProperties.color": "rgba(255,255,255,0.04)", "paneProperties.horzGridProperties.color": "rgba(255,255,255,0.04)" }
+          : { "paneProperties.vertGridProperties.color": "rgba(0,0,0,0.04)", "paneProperties.horzGridProperties.color": "rgba(0,0,0,0.04)" };
+        return { ...base, "paneProperties.legendProperties.showSeriesTitle": false, "paneProperties.legendProperties.showSeriesOHLC": ohlcOn, "paneProperties.legendProperties.showBarChange": ohlcOn };
+      })(),
       disabled_features: disabledFeatures,
       enabled_features:  ["side_toolbar_in_fullscreen_mode", "header_in_fullscreen_mode", "items_favoriting"],
     });
@@ -417,6 +424,17 @@ export default function TVChart({
       // Apply initial chart type if provided
       if (chartTypeRef.current !== undefined) {
         try { widget.activeChart().setChartType(chartTypeRef.current); } catch {}
+      }
+
+      // Custom fullscreen button — replaces the disabled native one; works on iOS Safari.
+      if (onFullscreenReqRef.current) {
+        try {
+          const btn = widget.createButton({ align: "right" });
+          btn.setAttribute("title", "Fullscreen");
+          btn.style.cssText = "display:flex;align-items:center;justify-content:center;width:28px;height:28px;cursor:pointer;";
+          btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>`;
+          btn.addEventListener("click", () => onFullscreenReqRef.current?.());
+        } catch {}
       }
 
       // Expose actions to parent (admin toolbar "Indicators" button + candle type dropdown)

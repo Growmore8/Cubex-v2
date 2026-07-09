@@ -21,6 +21,7 @@ interface Props {
   onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
   onActionsReady?: (actions: TVChartActions) => void;
   spreadPips?: number;
+  showBuiltinOHLC?: boolean;
 }
 
 // Domain that holds the licensed TradingView Advanced Charting Library.
@@ -41,7 +42,7 @@ export default function KLineProChart(props: Props) {
   if (hostname === TV_LIBRARY_DOMAIN) {
     // Licensed domain: full Advanced Charting Library with custom MT5 data feed,
     // position overlays, spread line, and all platform integrations.
-    return <TVChart {...props} />;
+    return <TVChart {...props} showBuiltinOHLC={props.showBuiltinOHLC} />;
   }
 
   // Other white-label tenant domains: Lightweight Charts with the platform's own
