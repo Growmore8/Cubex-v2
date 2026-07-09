@@ -963,10 +963,6 @@ export default function ClientMobile({ t }: { t: any }) {
                         <div className="mt-1 text-[10px] capitalize text-[var(--muted)]">{cat || disp || "Markets"}{disp && disp !== selSym ? " · " + disp : ""}</div>
                       </div>
                     </button>
-                    <div className="text-right">
-                      <div className="text-[28px] font-extrabold leading-none tabular-nums" style={{ color: upC ? BUY : SELL }}>{price != null ? gnum(price, dg(selSym)) : "…"}</div>
-                      <div className="mt-1 text-[12px] font-semibold tabular-nums" style={{ color: upC ? BUY : SELL }}>{upC ? "▲" : "▼"} {chg >= 0 ? "+" : ""}{gnum(chg, dg(selSym))} ({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</div>
-                    </div>
                   </div>
                   <div className="mt-2 flex items-center gap-1.5">
                     <select value={tf} onChange={(e) => setTf(e.target.value)}
