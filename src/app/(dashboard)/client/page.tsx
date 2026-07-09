@@ -1202,27 +1202,24 @@ export default function ClientTerminal() {
               </div>
             </>
           )}
-          <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2.5" style={{ background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent)" }}>
-            {/* NEW ORDER label */}
-            <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide shrink-0" style={{ color: "#2f81f7" }}>
-              <i className="fa-solid fa-bolt text-[9px]" />NEW ORDER
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2" style={{ background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent)" }}>
+            <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide shrink-0" style={{ color: "#2f81f7" }}>
+              <i className="fa-solid fa-bolt text-[10px]" />NEW ORDER
             </div>
-            <div className="h-3.5 w-px mx-0.5 shrink-0" style={{ background: "var(--border)" }} />
-            {/* Symbol + price — click to open spec */}
-            <button onClick={() => setSymInfoOpen((v) => !v)} title="Contract specification" className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:opacity-80 transition-opacity min-w-0 flex-1" style={{ background: "var(--soft)" }}>
-              <SymIcon symbol={selSym} size={16} />
-              <span className="text-[11px] font-bold truncate" style={{ color: "var(--text)" }}>{selSym}</span>
-              {price != null && <span className="text-[11px] font-bold tabular-nums ml-1" style={{ color: "var(--text)" }}>{gnum(price, d)}</span>}
-              <i className="fa-solid fa-circle-info text-[8px] opacity-40 ml-auto" style={{ color: "#2f81f7" }} />
-            </button>
-            {/* 1-Click toggle */}
-            <button title={oneClick ? "One-click trading ON — click to disable" : "One-click trading OFF — click to enable"} onClick={toggleOneClick} className="shrink-0 flex items-center gap-0.5 rounded-lg px-2 py-1 text-[9px] font-bold border transition-colors" style={oneClick ? { background: "#2f81f722", borderColor: "#2f81f7", color: "#2f81f7" } : { borderColor: "var(--border)", color: "var(--muted)" }}>
-              <i className="fa-solid fa-bolt" />1-Click
-            </button>
-            {/* Alerts bell */}
-            <button title="Price Alerts" onClick={() => setAlertModal(true)} className="shrink-0 flex h-7 w-7 items-center justify-center rounded-lg text-[11px]" style={{ color: alerts.length > 0 ? "#f59e0b" : "var(--muted)", background: "var(--soft)" }}>
-              <i className="fa-solid fa-bell" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => setSymInfoOpen((v) => !v)} title="Contract specification" className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold hover:opacity-80 transition-opacity" style={{ background: "var(--soft)", color: "#2f81f7" }}>
+                <SymIcon symbol={selSym} size={14} />
+                {selSym}
+                <i className="fa-solid fa-circle-info text-[8px] opacity-60" />
+              </button>
+              {price != null && <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text)" }}>{gnum(price, d)}</span>}
+              <button title={oneClick ? "One-click trading ON — click to disable" : "One-click trading OFF — click to enable"} onClick={toggleOneClick} className="rounded px-1.5 py-0.5 text-[9px] font-bold border transition-colors" style={oneClick ? { background: "#2f81f722", borderColor: "#2f81f7", color: "#2f81f7" } : { borderColor: "var(--border)", color: "var(--muted)" }}>
+                <i className="fa-solid fa-bolt mr-0.5" />1-Click
+              </button>
+              <button title="Price Alerts" onClick={() => setAlertModal(true)} className="rounded p-1 text-[11px]" style={{ color: alerts.length > 0 ? "#f59e0b" : "var(--muted)" }}>
+                <i className="fa-solid fa-bell" />
+              </button>
+            </div>
           </div>
           {/* Tab bar: TRADE | SIGNALS | NEWS | CALENDAR | ANALYTICS | DOM */}
           <div className="flex shrink-0 border-b border-[var(--border)]">
