@@ -8,7 +8,7 @@ import { SymIcon } from "@/lib/symIcon";
 import { iconForNotification } from "@/lib/notif";
 import { COUNTRIES } from "@/config/countries";
 
-const MobileChart = dynamic(() => import("@/components/KLineProChart"), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">Loading chart…</div> });
+const MobileChart = dynamic(() => import("@/components/LWChart"), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">Loading chart…</div> });
 
 const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD@tv-basicstudies"], ["Stoch", "Stochastic@tv-basicstudies"], ["BBands", "BB@tv-basicstudies"], ["MA", "MASimple@tv-basicstudies"], ["ROC", "ROC@tv-basicstudies"]];
 
@@ -1023,7 +1023,7 @@ export default function ClientMobile({ t }: { t: any }) {
             )}
             {/* Chart canvas */}
             <div ref={chartWrapRef} className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
-              <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={true} symbols={symbols} spreadPips={_mobSpreadPips(selSym)}
+              <MobileChart symbol={selSym} tf={tf} theme={theme as "dark" | "light"} digits={dg(selSym)} showTools={false} spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
