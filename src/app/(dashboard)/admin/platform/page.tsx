@@ -230,7 +230,6 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [stmtSending, setStmtSending] = useState(false);
   const [navSearch, setNavSearch] = useState("");
   const [mwSearch, setMwSearch] = useState("");
-  const [showOC, setShowOC] = useState(true); // chart buy/sell strip visibility
   const [soundMuted, setSoundMuted] = useState(false);
   useEffect(() => { setSoundMuted(isMuted()); }, []);
   const [role, setRole] = useState("");
@@ -766,43 +765,6 @@ const [selAcc, setSelAcc] = useState<any>(null);
 
   const shown: { sym: string; i: number }[] = layout === 1 ? (openCharts[activeChart] ? [{ sym: openCharts[activeChart], i: activeChart }] : []) : openCharts.slice(0, layout).map((sym, i) => ({ sym, i }));
   // MT5 model: price = BID. ask = price + spread. FLOATING uses live exchange spread.
-  const ocStrip = (sym: string) => {
-    const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1));
-    const isFloat = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING"; const cfgPips = adminSymSpreads[sym] || 0;
-    const liveSp = liveSpreadPips[sym]; const spPips = isFloat ? (liveSp != null && liveSp > 0 ? liveSp : cfgPips) : cfgPips;
-    const spPx = spPips * pip; const ask = p != null ? gnum(p + spPx, d) : "..."; const bid = p != null ? gnum(p, d) : "...";
-    const dk = theme === "dark";
-    const stripBg     = dk ? "rgba(9,12,18,0.90)"         : "rgba(255,255,255,0.94)";
-    const stripBorder = dk ? "rgba(255,255,255,0.10)"      : "var(--border)";
-    const lotsColor   = dk ? "rgba(255,255,255,0.35)"      : "var(--muted)";
-    const inputBg     = dk ? "rgba(255,255,255,0.07)"      : "var(--bg)";
-    const inputBorder = dk ? "rgba(255,255,255,0.14)"      : "var(--border)";
-    const inputColor  = dk ? "#e2e8f0"                     : "var(--text)";
-    const hideColor   = dk ? "rgba(255,255,255,0.5)"       : "var(--muted)";
-    const tradeBtnBg  = dk ? "rgba(9,12,18,0.9)"           : "rgba(255,255,255,0.94)";
-    const tradeBtnBorder = dk ? "rgba(255,255,255,0.12)"   : "var(--border)";
-    const tradeBtnColor  = dk ? "#9aa6bf"                  : "var(--muted)";
-    if (!showOC) return (
-      <button onClick={(e) => { e.stopPropagation(); setShowOC(true); }} className="absolute top-2 left-2 z-10 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: tradeBtnBg, border: `1px solid ${tradeBtnBorder}`, color: tradeBtnColor }} title="Show buy/sell">
-        <i className="fa-solid fa-bolt" /> Trade
-      </button>
-    );
-    return (
-    <div className="absolute top-2 left-2 z-10 flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: stripBg, border: `1px solid ${stripBorder}`, backdropFilter: "blur(6px)" }} onClick={(e) => e.stopPropagation()}>
-      <button onClick={() => place(sym, "SELL")} className="flex flex-col items-center rounded-xl px-4 py-1.5 font-bold shadow-md transition-all hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", minWidth: 72, lineHeight: 1.2, boxShadow: `0 6px 16px -6px ${SELLBTN}aa` }}>
-        <span style={{ fontSize: 13, letterSpacing: "0.02em" }}>Sell</span>
-        <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{bid}</span>
-      </button>
-      <div className="flex flex-col items-center gap-0.5">
-        <div style={{ fontSize: 9, color: lotsColor, letterSpacing: "0.06em", textTransform: "uppercase" }}>Lots</div>
-        <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} className="w-14 rounded border text-center font-mono" style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: inputColor, padding: "3px 4px", fontSize: 12, outline: "none" }} />
-      </div>
-      <button onClick={() => place(sym, "BUY")} className="flex flex-col items-center rounded-xl px-4 py-1.5 font-bold shadow-md transition-all hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff", minWidth: 72, lineHeight: 1.2, boxShadow: `0 6px 16px -6px ${BUYBTN}aa` }}>
-        <span style={{ fontSize: 13, letterSpacing: "0.02em" }}>Buy</span>
-        <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{ask}</span>
-      </button>
-      <button onClick={(e) => { e.stopPropagation(); setShowOC(false); }} className="ml-1 self-start text-[10px]" style={{ color: hideColor }} title="Hide buy/sell"><i className="fa-solid fa-eye-slash" /></button>
-    </div>); };
   return (
     <div style={{ ...(theme === "dark" ? ADSS_DARK : ADSS_LIGHT), fontFamily: ADSS_FONT }} className="relative flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       {trial && (
@@ -1066,25 +1028,35 @@ const [selAcc, setSelAcc] = useState<any>(null);
         </>)}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Platform toolbar: Symbol Filter only \u2014 TF/Candle/Indicators come from TV's native header */}
-          <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
-            <select value={openCharts[activeChart] || ""} onChange={(e) => { const v = e.target.value; if (v) setTile(v); }} className="h-6 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 text-[11px] outline-none" style={{ color: "var(--text)", minWidth: 100, maxWidth: 160 }}>
-              {(() => {
-                const symGroups: Record<string, typeof symbols> = {};
-                symbols.forEach((s) => { const cat = s.category || "other"; (symGroups[cat] || (symGroups[cat] = [])).push(s); });
-                const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "agriculture", "other"];
-                return Object.entries(symGroups).sort((a, b) => { const ia = CAT_ORDER.indexOf(a[0]); const ib = CAT_ORDER.indexOf(b[0]); return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib); }).map(([cat, syms]) => (
-                  <optgroup key={cat} label={cat.charAt(0).toUpperCase() + cat.slice(1)}>
-                    {syms.map((s) => <option key={s.symbol} value={s.symbol}>{s.display || s.symbol}</option>)}
-                  </optgroup>
-                ));
-              })()}
-            </select>
+          {/* Platform toolbar: Buy/Sell for active chart \u2014 TF/Candle/Indicators/Symbol Search come from TV's native header */}
+          <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1">
+            {(() => {
+              const sym = openCharts[activeChart];
+              if (!sym) return null;
+              const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1));
+              const isFloat = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING";
+              const cfgSp = adminSymSpreads[sym] || 0;
+              const liveSp = liveSpreadPips[sym];
+              const spPips = (isFloat ? (liveSp != null && liveSp > 0 ? liveSp : cfgSp) : cfgSp) + deskExtraSpread;
+              const spPx = spPips * pip;
+              const ask = p != null ? gnum(p + spPx, d) : "\u2014";
+              const bid = p != null ? gnum(p, d) : "\u2014";
+              return (
+                <>
+                  <button onClick={() => place(sym, "SELL")} className="flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-bold transition-all hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff" }}>
+                    <span>Sell</span><span className="font-mono">{bid}</span>
+                  </button>
+                  <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} className="w-16 rounded border text-center font-mono text-[11px]" style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: "2px 4px", outline: "none" }} title="Lots" />
+                  <button onClick={() => place(sym, "BUY")} className="flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-bold transition-all hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff" }}>
+                    <span>Buy</span><span className="font-mono">{ask}</span>
+                  </button>
+                </>
+              );
+            })()}
           </div>
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
               <div key={"tile" + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
-{ocStrip(sym)}
                 {(() => { const pos = [
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),

@@ -237,7 +237,7 @@ export default function TVChart({
         const dg  = sym?.digits ?? digits;
         setTimeout(() => onResolve({
           name, full_name: name, ticker: name, exchange: "",
-          description: sym?.display || name,
+          description: "",
           type: sym?.category || "forex",
           session: "24x7", timezone: "Etc/UTC",
           minmov: 1, pricescale: Math.pow(10, dg),
