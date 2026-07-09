@@ -157,7 +157,7 @@ export default function TVChart({
             pl.setPrice(price).setQuantity("").setText(body)
               .setLineColor(lineColor).setLineStyle(lineStyle).setLineWidth(lineWidth)
               .setBodyBackgroundColor(bg).setBodyTextColor("#fff")
-              .setQuantityBackgroundColor("rgba(0,0,0,0)").setQuantityTextColor("rgba(0,0,0,0)");
+              .setQuantityBackgroundColor("transparent").setQuantityTextColor("transparent");
             linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
           } catch {
             await addShape(price, {
@@ -385,6 +385,17 @@ export default function TVChart({
     // Calling widget.chartReady(cb) in v32 silently ignores cb — must use .then().
     const readyCb = () => {
       isReadyRef.current = true;
+
+      // Force-suppress TV native OHLC legend after chart is ready (creation-time overrides can be reset by TV)
+      if (showBuiltinOHLCRef.current === false) {
+        try {
+          widget.applyOverrides({
+            "paneProperties.legendProperties.showSeriesOHLC": false,
+            "paneProperties.legendProperties.showBarChange": false,
+            "paneProperties.legendProperties.showSeriesTitle": false,
+          });
+        } catch {}
+      }
 
       // Remove any Volume sub-pane (belt-and-suspenders alongside the disabled_feature)
       try {
