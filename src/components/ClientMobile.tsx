@@ -203,6 +203,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [tfPickerOpen, setTfPickerOpen] = useState(false);
   const chartWrapRef = useRef<HTMLDivElement>(null);
   const [isTV, setIsTV] = useState(false);
+  const [fsMode, setFsMode] = useState(false);
   useEffect(() => { setIsTV(window.location.hostname === "trade.growthcapitalltd.com"); }, []);
   const [countdown, setCountdown] = useState("");
   useEffect(() => {
@@ -969,7 +970,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
         {/* ───────── CHART ───────── */}
         <KeepAlive active={tab === "chart"}>{(
-          <div ref={chartWrapRef} className="flex h-full flex-col">
+          <div ref={chartWrapRef} className={fsMode ? "" : "flex h-full flex-col"} style={fsMode ? { position: "fixed", inset: 0, zIndex: 999, display: "flex", flexDirection: "column", background: "var(--bg)" } : undefined}>
             {/* MT5-style slim toolbar — LW only; TV uses its own native header */}
             {!isTV && <div className="relative flex h-11 shrink-0 items-center border-b border-[var(--border)] bg-[var(--panel)] px-1">
               {/* Symbol picker */}
@@ -991,10 +992,10 @@ export default function ClientMobile({ t }: { t: any }) {
                   <circle cx="4" cy="4" r="2.2" fill="var(--panel)" /><circle cx="11" cy="10" r="2.2" fill="var(--panel)" />
                 </svg>
               </button>
-              {/* Fullscreen */}
-              <button onClick={() => { setTfPickerOpen(false); const el = chartWrapRef.current; if (!el) return; const isFs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement); if (isFs) { (document.exitFullscreen ?? (document as any).webkitExitFullscreen)?.call(document); } else { (el.requestFullscreen ?? (el as any).webkitRequestFullscreen)?.call(el); } }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title="Fullscreen">
+              {/* Fullscreen — CSS-based, works on iOS */}
+              <button onClick={() => { setTfPickerOpen(false); setFsMode((f) => !f); }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title={fsMode ? "Exit fullscreen" : "Fullscreen"}>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.75">
-                  <path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" />
+                  {fsMode ? <path d="M5 1v4H1M13 5h-4V1M9 13v-4h4M1 9h4v4" /> : <path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" />}
                 </svg>
               </button>
               {/* TF picker dropdown */}
@@ -1032,13 +1033,13 @@ export default function ClientMobile({ t }: { t: any }) {
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ];
                 return isTV
-                  ? <TVMobileChart symbol={selSym} tf={tf} theme={theme as "dark" | "light"} digits={dg(selSym)} bare={false} showDrawingTools={true} symbols={symbols || []} spreadPips={_mobSpreadPips(selSym)} positions={pos} />
+                  ? <TVMobileChart symbol={selSym} tf={tf} theme={theme as "dark" | "light"} digits={dg(selSym)} bare={false} showDrawingTools={true} symbols={symbols || []} spreadPips={_mobSpreadPips(selSym)} positions={pos} onSymbolChange={(sym) => setSelSym(sym)} />
                   : <LWMobileChart symbol={selSym} tf={tf} theme={theme as "dark" | "light"} digits={dg(selSym)} showTools={false} spreadPips={_mobSpreadPips(selSym)} positions={pos} />;
               })()}
               {/* Candle countdown — all charts, near price axis */}
               {countdown && <div className="pointer-events-none absolute bottom-8 right-[68px] font-mono text-[10px] tabular-nums select-none" style={{ color: "rgba(138,147,166,0.75)" }}>{countdown}</div>}
-              {/* Floating fullscreen button for TV (no slim toolbar on TV) */}
-              {isTV && <button onClick={() => { const el = chartWrapRef.current; if (!el) return; const isFs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement); if (isFs) { (document.exitFullscreen ?? (document as any).webkitExitFullscreen)?.call(document); } else { (el.requestFullscreen ?? (el as any).webkitRequestFullscreen)?.call(el); } }} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: "rgba(0,0,0,0.45)", touchAction: "manipulation" }} title="Fullscreen"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="1.5" opacity="0.85"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" /></svg></button>}
+              {/* TV: floating fullscreen button so user can get chart+buy/sell fullscreen (TV's own button only does chart) */}
+              {isTV && <button onClick={() => setFsMode((f) => !f)} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: "rgba(0,0,0,0.45)", touchAction: "manipulation" }} title={fsMode ? "Exit fullscreen" : "Fullscreen"}><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="1.5" opacity="0.85">{fsMode ? <path d="M5 1v4H1M13 5h-4V1M9 13v-4h4M1 9h4v4" /> : <path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" />}</svg></button>}
             </div>
             {/* Quick trade bar */}
             <div className="border-t border-[var(--border)]" style={{ background: "var(--panel)" }}>

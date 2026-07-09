@@ -344,7 +344,7 @@ export default function TVChart({
       // header_symbol_search re-enabled — TV search uses our datafeed (platform symbols only)
       "symbol_search_hot_key",
       "timeframes_toolbar",
-      "legend_widget",             // hide TV's built-in OHLC legend — we show custom OHLC overlay instead
+      // legend_widget intentionally re-enabled — TV shows OHLC natively (left side on client, top-right on admin via CSS)
       "show_chart_property_page",  // hide settings gear — use Indicators for all options
       "display_market_status",
       "create_volume_indicator_by_default", // prevent Volume sub-pane from auto-adding

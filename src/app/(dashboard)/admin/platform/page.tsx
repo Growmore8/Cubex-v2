@@ -231,7 +231,6 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [navSearch, setNavSearch] = useState("");
   const [mwSearch, setMwSearch] = useState("");
   const [showOC, setShowOC] = useState(true); // chart buy/sell strip visibility
-  const [tileOhlc, setTileOhlc] = useState<Record<string, { open: number; high: number; low: number; close: number }>>({});
   const [soundMuted, setSoundMuted] = useState(false);
   useEffect(() => { setSoundMuted(isMuted()); }, []);
   const [role, setRole] = useState("");
@@ -1067,18 +1066,10 @@ const [selAcc, setSelAcc] = useState<any>(null);
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
               <div key={"tile" + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
 {ocStrip(sym)}
-                {tileOhlc[sym] && (() => { const o = tileOhlc[sym]; const d = dg(sym); return (
-                  <div className="pointer-events-none absolute right-2 top-1 z-10 flex items-center gap-2 rounded px-2 py-0.5" style={{ background: "rgba(9,12,18,0.72)", fontSize: 9.5, backdropFilter: "blur(4px)" }}>
-                    <span style={{ color: "#8b97a8" }}>O <span className="tabular-nums font-bold" style={{ color: "#c9d1d9" }}>{o.open.toFixed(d)}</span></span>
-                    <span style={{ color: "#8b97a8" }}>H <span className="tabular-nums font-bold" style={{ color: "#c9d1d9" }}>{o.high.toFixed(d)}</span></span>
-                    <span style={{ color: "#8b97a8" }}>L <span className="tabular-nums font-bold" style={{ color: "#c9d1d9" }}>{o.low.toFixed(d)}</span></span>
-                    <span style={{ color: "#8b97a8" }}>C <span className="tabular-nums font-bold" style={{ color: "#c9d1d9" }}>{o.close.toFixed(d)}</span></span>
-                  </div>
-                ); })()}
                 {(() => { const pos = [
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread; return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} onCandleUpdate={(bar) => setTileOhlc((prev) => ({ ...prev, [sym]: bar }))} />; })()}
+                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread; return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
               </div>
             ))}
           </div>
