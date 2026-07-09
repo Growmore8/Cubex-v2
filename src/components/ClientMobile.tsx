@@ -199,6 +199,8 @@ export default function ClientMobile({ t }: { t: any }) {
   const [notisOpen, setNotisOpen] = useState(false);
   const [reqsOpen, setReqsOpen] = useState(false);
   const [cfgSheet, setCfgSheet] = useState(false);
+  const [tfPickerOpen, setTfPickerOpen] = useState(false);
+  const chartWrapRef = useRef<HTMLDivElement>(null);
   const [countdown, setCountdown] = useState("");
   useEffect(() => {
     const TF_SEC: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400, "1W": 604800 };
@@ -965,34 +967,44 @@ export default function ClientMobile({ t }: { t: any }) {
         {/* ───────── CHART ───────── */}
         <KeepAlive active={tab === "chart"}>{(
           <div className="flex h-full flex-col">
-            {/* Chart header — big price block (symbol + name · large price + change) */}
-            {(() => {
-              const symMeta = (symbols || []).find((x: any) => x.symbol === selSym);
-              const disp = symMeta?.display; const cat = symMeta?.category;
-              const base = baselineRef.current[selSym]; const chg = (base != null && price != null) ? price - base : 0; const pct = pctOf(selSym); const upC = chg >= 0;
-              return (
-                <div className="border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <button onPointerDown={(e) => { e.preventDefault(); setSymSearch(""); setSymPickerOpen(true); }} className="flex items-center gap-2.5 text-left" style={{ touchAction: "manipulation" }}>
-                      <SymIcon symbol={selSym} size={32} />
-                      <div>
-                        <div className="flex items-center gap-1.5 text-[17px] font-extrabold leading-none text-[var(--text)]">{selSym || "Symbol"}<i className="fa-solid fa-chevron-down text-[9px] opacity-50" /></div>
-                        <div className="mt-1 text-[10px] capitalize text-[var(--muted)]">{cat || disp || "Markets"}{disp && disp !== selSym ? " · " + disp : ""}</div>
-                      </div>
+            {/* MT5-style slim toolbar */}
+            <div className="relative flex h-11 shrink-0 items-center border-b border-[var(--border)] bg-[var(--panel)] px-1">
+              {/* Symbol picker */}
+              <button onPointerDown={(e) => { e.preventDefault(); setSymSearch(""); setSymPickerOpen(true); setTfPickerOpen(false); }} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5" style={{ touchAction: "manipulation" }}>
+                <SymIcon symbol={selSym} size={18} />
+                <span className="text-[13px] font-bold text-[var(--text)]">{selSym || "Symbol"}</span>
+                <i className="fa-solid fa-chevron-down text-[8px] opacity-40" />
+              </button>
+              <div className="flex-1" />
+              {/* TF pill button */}
+              <button onClick={() => setTfPickerOpen((o) => !o)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[12px] font-bold" style={{ background: "rgba(41,98,255,0.12)", borderColor: "rgba(41,98,255,0.28)", color: "#4a7fff", touchAction: "manipulation" }}>
+                {tf} <span style={{ fontSize: 8, opacity: 0.7 }}>▼</span>
+              </button>
+              <div style={{ width: 2 }} />
+              {/* Indicators */}
+              <button onClick={() => { setCfgSheet(true); setTfPickerOpen(false); }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title="Indicators">
+                <svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.75">
+                  <line x1="0" y1="4" x2="16" y2="4" /><line x1="0" y1="10" x2="16" y2="10" />
+                  <circle cx="4" cy="4" r="2.2" fill="var(--panel)" /><circle cx="11" cy="10" r="2.2" fill="var(--panel)" />
+                </svg>
+              </button>
+              {/* Fullscreen */}
+              <button onClick={() => { setTfPickerOpen(false); if (document.fullscreenElement) { document.exitFullscreen(); } else { chartWrapRef.current?.requestFullscreen(); } }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title="Fullscreen">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.75">
+                  <path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" />
+                </svg>
+              </button>
+              {/* TF picker dropdown */}
+              {tfPickerOpen && (
+                <div className="absolute left-0 right-0 top-full z-50 flex items-center gap-1 border-b border-[var(--border)] px-2 py-2" style={{ background: "var(--panel)" }}>
+                  {(TFS || ["1M","5M","15M","30M","1H","4H","1D","1W"]).map((t: string) => (
+                    <button key={t} onClick={() => { setTf(t); setTfPickerOpen(false); }} className="flex-1 rounded py-1.5 text-[11px] font-bold" style={t === tf ? { background: "rgba(41,98,255,0.18)", color: "#4a7fff", border: "1px solid rgba(41,98,255,0.28)" } : { color: "var(--muted)", border: "1px solid transparent" }}>
+                      {t}
                     </button>
-                  </div>
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <select value={tf} onChange={(e) => setTf(e.target.value)}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--soft)] px-2 py-1 text-[11px] font-semibold text-[var(--text)] outline-none"
-                      style={{ touchAction: "manipulation" }}>
-                      {(TFS || ["1M","5M","15M","30M","1H","4H","1D","1W"]).map((x: string) => (
-                        <option key={x} value={x}>{x}</option>
-                      ))}
-                    </select>
-                  </div>
+                  ))}
                 </div>
-              );
-            })()}
+              )}
+            </div>
             {/* Indicator settings bottom sheet (periods) — opened from full-screen */}
             {cfgSheet && (
               <>
@@ -1009,19 +1021,15 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               </>
             )}
-            {/* Preview chart — drawing tools always hidden in normal view */}
-            <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
+            {/* Chart canvas */}
+            <div ref={chartWrapRef} className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
               <MobileChart symbol={selSym} tf={tf} theme={theme} digits={dg(selSym)} bare={true} symbols={symbols} spreadPips={_mobSpreadPips(selSym)}
                 positions={[
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]} />
-              {/* Countdown timer to next candle close */}
-              <div className="pointer-events-none absolute bottom-7 right-14 font-mono text-[10px] tabular-nums" style={{ color: "rgba(138,147,166,0.85)" }}>{countdown}</div>
-              {/* Indicator settings button */}
-              <button onClick={() => setCfgSheet(true)} className="absolute bottom-6 right-1 flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: "rgba(9,12,18,0.72)", color: "#8a93a6", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(4px)", touchAction: "manipulation" }} title="Indicator settings">
-                <i className="fa-solid fa-sliders text-[11px]" />
-              </button>
+              {/* Candle countdown — bottom-right, left of Y-axis */}
+              <div className="pointer-events-none absolute bottom-6 right-16 font-mono text-[10px] tabular-nums" style={{ color: "rgba(138,147,166,0.75)" }}>{countdown}</div>
             </div>
             {/* Quick trade bar */}
             <div className="border-t border-[var(--border)]" style={{ background: "var(--panel)" }}>
