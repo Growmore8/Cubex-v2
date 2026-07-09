@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { registerOverlay, init as klineInit, ActionType } from "klinecharts";
 import TVChart, { type ChartPosition } from "./TVChart";
+import LWChart from "./LWChart";
 import "@klinecharts/pro/dist/klinecharts-pro.css";
 import { KLineChartPro } from "@klinecharts/pro";
 
@@ -673,5 +674,17 @@ export default function KLineProChart(props: Props) {
     return <TVChart {...props} />;
   }
 
-  return <KlineChartInternal {...props} />;
+  // Non-licensed domains: use open-source Lightweight Charts
+  return (
+    <LWChart
+      symbol={props.symbol}
+      tf={props.tf}
+      theme={props.theme}
+      digits={props.digits}
+      positions={props.positions}
+      spreadPips={props.spreadPips}
+      onCandleUpdate={props.onCandleUpdate}
+      showTools={!props.bare}
+    />
+  );
 }

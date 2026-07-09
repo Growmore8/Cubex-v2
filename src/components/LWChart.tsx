@@ -167,7 +167,7 @@ export type ChartPosition = {
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
 function LWChart({
-  symbol, tf, theme, positions, digits = 2, showTools = true, ind, cfg, calcPnl, tool: toolProp, onTool, clearKey, spreadPips,
+  symbol, tf, theme, positions, digits = 2, showTools = true, ind, cfg, calcPnl, tool: toolProp, onTool, clearKey, spreadPips, onCandleUpdate,
 }: {
   symbol: string;
   tf: string;
@@ -177,6 +177,7 @@ function LWChart({
   onClose?: (id: string) => void;
   showTools?: boolean;
   spreadPips?: number;
+  onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
   /** Pure P&L formula from the parent so the chart can update position labels
       live on its own internal tick (without re-rendering). */
   calcPnl?: (p: ChartPosition, price: number) => number;
@@ -198,6 +199,7 @@ function LWChart({
   const askLineRef = useRef<any>(null);
   const spreadPipsRef = useRef(spreadPips ?? 0);
   spreadPipsRef.current = spreadPips ?? 0;
+  const onCandleUpdateRef = useRef(onCandleUpdate); onCandleUpdateRef.current = onCandleUpdate;
   // TradingView-style OHLC legend (updated via ref, no re-render) + right-click menu
   const legendRef = useRef<HTMLDivElement | null>(null);
   const cfgRef = useRef(cfg); cfgRef.current = cfg;
@@ -348,7 +350,7 @@ function LWChart({
       if (d && d.open != null) { hoveringRef.current = true; fmtLegRef.current(d); }
       else { hoveringRef.current = false; const last = barsRef.current[barsRef.current.length - 1]; if (last) fmtLegRef.current(last); }
     });
-    if (barsRef.current.length) { series.setData(barsRef.current); const n = barsRef.current.length; try { chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { chart.timeScale().fitContent(); } fmtLegRef.current(barsRef.current[n - 1]); }
+    if (barsRef.current.length) { series.setData(barsRef.current); const n = barsRef.current.length; try { chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { try { chart.timeScale().scrollToRealTime(); } catch { chart.timeScale().fitContent(); } } fmtLegRef.current(barsRef.current[n - 1]); }
     return () => { chart.remove(); chartRef.current = null; seriesRef.current = null; };
   }, [theme, digits]);
 
@@ -573,7 +575,7 @@ function LWChart({
         .sort((a: any, b: any) => a.time - b.time)
         .filter((c: any) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
       if (!bars.length) return false;
-      try { seriesRef.current.setData(bars); barsRef.current = bars; const n = bars.length; try { chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { chartRef.current?.timeScale().fitContent(); } onBarsLoaded.current(); fmtLegRef.current(bars[n - 1]); return true; }
+      try { seriesRef.current.setData(bars); barsRef.current = bars; const n = bars.length; try { chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { chartRef.current?.timeScale().fitContent(); } onBarsLoaded.current(); fmtLegRef.current(bars[n - 1]); onCandleUpdateRef.current?.(bars[n - 1]); return true; }
       catch { return false; }
     }
     // Build a plausible `count`-bar history (random walk) ending at `lastPrice`,
@@ -665,7 +667,9 @@ function LWChart({
             ? { price: close + spPx, color: "#2196F3", axisLabelVisible: true }
             : { price: close, color: "transparent", axisLabelVisible: false });
         } catch {}
-        if (!hoveringRef.current) fmtLegRef.current(barsRef.current[barsRef.current.length - 1]);
+        const cur = barsRef.current[barsRef.current.length - 1];
+        if (!hoveringRef.current && cur) fmtLegRef.current(cur);
+        if (cur) onCandleUpdateRef.current?.(cur);
       } catch { /* out-of-order tick during a reseed — ignore */ }
     };
     const iv = setInterval(apply, 80);
