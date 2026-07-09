@@ -155,6 +155,7 @@ function computeMACD(bars: any[], fast = 12, slow = 26, sig = 9) {
 
 export type ChartPosition = {
   id: string;
+  ticket?: string | number;
   type: "BUY" | "SELL";
   lots: number | string;
   openPrice: number;
