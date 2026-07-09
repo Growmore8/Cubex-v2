@@ -58,7 +58,7 @@ function loadScript(): Promise<void> {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TVChart({
   symbol, tf, theme, digits = 5,
-  positions, symbols, bare, showDrawingTools, chartType, hideLegend, onSymbolChange, onCandleUpdate, onActionsReady, spreadPips,
+  positions, symbols, bare, showDrawingTools, chartType, onSymbolChange, onCandleUpdate, onActionsReady, spreadPips,
 }: {
   symbol: string;
   tf: string;
@@ -69,7 +69,6 @@ export default function TVChart({
   bare?: boolean;
   showDrawingTools?: boolean;
   chartType?: number;
-  hideLegend?: boolean;
   onSymbolChange?: (sym: string) => void;
   onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
   onActionsReady?: (actions: TVChartActions) => void;
@@ -340,39 +339,15 @@ export default function TVChart({
     };
 
     const disabledFeatures: string[] = [
-      "use_localstorage_for_settings",
-      "header_compare",
-      "header_undo_redo",
-      "header_screenshot",
-      "header_saveload",
-      "go_to_date",
-      "show_logo_on_all_charts",
-      "caption_buttons_text_if_possible",
-      "drawing_templates",
-      "pine_script_editor_aspect_ratio",
-      "publish_study",
-      "share_study_templates",
-      "header_symbol_search",   // symbol text stays but search icon removed — platform has own pickers
-      "symbol_search_hot_key",
-      "edit_buttons_in_legend", // hide hover edit/hide buttons on OHLC legend series row
-      "timeframes_toolbar",
-      // legend_widget intentionally re-enabled — TV shows OHLC natively (left side on client, top-right on admin via CSS)
-      "show_chart_property_page",  // hide settings gear — use Indicators for all options
-      "display_market_status",
-      "create_volume_indicator_by_default", // prevent Volume sub-pane from auto-adding
-      "popup_hints",                         // suppress "Press and hold to see chart values" mobile popup
-      // NOTE: tradingview_logo intentionally NOT disabled — Section 3.2 of the
-      // Free Advanced Charts Agreement requires TradingView branding to remain visible.
+      "display_market_status",              // forex is 24/7; "market closed" banner would be misleading
+      "create_volume_indicator_by_default", // volume is meaningless for OTC forex; keep sub-pane clean
+      "popup_hints",                        // suppress long-press tooltip popup on mobile
+      // NOTE: tradingview_logo intentionally NOT disabled — the charting library
+      // license requires TradingView branding to remain visible.
     ];
     if (bare) {
-      // In bare (mobile) mode: hide TV's native header so only our React header shows
       disabledFeatures.push("header_toolbar", "header_indicators", "header_chart_type", "header_resolutions");
       if (!showDrawingTools) disabledFeatures.push("left_toolbar");
-    }
-    if (hideLegend) {
-      // Admin mode: hide TV's native OHLC legend (top-left) so the platform's own
-      // OHLC overlay (top-right) is the single source of OHLC display.
-      disabledFeatures.push("legend_widget");
     }
 
     const widget = new (window as any).TradingView.widget({

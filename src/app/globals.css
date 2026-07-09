@@ -468,30 +468,6 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   .ui-card:hover, .hover-lift:hover, .ui-btn:active, .ui-btn-primary:hover { transform: none !important; }
   .ui-pop, .ui-fade-up, .ui-fade-up-stagger > * { animation: none !important; }
 }
-/* KLineChart Pro: hide the built-in centre logo watermark */
-.klinecharts-pro-watermark { display: none !important; }
-/* KLineChart Pro ships height:80vh on its root — make it fill our chart
-   container instead, so it resizes correctly when the desk toolbox / panels
-   are dragged (otherwise the chart overflows into the panel below). */
-.klinecharts-pro { height: 100% !important; width: 100% !important; }
-/* Bare (compact mobile) mode: hide drawing sidebar and built-in TF/period bar.
-   The custom header dropdown is the only TF control in compact view. */
-.kline-bare .klinecharts-pro-drawing-bar { display: none !important; }
-.kline-bare .klinecharts-pro-period-bar { display: none !important; }
-/* Restore period bar + drawing bar when chart enters native fullscreen
-   (triggered by the chart's own fullscreen button). */
-:-webkit-full-screen .klinecharts-pro-period-bar { display: flex !important; }
-:fullscreen .klinecharts-pro-period-bar { display: flex !important; }
-:-webkit-full-screen .klinecharts-pro-drawing-bar { display: flex !important; }
-:fullscreen .klinecharts-pro-drawing-bar { display: flex !important; }
-/* Hide the built-in symbol navigator (hamburger + symbol name) from the period bar —
-   the app has its own symbol selector. */
-.klinecharts-pro-period-bar .symbol { display: none !important; }
-/* Chart background matches the app panels (navigator / toolbox). */
-.klinecharts-pro { --klinecharts-pro-background-color: var(--panel) !important; }
-/* Let the chart canvas own touch gestures (pinch / drag) on mobile, while
-   modals/lists keep normal scrolling. */
-.klinecharts-pro canvas { touch-action: none; }
 
 
 /* Mobile bottom-nav: scale pop when a tab becomes active (overshoot + settle) */

@@ -126,7 +126,6 @@ export default function AdminDeskPage() {
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
   const [selSym, setSelSym] = useState("");
   const [tf, setTf] = useState("1M");
-  const [tileOHLC, setTileOHLC] = useState<Record<number, { open: number; high: number; low: number; close: number }>>({});
 const [selAcc, setSelAcc] = useState<any>(null);
   const [lot, setLot] = useState(0.01);
   // Instant reflection: whenever the client list reloads (after a trade close,
@@ -1086,12 +1085,10 @@ const [selAcc, setSelAcc] = useState<any>(null);
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
               <div key={"tile" + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
 {ocStrip(sym)}
-                {/* OHLC overlay — top-right, above TV canvas, no pointer events */}
-                {tileOHLC[i] && <div className="pointer-events-none absolute right-14 top-1.5 z-20 select-none font-mono text-[10px]" style={{ color: theme === "dark" ? "rgba(160,175,200,0.88)" : "rgba(50,65,90,0.82)" }}>O {tileOHLC[i].open.toFixed(dg(sym))}&nbsp;&nbsp;H {tileOHLC[i].high.toFixed(dg(sym))}&nbsp;&nbsp;L {tileOHLC[i].low.toFixed(dg(sym))}&nbsp;&nbsp;C {tileOHLC[i].close.toFixed(dg(sym))}</div>}
                 {(() => { const pos = [
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread; return <KLineProChart hideLegend symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onCandleUpdate={(bar) => setTileOHLC((prev) => ({ ...prev, [i]: bar }))} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
+                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread; return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
               </div>
             ))}
           </div>

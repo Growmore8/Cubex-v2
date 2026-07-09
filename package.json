@@ -12,7 +12,6 @@
   "dependencies": {
     "@devexperts/dxcharts-lite": "^2.7.32",
     "@hookform/resolvers": "^5.4.0",
-    "@klinecharts/pro": "^0.1.1",
     "@prisma/client": "^6.19.3",
     "@simplewebauthn/browser": "^10.0.0",
     "@simplewebauthn/server": "^10.0.1",
@@ -25,7 +24,6 @@
     "ioredis": "^5.11.1",
     "jose": "^6.2.3",
     "jsonwebtoken": "^9.0.3",
-    "klinecharts": "9.8.12",
     "lightweight-charts": "^5.2.0",
     "lucide-react": "^1.17.0",
     "next": "^16.2.7",

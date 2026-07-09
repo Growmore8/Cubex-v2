@@ -17,7 +17,6 @@ interface Props {
   bare?: boolean;
   showDrawingTools?: boolean;
   chartType?: number;
-  hideLegend?: boolean;
   onSymbolChange?: (sym: string) => void;
   onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
   onActionsReady?: (actions: TVChartActions) => void;
