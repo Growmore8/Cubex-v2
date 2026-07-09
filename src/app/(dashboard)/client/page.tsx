@@ -1171,16 +1171,7 @@ export default function ClientTerminal() {
         <div onMouseDown={(e) => dragX(e, "mw")} className="w-1 cursor-col-resize bg-[var(--border)] hover:bg-[#3b82f6]" />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* OHLC strip — left-aligned, above chart */}
-          {ohlc && (
-            <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-3 py-1" style={{ background: "var(--panel)", fontSize: 10 }}>
-              <span className="font-semibold" style={{ color: "var(--muted)" }}>O <span className="tabular-nums font-bold" style={{ color: "var(--text)" }}>{ohlc.open.toFixed(d)}</span></span>
-              <span className="font-semibold" style={{ color: "var(--muted)" }}>H <span className="tabular-nums font-bold" style={{ color: "#26a69a" }}>{ohlc.high.toFixed(d)}</span></span>
-              <span className="font-semibold" style={{ color: "var(--muted)" }}>L <span className="tabular-nums font-bold" style={{ color: "#ef5350" }}>{ohlc.low.toFixed(d)}</span></span>
-              <span className="font-semibold" style={{ color: "var(--muted)" }}>C <span className="tabular-nums font-bold" style={{ color: ohlc.close >= ohlc.open ? "#26a69a" : "#ef5350" }}>{ohlc.close.toFixed(d)}</span></span>
-            </div>
-          )}
-          <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">{(() => { const pos = [
+<div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">{(() => { const pos = [
             ...positions.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
             ...pending.filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
           ]; return <KLineProChart symbol={selSym} tf={tf} theme={theme} digits={d} symbols={symbols} positions={pos} spreadPips={_spreadPips(selSym)} onSymbolChange={(sm) => { setSelSym(sm); setOhlc(null); }} onCandleUpdate={(bar) => setOhlc(bar)} />; })()}
