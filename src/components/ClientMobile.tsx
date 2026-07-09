@@ -969,7 +969,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
         {/* ───────── CHART ───────── */}
         <KeepAlive active={tab === "chart"}>{(
-          <div ref={chartWrapRef} className="flex h-full flex-col" style={chartFs ? { position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg)" } : undefined}>
+          <div ref={chartWrapRef} className="flex h-full flex-col" style={chartFs ? { position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg)", paddingTop: "env(safe-area-inset-top)" } : undefined}>
             {/* Custom symbol / TF toolbar — only for LW chart; TV has its own native header */}
             {!isTV && (
             <div className="relative flex h-11 shrink-0 items-center border-b border-[var(--border)] bg-[var(--panel)] px-1">
@@ -1026,12 +1026,6 @@ export default function ClientMobile({ t }: { t: any }) {
             )}
             {/* Chart canvas */}
             <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
-              {/* Fullscreen toggle for TV (TV has its own header, no room for it there) */}
-              {isTV && (
-                <button onClick={() => setChartFs((f) => !f)} style={{ position: "absolute", top: 8, right: 8, zIndex: 10, background: "rgba(0,0,0,0.35)", border: "none", borderRadius: 6, color: "#fff", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "manipulation" }}>
-                  <i className={chartFs ? "fa-solid fa-compress" : "fa-solid fa-expand"} style={{ fontSize: 12 }} />
-                </button>
-              )}
               {(() => {
                 const pos = [
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),

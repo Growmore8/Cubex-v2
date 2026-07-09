@@ -18,7 +18,7 @@ import { iconForNotification } from "@/lib/notif";
 import { isOnline as presenceOnline } from "@/components/ui/Presence";
 import instruments from "@/config/instruments";
 import { contractFor } from "@/config/contracts";
-import { gnum, gmoney, gsign, titleCaseName } from "@/lib/format";
+import { gnum, gmoney, titleCaseName } from "@/lib/format";
 import { ADSS_DARK, ADSS_LIGHT, ADSS_FONT, BUY, SELL, GOLD, BUYBTN, SELLBTN } from "@/config/theme";
 
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
@@ -134,8 +134,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   useEffect(() => {
     setSelAcc((cur: any) => (cur ? (clients.find((c: any) => c.id === cur.id) || cur) : cur));
   }, [clients]);
-  const [sl, setSl] = useState(0);
-  const [tp, setTp] = useState(0);
+  const sl = 0, tp = 0;
   const [tab, setTab] = useState("trade");
   const [tabState, setTabState] = useState<Record<string, boolean>>({ overview: true, trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true, requests: true, symbols: true, groups: true, risk: true, copy: true, signals: true, broadcast: true });
   const [copyRelations, setCopyRelations] = useState<any[]>([]);
@@ -168,7 +167,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [layout, setLayout] = useState(1);
   const [openCharts, setOpenCharts] = useState<string[]>([]);
   const [activeChart, setActiveChart] = useState(0);
-  const [oneClick, setOneClick] = useState(true);
+
   const [panels, setPanels] = useState<{ nav: boolean; mw: boolean; toolbox: boolean }>({ nav: true, mw: true, toolbox: true });
   const [ticket, setTicket] = useState<string | null>(null);
   const [tform, setTform] = useState<any>({ vol: 0.01, sl: 0, tp: 0, type: "Market" });
@@ -219,7 +218,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false, psar: false, cdl: false, stoch: false, atr: false, adx: false, sig: false, ribbon: false });
   const [chartCfg, setChartCfg] = useState<any>({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 });
-  const [cfgOpen, setCfgOpen] = useState(false);
+
   const [stmtModal, setStmtModal] = useState(false);
   const [stmtEmailModal, setStmtEmailModal] = useState(false);
   const [stmtPreset, setStmtPreset] = useState("all");
@@ -298,7 +297,6 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [hfTo, setHfTo] = useState("");
   const [hfType, setHfType] = useState("ALL");
   const prevRef = useRef<Record<string, number>>({});
-  const timersRef = useRef<Record<string, any>>({});
   const [dirs, setDirs] = useState<Record<string, number>>({});
 
   const selSymRef = useRef(selSym);
@@ -364,8 +362,6 @@ const [selAcc, setSelAcc] = useState<any>(null);
   }, []);
   const notifSeen = useRef<Set<string>>(new Set());
   const notifPrimed = useRef(false);
-  const deskOhlcRef = useRef<HTMLDivElement | null>(null);
-  const deskActiveRef = useRef(activeChart); deskActiveRef.current = activeChart;
   async function loadNotifs() {
     try {
       const d = await fetch("/api/notifications").then((r) => r.json());
@@ -1030,47 +1026,44 @@ const [selAcc, setSelAcc] = useState<any>(null);
         </>)}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Platform toolbar: Buy/Sell for active chart + live OHLC legend */}
-          <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1">
-            {(() => {
-              const sym = openCharts[activeChart];
-              if (!sym) return null;
-              const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1));
-              const isFloat = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING";
-              const cfgSp = adminSymSpreads[sym] || 0;
-              const liveSp = liveSpreadPips[sym];
-              const spPips = (isFloat ? (liveSp != null && liveSp > 0 ? liveSp : cfgSp) : cfgSp) + deskExtraSpread;
-              const spPx = spPips * pip;
-              const ask = p != null ? gnum(p + spPx, d) : "\u2014";
-              const bid = p != null ? gnum(p, d) : "\u2014";
-              return (
-                <>
-                  <button onClick={() => place(sym, "SELL")} className="flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-bold transition-all hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff" }}>
-                    <span>Sell</span><span className="font-mono">{bid}</span>
-                  </button>
-                  <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} className="w-16 rounded border text-center font-mono text-[11px]" style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: "2px 4px", outline: "none" }} title="Lots" />
-                  <button onClick={() => place(sym, "BUY")} className="flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-bold transition-all hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff" }}>
-                    <span>Buy</span><span className="font-mono">{ask}</span>
-                  </button>
-                  <div ref={deskOhlcRef} className="ml-3 font-mono text-[10px]" />
-                </>
-              );
-            })()}
+          {/* Chart tabs row \u2014 open symbol tabs with \u2715 close, lot input on right */}
+          <div className="flex items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1" style={{ scrollbarWidth: "none" }}>
+            {openCharts.map((sym, i) => (
+              <div key={sym + i} onClick={() => setActive(i)} className="flex shrink-0 cursor-pointer items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold select-none" style={{ background: i === activeChart ? "rgba(41,98,255,0.15)" : "transparent", color: i === activeChart ? "var(--accent)" : "var(--muted)", border: `1px solid ${i === activeChart ? "rgba(41,98,255,0.3)" : "transparent"}` }}>
+                <span>{sym}</span>
+                <button onClick={(e) => { e.stopPropagation(); removeChart(i); }} className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] hover:bg-[var(--soft)]" style={{ color: "var(--muted)", lineHeight: 1 }}>\u00d7</button>
+              </div>
+            ))}
+            <div className="flex-1" />
+            <span className="mr-1 text-[10px]" style={{ color: "var(--muted)" }}>Lot</span>
+            <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} className="w-16 rounded border text-center font-mono text-[11px]" style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: "2px 4px", outline: "none" }} title="Lots" />
           </div>
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
               <div key={"tile" + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
+                {/* Buy/Sell overlay \u2014 top-left of chart tile */}
+                {(() => {
+                  const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1));
+                  const isFloatO = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING";
+                  const spO = (isFloatO ? (liveSpreadPips[sym] ?? adminSymSpreads[sym] ?? 0) : (adminSymSpreads[sym] ?? 0)) + deskExtraSpread;
+                  const bid = p != null ? gnum(p, d) : "\u2014";
+                  const ask = p != null ? gnum(p + spO * pip, d) : "\u2014";
+                  return (
+                    <div style={{ position: "absolute", top: 8, left: 8, zIndex: 10, display: "flex", gap: 4, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => place(sym, "SELL")} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
+                        Sell <span className="font-mono text-[10px]">{bid}</span>
+                      </button>
+                      <button onClick={() => place(sym, "BUY")} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
+                        Buy <span className="font-mono text-[10px]">{ask}</span>
+                      </button>
+                    </div>
+                  );
+                })()}
                 {(() => { const pos = [
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread;
-                const handleCandleUpdate = i === activeChart ? (b: {open:number;high:number;low:number;close:number}) => {
-                  const el = deskOhlcRef.current; if (!el) return;
-                  const dd = dg(sym); const ch = b.close - b.open, pct = b.open ? (ch / b.open) * 100 : 0;
-                  const col = ch >= 0 ? "#26a69a" : "#ef5350";
-                  el.innerHTML = `<span style="color:var(--muted)">O</span><span style="color:${col}">${gnum(b.open,dd)}</span> <span style="color:var(--muted)">H</span><span style="color:${col}">${gnum(b.high,dd)}</span> <span style="color:var(--muted)">L</span><span style="color:${col}">${gnum(b.low,dd)}</span> <span style="color:var(--muted)">C</span><span style="color:${col}">${gnum(b.close,dd)}</span> <span style="color:${col}">${ch>=0?"+":""}${gnum(ch,dd)} (${pct>=0?"+":""}${pct.toFixed(2)}%)</span>`;
-                } : undefined;
-                return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} onCandleUpdate={handleCandleUpdate} />; })()}
+                return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
               </div>
             ))}
           </div>

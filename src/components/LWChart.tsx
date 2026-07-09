@@ -797,8 +797,8 @@ function LWChart({
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}
           onContextMenu={(e) => { e.preventDefault(); let price: number | null = null; try { const r = wrapRef.current?.getBoundingClientRect(); if (r && seriesRef.current) price = seriesRef.current.coordinateToPrice(e.clientY - r.top); } catch {} setCtxMenu({ x: e.clientX, y: e.clientY, price }); }}>
           <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
-          {/* TradingView-style OHLC legend — next to the Trade toggle (showTools only) */}
-          {showTools && <div ref={legendRef} style={{ position: "absolute", top: 8, left: 70, zIndex: 6, fontSize: 11, fontWeight: 600, pointerEvents: "none", whiteSpace: "nowrap", color: theme === "dark" ? "#9aa6bf" : "#475569", textShadow: theme === "dark" ? "0 1px 2px rgba(0,0,0,0.6)" : "none" }} />}
+          {/* TradingView-style OHLC legend — always visible; left offset shifts right of Trade toggle when showTools */}
+          <div ref={legendRef} style={{ position: "absolute", top: 8, left: showTools ? 70 : 8, zIndex: 6, fontSize: 11, fontWeight: 600, pointerEvents: "none", whiteSpace: "nowrap", color: theme === "dark" ? "#9aa6bf" : "#475569", textShadow: theme === "dark" ? "0 1px 2px rgba(0,0,0,0.6)" : "none" }} />
           {/* Desktop drawing tools (H-line / trend / clear) — floating top-left.
               Hidden when the parent header controls the tool (onTool set). */}
           {showTools && ind && !onTool && (
