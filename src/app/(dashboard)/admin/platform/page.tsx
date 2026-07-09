@@ -1026,17 +1026,14 @@ const [selAcc, setSelAcc] = useState<any>(null);
         </>)}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Chart tabs row \u2014 open symbol tabs with \u2715 close, lot input on right */}
+          {/* Chart tabs row \u2014 open symbol tabs with \u00d7 close */}
           <div className="flex items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1" style={{ scrollbarWidth: "none" }}>
             {openCharts.map((sym, i) => (
               <div key={sym + i} onClick={() => setActive(i)} className="flex shrink-0 cursor-pointer items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold select-none" style={{ background: i === activeChart ? "rgba(41,98,255,0.15)" : "transparent", color: i === activeChart ? "var(--accent)" : "var(--muted)", border: `1px solid ${i === activeChart ? "rgba(41,98,255,0.3)" : "transparent"}` }}>
                 <span>{sym}</span>
-                <button onClick={(e) => { e.stopPropagation(); removeChart(i); }} className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] hover:bg-[var(--soft)]" style={{ color: "var(--muted)", lineHeight: 1 }}>\u00d7</button>
+                <button onClick={(e) => { e.stopPropagation(); removeChart(i); }} className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] hover:bg-[var(--soft)]" style={{ color: "var(--muted)", lineHeight: 1 }}>{"\u00d7"}</button>
               </div>
             ))}
-            <div className="flex-1" />
-            <span className="mr-1 text-[10px]" style={{ color: "var(--muted)" }}>Lot</span>
-            <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} className="w-16 rounded border text-center font-mono text-[11px]" style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: "2px 4px", outline: "none" }} title="Lots" />
           </div>
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
@@ -1053,6 +1050,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                       <button onClick={() => place(sym, "SELL")} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
                         Sell <span className="font-mono text-[10px]">{bid}</span>
                       </button>
+                      <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} onClick={(e) => e.stopPropagation()} className="w-14 rounded border text-center font-mono text-[11px]" style={{ background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", padding: "2px 4px", outline: "none", backdropFilter: "blur(4px)" }} title="Lots" />
                       <button onClick={() => place(sym, "BUY")} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
                         Buy <span className="font-mono text-[10px]">{ask}</span>
                       </button>
