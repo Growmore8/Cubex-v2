@@ -58,7 +58,7 @@ function loadScript(): Promise<void> {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TVChart({
   symbol, tf, theme, digits = 5,
-  positions, symbols, bare, showDrawingTools, chartType, onSymbolChange, onCandleUpdate, onActionsReady, spreadPips,
+  positions, symbols, bare, showDrawingTools, chartType, hideLegend, onSymbolChange, onCandleUpdate, onActionsReady, spreadPips,
 }: {
   symbol: string;
   tf: string;
@@ -69,6 +69,7 @@ export default function TVChart({
   bare?: boolean;
   showDrawingTools?: boolean;
   chartType?: number;
+  hideLegend?: boolean;
   onSymbolChange?: (sym: string) => void;
   onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
   onActionsReady?: (actions: TVChartActions) => void;
@@ -365,11 +366,13 @@ export default function TVChart({
     ];
     if (bare) {
       // In bare (mobile) mode: hide TV's native header so only our React header shows
-      // (clean single-header look that matches MT5). The header_in_fullscreen_mode +
-      // side_toolbar_in_fullscreen_mode features ensure all tools reappear when the
-      // user enters TV fullscreen via the fullscreen icon we expose in our React header.
       disabledFeatures.push("header_toolbar", "header_indicators", "header_chart_type", "header_resolutions");
       if (!showDrawingTools) disabledFeatures.push("left_toolbar");
+    }
+    if (hideLegend) {
+      // Admin mode: hide TV's native OHLC legend (top-left) so the platform's own
+      // OHLC overlay (top-right) is the single source of OHLC display.
+      disabledFeatures.push("legend_widget");
     }
 
     const widget = new (window as any).TradingView.widget({

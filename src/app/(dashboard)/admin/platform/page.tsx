@@ -126,8 +126,7 @@ export default function AdminDeskPage() {
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
   const [selSym, setSelSym] = useState("");
   const [tf, setTf] = useState("1M");
-  const [chartType, setChartTypeState] = useState(1); // 1=Candlestick, 0=Bars, 2=Line, 8=Heiken-Ashi, 9=Hollow
-  const chartActionsRefs = useRef<Record<number, import("@/components/KLineProChart").TVChartActions>>({});
+  const [tileOHLC, setTileOHLC] = useState<Record<number, { open: number; high: number; low: number; close: number }>>({});
 const [selAcc, setSelAcc] = useState<any>(null);
   const [lot, setLot] = useState(0.01);
   // Instant reflection: whenever the client list reloads (after a trade close,
@@ -1068,10 +1067,9 @@ const [selAcc, setSelAcc] = useState<any>(null);
         </>)}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Platform toolbar: Symbol Filter | Timeframe | Candle Type | Indicators | chart tabs */}
-          <div className="flex items-center gap-1.5 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
-            {/* Symbol Filter */}
-            <select value={openCharts[activeChart] || ""} onChange={(e) => { const v = e.target.value; if (v) { setTile(v); } }} className="h-6 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 text-[11px] outline-none" style={{ color: "var(--text)", minWidth: 90, maxWidth: 130 }}>
+          {/* Platform toolbar: Symbol Filter only \u2014 TF/Candle/Indicators come from TV's native header */}
+          <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px]">
+            <select value={openCharts[activeChart] || ""} onChange={(e) => { const v = e.target.value; if (v) setTile(v); }} className="h-6 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 text-[11px] outline-none" style={{ color: "var(--text)", minWidth: 100, maxWidth: 160 }}>
               {(() => {
                 const symGroups: Record<string, typeof symbols> = {};
                 symbols.forEach((s) => { const cat = s.category || "other"; (symGroups[cat] || (symGroups[cat] = [])).push(s); });
@@ -1083,43 +1081,17 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 ));
               })()}
             </select>
-            <div className="h-4 w-px bg-[var(--border)]" />
-            {/* Timeframe */}
-            <select value={tf} onChange={(e) => setTf(e.target.value)} className="h-6 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 text-[11px] outline-none" style={{ color: "var(--text)" }}>
-              {TFS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            {/* Candle Type */}
-            <select value={chartType} onChange={(e) => { const v = Number(e.target.value); setChartTypeState(v); Object.values(chartActionsRefs.current).forEach((a) => a.setChartType(v)); }} className="h-6 rounded border border-[var(--border)] bg-[var(--bg)] px-1.5 text-[11px] outline-none" style={{ color: "var(--text)" }}>
-              <option value={1}>Candles</option>
-              <option value={0}>Bars</option>
-              <option value={2}>Line</option>
-              <option value={8}>Heiken Ashi</option>
-              <option value={9}>Hollow</option>
-            </select>
-            {/* Indicators */}
-            <button onClick={() => { chartActionsRefs.current[activeChart]?.openIndicators(); }} className="flex h-6 items-center gap-1 rounded border border-[var(--border)] px-2 text-[11px] hover:bg-[var(--soft)]" style={{ color: "var(--muted)" }} title="Indicators">
-              <i className="fa-solid fa-chart-line" style={{ fontSize: 10 }} /><span>Indicators</span>
-            </button>
-            <div className="h-4 w-px bg-[var(--border)]" />
-            {/* Chart tabs */}
-            <div className="flex flex-1 items-center gap-1 overflow-auto">
-              {openCharts.map((s, i) => (
-                <span key={s + "-" + i} onClick={() => setActive(i)} className="flex cursor-pointer items-center gap-1 rounded border px-2 py-0.5" style={i === activeChart ? { borderColor: "var(--accent)", color: "var(--text)" } : { borderColor: "var(--border)", color: "var(--muted)" }}>
-                  <span className="font-medium">{s}</span>
-                  <button onClick={(e) => { e.stopPropagation(); removeChart(i); }} className="text-[var(--muted)]">{"\u00D7"}</button>
-                </span>
-              ))}
-              <button onClick={() => { const a = symbols.find((s) => openCharts.indexOf(s.symbol) === -1); if (a) addChart(a.symbol); }} className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[var(--muted)]">+</button>
-            </div>
           </div>
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
               <div key={"tile" + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
 {ocStrip(sym)}
+                {/* OHLC overlay — top-right, above TV canvas, no pointer events */}
+                {tileOHLC[i] && <div className="pointer-events-none absolute right-14 top-1.5 z-20 select-none font-mono text-[10px]" style={{ color: theme === "dark" ? "rgba(160,175,200,0.88)" : "rgba(50,65,90,0.82)" }}>O {tileOHLC[i].open.toFixed(dg(sym))}&nbsp;&nbsp;H {tileOHLC[i].high.toFixed(dg(sym))}&nbsp;&nbsp;L {tileOHLC[i].low.toFixed(dg(sym))}&nbsp;&nbsp;C {tileOHLC[i].close.toFixed(dg(sym))}</div>}
                 {(() => { const pos = [
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread; return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} chartType={chartType} onActionsReady={(actions) => { chartActionsRefs.current[i] = actions; }} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
+                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread; return <KLineProChart hideLegend symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onCandleUpdate={(bar) => setTileOHLC((prev) => ({ ...prev, [i]: bar }))} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
               </div>
             ))}
           </div>
