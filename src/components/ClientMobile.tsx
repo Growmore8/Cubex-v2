@@ -199,6 +199,23 @@ export default function ClientMobile({ t }: { t: any }) {
   const [notisOpen, setNotisOpen] = useState(false);
   const [reqsOpen, setReqsOpen] = useState(false);
   const [cfgSheet, setCfgSheet] = useState(false);
+  const [countdown, setCountdown] = useState("");
+  useEffect(() => {
+    const TF_SEC: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400, "1W": 604800 };
+    const tick = () => {
+      const s = TF_SEC[tf] ?? 60;
+      const rem = s - (Math.floor(Date.now() / 1000) % s);
+      if (s >= 3600) {
+        const h = Math.floor(rem / 3600), m = Math.floor((rem % 3600) / 60), sc = rem % 60;
+        setCountdown(`${h}:${String(m).padStart(2, "0")}:${String(sc).padStart(2, "0")}`);
+      } else {
+        setCountdown(`${Math.floor(rem / 60)}:${String(rem % 60).padStart(2, "0")}`);
+      }
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [tf]);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [bioOn, setBioOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -999,6 +1016,12 @@ export default function ClientMobile({ t }: { t: any }) {
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ]} />
+              {/* Countdown timer to next candle close */}
+              <div className="pointer-events-none absolute bottom-7 right-14 font-mono text-[10px] tabular-nums" style={{ color: "rgba(138,147,166,0.85)" }}>{countdown}</div>
+              {/* Indicator settings button */}
+              <button onClick={() => setCfgSheet(true)} className="absolute bottom-6 right-1 flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: "rgba(9,12,18,0.72)", color: "#8a93a6", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(4px)", touchAction: "manipulation" }} title="Indicator settings">
+                <i className="fa-solid fa-sliders text-[11px]" />
+              </button>
             </div>
             {/* Quick trade bar */}
             <div className="border-t border-[var(--border)]" style={{ background: "var(--panel)" }}>
