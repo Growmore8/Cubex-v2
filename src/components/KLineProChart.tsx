@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import TVChart, { type ChartPosition, type TVChartActions } from "./TVChart";
-import TVWidget from "./TVWidget";
+import LWChart from "./LWChart";
 
 export type { ChartPosition, TVChartActions };
 
@@ -24,8 +24,7 @@ interface Props {
 }
 
 // Domain that holds the licensed TradingView Advanced Charting Library.
-// All other tenant domains use the free TradingView Advanced Chart Widget
-// (public embed from TradingView's CDN — uses TV's own market data).
+// All other tenant domains use Lightweight Charts with the platform's own MT5 feed.
 const TV_LIBRARY_DOMAIN = "trade.growthcapitalltd.com";
 
 export default function KLineProChart(props: Props) {
@@ -45,7 +44,17 @@ export default function KLineProChart(props: Props) {
     return <TVChart {...props} />;
   }
 
-  // Other white-label tenant domains: free public TradingView Advanced Chart Widget.
-  // Uses TradingView's own market data — no custom broker data feed.
-  return <TVWidget symbol={props.symbol} tf={props.tf} theme={props.theme} />;
+  // Other white-label tenant domains: Lightweight Charts with the platform's own
+  // MT5 data feed and position overlays — no TradingView dependency.
+  return (
+    <LWChart
+      symbol={props.symbol}
+      tf={props.tf}
+      theme={props.theme}
+      digits={props.digits}
+      positions={props.positions as any}
+      spreadPips={props.spreadPips}
+      onCandleUpdate={props.onCandleUpdate}
+    />
+  );
 }

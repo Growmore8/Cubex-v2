@@ -369,9 +369,11 @@ export default function TVChart({
         // across changeTheme calls and would keep the canvas dark in light mode).
         "paneProperties.vertGridProperties.color": "rgba(255,255,255,0.04)",
         "paneProperties.horzGridProperties.color": "rgba(255,255,255,0.04)",
+        "paneProperties.legendProperties.showSeriesTitle": false,
       } : {
         "paneProperties.vertGridProperties.color": "rgba(0,0,0,0.04)",
         "paneProperties.horzGridProperties.color": "rgba(0,0,0,0.04)",
+        "paneProperties.legendProperties.showSeriesTitle": false,
       },
       disabled_features: disabledFeatures,
       enabled_features:  ["side_toolbar_in_fullscreen_mode", "header_in_fullscreen_mode", "items_favoriting"],
@@ -404,10 +406,9 @@ export default function TVChart({
           try {
             const tvSym = widget.activeChart().symbol();
             if (tvSym !== symbolRef.current) {
-              // User changed symbol via TV's native OHLC legend or search — revert to
-              // the platform's current symbol. Symbol changes must go through the platform's
-              // own market-watch / symbol picker so only market-watch symbols are selectable.
-              widget.activeChart().setSymbol(symbolRef.current, () => {});
+              // TV native symbol search changed the symbol — propagate to platform.
+              symbolRef.current = tvSym;
+              onSymRef.current?.(tvSym);
             }
           } catch {}
         });
@@ -492,6 +493,6 @@ export default function TVChart({
   }, [positions, symbol, digits, spreadPips]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div ref={containerRef} style={{ position: "absolute", inset: 0, overflow: "hidden" }} />
+    <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
   );
 }
