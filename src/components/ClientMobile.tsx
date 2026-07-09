@@ -1329,36 +1329,6 @@ export default function ClientMobile({ t }: { t: any }) {
           </div>
           )}
 
-          {/* ── Quick trade bar (positions view only) ── */}
-          {tradeView === "positions" && (
-            <div className="sticky bottom-0 z-10 border-t border-[var(--border)]" style={{ background: "var(--panel)" }}>
-              <div className="flex items-stretch gap-1 px-1.5 py-1.5 min-[380px]:gap-1.5 min-[380px]:px-2.5 min-[380px]:py-2">
-                <button
-                  onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", chartVol); }}
-                  disabled={!account || account?.locked}
-                  className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50"
-                  style={{ background: SELLBTN, touchAction: "manipulation" }}
-                >
-                  <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Sell</div>
-                  <div className="text-[12px] font-bold tabular-nums">{bid != null ? gnum(bid, dg(selSym)) : "…"}</div>
-                </button>
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <button onClick={() => setChartVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] active:scale-95" style={{ background: "var(--soft)", touchAction: "manipulation" }}>−</button>
-                  <input type="number" inputMode="decimal" step="0.01" autoComplete="off" value={chartVol} onChange={(e) => setChartVol(Number(e.target.value))} className="h-8 w-12 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[11px] font-bold tabular-nums text-[var(--text)] outline-none" style={{ touchAction: "manipulation" }} />
-                  <button onClick={() => setChartVol((v) => +(v + 0.01).toFixed(2))} className="flex h-8 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] active:scale-95" style={{ background: "var(--soft)", touchAction: "manipulation" }}>+</button>
-                </div>
-                <button
-                  onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", chartVol); }}
-                  disabled={!account || account?.locked}
-                  className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50"
-                  style={{ background: BUYBTN, touchAction: "manipulation" }}
-                >
-                  <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Buy</div>
-                  <div className="text-[12px] font-bold tabular-nums">{ask != null ? gnum(ask, dg(selSym)) : "…"}</div>
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* ── HISTORY view inside Trade tab ── */}
           {tradeView === "history" && (
