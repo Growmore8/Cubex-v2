@@ -203,7 +203,9 @@ export default function ClientMobile({ t }: { t: any }) {
   const [tfPickerOpen, setTfPickerOpen] = useState(false);
   const chartWrapRef = useRef<HTMLDivElement>(null);
   const [isTV, setIsTV] = useState(false);
+  const [chartFs, setChartFs] = useState(false);
   useEffect(() => { setIsTV(window.location.hostname === "trade.growthcapitalltd.com"); }, []);
+  useEffect(() => { if (tab !== "chart") setChartFs(false); }, [tab]);
   const [countdown, setCountdown] = useState("");
   useEffect(() => {
     const TF_SEC: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400, "1W": 604800 };
@@ -967,7 +969,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
         {/* ───────── CHART ───────── */}
         <KeepAlive active={tab === "chart"}>{(
-          <div ref={chartWrapRef} className="flex h-full flex-col">
+          <div ref={chartWrapRef} className="flex h-full flex-col" style={chartFs ? { position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg)" } : undefined}>
             {/* Custom symbol / TF toolbar — only for LW chart; TV has its own native header */}
             {!isTV && (
             <div className="relative flex h-11 shrink-0 items-center border-b border-[var(--border)] bg-[var(--panel)] px-1">
@@ -989,6 +991,10 @@ export default function ClientMobile({ t }: { t: any }) {
                   <line x1="0" y1="4" x2="16" y2="4" /><line x1="0" y1="10" x2="16" y2="10" />
                   <circle cx="4" cy="4" r="2.2" fill="var(--panel)" /><circle cx="11" cy="10" r="2.2" fill="var(--panel)" />
                 </svg>
+              </button>
+              {/* Fullscreen toggle */}
+              <button onClick={() => setChartFs((f) => !f)} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title={chartFs ? "Exit fullscreen" : "Fullscreen"}>
+                <i className={chartFs ? "fa-solid fa-compress" : "fa-solid fa-expand"} style={{ fontSize: 13 }} />
               </button>
               {/* TF picker dropdown */}
               {tfPickerOpen && (
@@ -1020,6 +1026,12 @@ export default function ClientMobile({ t }: { t: any }) {
             )}
             {/* Chart canvas */}
             <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
+              {/* Fullscreen toggle for TV (TV has its own header, no room for it there) */}
+              {isTV && (
+                <button onClick={() => setChartFs((f) => !f)} style={{ position: "absolute", top: 8, right: 8, zIndex: 10, background: "rgba(0,0,0,0.35)", border: "none", borderRadius: 6, color: "#fff", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "manipulation" }}>
+                  <i className={chartFs ? "fa-solid fa-compress" : "fa-solid fa-expand"} style={{ fontSize: 12 }} />
+                </button>
+              )}
               {(() => {
                 const pos = [
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
@@ -1820,7 +1832,7 @@ export default function ClientMobile({ t }: { t: any }) {
       )}
 
       {/* BOTTOM NAV */}
-      <div style={{ background: "var(--panel)", borderTop: "1px solid var(--border)", paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }} className="px-2 pt-1.5">
+      {!chartFs && <div style={{ background: "var(--panel)", borderTop: "1px solid var(--border)", paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }} className="px-2 pt-1.5">
         <div className="flex items-stretch justify-around">
           {navItems.map(([k, icon, label]) => {
             const active = tab === k;
@@ -1840,7 +1852,7 @@ export default function ClientMobile({ t }: { t: any }) {
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {/* TRANSFER MODAL */}
       {xferModal && (

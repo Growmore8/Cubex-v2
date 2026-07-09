@@ -242,6 +242,8 @@ function LWChart({
   const rsiSeriesRef = useRef<any>(null);
   // Called inside seed() after bars load so indicators update even before user toggles
   const onBarsLoaded = useRef<() => void>(() => {});
+  const loadMoreRef = useRef<(() => void) | null>(null);
+  const loadingMoreRef = useRef(false);
   // Bollinger Bands
   const [bb, setBb] = useState(false);
   const bbMidRef = useRef<any>(null), bbUpRef = useRef<any>(null), bbLoRef = useRef<any>(null);
@@ -351,6 +353,10 @@ function LWChart({
       else { hoveringRef.current = false; const last = barsRef.current[barsRef.current.length - 1]; if (last) fmtLegRef.current(last); }
     });
     if (barsRef.current.length) { series.setData(barsRef.current); const n = barsRef.current.length; try { chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { try { chart.timeScale().scrollToRealTime(); } catch { chart.timeScale().fitContent(); } } fmtLegRef.current(barsRef.current[n - 1]); }
+    // Trigger load-more when user scrolls to the left edge of loaded bars
+    chart.timeScale().subscribeVisibleLogicalRangeChange((range: any) => {
+      if (range && range.from <= 2) try { loadMoreRef.current?.(); } catch {}
+    });
     return () => { chart.remove(); chartRef.current = null; seriesRef.current = null; };
   }, [theme, digits]);
 
@@ -562,6 +568,8 @@ function LWChart({
   useEffect(() => {
     let alive = true;
     barsRef.current = [];
+    loadMoreRef.current = null;
+    loadingMoreRef.current = false;
     // Clear the series immediately so a live tick arriving mid-reseed can't push a
     // bar with a time older than the previous timeframe's last bar (which throws
     // "Cannot update oldest data").
@@ -606,12 +614,36 @@ function LWChart({
     const cacheKey = "cubex-candles:" + symbol + ":" + tf;
     try { const cached = JSON.parse(localStorage.getItem(cacheKey) || "null"); if (cached && cached.length) seed(cached); } catch {}
 
-    fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${tf}`, { cache: "no-store" })
+    fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${tf}&limit=2000`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
         if (!alive) return;
         const ok = d && d.ok && seed(d.candles);
-        if (ok && d.candles) { try { localStorage.setItem(cacheKey, JSON.stringify(d.candles.slice(-300))); } catch {} }
+        if (ok && d.candles) {
+          try { localStorage.setItem(cacheKey, JSON.stringify(d.candles.slice(-300))); } catch {}
+          // Enable left-scroll load-more for deeper history
+          loadMoreRef.current = () => {
+            if (!alive || loadingMoreRef.current || !barsRef.current.length) return;
+            const capturedSym = symRef.current, capturedTf = tfRef.current;
+            const oldest = barsRef.current[0];
+            loadingMoreRef.current = true;
+            fetch(`/api/candles?symbol=${encodeURIComponent(capturedSym)}&tf=${capturedTf}&before=${oldest.time}&limit=1500`, { cache: "no-store" })
+              .then((r2) => r2.json())
+              .then((d2) => {
+                if (!alive || symRef.current !== capturedSym || tfRef.current !== capturedTf) return;
+                if (!d2.ok || !Array.isArray(d2.candles) || !d2.candles.length) { loadMoreRef.current = null; return; }
+                const existing = new Set(barsRef.current.map((b: any) => b.time));
+                const older = d2.candles
+                  .map((c: any) => ({ time: Number(c.time), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }))
+                  .filter((c: any) => isFinite(c.time) && isFinite(c.close) && !existing.has(c.time));
+                if (!older.length) { loadMoreRef.current = null; return; }
+                const merged = [...older, ...barsRef.current].sort((a: any, b: any) => a.time - b.time);
+                try { seriesRef.current?.setData(merged); barsRef.current = merged; onBarsLoaded.current(); } catch {}
+              })
+              .catch(() => {})
+              .finally(() => { loadingMoreRef.current = false; });
+          };
+        }
         // Fallback: the feed returned nothing for this symbol. Synthesize a full
         // 5000-bar history seeded from the first live price we receive.
         if (!ok) {
@@ -629,7 +661,7 @@ function LWChart({
         }
       })
       .catch((e) => console.warn("[LWChart] candle fetch failed", e));
-    return () => { alive = false; };
+    return () => { alive = false; loadMoreRef.current = null; };
   }, [symbol, tf]);
 
   // Live updates: build the forming bar from the live price stream. Ticks are
