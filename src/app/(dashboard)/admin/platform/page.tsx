@@ -364,6 +364,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
   }, []);
   const notifSeen = useRef<Set<string>>(new Set());
   const notifPrimed = useRef(false);
+  const deskOhlcRef = useRef<HTMLDivElement | null>(null);
+  const deskActiveRef = useRef(activeChart); deskActiveRef.current = activeChart;
   async function loadNotifs() {
     try {
       const d = await fetch("/api/notifications").then((r) => r.json());
@@ -1028,7 +1030,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
         </>)}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Platform toolbar: Buy/Sell for active chart \u2014 TF/Candle/Indicators/Symbol Search come from TV's native header */}
+          {/* Platform toolbar: Buy/Sell for active chart + live OHLC legend */}
           <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1">
             {(() => {
               const sym = openCharts[activeChart];
@@ -1050,6 +1052,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   <button onClick={() => place(sym, "BUY")} className="flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-bold transition-all hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff" }}>
                     <span>Buy</span><span className="font-mono">{ask}</span>
                   </button>
+                  <div ref={deskOhlcRef} className="ml-3 font-mono text-[10px]" />
                 </>
               );
             })()}
@@ -1060,7 +1063,14 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 {(() => { const pos = [
                   ...(selAcc ? open.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(selAcc ? pendingOrders.filter((o) => o.symbol === sym && o.accountLogin === selAcc.login) : []).map((o) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread; return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} />; })()}
+                ]; const isFloatSym=(adminSymTypes[sym]??"FLOATING")==="FLOATING"; const cfgSp=adminSymSpreads[sym]||0; const liveSp=liveSpreadPips[sym]; const spPips=(isFloatSym?(liveSp!=null&&liveSp>0?liveSp:cfgSp):cfgSp)+deskExtraSpread;
+                const handleCandleUpdate = i === activeChart ? (b: {open:number;high:number;low:number;close:number}) => {
+                  const el = deskOhlcRef.current; if (!el) return;
+                  const dd = dg(sym); const ch = b.close - b.open, pct = b.open ? (ch / b.open) * 100 : 0;
+                  const col = ch >= 0 ? "#26a69a" : "#ef5350";
+                  el.innerHTML = `<span style="color:var(--muted)">O</span><span style="color:${col}">${gnum(b.open,dd)}</span> <span style="color:var(--muted)">H</span><span style="color:${col}">${gnum(b.high,dd)}</span> <span style="color:var(--muted)">L</span><span style="color:${col}">${gnum(b.low,dd)}</span> <span style="color:var(--muted)">C</span><span style="color:${col}">${gnum(b.close,dd)}</span> <span style="color:${col}">${ch>=0?"+":""}${gnum(ch,dd)} (${pct>=0?"+":""}${pct.toFixed(2)}%)</span>`;
+                } : undefined;
+                return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} onCandleUpdate={handleCandleUpdate} />; })()}
               </div>
             ))}
           </div>

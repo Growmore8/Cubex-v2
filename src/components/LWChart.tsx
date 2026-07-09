@@ -722,10 +722,13 @@ function LWChart({
       // MT5 style: BUY=blue, SELL=red; pending=amber dashed; open=solid thick
       const entryCol = pending ? "#f59e0b" : (p.type === "BUY" ? "#2962ff" : "#f23645");
       const lotsStr = p.lots != null ? ` ${Number(p.lots).toFixed(2)}` : "";
+      const posLabel = !pending && p.ticket != null
+        ? `#${p.type} ${p.ticket}`
+        : `${p.kind ? p.kind + " " : ""}${p.type}${lotsStr}`;
       const entryLine = s.createPriceLine({
         price: p.openPrice, color: entryCol, lineWidth: pending ? 1 : 2,
         lineStyle: pending ? LineStyle.Dashed : LineStyle.Solid, axisLabelVisible: true,
-        title: `${p.kind ? p.kind + " " : ""}${p.type}${lotsStr}`,
+        title: posLabel,
       });
       lineRefs.current.push(entryLine);
       // SL = solid red; TP = solid green (MT5 style: solid, not dotted)
