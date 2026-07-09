@@ -1032,7 +1032,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
                 ];
                 return isTV
-                  ? <TVMobileChart symbol={selSym} tf={tf} theme={theme as "dark" | "light"} digits={dg(selSym)} showDrawingTools={true} symbols={symbols || []} spreadPips={_mobSpreadPips(selSym)} positions={pos} onSymbolChange={(sym) => setSelSym(sym)} onFullscreenRequest={() => setChartFs((f) => !f)} />
+                  ? <TVMobileChart symbol={selSym} tf={tf} theme={theme as "dark" | "light"} digits={dg(selSym)} showDrawingTools={true} symbols={symbols || []} spreadPips={_mobSpreadPips(selSym)} positions={pos} onSymbolChange={(sym) => setSelSym(sym)} onFullscreenRequest={() => setChartFs((f) => !f)} showBuiltinOHLC={false} />
                   : <LWMobileChart symbol={selSym} tf={tf} theme={theme as "dark" | "light"} digits={dg(selSym)} showTools={false} spreadPips={_mobSpreadPips(selSym)} positions={pos} />;
               })()}
               {/* Candle countdown — all charts, near price axis */}

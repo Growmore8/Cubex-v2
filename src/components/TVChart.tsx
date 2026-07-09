@@ -140,75 +140,37 @@ export default function TVChart({
           } catch {}
         };
 
-        // Full TradingView Charting Library: createPositionLine gives the exact
-        // MT5-style colored Y-axis boxes (qty box left + body box right).
-        // lineStyle: 0=solid (open positions), 2=dashed (pending/SL/TP)
-        // lineWidth: 2 for entry lines, 1 for SL/TP
-        const makeLine = async (
-          price: number, qty: string, body: string,
-          lineColor: string, bg: string,
-          lineStyle: number, lineWidth: number,
-        ) => {
-          try {
-            const raw = (chart as any).createPositionLine?.();
-            if (raw == null) throw new Error("unavailable");
-            const pl: any = (raw && typeof (raw as any).then === "function") ? await raw : raw;
-            if (!pl || typeof pl.setPrice !== "function") throw new Error("invalid");
-            if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
-            pl.setPrice(price)
-              .setQuantity(qty)
-              .setText(body)
-              .setLineColor(lineColor)
-              .setLineStyle(lineStyle)
-              .setLineWidth(lineWidth)
-              .setBodyBackgroundColor(bg)
-              .setBodyTextColor("#fff")
-              .setQuantityBackgroundColor(bg)
-              .setQuantityTextColor("#fff");
-            linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
-          } catch {
-            // fallback: horizontal_line shape — solid opaque colored label box
-            await addShape(price, {
-              linecolor: lineColor, linewidth: lineWidth, linestyle: lineStyle,
-              showLabel: true, text: qty + (body ? "  " + body : ""),
-              textcolor: "#fff",
-              fillBackground: true, backgroundColor: bg, backgroundTransparency: 0,
-            });
-          }
-        };
-
         for (const p of positionsRef.current || []) {
           if (drawSeqRef.current !== seq) return;
           const isBuy  = p.type === "BUY";
           const isPend = !!p.kind;
-          const color  = isBuy ? "#2962ff" : "#f23645";
-          const tkt    = p.ticket ? `#${p.ticket}` : "";
+          const color  = isPend ? "#f59e0b" : (isBuy ? "#2962ff" : "#f23645");
+          const tkt    = p.ticket != null ? String(p.ticket) : "";
           const pnlStr = (!isPend && p.pnl !== undefined)
             ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}`
             : "";
+          // Label matches LW chart: "#BUY 123456 +0.50" for open, "LIMIT BUY 0.01" for pending
+          const label  = !isPend && tkt
+            ? `#${p.type} ${tkt}${pnlStr}`
+            : `${p.kind ? p.kind + " " : ""}${p.type} ${Number(p.lots).toFixed(2)}`;
 
-          if (isPend) {
-            // Pending order: dashed line — kind + type in left box, ticket in right box
-            const kindLabel = `${p.kind ?? ""} ${p.type}`.trim();
-            await makeLine(p.openPrice, kindLabel, tkt || fmt(p.openPrice), color, color, 2, 1);
-          } else {
-            // Open position: #BUY / #SELL in left box (matches LW chart style), ticket + P&L in right box
-            const qtyLabel = tkt ? `#${p.type}` : p.type;
-            const bodyLabel = tkt ? `${p.ticket}${pnlStr}` : `${Number(p.lots).toFixed(2)}${pnlStr}`;
-            await makeLine(p.openPrice, qtyLabel, bodyLabel, color, color, 0, 2);
-          }
-          // SL/TP: thin dashed lines with colored Y-axis boxes
+          await addShape(p.openPrice, {
+            linecolor: color, linewidth: isPend ? 1 : 2, linestyle: isPend ? 2 : 0,
+            showLabel: true, text: label, textcolor: "#fff",
+            fillBackground: true, backgroundColor: color, backgroundTransparency: 0,
+          });
+
           if (p.sl && p.sl > 0)
-            await makeLine(p.sl,       "SL", `${tkt}  ${fmt(p.sl)}`,  "#f43f5e", "#f43f5e", 2, 1);
+            await addShape(p.sl, { linecolor: "#f43f5e", linewidth: 1, linestyle: 2, showLabel: true, text: `SL${tkt ? " " + tkt : ""}  ${fmt(p.sl)}`, textcolor: "#fff", fillBackground: true, backgroundColor: "#f43f5e", backgroundTransparency: 0 });
           if (p.tp && p.tp > 0)
-            await makeLine(p.tp,       "TP", `${tkt}  ${fmt(p.tp)}`,  "#10b981", "#10b981", 2, 1);
+            await addShape(p.tp, { linecolor: "#10b981", linewidth: 1, linestyle: 2, showLabel: true, text: `TP${tkt ? " " + tkt : ""}  ${fmt(p.tp)}`, textcolor: "#fff", fillBackground: true, backgroundColor: "#10b981", backgroundTransparency: 0 });
         }
 
-        // Ask spread line — teal, matches standard ask-price color
+        // Ask spread line — teal dashed, matches standard ask-price color
         if (spreadRef.current > 0 && lastBarRef.current && drawSeqRef.current === seq) {
           const spPips   = Math.round(spreadRef.current * 100) / 100;
           const askPrice = lastBarRef.current.close + spPips * Math.pow(10, -dg);
-          await makeLine(askPrice, "Ask", `+${spPips}p  ${fmt(askPrice)}`, "#26a69a", "#26a69a", 2, 1);
+          await addShape(askPrice, { linecolor: "#26a69a", linewidth: 1, linestyle: 2, showLabel: true, text: `Ask +${spPips}p  ${fmt(askPrice)}`, textcolor: "#fff", fillBackground: true, backgroundColor: "#26a69a", backgroundTransparency: 0 });
         }
       } catch {}
     }, 150);

@@ -168,7 +168,6 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [openCharts, setOpenCharts] = useState<string[]>([]);
   const [activeChart, setActiveChart] = useState(0);
   const [showBuySell, setShowBuySell] = useState(true);
-  const ohlcElsRef = useRef<Record<number, HTMLDivElement | null>>({});
 
   const [panels, setPanels] = useState<{ nav: boolean; mw: boolean; toolbox: boolean }>({ nav: true, mw: true, toolbox: true });
   const [ticket, setTicket] = useState<string | null>(null);
@@ -1056,8 +1055,6 @@ const [selAcc, setSelAcc] = useState<any>(null);
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
               <div key={"tile" + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
-                {/* OHLC legend \u2014 top-right of chart tile (below TV header) via DOM ref, updated by onCandleUpdate */}
-                <div ref={(el) => { ohlcElsRef.current[i] = el; }} style={{ position: "absolute", top: 50, right: 68, zIndex: 10, fontFamily: "monospace", fontSize: 11, fontWeight: 600, pointerEvents: "none", whiteSpace: "nowrap", color: theme === "dark" ? "#9aa6bf" : "#475569", textShadow: theme === "dark" ? "0 1px 2px rgba(0,0,0,0.6)" : "none" }} />
                 {/* Buy/Sell overlay \u2014 top-left, positioned below TV header (~38px) + left sidebar (~40px) */}
                 {(() => {
                   const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1));
@@ -1096,15 +1093,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   const isFloatSym = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING";
                   const cfgSp = adminSymSpreads[sym] || 0; const liveSp = liveSpreadPips[sym];
                   const spPips = (isFloatSym ? (liveSp != null && liveSp > 0 ? liveSp : cfgSp) : cfgSp) + deskExtraSpread;
-                  const tileIdx = i;
-                  const tileSym = sym;
-                  const handleCandleUpdate = (b: { open: number; high: number; low: number; close: number }) => {
-                    const el = ohlcElsRef.current[tileIdx]; if (!el) return;
-                    const dd = dg(tileSym); const ch = b.close - b.open, pct = b.open ? (ch / b.open) * 100 : 0;
-                    const col = ch >= 0 ? "#26a69a" : "#ef5350";
-                    el.innerHTML = `<span style="opacity:.6">O</span><span style="color:${col}">${gnum(b.open, dd)}</span> <span style="opacity:.6">H</span><span style="color:${col}">${gnum(b.high, dd)}</span> <span style="opacity:.6">L</span><span style="color:${col}">${gnum(b.low, dd)}</span> <span style="opacity:.6">C</span><span style="color:${col}">${gnum(b.close, dd)}</span> <span style="color:${col}">${ch >= 0 ? "+" : ""}${gnum(ch, dd)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)</span>`;
-                  };
-                  return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} showBuiltinOHLC={false} onCandleUpdate={handleCandleUpdate} />;
+                  return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} showBuiltinOHLC={false} />;
                 })()}
               </div>
             ))}

@@ -205,7 +205,7 @@ function LWChart({
   const legendRef = useRef<HTMLDivElement | null>(null);
   const cfgRef = useRef(cfg); cfgRef.current = cfg;
   const cfgKey = JSON.stringify(cfg || {});
-  const fmtLegRef = useRef<(b: any) => void>(() => {});
+  const fmtLegRef = useRef<(b: any, showIt?: boolean) => void>(() => {});
   const hoveringRef = useRef(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; price: number | null } | null>(null);
   const lineRefs = useRef<any[]>([]);
@@ -336,12 +336,16 @@ function LWChart({
         else if (bestKind === "t") { try { chart.removeSeries(trendRefs.current[bestIdx].series); } catch {} trendRefs.current.splice(bestIdx, 1); setDrawN((n) => n + 1); }
       }
     });
-    // OHLC legend (TradingView-style) — updated on crosshair move / each tick.
-    fmtLegRef.current = (b: any) => {
-      if (!legendRef.current || !b || b.open == null) return;
+    // OHLC legend — only shown when crosshair is active over a candle (hover-only, not static).
+    fmtLegRef.current = (b: any, showIt = false) => {
+      if (!legendRef.current) return;
+      if (!showIt || !b || b.open == null) { legendRef.current.innerHTML = ""; return; }
       const up = b.close >= b.open; const col = up ? "#26a69a" : "#ef5350";
       const ch = b.close - b.open, pct = b.open ? (ch / b.open) * 100 : 0;
+      const ts = b.time ? new Date(Number(b.time) * 1000) : null;
+      const dateStr = ts ? `${ts.getUTCFullYear()}-${String(ts.getUTCMonth()+1).padStart(2,"0")}-${String(ts.getUTCDate()).padStart(2,"0")} ${String(ts.getUTCHours()).padStart(2,"0")}:${String(ts.getUTCMinutes()).padStart(2,"0")}` : "";
       legendRef.current.innerHTML =
+        `${dateStr ? `<span style="opacity:.55;margin-right:6px">${dateStr}</span>` : ""}` +
         `<span style="opacity:.6">O</span><span style="color:${col}">${b.open}</span>` +
         ` <span style="opacity:.6">H</span><span style="color:${col}">${b.high}</span>` +
         ` <span style="opacity:.6">L</span><span style="color:${col}">${b.low}</span>` +
@@ -350,10 +354,10 @@ function LWChart({
     };
     chart.subscribeCrosshairMove((param: any) => {
       const d = param?.seriesData?.get(series);
-      if (d && d.open != null) { hoveringRef.current = true; fmtLegRef.current(d); }
-      else { hoveringRef.current = false; const last = barsRef.current[barsRef.current.length - 1]; if (last) fmtLegRef.current(last); }
+      if (d && d.open != null) { hoveringRef.current = true; fmtLegRef.current({ ...d, time: param.time }, true); }
+      else { hoveringRef.current = false; fmtLegRef.current(null, false); }
     });
-    if (barsRef.current.length) { series.setData(barsRef.current); const n = barsRef.current.length; try { chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { try { chart.timeScale().scrollToRealTime(); } catch { chart.timeScale().fitContent(); } } fmtLegRef.current(barsRef.current[n - 1]); }
+    if (barsRef.current.length) { series.setData(barsRef.current); const n = barsRef.current.length; try { chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { try { chart.timeScale().scrollToRealTime(); } catch { chart.timeScale().fitContent(); } } }
     // Trigger load-more when user scrolls to the left edge of loaded bars
     chart.timeScale().subscribeVisibleLogicalRangeChange((range: any) => {
       if (range && range.from <= 2) try { loadMoreRef.current?.(); } catch {}
@@ -701,7 +705,6 @@ function LWChart({
             : { price: close, color: "transparent", axisLabelVisible: false });
         } catch {}
         const cur = barsRef.current[barsRef.current.length - 1];
-        if (!hoveringRef.current && cur) fmtLegRef.current(cur);
         if (cur) onCandleUpdateRef.current?.(cur);
       } catch { /* out-of-order tick during a reseed — ignore */ }
     };
