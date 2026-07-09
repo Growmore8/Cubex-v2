@@ -348,7 +348,7 @@ function LWChart({
       if (d && d.open != null) { hoveringRef.current = true; fmtLegRef.current(d); }
       else { hoveringRef.current = false; const last = barsRef.current[barsRef.current.length - 1]; if (last) fmtLegRef.current(last); }
     });
-    if (barsRef.current.length) { series.setData(barsRef.current); chart.timeScale().fitContent(); fmtLegRef.current(barsRef.current[barsRef.current.length - 1]); }
+    if (barsRef.current.length) { series.setData(barsRef.current); const n = barsRef.current.length; try { chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { chart.timeScale().fitContent(); } fmtLegRef.current(barsRef.current[n - 1]); }
     return () => { chart.remove(); chartRef.current = null; seriesRef.current = null; };
   }, [theme, digits]);
 
@@ -573,7 +573,7 @@ function LWChart({
         .sort((a: any, b: any) => a.time - b.time)
         .filter((c: any) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
       if (!bars.length) return false;
-      try { seriesRef.current.setData(bars); barsRef.current = bars; chartRef.current?.timeScale().fitContent(); onBarsLoaded.current(); fmtLegRef.current(bars[bars.length - 1]); return true; }
+      try { seriesRef.current.setData(bars); barsRef.current = bars; const n = bars.length; try { chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { chartRef.current?.timeScale().fitContent(); } onBarsLoaded.current(); fmtLegRef.current(bars[n - 1]); return true; }
       catch { return false; }
     }
     // Build a plausible `count`-bar history (random walk) ending at `lastPrice`,

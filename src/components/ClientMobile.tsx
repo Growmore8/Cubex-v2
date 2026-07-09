@@ -8,7 +8,8 @@ import { SymIcon } from "@/lib/symIcon";
 import { iconForNotification } from "@/lib/notif";
 import { COUNTRIES } from "@/config/countries";
 
-const MobileChart = dynamic(() => import("@/components/LWChart"), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">Loading chart…</div> });
+const TVMobileChart = dynamic(() => import("@/components/TVChart"), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">Loading chart…</div> });
+const LWMobileChart = dynamic(() => import("@/components/LWChart"), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">Loading chart…</div> });
 
 const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD@tv-basicstudies"], ["Stoch", "Stochastic@tv-basicstudies"], ["BBands", "BB@tv-basicstudies"], ["MA", "MASimple@tv-basicstudies"], ["ROC", "ROC@tv-basicstudies"]];
 
@@ -201,6 +202,8 @@ export default function ClientMobile({ t }: { t: any }) {
   const [cfgSheet, setCfgSheet] = useState(false);
   const [tfPickerOpen, setTfPickerOpen] = useState(false);
   const chartWrapRef = useRef<HTMLDivElement>(null);
+  const [isTV, setIsTV] = useState(false);
+  useEffect(() => { setIsTV(window.location.hostname === "trade.growthcapitalltd.com"); }, []);
   const [countdown, setCountdown] = useState("");
   useEffect(() => {
     const TF_SEC: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400, "1W": 604800 };
@@ -989,7 +992,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 </svg>
               </button>
               {/* Fullscreen */}
-              <button onClick={() => { setTfPickerOpen(false); if (document.fullscreenElement) { document.exitFullscreen(); } else { chartWrapRef.current?.requestFullscreen(); } }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title="Fullscreen">
+              <button onClick={() => { setTfPickerOpen(false); const el = chartWrapRef.current; if (!el) return; const isFs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement); if (isFs) { (document.exitFullscreen ?? (document as any).webkitExitFullscreen)?.call(document); } else { (el.requestFullscreen ?? (el as any).webkitRequestFullscreen)?.call(el); } }} className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: "var(--muted)", touchAction: "manipulation" }} title="Fullscreen">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.75">
                   <path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" />
                 </svg>
@@ -1023,11 +1026,15 @@ export default function ClientMobile({ t }: { t: any }) {
             )}
             {/* Chart canvas */}
             <div ref={chartWrapRef} className="relative min-h-0 flex-1 overflow-hidden bg-[var(--bg)]">
-              <MobileChart symbol={selSym} tf={tf} theme={theme as "dark" | "light"} digits={dg(selSym)} showTools={false} spreadPips={_mobSpreadPips(selSym)}
-                positions={[
+              {(() => {
+                const pos = [
                   ...(positions || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: o.id, ticket: o.ticket, type: o.type, lots: o.lots, openPrice: Number(o.openPrice), sl: o.sl ? Number(o.sl) : undefined, tp: o.tp ? Number(o.tp) : undefined, pnl: pnlOf(o, prices[o.symbol] ?? o.openPrice, csz(o.symbol)) })),
                   ...(t.pending || []).filter((o: any) => o.symbol === selSym).map((o: any) => ({ id: "pnd-" + o.id, type: o.side, lots: o.lots, openPrice: Number(o.price), sl: o.sl || undefined, tp: o.tp || undefined, kind: o.kind })),
-                ]} />
+                ];
+                return isTV
+                  ? <TVMobileChart symbol={selSym} tf={tf} theme={theme as "dark" | "light"} digits={dg(selSym)} bare={true} showDrawingTools={true} spreadPips={_mobSpreadPips(selSym)} positions={pos} />
+                  : <LWMobileChart symbol={selSym} tf={tf} theme={theme as "dark" | "light"} digits={dg(selSym)} showTools={false} spreadPips={_mobSpreadPips(selSym)} positions={pos} />;
+              })()}
               {/* Candle countdown — bottom-right, left of Y-axis */}
               <div className="pointer-events-none absolute bottom-6 right-16 font-mono text-[10px] tabular-nums" style={{ color: "rgba(138,147,166,0.75)" }}>{countdown}</div>
             </div>
