@@ -96,6 +96,9 @@ export default function TVChart({
   const spreadRef      = useRef(spreadPips ?? 0); spreadRef.current = spreadPips ?? 0;
   const digitsRef      = useRef(digits); digitsRef.current = digits;
   const positionsRef   = useRef(positions); positionsRef.current = positions;
+  const allBarsRef     = useRef<Bar[]>([]);
+  const ohlcOverlayRef = useRef<HTMLDivElement | null>(null);
+  const bareRef        = useRef(bare); bareRef.current = bare;
 
   // Debounce coalesces rapid price-tick renders; version counter discards stale callbacks.
   const drawTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -140,6 +143,31 @@ export default function TVChart({
           } catch {}
         };
 
+        // createPositionLine with empty qty → only the right-side body box is visible,
+        // matching LW chart where the label appears on the right near the price axis.
+        const makeLine = async (
+          price: number, body: string, lineColor: string, bg: string, lineStyle: number, lineWidth: number,
+        ) => {
+          try {
+            const raw = (chart as any).createPositionLine?.();
+            if (raw == null) throw new Error("n/a");
+            const pl: any = (raw && typeof (raw as any).then === "function") ? await raw : raw;
+            if (!pl?.setPrice) throw new Error("invalid");
+            if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
+            pl.setPrice(price).setQuantity("").setText(body)
+              .setLineColor(lineColor).setLineStyle(lineStyle).setLineWidth(lineWidth)
+              .setBodyBackgroundColor(bg).setBodyTextColor("#fff")
+              .setQuantityBackgroundColor("rgba(0,0,0,0)").setQuantityTextColor("rgba(0,0,0,0)");
+            linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
+          } catch {
+            await addShape(price, {
+              linecolor: lineColor, linewidth: lineWidth, linestyle: lineStyle,
+              showLabel: true, text: body, textcolor: "#fff",
+              fillBackground: true, backgroundColor: bg, backgroundTransparency: 0,
+            });
+          }
+        };
+
         for (const p of positionsRef.current || []) {
           if (drawSeqRef.current !== seq) return;
           const isBuy  = p.type === "BUY";
@@ -147,30 +175,23 @@ export default function TVChart({
           const color  = isPend ? "#f59e0b" : (isBuy ? "#2962ff" : "#f23645");
           const tkt    = p.ticket != null ? String(p.ticket) : "";
           const pnlStr = (!isPend && p.pnl !== undefined)
-            ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}`
-            : "";
-          // Label matches LW chart: "#BUY 123456 +0.50" for open, "LIMIT BUY 0.01" for pending
+            ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}` : "";
           const label  = !isPend && tkt
             ? `#${p.type} ${tkt}${pnlStr}`
             : `${p.kind ? p.kind + " " : ""}${p.type} ${Number(p.lots).toFixed(2)}`;
 
-          await addShape(p.openPrice, {
-            linecolor: color, linewidth: isPend ? 1 : 2, linestyle: isPend ? 2 : 0,
-            showLabel: true, text: label, textcolor: "#fff",
-            fillBackground: true, backgroundColor: color, backgroundTransparency: 0,
-          });
-
+          await makeLine(p.openPrice, label, color, color, isPend ? 2 : 0, isPend ? 1 : 2);
           if (p.sl && p.sl > 0)
-            await addShape(p.sl, { linecolor: "#f43f5e", linewidth: 1, linestyle: 2, showLabel: true, text: `SL${tkt ? " " + tkt : ""}  ${fmt(p.sl)}`, textcolor: "#fff", fillBackground: true, backgroundColor: "#f43f5e", backgroundTransparency: 0 });
+            await makeLine(p.sl, `SL${tkt ? " " + tkt : ""}  ${fmt(p.sl)}`, "#f43f5e", "#f43f5e", 2, 1);
           if (p.tp && p.tp > 0)
-            await addShape(p.tp, { linecolor: "#10b981", linewidth: 1, linestyle: 2, showLabel: true, text: `TP${tkt ? " " + tkt : ""}  ${fmt(p.tp)}`, textcolor: "#fff", fillBackground: true, backgroundColor: "#10b981", backgroundTransparency: 0 });
+            await makeLine(p.tp, `TP${tkt ? " " + tkt : ""}  ${fmt(p.tp)}`, "#10b981", "#10b981", 2, 1);
         }
 
-        // Ask spread line — teal dashed, matches standard ask-price color
+        // Ask spread line — teal dashed
         if (spreadRef.current > 0 && lastBarRef.current && drawSeqRef.current === seq) {
           const spPips   = Math.round(spreadRef.current * 100) / 100;
           const askPrice = lastBarRef.current.close + spPips * Math.pow(10, -dg);
-          await addShape(askPrice, { linecolor: "#26a69a", linewidth: 1, linestyle: 2, showLabel: true, text: `Ask +${spPips}p  ${fmt(askPrice)}`, textcolor: "#fff", fillBackground: true, backgroundColor: "#26a69a", backgroundTransparency: 0 });
+          await makeLine(askPrice, `Ask +${spPips}p  ${fmt(askPrice)}`, "#26a69a", "#26a69a", 2, 1);
         }
       } catch {}
     }, 150);
@@ -249,6 +270,13 @@ export default function TVChart({
             lastBarRef.current = bars[bars.length - 1];
             const lb = lastBarRef.current;
             onCandleRef.current?.({ open: lb.open, high: lb.high, low: lb.low, close: lb.close });
+            // Accumulate for hover OHLC tooltip
+            if (firstDataRequest) allBarsRef.current = [...bars];
+            else {
+              const ex = new Set(allBarsRef.current.map((b) => b.time));
+              const older = bars.filter((b) => !ex.has(b.time));
+              if (older.length) allBarsRef.current = [...older, ...allBarsRef.current];
+            }
           }
           onHistory(bars, { noData: bars.length === 0 });
         } catch (e: any) { onError(e.message || "candles fetch failed"); }
@@ -288,6 +316,8 @@ export default function TVChart({
             lastBarRef.current = updated;
             cb(updated);
             onCandleRef.current?.({ open: updated.open, high: updated.high, low: updated.low, close: updated.close });
+            const la = allBarsRef.current, lb = la[la.length - 1];
+            if (lb && lb.time === barTimeMs) { lb.high = updated.high; lb.low = updated.low; lb.close = updated.close; }
           } else {
             const open = lastBarRef.current?.close ?? price;
             const newBar: Bar = {
@@ -299,6 +329,7 @@ export default function TVChart({
             lastBarRef.current = newBar;
             cb(newBar);
             onCandleRef.current?.({ open: newBar.open, high: newBar.high, low: newBar.low, close: newBar.close });
+            allBarsRef.current.push({ ...newBar });
           }
         });
       },
@@ -369,6 +400,40 @@ export default function TVChart({
       } catch {}
 
       drawRef.current(); // initial draw
+
+      // Floating OHLC box shown at crosshair position on hover (TV native legend is disabled)
+      try {
+        widget.activeChart().crosshairMoved().subscribe(null, (param: any) => {
+          const el = ohlcOverlayRef.current; if (!el) return;
+          if (!param?.time || !param.point) { el.style.display = "none"; return; }
+          const tRaw = Number(param.time);
+          // Bars stored with time in ms; TV may give seconds or ms — try both
+          const bar = allBarsRef.current.find((b) => b.time === tRaw || b.time === tRaw * 1000);
+          if (!bar) { el.style.display = "none"; return; }
+          const dg = digitsRef.current;
+          const fP = (v: number) => v.toFixed(dg);
+          const ms = bar.time > 1e11 ? bar.time : bar.time * 1000;
+          const d = new Date(ms);
+          const ds = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")} ${String(d.getUTCHours()).padStart(2,"0")}:${String(d.getUTCMinutes()).padStart(2,"0")}`;
+          el.innerHTML =
+            `<div style="color:#26a69a;font-weight:700;margin-bottom:5px;font-size:10px">${ds}</div>` +
+            `<div style="display:grid;grid-template-columns:auto auto;gap:2px 10px;font-size:10px">` +
+            `<span style="opacity:.55">Open:</span><span>${fP(bar.open)}</span>` +
+            `<span style="opacity:.55">High:</span><span>${fP(bar.high)}</span>` +
+            `<span style="opacity:.55">Low:</span><span>${fP(bar.low)}</span>` +
+            `<span style="opacity:.55">Close:</span><span>${fP(bar.close)}</span>` +
+            `</div>`;
+          const cont = el.parentElement;
+          const cw = cont ? cont.clientWidth : 500, ch = cont ? cont.clientHeight : 500;
+          const TW = 172, TH = 92;
+          // param.point is relative to chart pane; add header/toolbar offsets for non-bare charts
+          const offX = bareRef.current ? 0 : 40, offY = bareRef.current ? 0 : 38;
+          const cx = (param.point.x ?? 0) + offX, cy = (param.point.y ?? 0) + offY;
+          const x = cx + 14 + TW > cw ? Math.max(0, cx - TW - 8) : cx + 14;
+          const y = cy + 10 + TH > ch ? Math.max(0, cy - TH - 6) : cy + 10;
+          el.style.left = x + "px"; el.style.top = y + "px"; el.style.display = "block";
+        });
+      } catch {}
 
       try {
         widget.activeChart().onSymbolChanged().subscribe(null, () => {
@@ -473,6 +538,15 @@ export default function TVChart({
   }, [positions, symbol, digits, spreadPips]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+    <div style={{ position: "absolute", inset: 0 }}>
+      <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+      <div ref={ohlcOverlayRef} style={{
+        display: "none", position: "absolute", pointerEvents: "none", zIndex: 10,
+        background: "rgba(13,17,28,0.9)", border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: 6, padding: "7px 10px", fontFamily: "monospace",
+        color: "#e7ecf3", boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+        backdropFilter: "blur(6px)", minWidth: 148,
+      }} />
+    </div>
   );
 }
