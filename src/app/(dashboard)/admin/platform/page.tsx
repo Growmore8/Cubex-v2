@@ -109,13 +109,6 @@ export default function AdminDeskPage() {
   const [adminSymMax, setAdminSymMax] = useState<Record<string, number>>({});
   const [adminSymIds, setAdminSymIds] = useState<Record<string, string>>({});
   const [adminSymbols, setAdminSymbols] = useState<any[]>([]); // full admin symbol list (includes enabled, swap, commission)
-  const [adminNowMs, setAdminNowMs] = useState(Date.now());
-  useEffect(() => { const iv = setInterval(() => setAdminNowMs(Date.now()), 10000); return () => clearInterval(iv); }, []);
-  const adminSessions = (() => {
-    const t = new Date(adminNowMs).getUTCHours() * 60 + new Date(adminNowMs).getUTCMinutes();
-    const inR = (s: number, e: number) => s < e ? t >= s && t < e : t >= s || t < e;
-    return [{ n: "TKY", o: inR(0, 9*60) }, { n: "LON", o: inR(8*60, 17*60) }, { n: "NY", o: inR(13*60, 22*60) }, { n: "SYD", o: inR(22*60, 7*60) }];
-  })();
   const [symQ, setSymQ] = useState(""); // Symbols tab search query
   const [symCat, setSymCat] = useState("all"); // Symbols tab category filter
   const [symEdit, setSymEdit] = useState<{ sym: string; spread: number; spreadType: string; spreadMax: number; id: string; swapLong: number; swapShort: number; commissionPerLot: number } | null>(null);
@@ -919,15 +912,6 @@ const [selAcc, setSelAcc] = useState<any>(null);
                     </div>
                   ); })}
               </div></>)}
-          </div>
-          <div className="flex items-center gap-2 border-l border-[var(--border)] pl-2 ml-1 text-[9px]">
-            {adminSessions.map((s) => (
-              <span key={s.n} className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.o ? BUY : "#3b4455" }} />
-                <span style={{ color: s.o ? BUY : "var(--muted)", fontWeight: s.o ? 700 : 400 }}>{s.n}</span>
-              </span>
-            ))}
-            <span className="font-mono" style={{ color: "var(--muted)" }}>{new Date(adminNowMs).toUTCString().slice(17, 22)} UTC</span>
           </div>
           <button onClick={() => { setAdminTotpErr(""); setAdminTotpCode(""); if (adminTotpEnabled) setAdminTotpModal("disable"); else adminOpenTotpSetup(); }} disabled={adminTotpBusy} title={adminTotpEnabled ? "2FA enabled – click to disable" : "Set up 2FA"} className="rounded px-2 py-1 text-[var(--muted)] hover:bg-[var(--soft)] disabled:opacity-50" style={adminTotpEnabled ? { color: BUY } : undefined}><i className="fa-solid fa-lock" /></button>
           <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }} className="rounded px-2 py-1 hover:bg-[var(--soft)]" style={{ color: SELL }} title="Logout"><i className="fa-solid fa-right-from-bracket" /></button>
