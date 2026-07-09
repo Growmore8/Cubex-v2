@@ -301,7 +301,7 @@ function LWChart({
     chartRef.current = chart;
     seriesRef.current = series;
     // Bid / Ask price lines (MT5 style) — created once, updated on each tick via ref
-    askLineRef.current = series.createPriceLine({ price: 0, color: "#2196F3", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "Ask" });
+    askLineRef.current = series.createPriceLine({ price: 0, color: "#2196F3", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "Ask" });
     // a recreated chart loses prior drawings/indicators — drop the stale refs
     hlineRefs.current = []; trendRefs.current = []; smaRef.current = null; emaRef.current = null; psarRef.current = null; markersRef.current = null; sigMarkersRef.current = null; ribbonRefs.current = []; trendStart.current = null;
     // Click handler for H-Line / Trend drawing tools
@@ -687,19 +687,18 @@ function LWChart({
     linePricesRef.current = lp;
     for (const p of positions || []) {
       const pending = !!p.kind;
-      // Entry line: BUY=blue, SELL=crimson; pending=amber (dotted)
-      const entryCol = pending ? "#f59e0b" : (p.type === "BUY" ? "#3b82f6" : "#ef4444");
-      // Thin dotted entry line; label shows side + lots only (no running P&L).
+      // MT5 style: BUY=blue, SELL=red; pending=amber dashed; open=solid thick
+      const entryCol = pending ? "#f59e0b" : (p.type === "BUY" ? "#2962ff" : "#f23645");
+      const lotsStr = p.lots != null ? ` ${Number(p.lots).toFixed(2)}` : "";
       const entryLine = s.createPriceLine({
-        price: p.openPrice, color: entryCol, lineWidth: 1,
-        lineStyle: LineStyle.Dotted, axisLabelVisible: true,
-        title: `${p.kind ? p.kind + " " : ""}${p.type} ${Number(p.openPrice)}`,
+        price: p.openPrice, color: entryCol, lineWidth: pending ? 1 : 2,
+        lineStyle: pending ? LineStyle.Dashed : LineStyle.Solid, axisLabelVisible: true,
+        title: `${p.kind ? p.kind + " " : ""}${p.type}${lotsStr}`,
       });
       lineRefs.current.push(entryLine);
-      // SL = rose red; TP = emerald green — thin dotted, same for all trade types.
-      // Label each with its exact price so multiple trades' SL/TP stay distinct.
-      if (p.sl) lineRefs.current.push(s.createPriceLine({ price: p.sl, color: "#f43f5e", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: `SL ${Number(p.sl)}` }));
-      if (p.tp) lineRefs.current.push(s.createPriceLine({ price: p.tp, color: "#10b981", lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: `TP ${Number(p.tp)}` }));
+      // SL = solid red; TP = solid green (MT5 style: solid, not dotted)
+      if (p.sl) lineRefs.current.push(s.createPriceLine({ price: p.sl, color: "#f43f5e", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "SL" }));
+      if (p.tp) lineRefs.current.push(s.createPriceLine({ price: p.tp, color: "#10b981", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "TP" }));
     }
   }, [positions, theme, tf, symbol]);
 
