@@ -1600,15 +1600,6 @@ export default function ClientTerminal() {
                 )}
               </span>
               <span style={{ color: "var(--muted)" }}>Profit: <span className="font-mono font-bold" style={{ color: floating >= 0 ? BUY : SELL }}>{account ? (floating >= 0 ? "+" : "-") + cSym + fmt(Math.abs(floating)) : "--"}</span></span>
-              <span className="ml-auto flex items-center gap-2.5">
-                {sessions.map((s) => (
-                  <span key={s.name} className="flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.open ? "#16c79a" : "#4b5563" }} />
-                    <span className="text-[9px] font-bold" style={{ color: s.open ? "#16c79a" : "#4b5563" }}>{s.name}</span>
-                  </span>
-                ))}
-                <span className="text-[9px] font-mono" style={{ color: "var(--muted)" }}>{utcTime} UTC</span>
-              </span>
             </div>
           </div>
         );
