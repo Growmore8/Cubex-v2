@@ -25,8 +25,9 @@ const nextConfig = {
               "font-src 'self' data: https://cdnjs.cloudflare.com",
               // Block tradingview.com and twemoji CDN — allow only our own WS
               "connect-src 'self' wss: ws:",
-              // TradingView charting library uses blob: iframes internally
-              "frame-src 'self' blob:",
+              // TradingView charting library uses blob: iframes internally;
+              // TVWidget uses tradingview.com/widgetembed for non-licensed domains
+              "frame-src 'self' blob: https://www.tradingview.com",
               "object-src 'none'",
             ].join("; "),
           },
