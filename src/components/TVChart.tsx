@@ -353,10 +353,11 @@ export default function TVChart({
       // Free Advanced Charts Agreement requires TradingView branding to remain visible.
     ];
     if (bare) {
-      // In bare (mobile) mode: keep TV's native header so the built-in fullscreen button
-      // and all tools (indicators, chart type, drawing) are available to the user.
-      // The left drawing toolbar is hidden by default; it re-appears in fullscreen via
-      // the already-enabled "side_toolbar_in_fullscreen_mode" feature.
+      // In bare (mobile) mode: hide TV's native header so only our React header shows
+      // (clean single-header look that matches MT5). The header_in_fullscreen_mode +
+      // side_toolbar_in_fullscreen_mode features ensure all tools reappear when the
+      // user enters TV fullscreen via the fullscreen icon we expose in our React header.
+      disabledFeatures.push("header_toolbar", "header_indicators", "header_chart_type", "header_resolutions");
       if (!showDrawingTools) disabledFeatures.push("left_toolbar");
     }
 
@@ -382,7 +383,7 @@ export default function TVChart({
         "paneProperties.horzGridProperties.color": "rgba(0,0,0,0.04)",
       },
       disabled_features: disabledFeatures,
-      enabled_features:  ["side_toolbar_in_fullscreen_mode", "items_favoriting"],
+      enabled_features:  ["side_toolbar_in_fullscreen_mode", "header_in_fullscreen_mode", "items_favoriting"],
     });
 
     widgetRef.current = widget;

@@ -329,18 +329,6 @@ export default function ClientMobile({ t }: { t: any }) {
   }, []);
   const avatarRef = useRef<HTMLInputElement>(null);
   const baselineRef = useRef<Record<string, number>>({});
-  const [nowMsMob, setNowMsMob] = useState(Date.now());
-  useEffect(() => { const iv = setInterval(() => setNowMsMob(Date.now()), 30000); return () => clearInterval(iv); }, []);
-  const mobSessions = (() => {
-    const t2 = new Date(nowMsMob).getUTCHours() * 60 + new Date(nowMsMob).getUTCMinutes();
-    const inR = (s: number, e: number) => s < e ? t2 >= s && t2 < e : t2 >= s || t2 < e;
-    return [
-      { n: "TKY", o: inR(0, 9 * 60) },
-      { n: "LON", o: inR(8 * 60, 17 * 60) },
-      { n: "NY",  o: inR(13 * 60, 22 * 60) },
-      { n: "SYD", o: inR(22 * 60, 7 * 60) },
-    ];
-  })();
   const haptic = (pattern: number | number[] = 40) => { try { navigator.vibrate(pattern); } catch {} };
 
   // capture a session baseline price for % change movers
@@ -520,17 +508,6 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
         );
       })()}
-
-      {/* Market sessions bar */}
-      <div className="flex items-center gap-3 overflow-x-auto px-4 py-1.5 text-[9px] font-bold" style={{ borderBottom: "1px solid var(--border)", background: "rgba(0,0,0,0.1)" }}>
-        {mobSessions.map((s) => (
-          <span key={s.n} className="flex items-center gap-1 shrink-0">
-            <span className="h-1.5 w-1.5 rounded-full transition-colors" style={{ background: s.o ? "#16c79a" : "#3b4455" }} />
-            <span style={{ color: s.o ? "#16c79a" : "#4b5563" }}>{s.n}</span>
-          </span>
-        ))}
-        <span className="ml-auto shrink-0 font-mono" style={{ color: "var(--muted)" }}>{new Date(nowMsMob).toUTCString().slice(17, 22)} UTC</span>
-      </div>
 
       {/* Read-only banner */}
       {t.readOnly && (
