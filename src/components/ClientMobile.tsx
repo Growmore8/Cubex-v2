@@ -970,7 +970,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
         {/* ───────── CHART ───────── */}
         <KeepAlive active={tab === "chart"}>{(
-          <div ref={chartWrapRef} className={fsMode ? "" : "flex h-full flex-col"} style={fsMode ? { position: "fixed", inset: 0, zIndex: 999, display: "flex", flexDirection: "column", background: "var(--bg)" } : undefined}>
+          <div ref={chartWrapRef} className={fsMode ? "" : "flex h-full flex-col"} style={fsMode ? { position: "fixed", inset: 0, zIndex: 999, display: "flex", flexDirection: "column", background: "var(--bg)", paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" } : undefined}>
             {/* MT5-style slim toolbar — symbol / TF / fullscreen for both LW and TV */}
             <div className="relative flex h-11 shrink-0 items-center border-b border-[var(--border)] bg-[var(--panel)] px-1">
               {/* Symbol picker */}

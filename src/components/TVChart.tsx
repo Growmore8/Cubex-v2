@@ -75,6 +75,7 @@ export default function TVChart({
   const linesRef       = useRef<any[]>([]);
   const isReadyRef     = useRef(false);
   const symbolsRef     = useRef(symbols); symbolsRef.current = symbols;
+  const symbolRef      = useRef(symbol);   // tracks current platform symbol — used to revert TV-native searches
   const onSymRef       = useRef(onSymbolChange); onSymRef.current = onSymbolChange;
   const onCandleRef    = useRef(onCandleUpdate); onCandleRef.current = onCandleUpdate;
   const spreadRef      = useRef(spreadPips ?? 0); spreadRef.current = spreadPips ?? 0;
@@ -343,6 +344,7 @@ export default function TVChart({
       "share_study_templates",
       "header_symbol_search",   // symbol text stays but search icon removed — platform has own pickers
       "symbol_search_hot_key",
+      "edit_buttons_in_legend", // hide hover edit/hide buttons on OHLC legend series row
       "timeframes_toolbar",
       // legend_widget intentionally re-enabled — TV shows OHLC natively (left side on client, top-right on admin via CSS)
       "show_chart_property_page",  // hide settings gear — use Indicators for all options
@@ -374,8 +376,9 @@ export default function TVChart({
       fullscreen: false,
       toolbar_bg: theme === "dark" ? "#0f1117" : "#f0f3fa",
       overrides: theme === "dark" ? {
-        "paneProperties.background":     "#0f1117",
-        "paneProperties.backgroundType": "solid",
+        // No background override — let TV's "Dark" theme control the canvas color
+        // so changeTheme("Light") actually switches the background (custom overrides persist
+        // across changeTheme calls and would keep the canvas dark in light mode).
         "paneProperties.vertGridProperties.color": "rgba(255,255,255,0.04)",
         "paneProperties.horzGridProperties.color": "rgba(255,255,255,0.04)",
       } : {
@@ -410,7 +413,15 @@ export default function TVChart({
 
       try {
         widget.activeChart().onSymbolChanged().subscribe(null, () => {
-          try { onSymRef.current?.(widget.activeChart().symbol()); } catch {}
+          try {
+            const tvSym = widget.activeChart().symbol();
+            if (tvSym !== symbolRef.current) {
+              // User changed symbol via TV's native OHLC legend or search — revert to
+              // the platform's current symbol. Symbol changes must go through the platform's
+              // own market-watch / symbol picker so only market-watch symbols are selectable.
+              widget.activeChart().setSymbol(symbolRef.current, () => {});
+            }
+          } catch {}
         });
       } catch {}
     };
@@ -441,6 +452,7 @@ export default function TVChart({
   // ── Symbol change ────────────────────────────────────────────────────────────
   useEffect(() => {
     const w = widgetRef.current; if (!w || !symbol) return;
+    symbolRef.current = symbol; // update before setSymbol so onSymbolChanged sees it as a programmatic change
     const apply = () => {
       try {
         const chart = w.activeChart();
