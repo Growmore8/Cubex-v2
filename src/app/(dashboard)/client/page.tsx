@@ -1380,8 +1380,18 @@ export default function ClientTerminal() {
               const t = new Date(h.closedAt || h.closeTime || h.closeDate || 0).getTime();
               return t >= cutoff;
             });
+            const tabs = (
+              <div className="sticky top-0 z-10 flex gap-1 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5">
+                {(["today", "week", "month", "all"] as const).map((r) => (
+                  <button key={r} onClick={() => setAnalyticsRange(r)} className="flex-1 rounded py-0.5 text-[9px] font-semibold capitalize" style={{ background: analyticsRange === r ? "var(--accent)" : "transparent", color: analyticsRange === r ? "#fff" : "var(--muted)", border: "1px solid " + (analyticsRange === r ? "transparent" : "var(--border)") }}>{r === "today" ? "Today" : r === "week" ? "7D" : r === "month" ? "30D" : "All"}</button>
+                ))}
+              </div>
+            );
             if (!rows.length) return (
-              <div className="flex h-full items-center justify-center text-[11px] italic" style={{ color: "var(--muted)" }}>No closed trades{analyticsRange !== "all" ? " in this period" : ""}.</div>
+              <div className="text-[11px]">
+                {tabs}
+                <div className="flex h-32 items-center justify-center italic" style={{ color: "var(--muted)" }}>No closed trades{analyticsRange !== "all" ? " in this period" : ""}.</div>
+              </div>
             );
             const wins = rows.filter((h: any) => Number(h.pnl) > 0).length;
             const losses = rows.filter((h: any) => Number(h.pnl) < 0).length;
@@ -1405,11 +1415,7 @@ export default function ClientTerminal() {
             );
             return (
               <div className="text-[11px]">
-                <div className="sticky top-0 z-10 flex gap-1 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5">
-                  {(["today", "week", "month", "all"] as const).map((r) => (
-                    <button key={r} onClick={() => setAnalyticsRange(r)} className="flex-1 rounded py-0.5 text-[9px] font-semibold capitalize" style={{ background: analyticsRange === r ? "var(--accent)" : "transparent", color: analyticsRange === r ? "#fff" : "var(--muted)", border: "1px solid " + (analyticsRange === r ? "transparent" : "var(--border)") }}>{r === "today" ? "Today" : r === "week" ? "7D" : r === "month" ? "30D" : "All"}</button>
-                  ))}
-                </div>
+                {tabs}
                 {stat("Total Trades", String(rows.length))}
                 {stat("Win Rate", rows.length ? (wins / rows.length * 100).toFixed(1) + "%" : "—", wins > losses ? BUY : SELL)}
                 {stat("Wins / Losses", `${wins} / ${losses}`)}

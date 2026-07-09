@@ -1205,7 +1205,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                             <input type="number" step="0.00001" className={tInp} placeholder="0" value={ei("tp", p.tp ? Number(p.tp).toFixed(dg(p.symbol)) : "")} onChange={(e) => { setIe("tp", e.target.value); }} />
                           </td>
                           <td className="px-2 py-1 text-right">{pxFmt(p.symbol, cur)}</td>
-                          <td className="px-1 py-0.5 text-right"><span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums" style={{ background: pl >= 0 ? "rgba(38,166,154,0.13)" : "rgba(239,83,80,0.13)", color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+" : "") + gnum(pl, 2)}</span></td>
+                          <td className="px-2 py-1 text-right"><span className="text-[10px] font-bold tabular-nums" style={{ color: pl >= 0 ? BUY : SELL }}>{(pl >= 0 ? "+" : "") + gnum(pl, 2)}</span></td>
                           {swapEnabled && <><td className="px-2 py-1 text-right" style={{ color: Number(p.swap ?? 0) >= 0 ? BUY : SELL }} title="Accumulated swap">{Number(p.swap ?? 0) !== 0 ? gnum(Number(p.swap), 2) : "—"}</td>
                           <td className="px-2 py-1 text-right" style={{ color: SELL }} title="Commission charged">{Number(p.commission ?? 0) !== 0 ? gnum(Number(p.commission), 2) : "—"}</td></>}
                           <td className="px-2 py-1 text-right whitespace-nowrap">
