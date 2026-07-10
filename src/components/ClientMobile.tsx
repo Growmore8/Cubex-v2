@@ -167,22 +167,37 @@ function Sparkline({ data, up, w = 50, h = 20, full }: { data?: number[]; up: bo
   );
 }
 
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    seed = (seed * 1664525 + 1013904223) & 0x7fffffff;
+    const j = ((seed >>> 0) % (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 const WORLD_CREATORS = [
-  { id: "elon",    name: "Elon Musk",         handle: "@elonmusk",        cat: "Tech & Business", bg: "#1a1a2e", fg: "#e040fb", followers: "185.2M", img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Elon_Musk_Royal_Society_%28crop2%29.jpg/120px-Elon_Musk_Royal_Society_%28crop2%29.jpg" },
-  { id: "trump",   name: "Donald Trump",      handle: "@realDonaldTrump", cat: "Politics",        bg: "#b71c1c", fg: "#ffcdd2", followers: "92.1M",  img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Donald_Trump_official_portrait.jpg/120px-Donald_Trump_official_portrait.jpg" },
-  { id: "buffett", name: "Warren Buffett",    handle: "@WarrenBuffett",   cat: "Investing",       bg: "#1b5e20", fg: "#a5d6a7", followers: "1.8M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Warren_Buffett_KU_Visit.jpg/120px-Warren_Buffett_KU_Visit.jpg" },
-  { id: "saylor",  name: "Michael Saylor",    handle: "@saylor",          cat: "Crypto",          bg: "#e65100", fg: "#fff3e0", followers: "4.2M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Michael_Saylor_BTC_2021.jpg/120px-Michael_Saylor_BTC_2021.jpg" },
-  { id: "dalio",   name: "Ray Dalio",         handle: "@RayDalio",        cat: "Finance",         bg: "#0d47a1", fg: "#bbdefb", followers: "2.1M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Ray_Dalio_2019_%28cropped%29.jpg/120px-Ray_Dalio_2019_%28cropped%29.jpg" },
-  { id: "cathie",  name: "Cathie Wood",       handle: "@CathieDWood",     cat: "Investing",       bg: "#4a148c", fg: "#ce93d8", followers: "1.3M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Cathie_Wood_2021.jpg/120px-Cathie_Wood_2021.jpg" },
-  { id: "vitalik", name: "Vitalik Buterin",   handle: "@VitalikButerin",  cat: "Crypto",          bg: "#37474f", fg: "#80deea", followers: "5.8M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Vitalik_Buterin_TechCrunch_London_2015_%28cropped%29.jpg/120px-Vitalik_Buterin_TechCrunch_London_2015_%28cropped%29.jpg" },
-  { id: "beyonce", name: "Beyoncé",           handle: "@Beyonce",         cat: "Entertainment",   bg: "#f57f17", fg: "#fff8e1", followers: "312M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Beyonc%C3%A9_at_The_London_Stadium_%282%29_%28cropped%29.png/120px-Beyonc%C3%A9_at_The_London_Stadium_%282%29_%28cropped%29.png" },
-  { id: "ronaldo", name: "Cristiano Ronaldo", handle: "@Cristiano",       cat: "Sports",          bg: "#880e4f", fg: "#f48fb1", followers: "638M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Cristiano_Ronaldo_2018.jpg/120px-Cristiano_Ronaldo_2018.jpg" },
-  { id: "mrbeast", name: "MrBeast",           handle: "@MrBeast",         cat: "Creator",         bg: "#1a237e", fg: "#90caf9", followers: "240M",   img: "" },
-  { id: "soros",   name: "George Soros",      handle: "@georgesoros",     cat: "Finance",         bg: "#212121", fg: "#bdbdbd", followers: "890K",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/George_Soros_-_Festival_Economia_2012_1_%28cropped%29.jpg/120px-George_Soros_-_Festival_Economia_2012_1_%28cropped%29.jpg" },
-  { id: "pmarca",  name: "Marc Andreessen",   handle: "@pmarca",          cat: "Tech VC",         bg: "#004d40", fg: "#80cbc4", followers: "1.2M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Marc_Andreessen_at_SXSW_2014_%28cropped%29.jpg/120px-Marc_Andreessen_at_SXSW_2014_%28cropped%29.jpg" },
-  { id: "taylor",  name: "Taylor Swift",      handle: "@taylorswift13",   cat: "Music",           bg: "#4e342e", fg: "#ffccbc", followers: "282M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Taylor_Swift_at_the_2023_MTV_VMAs_3.png/120px-Taylor_Swift_at_the_2023_MTV_VMAs_3.png" },
-  { id: "drake",   name: "Drake",             handle: "@Drake",           cat: "Music",           bg: "#263238", fg: "#cfd8dc", followers: "145M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Drake_-_Aubrey_%26_the_Three_Migos_Tour_%28cropped%29.jpg/120px-Drake_-_Aubrey_%26_the_Three_Migos_Tour_%28cropped%29.jpg" },
-  { id: "lebron",  name: "LeBron James",      handle: "@KingJames",       cat: "Sports",          bg: "#bf360c", fg: "#ffccbc", followers: "162M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/LeBron_James_%2851959977144%29_%28cropped%29.jpg/120px-LeBron_James_%2851959977144%29_%28cropped%29.jpg" },
+  { id: "elon",    name: "Elon Musk",         handle: "@elonmusk",         cat: "Tech & Business", bg: "#1a1a2e", fg: "#e040fb", followers: "185.2M", img: "https://unavatar.io/twitter/elonmusk" },
+  { id: "trump",   name: "Donald Trump",      handle: "@realDonaldTrump",  cat: "Politics",        bg: "#b71c1c", fg: "#ffcdd2", followers: "92.1M",  img: "https://unavatar.io/twitter/realdonaldtrump" },
+  { id: "buffett", name: "Warren Buffett",    handle: "@WarrenBuffett",    cat: "Investing",       bg: "#1b5e20", fg: "#a5d6a7", followers: "1.8M",   img: "https://unavatar.io/twitter/warrenbuffett" },
+  { id: "saylor",  name: "Michael Saylor",    handle: "@saylor",           cat: "Crypto",          bg: "#e65100", fg: "#fff3e0", followers: "4.2M",   img: "https://unavatar.io/twitter/saylor" },
+  { id: "dalio",   name: "Ray Dalio",         handle: "@RayDalio",         cat: "Finance",         bg: "#0d47a1", fg: "#bbdefb", followers: "2.1M",   img: "https://unavatar.io/twitter/raydalio" },
+  { id: "cathie",  name: "Cathie Wood",       handle: "@CathieDWood",      cat: "Investing",       bg: "#4a148c", fg: "#ce93d8", followers: "1.3M",   img: "https://unavatar.io/twitter/cathiedwood" },
+  { id: "vitalik", name: "Vitalik Buterin",   handle: "@VitalikButerin",   cat: "Crypto",          bg: "#37474f", fg: "#80deea", followers: "5.8M",   img: "https://unavatar.io/twitter/vitalikbuterin" },
+  { id: "beyonce", name: "Beyoncé",           handle: "@Beyonce",          cat: "Entertainment",   bg: "#f57f17", fg: "#fff8e1", followers: "312M",   img: "https://unavatar.io/twitter/beyonce" },
+  { id: "ronaldo", name: "Cristiano Ronaldo", handle: "@Cristiano",        cat: "Sports",          bg: "#880e4f", fg: "#f48fb1", followers: "638M",   img: "https://unavatar.io/twitter/cristiano" },
+  { id: "mrbeast", name: "MrBeast",           handle: "@MrBeast",          cat: "Creator",         bg: "#1a237e", fg: "#90caf9", followers: "240M",   img: "https://unavatar.io/twitter/mrbeast" },
+  { id: "soros",   name: "George Soros",      handle: "@georgesoros",      cat: "Finance",         bg: "#212121", fg: "#bdbdbd", followers: "890K",   img: "https://unavatar.io/twitter/georgesoros" },
+  { id: "pmarca",  name: "Marc Andreessen",   handle: "@pmarca",           cat: "Tech VC",         bg: "#004d40", fg: "#80cbc4", followers: "1.2M",   img: "https://unavatar.io/twitter/pmarca" },
+  { id: "taylor",  name: "Taylor Swift",      handle: "@taylorswift13",    cat: "Music",           bg: "#4e342e", fg: "#ffccbc", followers: "282M",   img: "https://unavatar.io/twitter/taylorswift13" },
+  { id: "drake",   name: "Drake",             handle: "@Drake",            cat: "Music",           bg: "#263238", fg: "#cfd8dc", followers: "145M",   img: "https://unavatar.io/twitter/drake" },
+  { id: "lebron",  name: "LeBron James",      handle: "@KingJames",        cat: "Sports",          bg: "#bf360c", fg: "#ffccbc", followers: "162M",   img: "https://unavatar.io/twitter/kingjames" },
+  { id: "gates",   name: "Bill Gates",        handle: "@BillGates",        cat: "Tech & Philanthropy", bg: "#01579b", fg: "#b3e5fc", followers: "65.8M",  img: "https://unavatar.io/twitter/billgates" },
+  { id: "oprah",   name: "Oprah Winfrey",     handle: "@Oprah",            cat: "Entertainment",   bg: "#6a1b9a", fg: "#e1bee7", followers: "43.4M",  img: "https://unavatar.io/twitter/oprah" },
+  { id: "obama",   name: "Barack Obama",      handle: "@BarackObama",      cat: "Politics",        bg: "#1565c0", fg: "#bbdefb", followers: "133M",   img: "https://unavatar.io/twitter/barackobama" },
+  { id: "messi",   name: "Lionel Messi",      handle: "@TeamMessi",        cat: "Sports",          bg: "#283593", fg: "#c5cae9", followers: "107M",   img: "https://unavatar.io/twitter/teammessi" },
+  { id: "rihanna", name: "Rihanna",           handle: "@rihanna",          cat: "Music",           bg: "#880e4f", fg: "#fce4ec", followers: "107M",   img: "https://unavatar.io/twitter/rihanna" },
 ];
 
 export default function ClientMobile({ t }: { t: any }) {
@@ -766,21 +781,23 @@ export default function ClientMobile({ t }: { t: any }) {
                 if (dx < 0 && cur < ids.length - 1) switchAcc(ids[cur + 1]);
                 else if (dx > 0 && cur > 0) switchAcc(ids[cur - 1]);
               }}>
-              <div className="cp-card relative overflow-hidden rounded-[20px] px-5 py-7" style={{
+              <div className="cp-card relative overflow-hidden rounded-[12px] px-5 py-7" style={{
                 backgroundImage: cIsLive
-                  /* LIVE — Egg-Sour: lime top-left · warm orange centre · peach-pink bottom-right · cream corner */
-                  ? "radial-gradient(ellipse 70% 62% at 3% 6%, rgba(184,222,30,0.96) 0%, rgba(184,222,30,0.40) 42%, transparent 66%), radial-gradient(ellipse 40% 36% at 26% 22%, rgba(228,248,75,0.62) 0%, transparent 50%), radial-gradient(ellipse 72% 66% at 62% 60%, rgba(252,148,28,0.94) 0%, rgba(252,148,28,0.28) 50%, transparent 70%), radial-gradient(ellipse 52% 48% at 92% 90%, rgba(250,152,125,0.84) 0%, rgba(250,152,125,0.18) 46%, transparent 66%), radial-gradient(ellipse 42% 38% at 96% 3%, rgba(255,252,200,0.90) 0%, transparent 50%), linear-gradient(138deg,#e8fab0 0%,#f6f8a0 18%,#fde498 42%,#fdccaa 68%,#fcc0b5 88%,#fff4f0 100%)"
-                  /* DEMO — Cotton Candy: periwinkle top-left · dusty rose centre · warm gold bottom-right · bright white glow top-right */
-                  : "radial-gradient(ellipse 78% 70% at 2% 5%, rgba(165,148,230,0.88) 0%, rgba(165,148,230,0.30) 44%, transparent 65%), radial-gradient(ellipse 68% 62% at 25% 72%, rgba(235,142,162,0.90) 0%, rgba(235,142,162,0.28) 46%, transparent 66%), radial-gradient(ellipse 65% 58% at 90% 95%, rgba(250,195,112,0.86) 0%, rgba(250,195,112,0.22) 46%, transparent 66%), radial-gradient(ellipse 48% 44% at 75% 28%, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.50) 32%, transparent 55%), radial-gradient(ellipse 36% 32% at 96% 5%, rgba(212,202,252,0.70) 0%, transparent 50%), linear-gradient(135deg,#e0d5f8 0%,#f2dce8 26%,#f6d6d2 52%,#fce6be 76%,#fff6e4 100%)",
+                  /* LIVE — theme-warm (spec exact): lime→yellow→orange→pink */
+                  ? "radial-gradient(120% 120% at 80% 70%, rgba(255,140,90,.9), rgba(255,140,90,0) 55%), radial-gradient(120% 120% at 20% 90%, rgba(255,120,190,.75), rgba(255,120,190,0) 55%), linear-gradient(135deg,#d6f28a 0%,#f6e58a 35%,#ffb27a 65%,#ff9ec2 100%)"
+                  /* DEMO — theme-cool (spec exact): pink→lavender→sky-blue */
+                  : "radial-gradient(120% 120% at 20% 80%, rgba(240,140,220,.8), rgba(240,140,220,0) 55%), radial-gradient(120% 120% at 85% 70%, rgba(140,200,255,.8), rgba(140,200,255,0) 55%), linear-gradient(135deg,#ffd1ec 0%,#e9d4ff 45%,#cfe3ff 75%,#d7f0ff 100%)",
                 color: "#1a1d21",
-                boxShadow: "0 0 8px rgba(0,0,0,0.12), 0 2px 16px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.12), 0 12px 28px rgba(0,0,0,0.12)",
+                boxShadow: "0 0 8px rgba(0,0,0,.12), 0 2px 16px rgba(0,0,0,.12), 0 4px 20px rgba(0,0,0,.12), 0 12px 28px rgba(0,0,0,.12)",
               }}>
                 {/* all content sits above ::before (z:1) and ::after (z:2) */}
                 <div style={{ position: "relative", zIndex: 3 }}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
                       <div className="text-[11px] font-bold tracking-[0.2em]" style={{ color: "rgba(26,29,33,0.85)" }}>{(brand?.name || "").toUpperCase() || "TRADING"}</div>
-                      <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(26,29,33,0.12)", color: "#1a1d21" }}>{account?.type}</span>
+                      {cIsLive
+                        ? <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "#166534" }}><span className="cp-live-dot" />Live</span>
+                        : <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(26,29,33,0.12)", color: "#1a1d21" }}>Demo</span>}
                     </div>
                     <svg width="36" height="28" viewBox="0 0 24 22" fill="none">
                       <circle cx="3.5" cy="11" r="2" fill="rgba(26,29,33,0.68)" />
@@ -1190,10 +1207,14 @@ export default function ClientMobile({ t }: { t: any }) {
                     </div>
                   )}
 
-                  {/* ── Following tab — world creators ── */}
-                  {discoverTab === "following" && (
+                  {/* ── Following tab — world creators (daily shuffle) ── */}
+                  {discoverTab === "following" && (() => {
+                    const today = new Date();
+                    const daySeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+                    const dailyCreators = seededShuffle(WORLD_CREATORS, daySeed);
+                    return (
                     <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-                      {WORLD_CREATORS.map((c) => {
+                      {dailyCreators.map((c) => {
                         const isFollowed = followedCreators.has(c.id);
                         const initials = c.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
                         return (
@@ -1225,7 +1246,8 @@ export default function ClientMobile({ t }: { t: any }) {
                         );
                       })}
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* ── Discover / News posts ── */}
                   {discoverTab === "discover" && (
