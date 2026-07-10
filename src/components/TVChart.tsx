@@ -156,8 +156,7 @@ export default function TVChart({
             if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
             pl.setPrice(price).setQuantity("").setText(body)
               .setLineColor(lineColor).setLineStyle(lineStyle).setLineWidth(lineWidth)
-              .setBodyBackgroundColor(bg).setBodyTextColor("#fff")
-              .setQuantityBackgroundColor("transparent").setQuantityTextColor("transparent");
+              .setBodyBackgroundColor(bg).setBodyTextColor("#fff");
             linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
           } catch {
             await addShape(price, {

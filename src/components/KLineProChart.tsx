@@ -22,6 +22,7 @@ interface Props {
   onActionsReady?: (actions: TVChartActions) => void;
   spreadPips?: number;
   showBuiltinOHLC?: boolean;
+  onTfChange?: (tf: string) => void;
 }
 
 // Domain that holds the licensed TradingView Advanced Charting Library.
@@ -56,6 +57,7 @@ export default function KLineProChart(props: Props) {
       positions={props.positions as any}
       spreadPips={props.spreadPips}
       onCandleUpdate={props.onCandleUpdate}
+      onTfChange={props.onTfChange}
     />
   );
 }

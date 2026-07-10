@@ -168,7 +168,7 @@ export type ChartPosition = {
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
 function LWChart({
-  symbol, tf, theme, positions, digits = 2, showTools = true, ind, cfg, calcPnl, tool: toolProp, onTool, clearKey, spreadPips, onCandleUpdate,
+  symbol, tf, theme, positions, digits = 2, showTools = true, ind, cfg, calcPnl, tool: toolProp, onTool, clearKey, spreadPips, onCandleUpdate, onTfChange,
 }: {
   symbol: string;
   tf: string;
@@ -179,6 +179,7 @@ function LWChart({
   showTools?: boolean;
   spreadPips?: number;
   onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
+  onTfChange?: (tf: string) => void;
   /** Pure P&L formula from the parent so the chart can update position labels
       live on its own internal tick (without re-rendering). */
   calcPnl?: (p: ChartPosition, price: number) => number;
@@ -201,11 +202,10 @@ function LWChart({
   const spreadPipsRef = useRef(spreadPips ?? 0);
   spreadPipsRef.current = spreadPips ?? 0;
   const onCandleUpdateRef = useRef(onCandleUpdate); onCandleUpdateRef.current = onCandleUpdate;
-  // TradingView-style OHLC legend (updated via ref, no re-render) + right-click menu
-  const legendRef = useRef<HTMLDivElement | null>(null);
+  // Floating OHLC tooltip (appears near crosshair on hover, same style as TV chart)
+  const ohlcBoxRef = useRef<HTMLDivElement | null>(null);
   const cfgRef = useRef(cfg); cfgRef.current = cfg;
   const cfgKey = JSON.stringify(cfg || {});
-  const fmtLegRef = useRef<(b: any, showIt?: boolean) => void>(() => {});
   const hoveringRef = useRef(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; price: number | null } | null>(null);
   const lineRefs = useRef<any[]>([]);
@@ -336,26 +336,36 @@ function LWChart({
         else if (bestKind === "t") { try { chart.removeSeries(trendRefs.current[bestIdx].series); } catch {} trendRefs.current.splice(bestIdx, 1); setDrawN((n) => n + 1); }
       }
     });
-    // OHLC legend — only shown when crosshair is active over a candle (hover-only, not static).
-    fmtLegRef.current = (b: any, showIt = false) => {
-      if (!legendRef.current) return;
-      if (!showIt || !b || b.open == null) { legendRef.current.innerHTML = ""; return; }
-      const up = b.close >= b.open; const col = up ? "#26a69a" : "#ef5350";
-      const ch = b.close - b.open, pct = b.open ? (ch / b.open) * 100 : 0;
-      const ts = b.time ? new Date(Number(b.time) * 1000) : null;
-      const dateStr = ts ? `${ts.getUTCFullYear()}-${String(ts.getUTCMonth()+1).padStart(2,"0")}-${String(ts.getUTCDate()).padStart(2,"0")} ${String(ts.getUTCHours()).padStart(2,"0")}:${String(ts.getUTCMinutes()).padStart(2,"0")}` : "";
-      legendRef.current.innerHTML =
-        `${dateStr ? `<span style="opacity:.55;margin-right:6px">${dateStr}</span>` : ""}` +
-        `<span style="opacity:.6">O</span><span style="color:${col}">${b.open}</span>` +
-        ` <span style="opacity:.6">H</span><span style="color:${col}">${b.high}</span>` +
-        ` <span style="opacity:.6">L</span><span style="color:${col}">${b.low}</span>` +
-        ` <span style="opacity:.6">C</span><span style="color:${col}">${b.close}</span>` +
-        ` <span style="color:${col}">${ch >= 0 ? "+" : ""}${ch.toFixed(digits)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)</span>`;
-    };
+    // Floating OHLC tooltip — appears near crosshair on hover (no static top legend).
     chart.subscribeCrosshairMove((param: any) => {
+      const el = ohlcBoxRef.current;
       const d = param?.seriesData?.get(series);
-      if (d && d.open != null) { hoveringRef.current = true; fmtLegRef.current({ ...d, time: param.time }, true); }
-      else { hoveringRef.current = false; fmtLegRef.current(null, false); }
+      if (d && d.open != null && el) {
+        hoveringRef.current = true;
+        const ts = param.time ? new Date(Number(param.time) * 1000) : null;
+        const dateStr = ts
+          ? `${ts.getUTCFullYear()}-${String(ts.getUTCMonth()+1).padStart(2,"0")}-${String(ts.getUTCDate()).padStart(2,"0")} ${String(ts.getUTCHours()).padStart(2,"0")}:${String(ts.getUTCMinutes()).padStart(2,"0")}`
+          : "";
+        const fP = (v: number) => Number(v).toFixed(digits);
+        el.innerHTML =
+          `<div style="color:#26a69a;font-weight:700;margin-bottom:5px;font-size:10px">${dateStr}</div>` +
+          `<div style="display:grid;grid-template-columns:auto auto;gap:2px 10px;font-size:10px">` +
+          `<span style="opacity:.55">Open:</span><span>${fP(d.open)}</span>` +
+          `<span style="opacity:.55">High:</span><span>${fP(d.high)}</span>` +
+          `<span style="opacity:.55">Low:</span><span>${fP(d.low)}</span>` +
+          `<span style="opacity:.55">Close:</span><span>${fP(d.close)}</span>` +
+          `</div>`;
+        const cont = el.parentElement;
+        const cw = cont ? cont.clientWidth : 500, ch2 = cont ? cont.clientHeight : 500;
+        const TW = 172, TH = 92;
+        const cx = param.point?.x ?? 0, cy = param.point?.y ?? 0;
+        const x = cx + 14 + TW > cw ? Math.max(0, cx - TW - 8) : cx + 14;
+        const y = cy + 10 + TH > ch2 ? Math.max(0, cy - TH - 6) : cy + 10;
+        el.style.left = x + "px"; el.style.top = y + "px"; el.style.display = "block";
+      } else {
+        hoveringRef.current = false;
+        if (el) el.style.display = "none";
+      }
     });
     if (barsRef.current.length) { series.setData(barsRef.current); const n = barsRef.current.length; try { chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { try { chart.timeScale().scrollToRealTime(); } catch { chart.timeScale().fitContent(); } } }
     // Trigger load-more when user scrolls to the left edge of loaded bars
@@ -588,7 +598,7 @@ function LWChart({
         .sort((a: any, b: any) => a.time - b.time)
         .filter((c: any) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
       if (!bars.length) return false;
-      try { seriesRef.current.setData(bars); barsRef.current = bars; const n = bars.length; try { chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { chartRef.current?.timeScale().fitContent(); } onBarsLoaded.current(); fmtLegRef.current(bars[n - 1]); onCandleUpdateRef.current?.(bars[n - 1]); return true; }
+      try { seriesRef.current.setData(bars); barsRef.current = bars; const n = bars.length; try { chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { chartRef.current?.timeScale().fitContent(); } onBarsLoaded.current(); onCandleUpdateRef.current?.(bars[n - 1]); return true; }
       catch { return false; }
     }
     // Build a plausible `count`-bar history (random walk) ending at `lastPrice`,
@@ -796,12 +806,24 @@ function LWChart({
       )}
       {/* Chart column */}
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+        {/* TF selector bar — only shown on LW chart when parent provides onTfChange */}
+        {onTfChange && (
+          <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "3px 6px", borderBottom: `1px solid ${bord}`, background: panelBg, flexShrink: 0 }}>
+            {["1M","5M","15M","30M","1H","4H","1D"].map((t) => (
+              <button key={t} onClick={() => onTfChange(t)} style={{
+                padding: "1px 7px", fontSize: 10, fontWeight: tf === t ? 700 : 500, border: "none", borderRadius: 4, cursor: "pointer",
+                background: tf === t ? "#2962ff" : "transparent",
+                color: tf === t ? "#fff" : (theme === "dark" ? "#7a8699" : "#64748b"),
+              }}>{t}</button>
+            ))}
+          </div>
+        )}
         {/* Main price chart */}
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}
           onContextMenu={(e) => { e.preventDefault(); let price: number | null = null; try { const r = wrapRef.current?.getBoundingClientRect(); if (r && seriesRef.current) price = seriesRef.current.coordinateToPrice(e.clientY - r.top); } catch {} setCtxMenu({ x: e.clientX, y: e.clientY, price }); }}>
           <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
-          {/* TradingView-style OHLC legend — always visible; left offset shifts right of Trade toggle when showTools */}
-          <div ref={legendRef} style={{ position: "absolute", top: 8, left: showTools ? 70 : 8, zIndex: 6, fontSize: 11, fontWeight: 600, pointerEvents: "none", whiteSpace: "nowrap", color: theme === "dark" ? "#9aa6bf" : "#475569", textShadow: theme === "dark" ? "0 1px 2px rgba(0,0,0,0.6)" : "none" }} />
+          {/* Floating OHLC tooltip — appears near crosshair on hover */}
+          <div ref={ohlcBoxRef} style={{ display: "none", position: "absolute", pointerEvents: "none", zIndex: 10, background: "rgba(13,17,28,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "7px 10px", fontFamily: "monospace", color: "#e7ecf3", boxShadow: "0 4px 20px rgba(0,0,0,0.5)", backdropFilter: "blur(6px)", minWidth: 148 }} />
           {/* Desktop drawing tools (H-line / trend / clear) — floating top-left.
               Hidden when the parent header controls the tool (onTool set). */}
           {showTools && ind && !onTool && (
