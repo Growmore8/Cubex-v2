@@ -5,11 +5,11 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import { PACKAGES, PLAN_KEYS } from "@/config/packages";
 
 const FEATURE_FLAGS: { key: string; label: string; desc: string }[] = [
-  { key: "copyTrading", label: "Copy Trading", desc: "Clients can subscribe to signal providers and auto-copy trades" },
-  { key: "referral", label: "Referral Program", desc: "Clients can invite others and earn referral bonuses" },
-  { key: "analytics", label: "Advanced Analytics", desc: "Show detailed trading analytics and performance reports to clients" },
-  { key: "news", label: "Market News Feed", desc: "Show live market news in the client trading panel" },
-  { key: "economic", label: "Economic Calendar", desc: "Show the economic events calendar in the client panel" },
+  { key: "copyTrading",       label: "Copy Trading",       desc: "Clients can subscribe to signal providers and auto-copy trades" },
+  { key: "referralProgram",   label: "Referral Program",   desc: "Clients can invite others and earn referral bonuses" },
+  { key: "advancedAnalytics", label: "Advanced Analytics", desc: "Show detailed trading analytics and performance reports to clients" },
+  { key: "marketNewsFeed",    label: "Market News Feed",   desc: "Show live market news in the client trading panel" },
+  { key: "economicCalendar",  label: "Economic Calendar",  desc: "Show the economic events calendar in the client panel" },
 ];
 
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
