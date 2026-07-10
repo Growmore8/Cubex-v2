@@ -58,25 +58,49 @@
 .auth-pan2 { animation: auth-pan2 60s linear infinite; will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .auth-pan, .auth-pan2 { animation: none !important; } }
 
-/* ---- Interactive-card style glare sweep ---- */
-@keyframes card-sheen {
-  0%   { transform: translateX(-140%) skewX(-20deg); opacity: 0; }
-  12%  { opacity: 1; }
-  42%  { transform: translateX(240%) skewX(-20deg); opacity: 0; }
-  100% { transform: translateX(240%) skewX(-20deg); opacity: 0; }
+/* ---- CodePen card (trilm/raBGaQQ) ---- */
+@keyframes cpCardBg {
+  0%   { background-size: 100% auto; background-position: 50% 50%; }
+  60%  { background-size: 111% auto; background-position: 60% 60%; }
+  100% { background-size: 100% auto; background-position: 50% 50%; }
 }
-.card-sheen::before {
-  content: ""; position: absolute; top: -10%; bottom: -10%; left: 0; width: 45%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255,255,255,0.04) 20%,
-    rgba(255,255,255,0.32) 50%,
-    rgba(255,255,255,0.04) 80%,
-    transparent 100%
-  );
-  animation: card-sheen 4.5s ease-in-out infinite;
+@keyframes cpCardShimmer {
+  0%   { background-position: 0% 10%; }
+  50%  { background-position: 100% 91%; }
+  100% { background-position: 0% 10%; }
+}
+.cp-card {
+  background-size: 100% auto;
+  background-position: 50% 50%;
+  animation: cpCardBg 10s ease-in-out infinite;
+  transform: translateZ(0);
+}
+.cp-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  box-shadow: 0 -1px 0 0 rgba(255,255,255,0.9), 0 1px 0 0 rgba(0,0,0,0.18);
+  z-index: 1;
   pointer-events: none;
+}
+.cp-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background:
+    linear-gradient(120deg, rgba(255,255,255,0.02) 30%, rgba(255,255,255,0.28) 40%, rgba(255,255,255,0.08) 40%),
+    linear-gradient(0deg, rgba(255,255,255,0.18), rgba(255,255,255,0.28));
+  background-size: 150% 150%;
+  animation: cpCardShimmer 45s ease-in-out infinite;
+  transform: translateZ(0);
+  z-index: 2;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-card { animation: none; }
+  .cp-card::after { animation: none; }
 }
 
 /* ---- iOS "Liquid Glass" surfaces + nav ---- */
@@ -153,7 +177,7 @@
 .nav-ios-item { transition: color .25s ease, transform .2s cubic-bezier(.34,1.56,.64,1); }
 .nav-ios-item:active { transform: scale(0.88); }
 .nav-ios-pill { transition: left .34s cubic-bezier(.34,1.56,.64,1), width .34s cubic-bezier(.34,1.56,.64,1), background .25s ease; }
-@media (prefers-reduced-motion: reduce) { .card-sheen::before { animation: none; opacity: 0; } }
+
 /* inputs */
 .auth-field {
   transition: border-color 0.18s ease, box-shadow 0.2s ease, background 0.18s ease;

@@ -657,39 +657,34 @@ export default function ClientMobile({ t }: { t: any }) {
                 if (dx < 0 && cur < ids.length - 1) switchAcc(ids[cur + 1]);
                 else if (dx > 0 && cur > 0) switchAcc(ids[cur - 1]);
               }}>
-              <div className="relative overflow-hidden rounded-[20px] p-5 text-white" style={{
+              <div className="cp-card relative overflow-hidden rounded-[20px] p-5" style={{
                 backgroundImage: `url('/card-bg/${cIsLive ? "live" : "demo"}.jpeg')`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                border: `1px solid ${cIsLive ? "rgba(6,182,212,0.22)" : "rgba(200,45,85,0.28)"}`,
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+                color: "#1a1d21",
+                boxShadow: "0 0 8px rgba(0,0,0,0.12), 0 2px 16px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.12), 0 12px 28px rgba(0,0,0,0.12)",
               }}>
-                {/* Dark overlay so white text stays legible over the photo */}
-                <div className="pointer-events-none absolute inset-0" style={{ zIndex: 0, background: "rgba(0,0,0,0.38)" }} />
-                <WorldMapBg opacity={0.08} />
-                <div className="card-sheen pointer-events-none absolute inset-0" style={{ zIndex: 2 }} />
-                {/* Thin accent top bar */}
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ zIndex: 3, background: cIsLive ? "linear-gradient(90deg, transparent, rgba(6,182,212,0.8), transparent)" : "linear-gradient(90deg, transparent, rgba(220,80,110,0.85), transparent)" }} />
-                <div className="relative flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="text-[11px] font-bold tracking-[0.2em] text-white/90">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
-                    <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>{account?.type}</span>
+                {/* all content sits above ::before (z:1) and ::after (z:2) */}
+                <div style={{ position: "relative", zIndex: 3 }}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="text-[11px] font-bold tracking-[0.2em]" style={{ color: "rgba(26,29,33,0.85)" }}>{(brand?.name || "").toUpperCase() || "TRADING"}</div>
+                      <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(26,29,33,0.12)", color: "#1a1d21" }}>{account?.type}</span>
+                    </div>
+                    <div className="h-7 w-9 rounded-[6px]" style={{ background: "linear-gradient(135deg,#f4e3a1,#caa54e 45%,#9c7c2e 70%,#e9d27f)" }} />
                   </div>
-                  <div className="h-7 w-9 rounded-[6px]" style={{ background: "linear-gradient(135deg,#f4e3a1,#caa54e 45%,#9c7c2e 70%,#e9d27f)" }} />
-                </div>
-                <div className="relative mt-5">
-                  <div className="text-[9px] font-semibold tracking-[0.18em] text-white/55">TOTAL BALANCE</div>
-                  <div className="mt-1 text-[32px] font-extrabold leading-none tracking-tight text-white">{_cSym}{fmt(balance)}</div>
-                  <div className="mt-2 flex items-center gap-2 text-[11px] text-white/75">
-                    <span className="font-mono tracking-[0.2em]">{account?.login}</span>
-                    <span className="text-white/40">·</span>
-                    <span className="uppercase tracking-wide">{titleCaseName(account?.ownerName || account?.name)}</span>
+                  <div className="mt-5">
+                    <div className="text-[9px] font-semibold tracking-[0.18em]" style={{ color: "rgba(26,29,33,0.5)" }}>TOTAL BALANCE</div>
+                    <div className="mt-1 text-[32px] font-extrabold leading-none tracking-tight">{_cSym}{fmt(balance)}</div>
+                    <div className="mt-2 flex items-center gap-2 text-[11px]" style={{ color: "rgba(26,29,33,0.65)" }}>
+                      <span className="font-mono tracking-[0.2em]">{account?.login}</span>
+                      <span style={{ color: "rgba(26,29,33,0.35)" }}>·</span>
+                      <span className="uppercase tracking-wide">{titleCaseName(account?.ownerName || account?.name)}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="relative my-3 h-px" style={{ background: "rgba(255,255,255,0.18)" }} />
-                <div className="relative grid grid-cols-2 gap-2 text-white">
-                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">EQUITY</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(equity)}</div></div>
-                  <div><div className="text-[8px] tracking-[0.12em] text-white/50">FREE MARGIN</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(free)}</div></div>
+                  <div className="my-3 h-px" style={{ background: "rgba(26,29,33,0.15)" }} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><div className="text-[8px] tracking-[0.12em]" style={{ color: "rgba(26,29,33,0.45)" }}>EQUITY</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(equity)}</div></div>
+                    <div><div className="text-[8px] tracking-[0.12em]" style={{ color: "rgba(26,29,33,0.45)" }}>FREE MARGIN</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(free)}</div></div>
+                  </div>
                 </div>
               </div>
             </div>
