@@ -735,8 +735,8 @@ export default function ClientMobile({ t }: { t: any }) {
               }}>
               <div className="cp-card relative overflow-hidden rounded-[20px] p-5" style={{
                 backgroundImage: cIsLive
-                  ? "radial-gradient(circle at 68% 72%, rgba(236,72,153,0.55) 0%, transparent 48%), radial-gradient(circle at 22% 28%, rgba(99,102,241,0.85) 0%, rgba(167,139,250,0.65) 38%, transparent 62%), linear-gradient(140deg,#c7d2fe 0%,#ddd6fe 42%,#f9a8d4 100%)"
-                  : "radial-gradient(circle at 68% 72%, rgba(251,146,60,0.55) 0%, transparent 48%), radial-gradient(circle at 22% 28%, rgba(134,239,172,0.9) 0%, rgba(253,224,71,0.72) 40%, transparent 65%), linear-gradient(140deg,#bbf7d0 0%,#fef08a 46%,#fdba74 100%)",
+                  ? "radial-gradient(circle at 18% 82%, rgba(232,121,249,0.65) 0%, transparent 45%), radial-gradient(circle at 78% 20%, rgba(186,230,253,0.6) 0%, transparent 48%), linear-gradient(140deg,#f5d0fe 0%,#e9d5ff 28%,#c7d2fe 62%,#bae6fd 100%)"
+                  : "radial-gradient(circle at 58% 52%, rgba(251,146,60,0.72) 0%, transparent 42%), radial-gradient(circle at 82% 78%, rgba(251,113,133,0.48) 0%, transparent 38%), linear-gradient(140deg,#d9f99d 0%,#fef08a 38%,#fde68a 65%,#fca5a5 100%)",
                 color: "#1a1d21",
                 boxShadow: "0 0 8px rgba(0,0,0,0.12), 0 2px 16px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.12), 0 12px 28px rgba(0,0,0,0.12)",
               }}>
