@@ -1825,28 +1825,39 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
       )}
 
-      {/* BOTTOM NAV */}
-      {!chartFs && <div style={{ background: "var(--panel)", borderTop: "1px solid var(--border)", paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }} className="px-2 pt-1.5">
-        <div className="flex items-stretch justify-around">
-          {navItems.map(([k, icon, label]) => {
-            const active = tab === k;
-            const col = active ? A1 : "var(--muted)";
-            const badge = k === "trades" && (positions || []).length > 0 ? (positions || []).length : k === "account" && needKyc ? "!" : null;
-            return (
-              <button key={k} onClick={() => startTransition(() => setTab(k as any))} aria-label={label}
-                className="relative flex flex-1 flex-col items-center gap-0.5 py-1 active:opacity-70">
-                {/* pill background on active */}
-                <span className="absolute inset-x-1 top-0.5 bottom-0.5 rounded-2xl transition-all duration-300" style={{ background: active ? `${A1}18` : "transparent" }} />
-                <span className="relative flex items-center justify-center">
-                  <i className={`fa-solid ${icon}`} style={{ fontSize: 18, color: col, transition: "color .2s, transform .25s cubic-bezier(.34,1.56,.64,1)", transform: active ? "scale(1.12)" : "scale(1)" }} />
-                  {badge && <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: badge === "!" ? "#f59e0b" : A1, border: "1.5px solid var(--panel)" }}>{badge}</span>}
-                </span>
-                <span className="relative text-[9px] font-bold tracking-wide" style={{ color: col, transition: "color .2s" }}>{label}</span>
-              </button>
-            );
-          })}
+      {/* BOTTOM NAV — floating pill */}
+      {!chartFs && (
+        <div style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom))", paddingLeft: 10, paddingRight: 10, paddingTop: 6, flexShrink: 0 }}>
+          <div style={{
+            background: theme === "dark" ? "rgba(14,18,30,0.90)" : "rgba(248,250,255,0.92)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            borderRadius: 22,
+            border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.07)"}`,
+            boxShadow: theme === "dark" ? "0 4px 28px rgba(0,0,0,0.55), inset 0 0.5px 0 rgba(255,255,255,0.06)" : "0 4px 20px rgba(0,0,0,0.13), inset 0 0.5px 0 rgba(255,255,255,0.9)",
+            padding: "3px 4px",
+          }}>
+            <div className="flex items-stretch justify-around">
+              {navItems.map(([k, icon, label]) => {
+                const active = tab === k;
+                const col = active ? A1 : "var(--muted)";
+                const badge = k === "trades" && (positions || []).length > 0 ? (positions || []).length : k === "account" && needKyc ? "!" : null;
+                return (
+                  <button key={k} onClick={() => startTransition(() => setTab(k as any))} aria-label={label}
+                    className="relative flex flex-1 flex-col items-center gap-0.5 py-1.5 active:opacity-70">
+                    <span className="absolute inset-x-1 top-0.5 bottom-0.5 rounded-[18px] transition-all duration-300" style={{ background: active ? `${A1}1a` : "transparent" }} />
+                    <span className="relative flex items-center justify-center">
+                      <i className={`fa-solid ${icon}`} style={{ fontSize: 18, color: col, transition: "color .2s, transform .25s cubic-bezier(.34,1.56,.64,1)", transform: active ? "scale(1.14)" : "scale(1)" }} />
+                      {badge && <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: badge === "!" ? "#f59e0b" : A1, border: "1.5px solid var(--bg)" }}>{badge}</span>}
+                    </span>
+                    <span className="relative text-[9px] font-bold tracking-wide" style={{ color: col, transition: "color .2s" }}>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      </div>}
+      )}
 
       {/* TRANSFER MODAL */}
       {xferModal && (

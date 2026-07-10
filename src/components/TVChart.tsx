@@ -356,7 +356,6 @@ export default function TVChart({
       "create_volume_indicator_by_default", // volume is meaningless for OTC forex; keep sub-pane clean
       "popup_hints",                        // suppress long-press tooltip popup on mobile
       "timeframes_toolbar",                 // hide the bottom period quick-select bar (5y 1y 3m …)
-      "header_widget",                      // remove entire native TV header bar (symbol, undo/redo, indicators, etc.)
       // NOTE: tradingview_logo intentionally NOT disabled — the charting library
       // license requires TradingView branding to remain visible.
     ];

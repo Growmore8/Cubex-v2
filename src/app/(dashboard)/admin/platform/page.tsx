@@ -1063,7 +1063,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   const bid = p != null ? gnum(p, d) : "\u2014";
                   const ask = p != null ? gnum(p + spO * pip, d) : "\u2014";
                   return (
-                    <div style={{ position: "absolute", top: 8, left: 68, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ position: "absolute", top: 36, left: 68, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
                       {showBuySell ? (
                         <div style={{ display: "flex", gap: 5, alignItems: "center", background: "rgba(10,13,20,0.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 10, padding: "5px 7px", boxShadow: "0 4px 18px rgba(0,0,0,0.45)" }}>
                           <button onClick={() => place(sym, "SELL")} className="hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", border: "none", borderRadius: 7, padding: "5px 11px", fontSize: 12, fontWeight: 700, lineHeight: 1, cursor: "pointer", boxShadow: `0 2px 8px ${SELLBTN}66`, display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minWidth: 62 }}>
