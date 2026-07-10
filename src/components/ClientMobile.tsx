@@ -475,11 +475,23 @@ export default function ClientMobile({ t }: { t: any }) {
   // Account-card palette — FIXED premium dark gradients from the reference cards
   const cIsLive = account?.type === "LIVE";
   const cardDark = theme === "dark";
-  // 2-tone dark card — Binance/Bybit minimal palette.
-  // LIVE = dark navy, DEMO = dark slate. No glow, no heavy shadow.
+  // Interactive-card style fluid-art backgrounds — LIVE = ocean blue, DEMO = purple/rose.
+  // Multi-layer radial gradients recreate the abstract fluid painting look from the reference.
   const cardFrontBg = cIsLive
-    ? "linear-gradient(145deg, #0c1a2e 0%, #112440 50%, #0a1520 100%)"
-    : "linear-gradient(145deg, #131228 0%, #1a1838 50%, #0e0c1e 100%)";
+    ? [
+        "radial-gradient(ellipse at 22% 78%, rgba(6,182,212,0.85) 0%, transparent 48%)",
+        "radial-gradient(ellipse at 82% 18%, rgba(79,102,255,0.80) 0%, transparent 44%)",
+        "radial-gradient(ellipse at 55% 48%, rgba(14,165,233,0.50) 0%, transparent 42%)",
+        "radial-gradient(ellipse at 68% 72%, rgba(99,220,255,0.30) 0%, transparent 35%)",
+        "linear-gradient(145deg, #040e20 0%, #07162e 55%, #050a1a 100%)",
+      ].join(",")
+    : [
+        "radial-gradient(ellipse at 28% 72%, rgba(168,85,247,0.85) 0%, transparent 48%)",
+        "radial-gradient(ellipse at 78% 22%, rgba(236,72,153,0.75) 0%, transparent 44%)",
+        "radial-gradient(ellipse at 52% 50%, rgba(244,63,94,0.40) 0%, transparent 42%)",
+        "radial-gradient(ellipse at 70% 68%, rgba(255,180,220,0.22) 0%, transparent 35%)",
+        "linear-gradient(145deg, #160520 0%, #200828 55%, #180418 100%)",
+      ].join(",");
 
   return (
     <>
@@ -665,18 +677,18 @@ export default function ClientMobile({ t }: { t: any }) {
               }}>
               <div className="relative overflow-hidden rounded-[20px] p-5 text-white" style={{
                 background: cardFrontBg,
-                border: "1px solid rgba(255,255,255,0.10)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10)",
+                border: `1px solid ${cIsLive ? "rgba(6,182,212,0.22)" : "rgba(168,85,247,0.22)"}`,
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
               }}>
                 <WorldMapBg opacity={0.16} />
                 <div className="card-sheen pointer-events-none absolute inset-0" />
-                {/* Interactive-card signature circle ring decorations — no logos, background only */}
-                <svg className="pointer-events-none absolute" width="210" height="180" viewBox="0 0 210 180" fill="none" style={{ top: -24, right: -24, opacity: 0.10 }}>
+                {/* Interactive-card signature circle ring decorations */}
+                <svg className="pointer-events-none absolute" width="210" height="180" viewBox="0 0 210 180" fill="none" style={{ top: -24, right: -24, opacity: 0.15 }}>
                   <circle cx="145" cy="58" r="98" stroke="white" strokeWidth="1.5" />
                   <circle cx="170" cy="28" r="72" stroke="white" strokeWidth="1" />
                 </svg>
-                {/* Thin accent top bar — no glow */}
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ background: `linear-gradient(90deg, transparent, ${A1}99, transparent)` }} />
+                {/* Thin accent top bar matching card color */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ background: cIsLive ? "linear-gradient(90deg, transparent, rgba(6,182,212,0.8), transparent)" : "linear-gradient(90deg, transparent, rgba(168,85,247,0.8), transparent)" }} />
                 <div className="relative flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <div className="text-[11px] font-bold tracking-[0.2em] text-white/90">{(brand?.name || "").toUpperCase() || "TRADING"}</div>

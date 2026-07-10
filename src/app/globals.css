@@ -58,17 +58,25 @@
 .auth-pan2 { animation: auth-pan2 60s linear infinite; will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .auth-pan, .auth-pan2 { animation: none !important; } }
 
-/* ---- Premium account card sheen ---- */
+/* ---- Interactive-card style glare sweep ---- */
 @keyframes card-sheen {
-  0%   { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
-  18%  { opacity: 0.5; }
-  40%  { transform: translateX(220%) skewX(-18deg); opacity: 0; }
-  100% { transform: translateX(220%) skewX(-18deg); opacity: 0; }
+  0%   { transform: translateX(-140%) skewX(-20deg); opacity: 0; }
+  12%  { opacity: 1; }
+  42%  { transform: translateX(240%) skewX(-20deg); opacity: 0; }
+  100% { transform: translateX(240%) skewX(-20deg); opacity: 0; }
 }
 .card-sheen::before {
-  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
-  animation: card-sheen 6s ease-in-out infinite;
+  content: ""; position: absolute; top: -10%; bottom: -10%; left: 0; width: 45%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.04) 20%,
+    rgba(255,255,255,0.32) 50%,
+    rgba(255,255,255,0.04) 80%,
+    transparent 100%
+  );
+  animation: card-sheen 4.5s ease-in-out infinite;
+  pointer-events: none;
 }
 
 /* ---- iOS "Liquid Glass" surfaces + nav ---- */
