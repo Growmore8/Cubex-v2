@@ -193,9 +193,10 @@ export default function TVChart({
 
         // Build all position-line promises in parallel — avoids sequential await
         // delay when many trades are open (each createPositionLine may round-trip).
+        // Stale-draw guard lives inside makeLine (after the async createPositionLine call);
+        // checking it here would be unreachable since the loop is fully synchronous.
         const linePromises: Promise<void>[] = [];
         for (const p of positionsRef.current || []) {
-          if (drawSeqRef.current !== seq) return;
           const isBuy  = p.type === "BUY";
           const isPend = !!p.kind;
           const color  = isPend ? "#f59e0b" : (isBuy ? "#2962ff" : "#f23645");
@@ -227,7 +228,7 @@ export default function TVChart({
           });
         }
       } catch {}
-    }, 30);
+    }, 60);
   };
 
   // ── Build and mount the widget (once per mount) ──────────────────────────────
@@ -561,9 +562,7 @@ export default function TVChart({
     const apply = () => {
       try {
         const chart = w.activeChart();
-        if (chart.symbol() !== symbol) chart.setSymbol(symbol, () => {
-          try { w.activeChart().executeActionById("timeScaleReset"); } catch {}
-        });
+        if (chart.symbol() !== symbol) chart.setSymbol(symbol, () => {});
       } catch {}
     };
     // Chart is already ready (isReadyRef set in readyCb) — call immediately.
