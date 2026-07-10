@@ -474,8 +474,6 @@ export default function ClientMobile({ t }: { t: any }) {
 
   const cIsLive = account?.type === "LIVE";
   const cardDark = theme === "dark";
-  // Solid dark base — fluid art blobs are rendered as JSX inside the card.
-  const cardBaseBg = cIsLive ? "#030c1c" : "#180308";
 
   return (
     <>
@@ -660,28 +658,14 @@ export default function ClientMobile({ t }: { t: any }) {
                 else if (dx > 0 && cur > 0) switchAcc(ids[cur - 1]);
               }}>
               <div className="relative overflow-hidden rounded-[20px] p-5 text-white" style={{
-                background: cardBaseBg,
+                backgroundImage: `url('/card-bg/${cIsLive ? "live" : "demo"}.jpeg')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
                 border: `1px solid ${cIsLive ? "rgba(6,182,212,0.22)" : "rgba(200,45,85,0.28)"}`,
                 boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
               }}>
-                {/* Fluid-art blob layer — organic shapes + blur = liquid painting look */}
-                <div className="pointer-events-none absolute inset-0" style={{ zIndex: 0 }}>
-                  {cIsLive ? (<>
-                    {/* LIVE — ocean blue / cyan / electric indigo */}
-                    <div style={{ position:"absolute", width:"75%", height:"90%", top:"5%", left:"-15%", background:"rgba(6,155,210,0.88)", borderRadius:"42% 58% 65% 35% / 45% 52% 48% 55%", filter:"blur(34px)" }} />
-                    <div style={{ position:"absolute", width:"60%", height:"80%", top:"-15%", left:"50%", background:"rgba(55,72,230,0.82)", borderRadius:"68% 32% 48% 52% / 32% 62% 38% 68%", filter:"blur(28px)" }} />
-                    <div style={{ position:"absolute", width:"40%", height:"55%", top:"28%", left:"30%", background:"rgba(160,228,255,0.38)", borderRadius:"55% 45% 38% 62% / 58% 44% 56% 42%", filter:"blur(20px)" }} />
-                    <div style={{ position:"absolute", width:"30%", height:"40%", top:"55%", left:"62%", background:"rgba(8,40,120,0.70)", borderRadius:"50% 50% 70% 30% / 40% 60% 40% 60%", filter:"blur(18px)" }} />
-                  </>) : (<>
-                    {/* DEMO — deep crimson / rose / cream (matches reference photo) */}
-                    <div style={{ position:"absolute", width:"72%", height:"88%", top:"8%", left:"-12%", background:"rgba(185,25,60,0.92)", borderRadius:"42% 58% 62% 38% / 48% 54% 46% 52%", filter:"blur(32px)" }} />
-                    <div style={{ position:"absolute", width:"58%", height:"78%", top:"-18%", left:"48%", background:"rgba(140,12,40,0.88)", borderRadius:"65% 35% 50% 50% / 35% 65% 35% 65%", filter:"blur(26px)" }} />
-                    <div style={{ position:"absolute", width:"42%", height:"58%", top:"22%", left:"28%", background:"rgba(238,95,130,0.52)", borderRadius:"55% 45% 40% 60% / 60% 42% 58% 40%", filter:"blur(20px)" }} />
-                    {/* cream/ivory centre highlight — the "flower" swirl */}
-                    <div style={{ position:"absolute", width:"38%", height:"48%", top:"30%", left:"33%", background:"rgba(248,215,178,0.32)", borderRadius:"50% 50% 55% 45% / 45% 55% 45% 55%", filter:"blur(16px)" }} />
-                    <div style={{ position:"absolute", width:"22%", height:"28%", top:"35%", left:"42%", background:"rgba(255,240,210,0.22)", borderRadius:"50%", filter:"blur(10px)" }} />
-                  </>)}
-                </div>
+                {/* Dark overlay so white text stays legible over the photo */}
+                <div className="pointer-events-none absolute inset-0" style={{ zIndex: 0, background: "rgba(0,0,0,0.38)" }} />
                 <WorldMapBg opacity={0.08} />
                 <div className="card-sheen pointer-events-none absolute inset-0" style={{ zIndex: 2 }} />
                 {/* Thin accent top bar */}
