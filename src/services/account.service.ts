@@ -148,7 +148,7 @@ export async function adjustBalance(tenantId: string, id: string, type: string, 
   else if (type === "WITHDRAWAL") data = { withdrawal: { increment: amt } };
   else if (type === "CREDIT_IN") data = { credit: { increment: amt } };
   else if (type === "CREDIT_OUT") data = { credit: { decrement: amt } };
-  else if (type === "BONUS") data = { bonus: { increment: amt } };
+  else if (type === "BONUS" || type === "REFERRAL") data = { bonus: { increment: amt } };
   else if (type === "INSURANCE") data = { insurance: { increment: amt } };
   else throw new Error("Invalid type");
   const backdated = appliedAt && !isNaN(appliedAt.getTime());

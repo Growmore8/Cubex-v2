@@ -14,18 +14,19 @@ const schema = z.object({
   country: z.string().optional(),
   type: z.enum(["DEMO", "LIVE"]).optional(),
   tenantSlug: z.string().optional(),
+  referralCode: z.string().optional(),
 });
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password, phone, country, type, tenantSlug } = schema.parse(await req.json());
+    const { name, email, password, phone, country, type, tenantSlug, referralCode } = schema.parse(await req.json());
     const h = await headers();
     const host = h.get("host");
     const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
     if (!rateLimit(`register:${ip}`, 5, 60_000)) {
       return NextResponse.json({ ok: false, error: "Too many attempts. Please wait a minute." }, { status: 429 });
     }
-    const result = await registerClient(host, name, email.toLowerCase(), password, phone, country, type, tenantSlug);
+    const result = await registerClient(host, name, email.toLowerCase(), password, phone, country, type, tenantSlug, referralCode);
     if (result.needsVerification) {
       return NextResponse.json({ ok: true, needsVerification: true, email: result.email });
     }

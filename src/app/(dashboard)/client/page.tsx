@@ -222,6 +222,8 @@ export default function ClientTerminal() {
   }
   async function uploadAvatar(e: any) { const file = e.target.files && e.target.files[0]; if (!file) return; setAvatarUploading(true); const fd = new FormData(); fd.append("file", file); const r = await fetch("/api/client/avatar", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); setAvatarUploading(false); if (r.ok && r.avatarUrl) setAvatarUrl(r.avatarUrl); else setErr(r.error || "Avatar upload failed"); }
   const [profileOpen, setProfileOpen] = useState(false);
+  const [refData, setRefData] = useState<any>(null);
+  const [refCopied, setRefCopied] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
   const [deskTotpEnabled, setDeskTotpEnabled] = useState(false);
   const [deskTotpModal, setDeskTotpModal] = useState<"setup" | "disable" | null>(null);
@@ -297,6 +299,12 @@ export default function ClientTerminal() {
   useEffect(() => { fetch("/api/public/brand").then((r) => r.json()).then((b) => { if (b.ok) setSplashBrand(b); }).catch(() => {}); }, []);
   // Check trial status to hide account-creation options on demo tenants.
   useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((d) => { if (!d.ok) return; if (d.trial) setIsTrial(true); if (d.features) setFeatures(d.features); }).catch(() => {}); }, []);
+  // Load referral data when profile panel opens (only if referralProgram is enabled).
+  useEffect(() => {
+    if (profileOpen && features.referralProgram !== false && !refData) {
+      fetch("/api/client/referral").then((r) => r.json()).then((d) => { if (d.ok) setRefData(d); }).catch(() => {});
+    }
+  }, [profileOpen, features.referralProgram]); // eslint-disable-line react-hooks/exhaustive-deps
   // If the current right-tab becomes feature-gated (SA disabled it), fall back to TRADE.
   useEffect(() => {
     if (rightTab === "SIGNALS"   && features.copyTrading       === false) setRightTab("TRADE");
@@ -996,6 +1004,63 @@ export default function ClientTerminal() {
                 <i className="fa-solid fa-file-invoice w-4 text-center" style={{ color: BUY }} />Statement / Report
               </button>
             </div>
+
+            {/* referral — only shown when feature is enabled */}
+            {features.referralProgram !== false && (
+              <div className="shrink-0 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+                <div className="mb-1.5 text-[8px] font-semibold uppercase tracking-wide text-[var(--muted)]">Refer &amp; Earn</div>
+                {!refData ? (
+                  <div className="py-1 text-[10px] text-[var(--muted)]">Loading…</div>
+                ) : (
+                  <>
+                    {/* stats row */}
+                    <div className="mb-2 grid grid-cols-2 gap-1.5">
+                      <div className="rounded-lg px-2 py-1.5 text-center" style={{ background: "var(--soft)" }}>
+                        <div className="text-[15px] font-bold tabular-nums" style={{ color: BUY }}>{refData.count}</div>
+                        <div className="text-[8px] text-[var(--muted)]">Referred</div>
+                      </div>
+                      <div className="rounded-lg px-2 py-1.5 text-center" style={{ background: "var(--soft)" }}>
+                        <div className="text-[15px] font-bold tabular-nums" style={{ color: BUY }}>${Number(refData.totalEarned || 0).toFixed(2)}</div>
+                        <div className="text-[8px] text-[var(--muted)]">Earned</div>
+                      </div>
+                    </div>
+                    {/* reward rates */}
+                    {(refData.signupBonus > 0 || refData.depositPercent > 0) && (
+                      <div className="mb-2 rounded-lg px-2 py-1.5 text-[10px]" style={{ background: "rgba(22,199,154,0.08)", color: BUY }}>
+                        {refData.signupBonus > 0 && <div>✓ ${refData.signupBonus} signup bonus per referral</div>}
+                        {refData.depositPercent > 0 && <div>✓ {refData.depositPercent}% of each deposit</div>}
+                        {refData.tradingPercent > 0 && <div>✓ {refData.tradingPercent}% trading commission</div>}
+                      </div>
+                    )}
+                    {/* referral link */}
+                    <div className="mb-1.5 flex items-center gap-1 rounded-lg border px-2 py-1.5" style={{ borderColor: "var(--border)", background: "var(--soft)" }}>
+                      <span className="flex-1 truncate font-mono text-[9px] text-[var(--muted)]">{refData.referralCode}</span>
+                      <button
+                        onClick={() => {
+                          const link = `${window.location.origin}/register?ref=${refData.referralCode}`;
+                          navigator.clipboard.writeText(link).then(() => { setRefCopied(true); setTimeout(() => setRefCopied(false), 2000); });
+                        }}
+                        className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold text-white"
+                        style={{ background: refCopied ? "#16a34a" : BUY }}
+                      >
+                        {refCopied ? "Copied!" : "Copy Link"}
+                      </button>
+                    </div>
+                    {/* recent referrals */}
+                    {refData.referrals?.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {refData.referrals.slice(0, 3).map((r: any) => (
+                          <div key={r.id} className="flex items-center justify-between rounded px-1.5 py-1 text-[9px]" style={{ background: "var(--soft)" }}>
+                            <span style={{ color: "var(--muted)" }}>{new Date(r.createdAt).toLocaleDateString()}</span>
+                            <span style={{ color: r.totalEarned > 0 ? BUY : "var(--muted)" }}>{r.totalEarned > 0 ? `+$${r.totalEarned.toFixed(2)}` : r.signupBonusPaid ? "Active" : "Pending"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* security */}
             <div className="shrink-0 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>

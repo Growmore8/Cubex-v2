@@ -13,6 +13,82 @@ const LWMobileChart = dynamic(() => import("@/components/LWChart"), { ssr: false
 
 const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD@tv-basicstudies"], ["Stoch", "Stochastic@tv-basicstudies"], ["BBands", "BB@tv-basicstudies"], ["MA", "MASimple@tv-basicstudies"], ["ROC", "ROC@tv-basicstudies"]];
 
+// ── Referral card (self-contained, fetches its own data) ──────────────────────
+function ReferralCard({ cSym }: { cSym: string }) {
+  const [data, setData] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    fetch("/api/client/referral").then((r) => r.json()).then((d) => { if (d.ok) setData(d); }).catch(() => {});
+  }, []);
+  if (!data) return null;
+  const BUY = "#26a69a";
+  const link = typeof window !== "undefined" ? `${window.location.origin}/register?ref=${data.referralCode}` : "";
+  const copy = () => { navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2200); }); };
+  return (
+    <div className="glass-card p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: "rgba(22,199,154,0.12)" }}>
+          <i className="fa-solid fa-gift text-sm" style={{ color: BUY }} />
+        </div>
+        <div>
+          <div className="text-[11px] font-bold tracking-wide">REFER &amp; EARN</div>
+          <div className="text-[10px] text-[var(--muted)]">Invite friends — earn when they trade</div>
+        </div>
+      </div>
+
+      {/* stats */}
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <div className="rounded-xl py-2 text-center" style={{ background: "var(--soft)" }}>
+          <div className="text-[18px] font-extrabold tabular-nums" style={{ color: BUY }}>{data.count}</div>
+          <div className="text-[9px] font-semibold text-[var(--muted)]">REFERRED</div>
+        </div>
+        <div className="rounded-xl py-2 text-center" style={{ background: "var(--soft)" }}>
+          <div className="text-[18px] font-extrabold tabular-nums" style={{ color: BUY }}>{cSym}{Number(data.totalEarned || 0).toFixed(2)}</div>
+          <div className="text-[9px] font-semibold text-[var(--muted)]">TOTAL EARNED</div>
+        </div>
+      </div>
+
+      {/* reward rules */}
+      {(data.signupBonus > 0 || data.depositPercent > 0 || data.tradingPercent > 0) && (
+        <div className="mb-3 space-y-1 rounded-xl p-2.5 text-[11px]" style={{ background: "rgba(22,199,154,0.07)" }}>
+          {data.signupBonus > 0    && <div className="flex items-center gap-1.5" style={{ color: BUY }}><i className="fa-solid fa-check-circle text-[10px]" />{cSym}{data.signupBonus} signup bonus per referral</div>}
+          {data.depositPercent > 0 && <div className="flex items-center gap-1.5" style={{ color: BUY }}><i className="fa-solid fa-check-circle text-[10px]" />{data.depositPercent}% of each deposit they make</div>}
+          {data.tradingPercent > 0 && <div className="flex items-center gap-1.5" style={{ color: BUY }}><i className="fa-solid fa-check-circle text-[10px]" />{data.tradingPercent}% of trading commission</div>}
+        </div>
+      )}
+
+      {/* referral code + copy link */}
+      <div className="mb-2 flex items-center gap-2 rounded-xl border p-2.5" style={{ borderColor: "var(--border)", background: "var(--soft)" }}>
+        <i className="fa-solid fa-link text-[11px] text-[var(--muted)]" />
+        <span className="flex-1 truncate font-mono text-[10px] tracking-wider text-[var(--muted)]">{data.referralCode}</span>
+      </div>
+      <button
+        onClick={copy}
+        className="w-full rounded-xl py-2.5 text-[13px] font-bold text-white transition-colors"
+        style={{ background: copied ? "#16a34a" : BUY }}
+      >
+        <i className={`fa-solid ${copied ? "fa-check" : "fa-copy"} mr-2`} />
+        {copied ? "Link Copied!" : "Copy Referral Link"}
+      </button>
+
+      {/* recent referrals list */}
+      {data.referrals?.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          <div className="text-[9px] font-semibold text-[var(--muted)]">RECENT REFERRALS</div>
+          {data.referrals.map((r: any) => (
+            <div key={r.id} className="flex items-center justify-between rounded-lg px-2.5 py-2" style={{ background: "var(--soft)" }}>
+              <div className="text-[11px] text-[var(--muted)]">{new Date(r.createdAt).toLocaleDateString()}</div>
+              <div className="text-[11px] font-semibold" style={{ color: r.totalEarned > 0 ? BUY : "var(--muted)" }}>
+                {r.totalEarned > 0 ? `+${cSym}${r.totalEarned.toFixed(2)}` : r.signupBonusPaid ? "Active" : "Pending deposit"}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ADSS palette (matches admin desk + client desktop) — fixed, not tenant colour.
 const DARK: any = { "--bg": "#0a0d12", "--panel": "#11151d", "--card": "#141a24", "--border": "#1c2330", "--text": "#e7ecf3", "--muted": "#8a93a6", "--soft": "#151b25", "--accent": "#16c79a" };
 const LIGHT: any = { "--bg": "#f3f5f9", "--panel": "#ffffff", "--card": "#ffffff", "--border": "#e6eaf0", "--text": "#0f172a", "--muted": "#64748b", "--soft": "#eef2f6", "--accent": "#0f9d77" };
@@ -1473,6 +1549,9 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Withdrawal</span><span>{_cSym}{fmt(Number(account?.withdrawal || 0))}</span></div>
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Profit</span><span style={{ color: Number(account?.pnl || 0) >= 0 ? BUY : SELL }}>{_cSym}{fmt(Number(account?.pnl || 0))}</span></div>
             </div>
+
+            {/* referral — only shown when feature is enabled */}
+            {ft.referralProgram !== false && <ReferralCard cSym={_cSym} />}
 
             {/* running trade summary */}
             <div className="glass-card p-4">

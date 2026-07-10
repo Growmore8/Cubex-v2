@@ -162,6 +162,7 @@ export async function registerClient(
   country?: string,
   type: "DEMO" | "LIVE" = "LIVE",
   tenantSlug?: string,
+  referralCode?: string,
 ): Promise<RegisterResult> {
   let tenant: any = await resolveTenant(host);
   if (!tenant && tenantSlug) {
@@ -242,6 +243,14 @@ export async function registerClient(
         deposit: type === "DEMO" ? new Prisma.Decimal(10000) : new Prisma.Decimal(0),
       },
     });
+    // Link referral if a valid code was supplied
+    if (referralCode) {
+      const referrer = await (tx.user.findFirst as any)({ where: { referralCode, tenantId: tenant!.id, role: "CLIENT" } });
+      if (referrer && referrer.id !== user.id) {
+        await (tx as any).referral.create({ data: { tenantId: tenant!.id, referrerId: referrer.id, refereeId: user.id } });
+        await (tx.user.update as any)({ where: { id: user.id }, data: { referredById: referrer.id } });
+      }
+    }
     return { sub: user.id, role: "CLIENT" as Role, tenantId: tenant!.id, email: lowerEmail, name };
   });
 

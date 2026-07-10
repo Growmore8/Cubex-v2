@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { notify, notifyStaff } from "@/services/notification.service";
 import { sendUserMail } from "@/lib/tenant-mail";
 import { depositWithdrawalEmail } from "@/lib/email-templates";
+import { adjustBalance } from "@/services/account.service";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,6 +32,53 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     await prisma.$transaction(ops);
     await audit(s.tenantId as string, "payment." + status.toLowerCase(), rec.kind + " " + rec.amount + " " + (rec.method || ""), s.email || "admin");
+
+    // Referral reward: credit the referrer when their referred client makes a deposit
+    if (approve && rec.kind === "DEPOSIT") {
+      try {
+        const depAcc = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true } });
+        if (depAcc?.userId) {
+          const referral = await (prisma.referral as any).findFirst({ where: { refereeId: depAcc.userId, tenantId: s.tenantId } });
+          if (referral) {
+            const cfg = await prisma.setting.findUnique({ where: { key: `referral:${s.tenantId}` } });
+            const config: any = (cfg?.value as any) || {};
+            const depositPct = Number(config.depositPercent || 0);
+            const signupAmt  = Number(config.signupBonus  || 0);
+            const minDep     = Number(config.minDepositForSignup || 0);
+            const depAmount  = Number(rec.amount);
+            // Find referrer's primary LIVE account
+            const refAcc = await prisma.account.findFirst({
+              where: { userId: referral.referrerId, tenantId: s.tenantId as string, type: "LIVE", deactivated: false },
+              orderBy: { createdAt: "asc" },
+            });
+            if (refAcc) {
+              let earned = 0;
+              // Deposit % bonus on every qualifying deposit
+              if (depositPct > 0 && depAmount >= minDep) {
+                const bonus = Math.round(depAmount * depositPct) / 100;
+                if (bonus > 0) {
+                  await adjustBalance(s.tenantId as string, refAcc.id, "REFERRAL", bonus, `Referral deposit bonus (${depositPct}% of $${depAmount})`, "system");
+                  earned += bonus;
+                }
+              }
+              // One-time signup bonus on first deposit
+              if (!referral.signupBonusPaid && signupAmt > 0 && depAmount >= minDep) {
+                await adjustBalance(s.tenantId as string, refAcc.id, "REFERRAL", signupAmt, "Referral signup bonus", "system");
+                earned += signupAmt;
+              }
+              await (prisma.referral as any).update({
+                where: { id: referral.id },
+                data: {
+                  signupBonusPaid: true,
+                  ...(earned > 0 ? { totalEarned: { increment: new Prisma.Decimal(earned) } } : {}),
+                },
+              });
+            }
+          }
+        }
+      } catch {}
+    }
+
     // Notify the client of the decision
     try {
       const acc = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true, login: true, managerId: true, name: true } });

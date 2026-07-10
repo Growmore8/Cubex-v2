@@ -93,6 +93,8 @@ model User {
   activeSession   String?
   totpSecret      String?
   totpEnabled     Boolean    @default(false)
+  referralCode    String?    @unique
+  referredById    String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   accounts        Account[]  @relation("AccountOwner")
@@ -553,6 +555,18 @@ model Signal {
   createdAt  DateTime @default(now())
   @@index([tenantId, active])
 }
+model Referral {
+  id              String   @id @default(uuid())
+  tenantId        String
+  referrerId      String
+  refereeId       String   @unique
+  signupBonusPaid Boolean  @default(false)
+  totalEarned     Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt       DateTime @default(now())
+  @@index([tenantId])
+  @@index([referrerId])
+}
+
 enum Role {
   SUPERADMIN
   ADMIN
@@ -613,6 +627,7 @@ enum FinType {
   CREDIT_IN
   CREDIT_OUT
   BONUS
+  REFERRAL
   INSURANCE
   TRANSFER_IN
   TRANSFER_OUT
