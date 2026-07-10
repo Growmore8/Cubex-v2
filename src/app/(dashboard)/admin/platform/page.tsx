@@ -364,8 +364,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
   }, []);
   // If the active tab is feature-gated (SA disabled it), fall back to Trade.
   useEffect(() => {
-    if ((tab === "copy" || tab === "signals") && features.copyTrading === false) setTab("trade");
-  }, [features]); // eslint-disable-line react-hooks/exhaustive-deps
+    if ((tab === "copy" || tab === "signals") && (features.copyTrading === false || perms.copyTrading === false)) setTab("trade");
+  }, [features, perms]); // eslint-disable-line react-hooks/exhaustive-deps
   const notifSeen = useRef<Set<string>>(new Set());
   const notifPrimed = useRef(false);
   async function loadNotifs() {
@@ -1153,8 +1153,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
               {TABS.filter(([k]) =>
                 tabState[k] &&
                 (k !== "audit"   || can("viewAudit")) &&
-                (k !== "copy"    || features.copyTrading    !== false) &&
-                (k !== "signals" || features.copyTrading    !== false)
+                (k !== "copy"    || (features.copyTrading !== false && perms.copyTrading !== false)) &&
+                (k !== "signals" || (features.copyTrading !== false && perms.copyTrading !== false))
               ).map(([k, lbl]) => {
                 const active = tab === k;
                 return (

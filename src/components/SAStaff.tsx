@@ -264,8 +264,8 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── PASSWORD MODAL ── */}
       {pwRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={() => setPwRow(null)}>
-          <div className="ui-card ui-pop w-[360px] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+          <div className="ui-card ui-pop w-[360px] p-5 shadow-2xl">
             <div className="mb-1 flex items-center justify-between">
               <div className="font-semibold">Reset Password</div>
               <button onClick={() => setPwRow(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
@@ -288,8 +288,8 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
 
       {/* ── PERMISSIONS MODAL ── */}
       {permFor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={() => setPermFor(null)}>
-          <div className="ui-card ui-pop max-h-[80vh] w-[500px] overflow-auto p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+          <div className="ui-card ui-pop max-h-[80vh] w-[500px] overflow-auto p-5 shadow-2xl">
             <div className="mb-0.5 flex items-center justify-between">
               <div className="font-semibold text-lg">Permissions — {permFor.name}</div>
               <button onClick={() => setPermFor(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>

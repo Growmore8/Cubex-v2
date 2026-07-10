@@ -16,6 +16,7 @@ const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
   { sec: "Reports", items: [["viewAudit", "View Audit Log"], ["exportPdf", "Export PDF Reports"]] },
   { sec: "Communication", items: [["sendNotifications", "Send Notifications"]] },
   { sec: "Spread", items: [["editSpread", "Edit Spread Settings (account markup)"]] },
+  { sec: "Features", items: [["copyTrading", "Copy Trading (signals & auto-copy)"]] },
 ];
 
 // In-place Manage Managers modal — opens over the desk, no page navigation.
@@ -139,7 +140,7 @@ export default function ManagersModal({ onClose }: { onClose: () => void }) {
 
       {/* CREATE */}
       {createOpen && (
-        <div className={ovl} onMouseDown={() => setCreateOpen(false)}>
+        <div className={ovl} onMouseDown={(e) => { e.stopPropagation(); setCreateOpen(false); }}>
           <div className={card + " max-h-[90vh] w-[440px] overflow-y-auto"} onMouseDown={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between"><div className="text-base font-semibold">New Manager</div><button onClick={() => setCreateOpen(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button></div>
             <div className="space-y-3">
@@ -156,7 +157,7 @@ export default function ManagersModal({ onClose }: { onClose: () => void }) {
 
       {/* EDIT */}
       {editRow && (
-        <div className={ovl} onMouseDown={() => setEditRow(null)}>
+        <div className={ovl} onMouseDown={(e) => { e.stopPropagation(); setEditRow(null); }}>
           <div className={card + " w-[400px]"} onMouseDown={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between"><div className="text-base font-semibold">Edit Manager</div><button onClick={() => setEditRow(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button></div>
             <div className="space-y-3">
@@ -171,7 +172,7 @@ export default function ManagersModal({ onClose }: { onClose: () => void }) {
 
       {/* PASSWORD */}
       {pwRow && (
-        <div className={ovl} onMouseDown={() => setPwRow(null)}>
+        <div className={ovl} onMouseDown={(e) => { e.stopPropagation(); setPwRow(null); }}>
           <div className={card + " w-[360px]"} onMouseDown={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center justify-between"><div className="font-semibold">Reset Password</div><button onClick={() => setPwRow(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button></div>
             <div className="mb-3 text-xs text-[var(--muted)]">{pwRow.name} — {pwRow.email}</div>
@@ -184,7 +185,7 @@ export default function ManagersModal({ onClose }: { onClose: () => void }) {
 
       {/* PERMISSIONS */}
       {permFor && (
-        <div className={ovl} onMouseDown={() => setPermFor(null)}>
+        <div className={ovl} onMouseDown={(e) => { e.stopPropagation(); setPermFor(null); }}>
           <div className={card + " max-h-[80vh] w-[500px] overflow-auto"} onMouseDown={(e) => e.stopPropagation()}>
             <div className="mb-0.5 flex items-center justify-between"><div className="text-base font-semibold">Permissions — {permFor.name}</div><button onClick={() => setPermFor(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button></div>
             <div className="mb-4 text-xs text-[var(--muted)]">Unchecked = denied. Still gated by the tenant-level permissions.</div>
@@ -206,7 +207,7 @@ export default function ManagersModal({ onClose }: { onClose: () => void }) {
 
       {/* DELETE */}
       {delRow && (
-        <div className={ovl} onMouseDown={() => setDelRow(null)}>
+        <div className={ovl} onMouseDown={(e) => { e.stopPropagation(); setDelRow(null); }}>
           <div className={card + " w-[380px]"} onMouseDown={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center justify-between"><div className="font-semibold text-red-500">Delete Manager</div><button onClick={() => setDelRow(null)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button></div>
             <p className="mb-1 text-sm text-[var(--muted)]">Delete <span className="font-semibold text-[var(--text)]">{delRow.name}</span> ({delRow.email})?</p>
