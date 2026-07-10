@@ -759,8 +759,15 @@ export default function ClientMobile({ t }: { t: any }) {
                     </div>
                   </div>
                   <div className="my-3 h-px" style={{ background: "rgba(26,29,33,0.15)" }} />
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <div><div className="text-[8px] tracking-[0.12em]" style={{ color: "rgba(26,29,33,0.45)" }}>EQUITY</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(equity)}</div></div>
+                    <div>
+                      <div className="text-[8px] tracking-[0.12em]" style={{ color: "rgba(26,29,33,0.45)" }}>P&amp;L</div>
+                      <div className="flex items-center gap-0.5 text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#166534" : "#991b1b" }}>
+                        <i className={"fa-solid text-[9px] " + (floating >= 0 ? "fa-arrow-trend-up" : "fa-arrow-trend-down")} />
+                        {floating >= 0 ? "+" : ""}{_cSym}{fmt(Math.abs(floating))}
+                      </div>
+                    </div>
                     <div><div className="text-[8px] tracking-[0.12em]" style={{ color: "rgba(26,29,33,0.45)" }}>FREE MARGIN</div><div className="text-[13px] font-bold tabular-nums">{_cSym}{fmt(free)}</div></div>
                   </div>
                 </div>
