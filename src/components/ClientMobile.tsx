@@ -475,22 +475,25 @@ export default function ClientMobile({ t }: { t: any }) {
   // Account-card palette — FIXED premium dark gradients from the reference cards
   const cIsLive = account?.type === "LIVE";
   const cardDark = theme === "dark";
-  // Interactive-card style fluid-art backgrounds — LIVE = ocean blue, DEMO = purple/rose.
-  // Multi-layer radial gradients recreate the abstract fluid painting look from the reference.
+  // Interactive-card fluid-art backgrounds.
+  // DEMO = maroon/pink/cream (exact match to reference image).
+  // LIVE = deep navy/cyan/indigo (same fluid-art style, blue palette).
   const cardFrontBg = cIsLive
     ? [
-        "radial-gradient(ellipse at 22% 78%, rgba(6,182,212,0.85) 0%, transparent 48%)",
-        "radial-gradient(ellipse at 82% 18%, rgba(79,102,255,0.80) 0%, transparent 44%)",
-        "radial-gradient(ellipse at 55% 48%, rgba(14,165,233,0.50) 0%, transparent 42%)",
-        "radial-gradient(ellipse at 68% 72%, rgba(99,220,255,0.30) 0%, transparent 35%)",
-        "linear-gradient(145deg, #040e20 0%, #07162e 55%, #050a1a 100%)",
+        "radial-gradient(ellipse at 22% 75%, rgba(6,182,212,0.88) 0%, transparent 48%)",
+        "radial-gradient(ellipse at 80% 20%, rgba(55,80,230,0.82) 0%, transparent 44%)",
+        "radial-gradient(ellipse at 55% 50%, rgba(14,165,233,0.48) 0%, transparent 42%)",
+        "radial-gradient(ellipse at 65% 70%, rgba(160,230,255,0.20) 0%, transparent 32%)",
+        "linear-gradient(145deg, #030c1c 0%, #060f28 55%, #04091a 100%)",
       ].join(",")
     : [
-        "radial-gradient(ellipse at 28% 72%, rgba(168,85,247,0.85) 0%, transparent 48%)",
-        "radial-gradient(ellipse at 78% 22%, rgba(236,72,153,0.75) 0%, transparent 44%)",
-        "radial-gradient(ellipse at 52% 50%, rgba(244,63,94,0.40) 0%, transparent 42%)",
-        "radial-gradient(ellipse at 70% 68%, rgba(255,180,220,0.22) 0%, transparent 35%)",
-        "linear-gradient(145deg, #160520 0%, #200828 55%, #180418 100%)",
+        // Deep maroon base with pink/rose fluid swirls + cream centre highlight
+        "radial-gradient(ellipse at 50% 52%, rgba(245,215,185,0.28) 0%, transparent 30%)",
+        "radial-gradient(ellipse at 28% 68%, rgba(200,45,85,0.90) 0%, transparent 46%)",
+        "radial-gradient(ellipse at 76% 24%, rgba(160,20,55,0.85) 0%, transparent 42%)",
+        "radial-gradient(ellipse at 55% 42%, rgba(230,90,120,0.50) 0%, transparent 38%)",
+        "radial-gradient(ellipse at 15% 20%, rgba(110,10,30,0.70) 0%, transparent 35%)",
+        "linear-gradient(145deg, #2a0610 0%, #3d0c1a 50%, #220408 100%)",
       ].join(",");
 
   return (
@@ -677,7 +680,7 @@ export default function ClientMobile({ t }: { t: any }) {
               }}>
               <div className="relative overflow-hidden rounded-[20px] p-5 text-white" style={{
                 background: cardFrontBg,
-                border: `1px solid ${cIsLive ? "rgba(6,182,212,0.22)" : "rgba(168,85,247,0.22)"}`,
+                border: `1px solid ${cIsLive ? "rgba(6,182,212,0.22)" : "rgba(200,45,85,0.28)"}`,
                 boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
               }}>
                 <WorldMapBg opacity={0.16} />
@@ -688,7 +691,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   <circle cx="170" cy="28" r="72" stroke="white" strokeWidth="1" />
                 </svg>
                 {/* Thin accent top bar matching card color */}
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ background: cIsLive ? "linear-gradient(90deg, transparent, rgba(6,182,212,0.8), transparent)" : "linear-gradient(90deg, transparent, rgba(168,85,247,0.8), transparent)" }} />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ background: cIsLive ? "linear-gradient(90deg, transparent, rgba(6,182,212,0.8), transparent)" : "linear-gradient(90deg, transparent, rgba(220,80,110,0.85), transparent)" }} />
                 <div className="relative flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <div className="text-[11px] font-bold tracking-[0.2em] text-white/90">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
