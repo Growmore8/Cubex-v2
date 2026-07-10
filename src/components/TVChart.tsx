@@ -325,16 +325,17 @@ export default function TVChart({
         const sock = io({ path: "/socket.io" });
         socketRef.current = sock;
         const sec = resSecond(resolution);
+        // Crypto can move 10%+ intraday; forex/metals use a tighter 3% filter.
+        const isCrypto = /BTC|ETH|XRP|LTC|ADA|DOT|SOL|DOGE|MATIC|BNB/i.test(symbolInfo.name);
+        const spikeThreshold = isCrypto ? 0.12 : 0.03;
 
         sock.on("tick", ({ symbol: sym, price, real }: any) => {
           if (sym !== symbolInfo.name || price == null) return;
           const cb = realtimeCbRef.current; if (!cb) return;
-          // Spike filter: reject any tick that moves >2% from the last close.
-          // Bad feed ticks (e.g. a zero or extreme outlier) permanently stretch
-          // the candle's high/low, causing huge wicks. 5% catches bad data while
-          // allowing legitimate sharp moves in crypto.
+          // Spike filter: reject ticks that move beyond the threshold from the last close.
+          // Crypto uses 12%, forex/metals use 3% — stops bad feed ticks from creating huge wicks.
           if (lastBarRef.current && lastBarRef.current.close > 0) {
-            if (Math.abs(price - lastBarRef.current.close) / lastBarRef.current.close > 0.02) return;
+            if (Math.abs(price - lastBarRef.current.close) / lastBarRef.current.close > spikeThreshold) return;
           }
           const truePrice = real ?? price;
           const barTimeMs = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
@@ -560,7 +561,9 @@ export default function TVChart({
     const apply = () => {
       try {
         const chart = w.activeChart();
-        if (chart.symbol() !== symbol) chart.setSymbol(symbol, () => {});
+        if (chart.symbol() !== symbol) chart.setSymbol(symbol, () => {
+          try { w.activeChart().executeActionById("timeScaleReset"); } catch {}
+        });
       } catch {}
     };
     // Chart is already ready (isReadyRef set in readyCb) — call immediately.
@@ -577,7 +580,11 @@ export default function TVChart({
   // ── Timeframe change ─────────────────────────────────────────────────────────
   useEffect(() => {
     const w = widgetRef.current; if (!w || !tf) return;
-    try { w.activeChart().setResolution(tvRes(tf), () => {}); } catch {}
+    try {
+      w.activeChart().setResolution(tvRes(tf), () => {
+        try { w.activeChart().executeActionById("timeScaleReset"); } catch {}
+      });
+    } catch {}
   }, [tf]);
 
   // ── Theme change ─────────────────────────────────────────────────────────────
