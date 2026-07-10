@@ -157,17 +157,17 @@ export default function TVChart({
             if (!pl?.setPrice) throw new Error("invalid");
             if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
             pl.setPrice(price)
-              .setQuantity(body)
-              .setQuantityBackgroundColor(bg)
-              .setQuantityTextColor("#fff")
-              .setQuantityBorderColor(bg)
-              .setText("")
+              .setQuantity("")
+              .setQuantityBackgroundColor("transparent")
+              .setQuantityTextColor("transparent")
+              .setQuantityBorderColor("transparent")
+              .setText(body)
+              .setBodyBackgroundColor(bg)
+              .setBodyTextColor("#fff")
+              .setBodyBorderColor(bg)
               .setLineColor(lineColor)
               .setLineStyle(lineStyle)
-              .setLineWidth(lineWidth)
-              .setBodyBackgroundColor("transparent")
-              .setBodyTextColor("#fff")
-              .setBodyBorderColor("transparent");
+              .setLineWidth(lineWidth);
             linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
           } catch {
             await addShape(price, {
