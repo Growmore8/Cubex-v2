@@ -106,6 +106,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [totpErr, setTotpErr] = useState("");
   const [totpMsg, setTotpMsg] = useState("");
   const {
+    features,
     theme, brand, account, accts, accId, pnlOnly, swapEnabled, readOnly, isTrial, needKyc, positions, pending, history, financials, notis, symbols, prices, dirs,
     selSym, vol, sl, tp, err,
     balance, equity, floating, free, used, level, price, bid, ask, tf, TFS,
@@ -115,6 +116,7 @@ export default function ClientMobile({ t }: { t: any }) {
     fmt, csz, pnlOf, cSym, fxRate, dg, markAllNotifsRead, logout, pin,
     acctReqModal, setAcctReqModal,
   } = t;
+  const ft: Record<string, boolean> = features || {};
   const _cSym: string = cSym ?? "$";
   const _fxRate: number = fxRate ?? 1;
 
@@ -471,16 +473,13 @@ export default function ClientMobile({ t }: { t: any }) {
   };
 
   // Account-card palette — FIXED premium dark gradients from the reference cards
-  // (NOT the tenant theme). The card stays dark in light mode too. LIVE = deep
-  // blue, DEMO = purple/magenta. Front + back share the gradient.
   const cIsLive = account?.type === "LIVE";
-  const cardDark = theme === "dark"; // (kept for button styling elsewhere)
-  const cardC1 = cIsLive ? "#2547d6" : "#7c2d92";
-  const cardC2 = cIsLive ? "#4f74ff" : "#a83bbf";
-  const cardGlow = cIsLive ? "rgba(79,116,255,.55)" : "rgba(168,59,191,.55)";
-  // Reference-style dark gradient (constant across light/dark): rich colour top-left,
-  // deepening to near-black bottom-right. World-map shade + chip sit on top.
-  const cardFrontBg = `linear-gradient(145deg, ${cardC1} 0%, ${cardC2} 42%, #1a1430 78%, #0b0a16 100%)`;
+  const cardDark = theme === "dark";
+  // 2-tone dark card — Binance/Bybit minimal palette.
+  // LIVE = dark navy, DEMO = dark slate. No glow, no heavy shadow.
+  const cardFrontBg = cIsLive
+    ? "linear-gradient(145deg, #0c1a2e 0%, #112440 50%, #0a1520 100%)"
+    : "linear-gradient(145deg, #131228 0%, #1a1838 50%, #0e0c1e 100%)";
 
   return (
     <>
@@ -500,7 +499,7 @@ export default function ClientMobile({ t }: { t: any }) {
           <div className="flex items-center gap-2.5">
             {/* avatar with brand gradient ring + presence dot */}
             <span className="relative inline-flex shrink-0">
-              <span className="rounded-full p-[2px]" style={{ background: `linear-gradient(135deg, ${hPrimary}, ${hAccent})`, boxShadow: `0 4px 12px -4px ${hPrimary}66` }}>
+              <span className="rounded-full p-[2px]" style={{ background: `linear-gradient(135deg, ${hPrimary}, ${hAccent})` }}>
                 <span className="block rounded-full p-[1.5px]" style={{ background: "var(--bg)" }}><Avatar size={34} /></span>
               </span>
             </span>
@@ -526,7 +525,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </button>
             <button onClick={() => { setNotisOpen((o) => !o); if (!notisOpen && unread > 0) fetch("/api/client/notifications", { method: "POST" }).then(() => {}).catch(() => {}); }} className="relative flex h-9 w-9 items-center justify-center rounded-full transition-transform active:scale-90" style={{ background: "var(--soft)", border: "1px solid var(--border)" }}>
               <i className="fa-solid fa-bell text-[13px]" style={{ color: unread > 0 ? GOLD : "var(--muted)" }} />
-              {unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: SELL, border: "1.5px solid var(--bg)", boxShadow: `0 0 8px ${SELL}99` }}>{unread > 9 ? "9+" : unread}</span>}
+              {unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: SELL, border: "1.5px solid var(--bg)" }}>{unread > 9 ? "9+" : unread}</span>}
             </button>
           </div>
         </div>
@@ -666,23 +665,28 @@ export default function ClientMobile({ t }: { t: any }) {
               }}>
               <div className="relative overflow-hidden rounded-[20px] p-5 text-white" style={{
                 background: cardFrontBg,
-                border: "1px solid rgba(255,255,255,0.14)",
-                boxShadow: "0 26px 50px -22px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.18)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10)",
               }}>
                 <WorldMapBg opacity={0.16} />
                 <div className="card-sheen pointer-events-none absolute inset-0" />
-                <div className="pointer-events-none absolute -right-16 -top-24 h-60 w-60 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.12), transparent 70%)" }} />
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${cardC1}, ${cardC2}, ${cardC1})`, boxShadow: `0 0 16px 1px ${cardGlow}` }} />
+                {/* Interactive-card signature circle ring decorations — no logos, background only */}
+                <svg className="pointer-events-none absolute" width="210" height="180" viewBox="0 0 210 180" fill="none" style={{ top: -24, right: -24, opacity: 0.10 }}>
+                  <circle cx="145" cy="58" r="98" stroke="white" strokeWidth="1.5" />
+                  <circle cx="170" cy="28" r="72" stroke="white" strokeWidth="1" />
+                </svg>
+                {/* Thin accent top bar — no glow */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ background: `linear-gradient(90deg, transparent, ${A1}99, transparent)` }} />
                 <div className="relative flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <div className="text-[11px] font-bold tracking-[0.2em] text-white/90">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
                     <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>{account?.type}</span>
                   </div>
-                  <div className="h-7 w-9 rounded-[6px]" style={{ background: "linear-gradient(135deg,#f4e3a1,#caa54e 45%,#9c7c2e 70%,#e9d27f)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.6), inset 0 -1px 2px rgba(0,0,0,0.35)" }} />
+                  <div className="h-7 w-9 rounded-[6px]" style={{ background: "linear-gradient(135deg,#f4e3a1,#caa54e 45%,#9c7c2e 70%,#e9d27f)" }} />
                 </div>
                 <div className="relative mt-5">
                   <div className="text-[9px] font-semibold tracking-[0.18em] text-white/55">TOTAL BALANCE</div>
-                  <div className="mt-1 text-[32px] font-extrabold leading-none tracking-tight text-white" style={{ textShadow: "0 2px 14px rgba(0,0,0,0.5)" }}>{_cSym}{fmt(balance)}</div>
+                  <div className="mt-1 text-[32px] font-extrabold leading-none tracking-tight text-white">{_cSym}{fmt(balance)}</div>
                   <div className="mt-2 flex items-center gap-2 text-[11px] text-white/75">
                     <span className="font-mono tracking-[0.2em]">{account?.login}</span>
                     <span className="text-white/40">·</span>
@@ -715,9 +719,8 @@ export default function ClientMobile({ t }: { t: any }) {
                   { label: "Transfer", icon: "fa-money-bill-transfer", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); } },
                 ]).map((b) => (
                   <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, var(--card), var(--soft))", border: "1px solid var(--border)", boxShadow: cardDark ? "inset 0 1px 0 rgba(255,255,255,0.06)" : "0 1px 2px rgba(0,0,0,0.05)" }}>
-                    {/* metallic chrome icon chip (reference look) */}
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#f7f9fc,#cfd6e2 42%,#9aa3b4 72%,#eef1f6)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -2px 3px rgba(0,0,0,0.25), 0 2px 5px rgba(0,0,0,0.28)" }}>
-                      <i className={"fa-solid " + b.icon} style={{ color: b.col, fontSize: 15, filter: "drop-shadow(0 1px 0 rgba(255,255,255,0.6))" }} />
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#f7f9fc,#cfd6e2 42%,#9aa3b4 72%,#eef1f6)" }}>
+                      <i className={"fa-solid " + b.icon} style={{ color: b.col, fontSize: 15 }} />
                     </span>
                     <span className="text-[11px]">{b.label}</span>
                   </button>
@@ -729,7 +732,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 <div className="grid grid-cols-3 gap-2">
                   {[1000, 5000, 10000].map((amt) => (
                     <button key={amt} onClick={() => doTopUp(amt)} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, var(--card), var(--soft))", border: "1px solid var(--border)" }}>
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#fde7b8,#e0b94e 45%,#b8860b 72%,#fbe9b0)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -2px 3px rgba(0,0,0,0.25), 0 2px 5px rgba(0,0,0,0.28)" }}><i className="fa-solid fa-coins" style={{ color: "#7a5b07", fontSize: 15 }} /></span>
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#fde7b8,#e0b94e 45%,#b8860b 72%,#fbe9b0)" }}><i className="fa-solid fa-coins" style={{ color: "#7a5b07", fontSize: 15 }} /></span>
                       <span className="text-[12px]">{_cSym}{amt.toLocaleString()}</span>
                     </button>
                   ))}
@@ -848,8 +851,8 @@ export default function ClientMobile({ t }: { t: any }) {
               )}
             </div>
 
-            {/* signals above news */}
-            {mobSignalsLoaded && mobSignals.length > 0 && (
+            {/* signals above news — hidden if SA disabled copyTrading */}
+            {ft.copyTrading !== false && mobSignalsLoaded && mobSignals.length > 0 && (
               <div className="glass-card p-3">
                 <div className="mb-2 text-[11px] font-bold tracking-wide"><i className="fa-solid fa-signal mr-1.5" style={{ color: "#2f81f7" }} />ANALYST SIGNALS <span className="ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: "#2f81f722", color: "#2f81f7" }}>{mobSignals.length}</span></div>
                 <div className="space-y-2">
@@ -884,8 +887,8 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
             )}
 
-            {/* news below market movers */}
-            <div className="glass-card p-3">
+            {/* news below market movers — hidden if SA disabled marketNewsFeed */}
+            {ft.marketNewsFeed !== false && <div className="glass-card p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-[11px] font-bold tracking-wide"><i className="fa-solid fa-newspaper mr-1.5" style={{ color: "var(--accent)" }} />LATEST NEWS</div>
                 {mobNewsLoading && <i className="fa-solid fa-circle-notch fa-spin text-[10px] text-[var(--muted)]" />}
@@ -905,7 +908,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   ))}
                 </div>
               )}
-            </div>
+            </div>}
           </div>
         )}</KeepAlive>
 

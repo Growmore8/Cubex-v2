@@ -55,6 +55,7 @@ export default function ClientTerminal() {
   const booted = dataReady && minElapsed; // start fade only when both are true
   const [kycVerified, setKycVerified] = useState(true); // assume ok until /account resolves
   const [swapEnabled, setSwapEnabled] = useState(true);
+  const [features, setFeatures] = useState<Record<string, boolean>>({});
   const [accts, setAccts] = useState<any[]>([]);
   const [xferModal, setXferModal] = useState(false);
   const [xfer, setXfer] = useState<any>({});
@@ -295,7 +296,14 @@ export default function ClientTerminal() {
   // Fast brand fetch so the splash shows the logo/slogan immediately.
   useEffect(() => { fetch("/api/public/brand").then((r) => r.json()).then((b) => { if (b.ok) setSplashBrand(b); }).catch(() => {}); }, []);
   // Check trial status to hide account-creation options on demo tenants.
-  useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((d) => { if (d.ok && d.trial) setIsTrial(true); }).catch(() => {}); }, []);
+  useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((d) => { if (!d.ok) return; if (d.trial) setIsTrial(true); if (d.features) setFeatures(d.features); }).catch(() => {}); }, []);
+  // If the current right-tab becomes feature-gated (SA disabled it), fall back to TRADE.
+  useEffect(() => {
+    if (rightTab === "SIGNALS"   && features.copyTrading       === false) setRightTab("TRADE");
+    if (rightTab === "NEWS"      && features.marketNewsFeed    === false) setRightTab("TRADE");
+    if (rightTab === "CALENDAR"  && features.economicCalendar  === false) setRightTab("TRADE");
+    if (rightTab === "ANALYTICS" && features.advancedAnalytics === false) setRightTab("TRADE");
+  }, [features]); // eslint-disable-line react-hooks/exhaustive-deps
   // Keep the splash up for at least 3s (branding), regardless of how fast data loads.
   useEffect(() => { const t = setTimeout(() => setMinElapsed(true), 3000); return () => clearTimeout(t); }, []);
   // Once booted (data ready AND 3s elapsed), fade the splash out then unmount it.
@@ -776,7 +784,7 @@ export default function ClientTerminal() {
   // and the 3s branding minimum has passed, then the app mounts.
   if (!splashGone) return <ClientSplash brand={splashBrand || brand} theme={theme} hiding={booted} />;
 
-  if (isMobile) return <ClientMobile t={{ theme, brand, account, accts, accId, pnlOnly, swapEnabled, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, accountSpreadMarkup, prices, liveSpreadPips, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, avatarUploading, uploadAvatar, fmt, csz, pnlOf: pnlOfAcc, cSym, fxRate, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
+  if (isMobile) return <ClientMobile t={{ features, theme, brand, account, accts, accId, pnlOnly, swapEnabled, readOnly, isTrial, needKyc, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, accountSpreadMarkup, prices, liveSpreadPips, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, avatarUploading, uploadAvatar, fmt, csz, pnlOf: pnlOfAcc, cSym, fxRate, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]) }} />;
   if (tenantSuspended) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 text-center px-6" style={{ background: "#0f172a", color: "#94a3b8" }}>
@@ -1221,9 +1229,19 @@ export default function ClientTerminal() {
               </button>
             </div>
           </div>
-          {/* Tab bar: TRADE | SIGNALS | NEWS | CALENDAR | ANALYTICS | DOM */}
+          {/* Tab bar: TRADE | SIGNALS | NEWS | CALENDAR | ANALYTICS | DOM
+              Feature flags (SA-controlled, tenant-wide): copyTrading→SIGNALS,
+              marketNewsFeed→NEWS, economicCalendar→CALENDAR, advancedAnalytics→ANALYTICS */}
           <div className="flex shrink-0 border-b border-[var(--border)]">
-            {(["TRADE", "SIGNALS", "NEWS", "CALENDAR", "ANALYTICS", "DOM"] as const).map((t) => (
+            {(["TRADE", "SIGNALS", "NEWS", "CALENDAR", "ANALYTICS", "DOM"] as const)
+              .filter((t) => {
+                if (t === "SIGNALS")   return features.copyTrading       !== false;
+                if (t === "NEWS")      return features.marketNewsFeed    !== false;
+                if (t === "CALENDAR")  return features.economicCalendar  !== false;
+                if (t === "ANALYTICS") return features.advancedAnalytics !== false;
+                return true;
+              })
+              .map((t) => (
               <button key={t} onClick={() => setRightTab(t)} className="flex-1 py-1.5 text-[9px] font-semibold uppercase tracking-wide transition-colors" style={rightTab === t ? { color: "#2f81f7", borderBottom: "2px solid #2f81f7" } : { color: "var(--muted)" }}>
                 {t === "TRADE" ? <i className="fa-solid fa-arrow-right-arrow-left" /> : t === "SIGNALS" ? <span className="relative"><i className="fa-solid fa-signal" />{signals.length > 0 && <span className="absolute -top-1 -right-1.5 rounded-full px-[3px] text-[7px] font-bold leading-tight" style={{ background: "#2f81f7", color: "#fff" }}>{signals.length}</span>}</span> : t === "NEWS" ? <i className="fa-solid fa-newspaper" /> : t === "CALENDAR" ? <i className="fa-solid fa-calendar-days" /> : t === "ANALYTICS" ? <i className="fa-solid fa-chart-bar" /> : <i className="fa-solid fa-table-list" />}
                 <span className="block text-[7px] mt-0.5 leading-none">{t === "TRADE" ? "Trade" : t === "SIGNALS" ? "Signals" : t === "NEWS" ? "News" : t === "CALENDAR" ? "Cal" : t === "ANALYTICS" ? "Stats" : "DOM"}</span>

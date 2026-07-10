@@ -135,6 +135,7 @@ export default function TVChart({
           try {
             const raw = chart.createShape({ time: anchorSec, price }, {
               shape: "horizontal_line", lock: true, disableSave: true,
+              disableUndo: true, editable: false,
               showInObjectsTree: false, overrides: ovr,
             });
             const id: any = (raw && typeof (raw as any).then === "function") ? await raw : raw;
