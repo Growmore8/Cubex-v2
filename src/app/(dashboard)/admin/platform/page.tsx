@@ -155,6 +155,9 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const dupTimerRef = useRef<any>(null);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+  // Auto-clear feedback messages after 5 seconds so they never stick permanently.
+  useEffect(() => { if (!err) return; const t = setTimeout(() => setErr(""), 5000); return () => clearTimeout(t); }, [err]);
+  useEffect(() => { if (!ok) return; const t = setTimeout(() => setOk(""), 5000); return () => clearTimeout(t); }, [ok]);
   const [toasts, setToasts] = useState<any[]>([]);
   const [confirmBox, setConfirmBox] = useState<{ msg: string; danger?: boolean; onYes: () => void; requireWord?: string } | null>(null);
   const [confirmInput, setConfirmInput] = useState("");

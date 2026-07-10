@@ -147,6 +147,8 @@ export default function ClientTerminal() {
   const [tpSlEdit, setTpSlEdit] = useState<{ id: string; field: "tp" | "sl" | "trailingStop"; val: string } | null>(null);
   const [posCtx, setPosCtx] = useState<{ x: number; y: number; pos: any } | null>(null);
   const [err, setErr] = useState("");
+  // Auto-clear inline trade errors after 5 seconds so they never stick permanently.
+  useEffect(() => { if (!err) return; const t = setTimeout(() => setErr(""), 5000); return () => clearTimeout(t); }, [err]);
   const [pinLock, setPinLock] = useState(false);
   const [pinHasPin, setPinHasPin] = useState(false);
   const [pinInput, setPinInput] = useState("");
@@ -227,7 +229,7 @@ export default function ClientTerminal() {
     } catch (e: any) { setDeskTotpErr(e.message || "Invalid code"); }
     finally { setDeskTotpBusy(false); }
   }
-  async function uploadAvatar(e: any) { const file = e.target.files && e.target.files[0]; if (!file) return; setAvatarUploading(true); const fd = new FormData(); fd.append("file", file); const r = await fetch("/api/client/avatar", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); setAvatarUploading(false); if (r.ok && r.avatarUrl) setAvatarUrl(r.avatarUrl); else setErr(r.error || "Avatar upload failed"); }
+  async function uploadAvatar(e: any) { const file = e.target.files && e.target.files[0]; if (!file) return; setAvatarUploading(true); const fd = new FormData(); fd.append("file", file); const r = await fetch("/api/client/avatar", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false })); setAvatarUploading(false); if (r.ok && r.avatarUrl) setAvatarUrl(r.avatarUrl); else toast.error(r.error || "Avatar upload failed"); }
   const [profileOpen, setProfileOpen] = useState(false);
   const [refData, setRefData] = useState<any>(null);
   const [refCopied, setRefCopied] = useState(false);
@@ -589,7 +591,7 @@ export default function ClientTerminal() {
     if (account?.locked) { toast.error("Your account is read-only. Cannot create new accounts."); return { ok: false }; }
     const tid = toast.loading(`Opening ${type === "LIVE" ? "live" : "demo"} account…`);
     const r = await fetch("/api/client/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }) }).then((x) => x.json()).catch(() => ({ ok: false }));
-    if (!r.ok) { toast.error(r.error || "Failed to open account", { id: tid }); setErr(r.error || "Failed"); return r; }
+    if (!r.ok) { toast.error(r.error || "Failed to open account", { id: tid }); return r; }
     if (r.pending) { toast.dismiss(tid); if (isMobile) setAcctReqModal(true); else toast.success("Request sent — your additional live account needs admin approval. You'll be notified once it's reviewed.", { duration: 6000 }); return r; }
     toast.success(`${type === "LIVE" ? "Live" : "Demo"} account ${r.account?.login || ""} created`, { id: tid });
     if (r.account) { accIdRef.current = r.account.id; setAccId(r.account.id); }

@@ -32,6 +32,7 @@ function subBadge(s: string) {
 export default function SATenantsPage() {
   const [rows, setRows] = useState<any[]>([]);
   const [err, setErr] = useState("");
+  useEffect(() => { if (!err) return; const t = setTimeout(() => setErr(""), 5000); return () => clearTimeout(t); }, [err]);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState<any>({ plan: "STARTER", seats: 5, primaryColor: "#2563eb", accentColor: "#22c55e" });
   const [permFor, setPermFor] = useState<any>(null);
