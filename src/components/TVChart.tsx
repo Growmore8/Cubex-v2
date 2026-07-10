@@ -168,6 +168,8 @@ export default function TVChart({
               .setLineColor(lineColor)
               .setLineStyle(lineStyle)
               .setLineWidth(lineWidth);
+            try { (pl as any).setLineLength?.(0); } catch {}
+            try { (pl as any).setExtendLeft?.(true); } catch {}
             linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
           } catch {
             await addShape(price, {
@@ -185,22 +187,28 @@ export default function TVChart({
           const isPend = !!p.kind;
           const color  = isPend ? "#f59e0b" : (isBuy ? "#2962ff" : "#f23645");
           const tkt   = p.ticket != null ? String(p.ticket) : "";
+          const priceStr = fmt(p.openPrice);
           const label = !isPend && tkt
-            ? `#${p.type} ${tkt}`
-            : `${p.kind ? p.kind + " " : ""}${p.type} ${Number(p.lots).toFixed(2)}`;
+            ? `#${p.type} ${tkt}  ${priceStr}`
+            : `${p.kind ? p.kind + " " : ""}${p.type} ${Number(p.lots).toFixed(2)}  ${priceStr}`;
 
           await makeLine(p.openPrice, label, color, color, isPend ? 2 : 0, isPend ? 1 : 2);
           if (p.sl && p.sl > 0)
-            await makeLine(p.sl, `SL`, "#f43f5e", "#f43f5e", 2, 1);
+            await makeLine(p.sl, `SL  ${fmt(p.sl)}`, "#f43f5e", "#f43f5e", 2, 1);
           if (p.tp && p.tp > 0)
-            await makeLine(p.tp, `TP`, "#10b981", "#10b981", 2, 1);
+            await makeLine(p.tp, `TP  ${fmt(p.tp)}`, "#10b981", "#10b981", 2, 1);
         }
 
-        // Ask spread line — teal dashed
+        // Ask spread line — teal dotted, minimal label so it doesn't crowd position labels
         if (spreadRef.current > 0 && lastBarRef.current && drawSeqRef.current === seq) {
           const spPips   = Math.round(spreadRef.current * 100) / 100;
           const askPrice = lastBarRef.current.close + spPips * Math.pow(10, -dg);
-          await makeLine(askPrice, `Ask +${spPips}p  ${fmt(askPrice)}`, "#26a69a", "#26a69a", 2, 1);
+          await addShape(askPrice, {
+            linecolor: "#26a69a", linewidth: 1, linestyle: 1,
+            showLabel: true, text: `Ask  ${fmt(askPrice)}`, textcolor: "#26a69a",
+            fillBackground: false, backgroundTransparency: 100,
+            horzLabelsAlign: "right",
+          });
         }
       } catch {}
     }, 150);
