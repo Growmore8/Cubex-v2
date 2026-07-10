@@ -168,21 +168,21 @@ function Sparkline({ data, up, w = 50, h = 20, full }: { data?: number[]; up: bo
 }
 
 const WORLD_CREATORS = [
-  { id: "elon",      name: "Elon Musk",          handle: "@elonmusk",         cat: "Tech & Business", bg: "#1a1a2e", fg: "#e040fb", followers: "185.2M" },
-  { id: "trump",     name: "Donald Trump",        handle: "@realDonaldTrump",  cat: "Politics",        bg: "#b71c1c", fg: "#ffcdd2", followers: "92.1M"  },
-  { id: "buffett",   name: "Warren Buffett",      handle: "@WarrenBuffett",    cat: "Investing",       bg: "#1b5e20", fg: "#a5d6a7", followers: "1.8M"   },
-  { id: "saylor",    name: "Michael Saylor",      handle: "@saylor",           cat: "Crypto",          bg: "#e65100", fg: "#fff3e0", followers: "4.2M"   },
-  { id: "dalio",     name: "Ray Dalio",           handle: "@RayDalio",         cat: "Finance",         bg: "#0d47a1", fg: "#bbdefb", followers: "2.1M"   },
-  { id: "cathie",    name: "Cathie Wood",         handle: "@CathieDWood",      cat: "Investing",       bg: "#4a148c", fg: "#ce93d8", followers: "1.3M"   },
-  { id: "vitalik",   name: "Vitalik Buterin",     handle: "@VitalikButerin",   cat: "Crypto",          bg: "#37474f", fg: "#80deea", followers: "5.8M"   },
-  { id: "beyonce",   name: "Beyoncé",             handle: "@Beyonce",          cat: "Entertainment",   bg: "#f57f17", fg: "#fff8e1", followers: "312M"   },
-  { id: "ronaldo",   name: "Cristiano Ronaldo",   handle: "@Cristiano",        cat: "Sports",          bg: "#880e4f", fg: "#f48fb1", followers: "638M"   },
-  { id: "mrbeast",   name: "MrBeast",             handle: "@MrBeast",          cat: "Creator",         bg: "#1a237e", fg: "#90caf9", followers: "240M"   },
-  { id: "soros",     name: "George Soros",        handle: "@georgesoros",      cat: "Finance",         bg: "#212121", fg: "#bdbdbd", followers: "890K"   },
-  { id: "pmarca",    name: "Marc Andreessen",     handle: "@pmarca",           cat: "Tech VC",         bg: "#004d40", fg: "#80cbc4", followers: "1.2M"   },
-  { id: "taylor",    name: "Taylor Swift",        handle: "@taylorswift13",    cat: "Music",           bg: "#4e342e", fg: "#ffccbc", followers: "282M"   },
-  { id: "drake",     name: "Drake",               handle: "@Drake",            cat: "Music",           bg: "#263238", fg: "#cfd8dc", followers: "145M"   },
-  { id: "lebron",    name: "LeBron James",        handle: "@KingJames",        cat: "Sports",          bg: "#bf360c", fg: "#ffccbc", followers: "162M"   },
+  { id: "elon",    name: "Elon Musk",         handle: "@elonmusk",        cat: "Tech & Business", bg: "#1a1a2e", fg: "#e040fb", followers: "185.2M", img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Elon_Musk_Royal_Society_%28crop2%29.jpg/120px-Elon_Musk_Royal_Society_%28crop2%29.jpg" },
+  { id: "trump",   name: "Donald Trump",      handle: "@realDonaldTrump", cat: "Politics",        bg: "#b71c1c", fg: "#ffcdd2", followers: "92.1M",  img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Donald_Trump_official_portrait.jpg/120px-Donald_Trump_official_portrait.jpg" },
+  { id: "buffett", name: "Warren Buffett",    handle: "@WarrenBuffett",   cat: "Investing",       bg: "#1b5e20", fg: "#a5d6a7", followers: "1.8M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Warren_Buffett_KU_Visit.jpg/120px-Warren_Buffett_KU_Visit.jpg" },
+  { id: "saylor",  name: "Michael Saylor",    handle: "@saylor",          cat: "Crypto",          bg: "#e65100", fg: "#fff3e0", followers: "4.2M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Michael_Saylor_BTC_2021.jpg/120px-Michael_Saylor_BTC_2021.jpg" },
+  { id: "dalio",   name: "Ray Dalio",         handle: "@RayDalio",        cat: "Finance",         bg: "#0d47a1", fg: "#bbdefb", followers: "2.1M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Ray_Dalio_2019_%28cropped%29.jpg/120px-Ray_Dalio_2019_%28cropped%29.jpg" },
+  { id: "cathie",  name: "Cathie Wood",       handle: "@CathieDWood",     cat: "Investing",       bg: "#4a148c", fg: "#ce93d8", followers: "1.3M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Cathie_Wood_2021.jpg/120px-Cathie_Wood_2021.jpg" },
+  { id: "vitalik", name: "Vitalik Buterin",   handle: "@VitalikButerin",  cat: "Crypto",          bg: "#37474f", fg: "#80deea", followers: "5.8M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Vitalik_Buterin_TechCrunch_London_2015_%28cropped%29.jpg/120px-Vitalik_Buterin_TechCrunch_London_2015_%28cropped%29.jpg" },
+  { id: "beyonce", name: "Beyoncé",           handle: "@Beyonce",         cat: "Entertainment",   bg: "#f57f17", fg: "#fff8e1", followers: "312M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Beyonc%C3%A9_at_The_London_Stadium_%282%29_%28cropped%29.png/120px-Beyonc%C3%A9_at_The_London_Stadium_%282%29_%28cropped%29.png" },
+  { id: "ronaldo", name: "Cristiano Ronaldo", handle: "@Cristiano",       cat: "Sports",          bg: "#880e4f", fg: "#f48fb1", followers: "638M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Cristiano_Ronaldo_2018.jpg/120px-Cristiano_Ronaldo_2018.jpg" },
+  { id: "mrbeast", name: "MrBeast",           handle: "@MrBeast",         cat: "Creator",         bg: "#1a237e", fg: "#90caf9", followers: "240M",   img: "" },
+  { id: "soros",   name: "George Soros",      handle: "@georgesoros",     cat: "Finance",         bg: "#212121", fg: "#bdbdbd", followers: "890K",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/George_Soros_-_Festival_Economia_2012_1_%28cropped%29.jpg/120px-George_Soros_-_Festival_Economia_2012_1_%28cropped%29.jpg" },
+  { id: "pmarca",  name: "Marc Andreessen",   handle: "@pmarca",          cat: "Tech VC",         bg: "#004d40", fg: "#80cbc4", followers: "1.2M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Marc_Andreessen_at_SXSW_2014_%28cropped%29.jpg/120px-Marc_Andreessen_at_SXSW_2014_%28cropped%29.jpg" },
+  { id: "taylor",  name: "Taylor Swift",      handle: "@taylorswift13",   cat: "Music",           bg: "#4e342e", fg: "#ffccbc", followers: "282M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Taylor_Swift_at_the_2023_MTV_VMAs_3.png/120px-Taylor_Swift_at_the_2023_MTV_VMAs_3.png" },
+  { id: "drake",   name: "Drake",             handle: "@Drake",           cat: "Music",           bg: "#263238", fg: "#cfd8dc", followers: "145M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Drake_-_Aubrey_%26_the_Three_Migos_Tour_%28cropped%29.jpg/120px-Drake_-_Aubrey_%26_the_Three_Migos_Tour_%28cropped%29.jpg" },
+  { id: "lebron",  name: "LeBron James",      handle: "@KingJames",       cat: "Sports",          bg: "#bf360c", fg: "#ffccbc", followers: "162M",   img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/LeBron_James_%2851959977144%29_%28cropped%29.jpg/120px-LeBron_James_%2851959977144%29_%28cropped%29.jpg" },
 ];
 
 export default function ClientMobile({ t }: { t: any }) {
@@ -768,10 +768,10 @@ export default function ClientMobile({ t }: { t: any }) {
               }}>
               <div className="cp-card relative overflow-hidden rounded-[20px] px-5 py-7" style={{
                 backgroundImage: cIsLive
-                  /* LIVE — Egg-Sour: vivid lime top-left · warm orange centre · soft peach-pink bottom-right */
-                  ? "radial-gradient(ellipse 64% 58% at 6% 10%, rgba(168,222,0,0.96) 0%, rgba(168,222,0,0.40) 44%, transparent 68%), radial-gradient(ellipse 36% 32% at 30% 26%, rgba(238,252,80,0.52) 0%, transparent 50%), radial-gradient(ellipse 68% 64% at 60% 56%, rgba(252,140,28,0.92) 0%, rgba(252,140,28,0.28) 52%, transparent 72%), radial-gradient(ellipse 48% 44% at 90% 88%, rgba(252,150,120,0.82) 0%, rgba(252,150,120,0.20) 46%, transparent 68%), radial-gradient(ellipse 44% 40% at 96% 4%, rgba(255,255,255,0.90) 0%, transparent 52%), linear-gradient(138deg,#eefab0 0%,#fef6c0 22%,#fed898 50%,#fecab8 78%,#fff4ee 100%)"
-                  /* DEMO — Cotton Candy: soft periwinkle top-left · rose-pink centre · warm gold bottom-right · white glow */
-                  : "radial-gradient(ellipse 68% 62% at 8% 12%, rgba(158,148,232,0.82) 0%, rgba(158,148,232,0.28) 46%, transparent 70%), radial-gradient(ellipse 55% 50% at 40% 62%, rgba(238,138,152,0.88) 0%, rgba(238,138,152,0.28) 48%, transparent 70%), radial-gradient(ellipse 62% 56% at 84% 88%, rgba(252,196,108,0.82) 0%, rgba(252,196,108,0.22) 48%, transparent 70%), radial-gradient(ellipse 44% 40% at 90% 12%, rgba(218,208,252,0.58) 0%, transparent 52%), radial-gradient(ellipse 52% 48% at 56% 38%, rgba(255,255,255,0.82) 0%, transparent 56%), linear-gradient(135deg,#dcd4f4 0%,#f0dce8 30%,#f8d4d0 54%,#fde8bc 78%,#fff5e4 100%)",
+                  /* LIVE — Egg-Sour: lime top-left · warm orange centre · peach-pink bottom-right · cream corner */
+                  ? "radial-gradient(ellipse 70% 62% at 3% 6%, rgba(184,222,30,0.96) 0%, rgba(184,222,30,0.40) 42%, transparent 66%), radial-gradient(ellipse 40% 36% at 26% 22%, rgba(228,248,75,0.62) 0%, transparent 50%), radial-gradient(ellipse 72% 66% at 62% 60%, rgba(252,148,28,0.94) 0%, rgba(252,148,28,0.28) 50%, transparent 70%), radial-gradient(ellipse 52% 48% at 92% 90%, rgba(250,152,125,0.84) 0%, rgba(250,152,125,0.18) 46%, transparent 66%), radial-gradient(ellipse 42% 38% at 96% 3%, rgba(255,252,200,0.90) 0%, transparent 50%), linear-gradient(138deg,#e8fab0 0%,#f6f8a0 18%,#fde498 42%,#fdccaa 68%,#fcc0b5 88%,#fff4f0 100%)"
+                  /* DEMO — Cotton Candy: periwinkle top-left · dusty rose centre · warm gold bottom-right · bright white glow top-right */
+                  : "radial-gradient(ellipse 78% 70% at 2% 5%, rgba(165,148,230,0.88) 0%, rgba(165,148,230,0.30) 44%, transparent 65%), radial-gradient(ellipse 68% 62% at 25% 72%, rgba(235,142,162,0.90) 0%, rgba(235,142,162,0.28) 46%, transparent 66%), radial-gradient(ellipse 65% 58% at 90% 95%, rgba(250,195,112,0.86) 0%, rgba(250,195,112,0.22) 46%, transparent 66%), radial-gradient(ellipse 48% 44% at 75% 28%, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.50) 32%, transparent 55%), radial-gradient(ellipse 36% 32% at 96% 5%, rgba(212,202,252,0.70) 0%, transparent 50%), linear-gradient(135deg,#e0d5f8 0%,#f2dce8 26%,#f6d6d2 52%,#fce6be 76%,#fff6e4 100%)",
                 color: "#1a1d21",
                 boxShadow: "0 0 8px rgba(0,0,0,0.12), 0 2px 16px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.12), 0 12px 28px rgba(0,0,0,0.12)",
               }}>
@@ -1198,9 +1198,16 @@ export default function ClientMobile({ t }: { t: any }) {
                         const initials = c.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
                         return (
                           <div key={c.id} className="flex items-center gap-3 px-3 py-2.5">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
-                              style={{ background: c.bg, color: c.fg }}>
-                              {initials}
+                            <div className="relative h-11 w-11 shrink-0">
+                              {c.img ? (
+                                <img src={c.img} alt={c.name}
+                                  className="h-11 w-11 rounded-full object-cover"
+                                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextSibling as HTMLElement).style.display = "flex"; }} />
+                              ) : null}
+                              <div className="absolute inset-0 flex items-center justify-center rounded-full text-[13px] font-bold"
+                                style={{ background: c.bg, color: c.fg, display: c.img ? "none" : "flex" }}>
+                                {initials}
+                              </div>
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{c.name}</div>

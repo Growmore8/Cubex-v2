@@ -91,11 +91,10 @@
   inset: 0;
   border-radius: 20px;
   background:
-    linear-gradient(118deg, rgba(255,255,255,0.0) 22%, rgba(255,255,255,0.72) 38%, rgba(255,255,255,0.55) 44%, rgba(255,255,255,0.0) 58%),
-    linear-gradient(0deg, rgba(255,255,255,0.18), rgba(255,255,255,0.42));
-  background-size: 220% 220%;
-  mix-blend-mode: soft-light;
-  animation: cpCardShimmer 14s ease-in-out infinite;
+    linear-gradient(120deg, rgba(255,255,255,0.02) 28%, rgba(255,255,255,0.25) 40%, rgba(255,255,255,0.06) 52%),
+    linear-gradient(0deg, rgba(255,255,255,0.12), rgba(255,255,255,0.20));
+  background-size: 150% 150%;
+  animation: cpCardShimmer 45s ease-in-out infinite;
   transform: translateZ(0);
   z-index: 2;
   pointer-events: none;
