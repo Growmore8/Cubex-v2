@@ -63,7 +63,7 @@ export default function RootLayout({
           {children}
           <UpdateWatcher />
           <Toaster
-            position="top-right"
+            position="top-center"
             toastOptions={{
               style: {
                 fontSize: "13px",
