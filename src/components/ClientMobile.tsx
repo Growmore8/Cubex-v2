@@ -735,8 +735,10 @@ export default function ClientMobile({ t }: { t: any }) {
               }}>
               <div className="cp-card relative overflow-hidden rounded-[20px] px-5 py-7" style={{
                 backgroundImage: cIsLive
-                  ? "radial-gradient(ellipse 70% 60% at 78% 22%, rgba(186,230,252,0.92) 0%, transparent 58%), radial-gradient(ellipse 65% 70% at 20% 75%, rgba(192,132,252,0.72) 0%, transparent 55%), linear-gradient(140deg,#f0e7ff 0%,#ddd6fe 30%,#bae6fd 65%,#e0f2fe 100%)"
-                  : "radial-gradient(ellipse 65% 55% at 18% 35%, rgba(190,242,100,0.90) 0%, transparent 52%), radial-gradient(ellipse 60% 58% at 72% 50%, rgba(251,146,60,0.84) 0%, transparent 50%), radial-gradient(ellipse 50% 55% at 88% 82%, rgba(251,113,133,0.60) 0%, transparent 45%), linear-gradient(140deg,#c4f27a 0%,#fef08a 38%,#fed7aa 62%,#fda4af 100%)",
+                  /* Cool card — lavender-pink left, ice-blue right, white centre glow */
+                  ? "radial-gradient(ellipse 68% 72% at 8% 52%, rgba(210,140,252,0.82) 0%, transparent 55%), radial-gradient(ellipse 72% 62% at 88% 28%, rgba(168,196,252,0.90) 0%, transparent 56%), radial-gradient(ellipse 55% 55% at 50% 50%, rgba(255,255,255,0.38) 0%, transparent 50%), linear-gradient(140deg,#f0d6fc 0%,#e8d5ff 22%,#d0deff 52%,#b8d4fd 78%,#dceeff 100%)"
+                  /* Warm card — lime-green top-left, orange centre, rose-pink bottom-right */
+                  : "radial-gradient(ellipse 72% 68% at 12% 22%, rgba(196,240,50,0.96) 0%, transparent 52%), radial-gradient(ellipse 68% 66% at 72% 46%, rgba(245,140,55,0.94) 0%, transparent 52%), radial-gradient(ellipse 54% 54% at 90% 84%, rgba(248,105,105,0.74) 0%, transparent 48%), linear-gradient(140deg,#c9e836 0%,#f5e844 30%,#fdbb74 56%,#fca5a5 100%)",
                 color: "#1a1d21",
                 boxShadow: "0 0 8px rgba(0,0,0,0.12), 0 2px 16px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.12), 0 12px 28px rgba(0,0,0,0.12)",
               }}>
