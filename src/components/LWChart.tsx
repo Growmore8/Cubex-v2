@@ -167,8 +167,10 @@ export type ChartPosition = {
 
 const TF_SECONDS: Record<string, number> = { "1M": 60, "5M": 300, "15M": 900, "30M": 1800, "1H": 3600, "4H": 14400, "1D": 86400 };
 
+type Sym = { symbol: string; category?: string; digits?: number; display?: string };
+
 function LWChart({
-  symbol, tf, theme, positions, digits = 2, showTools = true, ind, cfg, calcPnl, tool: toolProp, onTool, clearKey, spreadPips, onCandleUpdate, onTfChange,
+  symbol, tf, theme, positions, digits = 2, showTools = true, ind, cfg, calcPnl, tool: toolProp, onTool, clearKey, spreadPips, onCandleUpdate, onTfChange, symbols, onSymbolChange,
 }: {
   symbol: string;
   tf: string;
@@ -180,6 +182,8 @@ function LWChart({
   spreadPips?: number;
   onCandleUpdate?: (bar: { open: number; high: number; low: number; close: number }) => void;
   onTfChange?: (tf: string) => void;
+  symbols?: Sym[];
+  onSymbolChange?: (sym: string) => void;
   /** Pure P&L formula from the parent so the chart can update position labels
       live on its own internal tick (without re-rendering). */
   calcPnl?: (p: ChartPosition, price: number) => number;
@@ -208,6 +212,8 @@ function LWChart({
   const cfgKey = JSON.stringify(cfg || {});
   const hoveringRef = useRef(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; price: number | null } | null>(null);
+  const [symOpen, setSymOpen] = useState(false);
+  const [symSearch, setSymSearch] = useState("");
   const lineRefs = useRef<any[]>([]);
   const linePricesRef = useRef<number[]>([]); // entry/SL/TP/trigger prices to keep in view
   const posLinesRef = useRef<{ line: any; p: ChartPosition }[]>([]); // open-trade entry lines for live P&L labels
@@ -347,13 +353,15 @@ function LWChart({
           ? `${ts.getUTCFullYear()}-${String(ts.getUTCMonth()+1).padStart(2,"0")}-${String(ts.getUTCDate()).padStart(2,"0")} ${String(ts.getUTCHours()).padStart(2,"0")}:${String(ts.getUTCMinutes()).padStart(2,"0")}`
           : "";
         const fP = (v: number) => Number(v).toFixed(digits);
+        const isUp = d.close >= d.open;
+        const pc = isUp ? "#26a69a" : "#ef5350";
         el.innerHTML =
-          `<div style="color:#26a69a;font-weight:700;margin-bottom:5px;font-size:10px">${dateStr}</div>` +
+          `<div style="color:${pc};font-weight:700;margin-bottom:5px;font-size:10px">${dateStr}</div>` +
           `<div style="display:grid;grid-template-columns:auto auto;gap:2px 10px;font-size:10px">` +
-          `<span style="opacity:.55">Open:</span><span>${fP(d.open)}</span>` +
-          `<span style="opacity:.55">High:</span><span>${fP(d.high)}</span>` +
-          `<span style="opacity:.55">Low:</span><span>${fP(d.low)}</span>` +
-          `<span style="opacity:.55">Close:</span><span>${fP(d.close)}</span>` +
+          `<span style="opacity:.55">Open:</span><span style="color:${pc}">${fP(d.open)}</span>` +
+          `<span style="opacity:.55">High:</span><span style="color:${pc}">${fP(d.high)}</span>` +
+          `<span style="opacity:.55">Low:</span><span style="color:${pc}">${fP(d.low)}</span>` +
+          `<span style="opacity:.55">Close:</span><span style="color:${pc}">${fP(d.close)}</span>` +
           `</div>`;
         const cont = el.parentElement;
         const cw = cont ? cont.clientWidth : 500, ch2 = cont ? cont.clientHeight : 500;
@@ -808,7 +816,55 @@ function LWChart({
       <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
         {/* TF selector bar — only shown on LW chart when parent provides onTfChange */}
         {onTfChange && (
-          <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "3px 6px", borderBottom: `1px solid ${bord}`, background: panelBg, flexShrink: 0 }}>
+          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 2, padding: "3px 6px", borderBottom: `1px solid ${bord}`, background: panelBg, flexShrink: 0 }}>
+            {/* Symbol picker */}
+            {symbols && symbols.length > 0 && onSymbolChange && (
+              <>
+                <button onClick={() => { setSymOpen((o) => !o); setSymSearch(""); }} style={{
+                  padding: "1px 8px", fontSize: 10, fontWeight: 700, border: `1px solid ${bord}`, borderRadius: 4, cursor: "pointer",
+                  background: "transparent", color: theme === "dark" ? "#e7ecf3" : "#1a2233", marginRight: 4,
+                }}>
+                  {symbol} ▾
+                </button>
+                {symOpen && (
+                  <div style={{
+                    position: "absolute", top: "100%", left: 0, zIndex: 200,
+                    background: theme === "dark" ? "#1a2233" : "#fff",
+                    border: `1px solid ${bord}`, borderRadius: 6,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+                    minWidth: 180, maxHeight: 260, display: "flex", flexDirection: "column",
+                  }}>
+                    <input
+                      autoFocus
+                      value={symSearch}
+                      onChange={(e) => setSymSearch(e.target.value)}
+                      placeholder="Search symbol..."
+                      style={{
+                        border: "none", borderBottom: `1px solid ${bord}`,
+                        background: "transparent", color: "inherit",
+                        padding: "6px 10px", fontSize: 11, outline: "none",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div style={{ overflowY: "auto", flex: 1 }}>
+                      {symbols.filter((s) => s.symbol.toLowerCase().includes(symSearch.toLowerCase())).map((s) => (
+                        <div key={s.symbol} onClick={() => { onSymbolChange(s.symbol); setSymOpen(false); }}
+                          style={{
+                            padding: "5px 10px", fontSize: 11, cursor: "pointer",
+                            background: s.symbol === symbol ? "#2962ff" : "transparent",
+                            color: s.symbol === symbol ? "#fff" : (theme === "dark" ? "#e7ecf3" : "#1a2233"),
+                          }}
+                          onMouseEnter={(e) => { if (s.symbol !== symbol) (e.currentTarget as HTMLDivElement).style.background = theme === "dark" ? "#2a3347" : "#f0f4ff"; }}
+                          onMouseLeave={(e) => { if (s.symbol !== symbol) (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+                        >
+                          {s.display || s.symbol}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
             {["1M","5M","15M","30M","1H","4H","1D"].map((t) => (
               <button key={t} onClick={() => onTfChange(t)} style={{
                 padding: "1px 7px", fontSize: 10, fontWeight: tf === t ? 700 : 500, border: "none", borderRadius: 4, cursor: "pointer",

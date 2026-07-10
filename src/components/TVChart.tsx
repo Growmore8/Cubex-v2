@@ -143,28 +143,17 @@ export default function TVChart({
           } catch {}
         };
 
-        // createPositionLine with empty qty → only the right-side body box is visible,
-        // matching LW chart where the label appears on the right near the price axis.
+        // Right-aligned price label — same visual style as LW chart's createPriceLine title.
+        // horzLabelsAlign:"right" pins the label to the right edge (near price axis).
         const makeLine = async (
           price: number, body: string, lineColor: string, bg: string, lineStyle: number, lineWidth: number,
         ) => {
-          try {
-            const raw = (chart as any).createPositionLine?.();
-            if (raw == null) throw new Error("n/a");
-            const pl: any = (raw && typeof (raw as any).then === "function") ? await raw : raw;
-            if (!pl?.setPrice) throw new Error("invalid");
-            if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
-            pl.setPrice(price).setQuantity("").setText(body)
-              .setLineColor(lineColor).setLineStyle(lineStyle).setLineWidth(lineWidth)
-              .setBodyBackgroundColor(bg).setBodyTextColor("#fff");
-            linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
-          } catch {
-            await addShape(price, {
-              linecolor: lineColor, linewidth: lineWidth, linestyle: lineStyle,
-              showLabel: true, text: body, textcolor: "#fff",
-              fillBackground: true, backgroundColor: bg, backgroundTransparency: 0,
-            });
-          }
+          await addShape(price, {
+            linecolor: lineColor, linewidth: lineWidth, linestyle: lineStyle,
+            showLabel: true, text: body, textcolor: "#fff",
+            fillBackground: true, backgroundColor: bg, backgroundTransparency: 0,
+            horzLabelsAlign: "right",
+          });
         };
 
         for (const p of positionsRef.current || []) {
@@ -417,21 +406,27 @@ export default function TVChart({
           const el = ohlcOverlayRef.current; if (!el) return;
           if (!param?.time || !param.point) { el.style.display = "none"; return; }
           const tRaw = Number(param.time);
-          // Bars stored with time in ms; TV may give seconds or ms — try both
-          const bar = allBarsRef.current.find((b) => b.time === tRaw || b.time === tRaw * 1000);
+          // Normalize both to seconds before comparing (TV gives seconds; bars stored in ms)
+          const tSec = tRaw > 1e10 ? Math.floor(tRaw / 1000) : tRaw;
+          const bar = allBarsRef.current.find((b) => {
+            const bSec = b.time > 1e10 ? Math.floor(b.time / 1000) : b.time;
+            return bSec === tSec;
+          });
           if (!bar) { el.style.display = "none"; return; }
           const dg = digitsRef.current;
           const fP = (v: number) => v.toFixed(dg);
           const ms = bar.time > 1e11 ? bar.time : bar.time * 1000;
-          const d = new Date(ms);
-          const ds = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")} ${String(d.getUTCHours()).padStart(2,"0")}:${String(d.getUTCMinutes()).padStart(2,"0")}`;
+          const dt = new Date(ms);
+          const ds = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,"0")}-${String(dt.getUTCDate()).padStart(2,"0")} ${String(dt.getUTCHours()).padStart(2,"0")}:${String(dt.getUTCMinutes()).padStart(2,"0")}`;
+          const isUp = bar.close >= bar.open;
+          const pc = isUp ? "#26a69a" : "#ef5350";
           el.innerHTML =
-            `<div style="color:#26a69a;font-weight:700;margin-bottom:5px;font-size:10px">${ds}</div>` +
+            `<div style="color:${pc};font-weight:700;margin-bottom:5px;font-size:10px">${ds}</div>` +
             `<div style="display:grid;grid-template-columns:auto auto;gap:2px 10px;font-size:10px">` +
-            `<span style="opacity:.55">Open:</span><span>${fP(bar.open)}</span>` +
-            `<span style="opacity:.55">High:</span><span>${fP(bar.high)}</span>` +
-            `<span style="opacity:.55">Low:</span><span>${fP(bar.low)}</span>` +
-            `<span style="opacity:.55">Close:</span><span>${fP(bar.close)}</span>` +
+            `<span style="opacity:.55">Open:</span><span style="color:${pc}">${fP(bar.open)}</span>` +
+            `<span style="opacity:.55">High:</span><span style="color:${pc}">${fP(bar.high)}</span>` +
+            `<span style="opacity:.55">Low:</span><span style="color:${pc}">${fP(bar.low)}</span>` +
+            `<span style="opacity:.55">Close:</span><span style="color:${pc}">${fP(bar.close)}</span>` +
             `</div>`;
           const cont = el.parentElement;
           const cw = cont ? cont.clientWidth : 500, ch = cont ? cont.clientHeight : 500;

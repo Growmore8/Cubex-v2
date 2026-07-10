@@ -58,6 +58,8 @@ export default function KLineProChart(props: Props) {
       spreadPips={props.spreadPips}
       onCandleUpdate={props.onCandleUpdate}
       onTfChange={props.onTfChange}
+      symbols={props.symbols}
+      onSymbolChange={props.onSymbolChange}
     />
   );
 }
