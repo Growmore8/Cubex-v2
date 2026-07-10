@@ -764,7 +764,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     <div>
                       <div className="text-[8px] tracking-[0.12em]" style={{ color: "rgba(26,29,33,0.45)" }}>P&amp;L</div>
                       <div className="flex items-center gap-0.5 text-[13px] font-bold tabular-nums" style={{ color: floating >= 0 ? "#166534" : "#991b1b" }}>
-                        <i className={"fa-solid text-[9px] " + (floating >= 0 ? "fa-arrow-trend-up" : "fa-arrow-trend-down")} />
+                        <i className={"fa-solid text-[9px] " + (floating >= 0 ? "fa-caret-up" : "fa-caret-down")} />
                         {floating >= 0 ? "+" : ""}{_cSym}{fmt(Math.abs(floating))}
                       </div>
                     </div>
