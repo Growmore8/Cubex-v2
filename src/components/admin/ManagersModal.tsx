@@ -16,7 +16,13 @@ const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
   { sec: "Reports", items: [["viewAudit", "View Audit Log"], ["exportPdf", "Export PDF Reports"]] },
   { sec: "Communication", items: [["sendNotifications", "Send Notifications"]] },
   { sec: "Spread", items: [["editSpread", "Edit Spread Settings (account markup)"]] },
-  { sec: "Features", items: [["copyTrading", "Copy Trading (signals & auto-copy)"]] },
+  { sec: "Features", items: [
+    ["copyTrading",       "Copy Trading (signals & auto-copy)"],
+    ["advancedAnalytics", "Advanced Analytics"],
+    ["marketNewsFeed",    "Market News Feed"],
+    ["economicCalendar",  "Economic Calendar"],
+    ["referralProgram",   "Referral Program"],
+  ] },
 ];
 
 // In-place Manage Managers modal — opens over the desk, no page navigation.

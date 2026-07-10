@@ -48,7 +48,8 @@ export const PERM_KEYS = [
   "manualTrade", "closeTrades", "editTrades", "deleteTrades",
   "viewAudit", "exportPdf", "sendNotifications",
   "editSpread",
-  "copyTrading",
+  // Feature-flag mirrors — admin can restrict per manager (SA sets the tenant ceiling)
+  "copyTrading", "advancedAnalytics", "marketNewsFeed", "economicCalendar", "referralProgram",
 ] as const;
 
 // Resolve every permission key to a final boolean for this session, applying the

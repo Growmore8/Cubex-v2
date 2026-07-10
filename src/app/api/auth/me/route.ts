@@ -26,6 +26,32 @@ export async function GET() {
       }
     } catch {}
   }
+  // For clients: apply the assigned manager's feature perms as an extra gate.
+  // If any manager assigned to the client's accounts has a feature perm set to false,
+  // that feature is hidden for the client — regardless of the tenant-level flag.
+  if (s.role === "CLIENT" && s.sub) {
+    try {
+      const accounts = await prisma.account.findMany({
+        where: { userId: s.sub, deactivated: false },
+        select: { managerId: true },
+      });
+      const managerIds = [...new Set(accounts.map((a) => a.managerId).filter(Boolean))] as string[];
+      if (managerIds.length > 0) {
+        const managers = await prisma.user.findMany({
+          where: { id: { in: managerIds } },
+          select: { perms: true },
+        });
+        const FEATURE_PERM_KEYS = ["copyTrading", "advancedAnalytics", "marketNewsFeed", "economicCalendar", "referralProgram"] as const;
+        for (const mgr of managers) {
+          const mp: any = (mgr.perms as any) || {};
+          for (const key of FEATURE_PERM_KEYS) {
+            if (mp[key] === false) features[key] = false;
+          }
+        }
+      }
+    } catch {}
+  }
+
   return NextResponse.json({
     ok: true,
     user: { id: s.sub, name: s.name, email: s.email, role: s.role, tenantId: s.tenantId },
