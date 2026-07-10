@@ -167,6 +167,24 @@ function Sparkline({ data, up, w = 50, h = 20, full }: { data?: number[]; up: bo
   );
 }
 
+const WORLD_CREATORS = [
+  { id: "elon",      name: "Elon Musk",          handle: "@elonmusk",         cat: "Tech & Business", bg: "#1a1a2e", fg: "#e040fb", followers: "185.2M" },
+  { id: "trump",     name: "Donald Trump",        handle: "@realDonaldTrump",  cat: "Politics",        bg: "#b71c1c", fg: "#ffcdd2", followers: "92.1M"  },
+  { id: "buffett",   name: "Warren Buffett",      handle: "@WarrenBuffett",    cat: "Investing",       bg: "#1b5e20", fg: "#a5d6a7", followers: "1.8M"   },
+  { id: "saylor",    name: "Michael Saylor",      handle: "@saylor",           cat: "Crypto",          bg: "#e65100", fg: "#fff3e0", followers: "4.2M"   },
+  { id: "dalio",     name: "Ray Dalio",           handle: "@RayDalio",         cat: "Finance",         bg: "#0d47a1", fg: "#bbdefb", followers: "2.1M"   },
+  { id: "cathie",    name: "Cathie Wood",         handle: "@CathieDWood",      cat: "Investing",       bg: "#4a148c", fg: "#ce93d8", followers: "1.3M"   },
+  { id: "vitalik",   name: "Vitalik Buterin",     handle: "@VitalikButerin",   cat: "Crypto",          bg: "#37474f", fg: "#80deea", followers: "5.8M"   },
+  { id: "beyonce",   name: "Beyoncé",             handle: "@Beyonce",          cat: "Entertainment",   bg: "#f57f17", fg: "#fff8e1", followers: "312M"   },
+  { id: "ronaldo",   name: "Cristiano Ronaldo",   handle: "@Cristiano",        cat: "Sports",          bg: "#880e4f", fg: "#f48fb1", followers: "638M"   },
+  { id: "mrbeast",   name: "MrBeast",             handle: "@MrBeast",          cat: "Creator",         bg: "#1a237e", fg: "#90caf9", followers: "240M"   },
+  { id: "soros",     name: "George Soros",        handle: "@georgesoros",      cat: "Finance",         bg: "#212121", fg: "#bdbdbd", followers: "890K"   },
+  { id: "pmarca",    name: "Marc Andreessen",     handle: "@pmarca",           cat: "Tech VC",         bg: "#004d40", fg: "#80cbc4", followers: "1.2M"   },
+  { id: "taylor",    name: "Taylor Swift",        handle: "@taylorswift13",    cat: "Music",           bg: "#4e342e", fg: "#ffccbc", followers: "282M"   },
+  { id: "drake",     name: "Drake",               handle: "@Drake",            cat: "Music",           bg: "#263238", fg: "#cfd8dc", followers: "145M"   },
+  { id: "lebron",    name: "LeBron James",        handle: "@KingJames",        cat: "Sports",          bg: "#bf360c", fg: "#ffccbc", followers: "162M"   },
+];
+
 export default function ClientMobile({ t }: { t: any }) {
   const [noOpen, setNoOpen] = useState(false);
   const [noForm, setNoForm] = useState<any>({ idx: 0, lots: 0.01, trigger: "", sl: "", tp: "" });
@@ -218,6 +236,15 @@ export default function ClientMobile({ t }: { t: any }) {
   const [actCarouselIdx, setActCarouselIdx] = useState(0);
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [calendarLoaded, setCalendarLoaded] = useState(false);
+  const [followedCreators, setFollowedCreators] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("cx_followed") || "[]")); } catch { return new Set(); }
+  });
+  const toggleFollow = (id: string) => setFollowedCreators((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    try { localStorage.setItem("cx_followed", JSON.stringify([...next])); } catch {}
+    return next;
+  });
   const [mobSignals, setMobSignals] = useState<any[]>([]);
   const [mobSignalsLoaded, setMobSignalsLoaded] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
@@ -1063,7 +1090,7 @@ export default function ClientMobile({ t }: { t: any }) {
                               {isTrade ? (curAct.pnl >= 0 ? "+" : "") + _cSym + fmt(Math.abs(curAct.pnl)) : _cSym + fmt(curAct.amount)}
                             </div>
                             <div className="mt-0.5 text-[9px]" style={{ color: isTrade ? "var(--muted)" : (curAct.status === "APPROVED" ? BUY : curAct.status === "REJECTED" ? SELL : "var(--muted)") }}>
-                              {isTrade ? `${curAct.side} ${curAct.lot}L` : (curAct.status || "PENDING")} · {timeAgo(curAct.time)}
+                              {isTrade ? `${curAct.side}${curAct.lot ? ` ${curAct.lot}L` : ""}` : (curAct.status || "PENDING")} · {timeAgo(curAct.time)}
                             </div>
                           </div>
                           {/* dot indicators */}
@@ -1082,28 +1109,6 @@ export default function ClientMobile({ t }: { t: any }) {
               );
             })()}
 
-            {/* news below market movers — hidden if SA disabled marketNewsFeed */}
-            {ft.marketNewsFeed !== false && <div className="glass-card p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-[11px] font-bold tracking-wide"><i className="fa-solid fa-newspaper mr-1.5" style={{ color: "var(--accent)" }} />LATEST NEWS</div>
-                {mobNewsLoading && <i className="fa-solid fa-circle-notch fa-spin text-[10px] text-[var(--muted)]" />}
-              </div>
-              {!mobNewsLoading && mobNews.length === 0 ? (
-                <div className="py-3 text-center text-[11px] text-[var(--muted)]">No news available</div>
-              ) : (
-                <div className="space-y-3">
-                  {mobNews.slice(0, 5).map((n: any) => (
-                    <a key={n.id} href={n.url} target="_blank" rel="noreferrer" className="block rounded-xl active:opacity-70">
-                      <div className="text-[12px] font-semibold leading-snug text-[var(--text)] line-clamp-2">{n.headline}</div>
-                      <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-[var(--muted)]">
-                        <span>{n.source}</span><span>·</span>
-                        <span>{n.datetime ? (() => { const ms = Date.now() - n.datetime * 1000; const m = Math.floor(ms / 60000); if (m < 60) return m + "m ago"; const h = Math.floor(m / 60); if (h < 24) return h + "h ago"; return new Date(n.datetime * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" }); })() : ""}</span>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>}
             {/* ── DISCOVER FEED ── */}
             {(ft.copyTrading !== false || ft.marketNewsFeed !== false) && (() => {
               const timeAgoSec = (d: any) => {
@@ -1117,14 +1122,14 @@ export default function ClientMobile({ t }: { t: any }) {
               };
               const sigPosts = ft.copyTrading !== false ? (mobSignals || []).map((s: any) => ({ kind: "signal", ...s })) : [];
               const newsPosts = ft.marketNewsFeed !== false ? (mobNews || []).map((n: any) => ({ kind: "news", ...n })) : [];
-              const allPosts = discoverTab === "following" ? sigPosts : newsPosts;
+              const allPosts = newsPosts;
 
               const impactCol: Record<string, string> = { high: "#ef4444", medium: "#f59e0b", low: "#6b7280" };
 
               return (
-                <div className="overflow-hidden rounded-2xl" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                  {/* sticky tab header — locks to top of scroll container once it scrolls there */}
-                  <div className="sticky top-0 z-10 px-3 pt-3 pb-0" style={{ background: "var(--card)", borderBottom: "1px solid var(--border)" }}>
+                <div className="rounded-2xl" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                  {/* sticky tab header — locks just below the app header (top:0 of the scroll container = right under fixed app bar) */}
+                  <div className="sticky top-0 z-10 px-3 pt-3 pb-0" style={{ background: "var(--card)", borderBottom: "1px solid var(--border)", borderRadius: "1rem 1rem 0 0" }}>
                     <div className="mb-2 text-[11px] font-bold tracking-wide">
                       <i className="fa-solid fa-compass mr-1.5" style={{ color: "var(--accent)" }} />DISCOVER
                     </div>
@@ -1185,8 +1190,38 @@ export default function ClientMobile({ t }: { t: any }) {
                     </div>
                   )}
 
-                  {/* ── Discover / Following posts ── */}
-                  {discoverTab !== "calendar" && (
+                  {/* ── Following tab — world creators ── */}
+                  {discoverTab === "following" && (
+                    <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                      {WORLD_CREATORS.map((c) => {
+                        const isFollowed = followedCreators.has(c.id);
+                        const initials = c.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                        return (
+                          <div key={c.id} className="flex items-center gap-3 px-3 py-2.5">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
+                              style={{ background: c.bg, color: c.fg }}>
+                              {initials}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{c.name}</div>
+                              <div className="text-[10px] truncate" style={{ color: "var(--muted)" }}>{c.handle} · {c.cat}</div>
+                              <div className="text-[10px]" style={{ color: "var(--muted)" }}>{c.followers} followers</div>
+                            </div>
+                            <button onClick={() => toggleFollow(c.id)}
+                              className="shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all"
+                              style={isFollowed
+                                ? { background: "var(--soft)", color: "var(--muted)", border: "1px solid var(--border)" }
+                                : { background: "var(--accent)", color: "#fff", border: "1px solid transparent" }}>
+                              {isFollowed ? "Following" : "Follow"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* ── Discover / News posts ── */}
+                  {discoverTab === "discover" && (
                     <div className="divide-y" style={{ borderColor: "var(--border)" }}>
                       {allPosts.length === 0 && (
                         <div className="py-6 text-center text-[11px]" style={{ color: "var(--muted)" }}>Nothing here yet</div>
