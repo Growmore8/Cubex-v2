@@ -1705,8 +1705,8 @@ export default function ClientMobile({ t }: { t: any }) {
               ) : myReqs.length === 0 ? (
                 <div className="py-3 text-center text-[11px] text-[var(--muted)]">No requests yet.</div>
               ) : (<>
-                <div className="space-y-2">{myReqs.slice(0, 5).map(reqRow)}</div>
-                {myReqs.length > 5 && (
+                <div className="space-y-2">{myReqs.slice(0, 1).map(reqRow)}</div>
+                {myReqs.length > 1 && (
                   <button onClick={() => setReqsOpen(true)} className="mt-2.5 w-full rounded-xl py-2 text-[12px] font-semibold" style={{ background: "var(--soft)", color: BLUE }}>View all ({myReqs.length})</button>
                 )}
               </>)}
