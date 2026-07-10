@@ -1115,9 +1115,16 @@ export default function ClientMobile({ t }: { t: any }) {
               };
               const sigPosts = ft.copyTrading !== false ? (mobSignals || []).map((s: any) => ({ kind: "signal", ...s })) : [];
               const newsPosts = ft.marketNewsFeed !== false ? (mobNews || []).map((n: any) => ({ kind: "news", ...n })) : [];
+              // stable interleave — no Math.random() in render
+              const interleaved: any[] = [];
+              const sLen = sigPosts.length, nLen = newsPosts.length;
+              for (let i = 0; i < Math.max(sLen, nLen); i++) {
+                if (i < sLen) interleaved.push(sigPosts[i]);
+                if (i < nLen) interleaved.push(newsPosts[i]);
+              }
               const allPosts = discoverTab === "signals" ? sigPosts
                 : discoverTab === "news" ? newsPosts
-                : [...sigPosts, ...newsPosts].sort(() => Math.random() - 0.5).slice(0, 8);
+                : interleaved.slice(0, 8);
               return (
                 <div className="glass-card overflow-hidden p-0">
                   {/* header + tabs */}
@@ -1192,19 +1199,19 @@ export default function ClientMobile({ t }: { t: any }) {
                               </span>
                             </button>
                           )}
-                          {/* engagement row */}
+                          {/* engagement row — stable deterministic counts based on index */}
                           <div className="flex items-center gap-4 pt-1">
                             <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
-                              <i className="fa-regular fa-comment" /><span>{Math.floor(Math.random() * 80 + 5)}</span>
+                              <i className="fa-regular fa-comment" /><span>{5 + (i * 13) % 75}</span>
                             </button>
                             <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
-                              <i className="fa-solid fa-retweet" /><span>{Math.floor(Math.random() * 30 + 1)}</span>
+                              <i className="fa-solid fa-retweet" /><span>{1 + (i * 7) % 29}</span>
                             </button>
                             <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
-                              <i className="fa-regular fa-thumbs-up" /><span>{Math.floor(Math.random() * 200 + 10)}</span>
+                              <i className="fa-regular fa-thumbs-up" /><span>{10 + (i * 31) % 190}</span>
                             </button>
                             <div className="flex items-center gap-1 ml-auto text-[11px]" style={{ color: "var(--muted)" }}>
-                              <i className="fa-solid fa-chart-simple" /><span>{(Math.floor(Math.random() * 900 + 100)).toLocaleString()}K</span>
+                              <i className="fa-solid fa-chart-simple" /><span>{(100 + (i * 97) % 900).toLocaleString()}K</span>
                             </div>
                             {!isSig && p.url && (
                               <a href={p.url} target="_blank" rel="noreferrer" className="text-[11px]" style={{ color: "var(--muted)" }}>
