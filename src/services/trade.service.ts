@@ -97,8 +97,16 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
 
   await assertMargin(account, { symbol: input.symbol, type: input.side, lots: Number(input.lots) }, ask);
 
-  // Commission = lots × commissionPerLot
-  const commission = Number(input.lots) * Number(symRow?.commissionPerLot ?? 0);
+  // Commission: group override takes priority over symbol default (-1 = use symbol)
+  let commRate = Number(symRow?.commissionPerLot ?? 0);
+  if (account.groupId) {
+    const grp = await (prisma.tradeGroup as any).findFirst({
+      where: { id: account.groupId },
+      select: { commissionPerLot: true },
+    }).catch(() => null);
+    if (grp && Number(grp.commissionPerLot) >= 0) commRate = Number(grp.commissionPerLot);
+  }
+  const commission = Number(input.lots) * commRate;
 
   // Trailing stop: convert pips to price distance
   const trailingStopPips = Number(input.trailingStop) || 0;

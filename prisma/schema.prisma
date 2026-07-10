@@ -301,6 +301,9 @@ model TradeGroup {
   spreadType String    @default("FIXED")
   spreadMax  Decimal   @default(0) @db.Decimal(10, 2)
   config     Json      @default("{}")
+  swapEnabled      Boolean @default(true)           // false = Islamic / swap-free group
+  swapMultiplier   Decimal @default(1.000) @db.Decimal(6, 3) // 0.5 = VIP half-rate, 1 = standard, 0 = no swap
+  commissionPerLot Decimal @default(-1.00) @db.Decimal(10, 2) // -1 = use symbol default; ≥0 = group override
   // null = admin-level group; set = group belongs to this manager (3-level: manager > group > client)
   managerId  String?
   manager    User?     @relation("ManagerGroups", fields: [managerId], references: [id], onDelete: SetNull)

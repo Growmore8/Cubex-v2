@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/guard";
 import { updateGroup, deleteGroup } from "@/services/group.service";
 
-const schema = z.object({ name: z.string().optional(), spread: z.number().optional(), spreadType: z.string().optional(), spreadMax: z.number().optional(), managerId: z.string().nullable().optional(), config: z.any().optional() });
+const schema = z.object({ name: z.string().optional(), spread: z.number().optional(), spreadType: z.string().optional(), spreadMax: z.number().optional(), managerId: z.string().nullable().optional(), config: z.any().optional(), swapEnabled: z.boolean().optional(), swapMultiplier: z.number().optional(), commissionPerLot: z.number().optional() });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

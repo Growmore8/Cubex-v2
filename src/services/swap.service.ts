@@ -38,7 +38,7 @@ export async function runSwapRollover(tenantIdFilter?: string): Promise<Rollover
     try {
       const trades = await prisma.trade.findMany({
         where: { account: { tenantId: tenant.id } },
-        include: { account: { select: { swapFree: true, id: true } } },
+        include: { account: { select: { swapFree: true, id: true, groupId: true } } },
       });
       if (!trades.length) continue;
 
@@ -47,6 +47,13 @@ export async function runSwapRollover(tenantIdFilter?: string): Promise<Rollover
         select: { symbol: true, digits: true, swapLong: true, swapShort: true },
       });
       const symMap = new Map(symbols.map((s) => [s.symbol, s]));
+
+      // Load group swap settings for this tenant (Islamic gate + VIP multiplier)
+      const grpRows = await (prisma.tradeGroup as any).findMany({
+        where: { tenantId: tenant.id },
+        select: { id: true, swapEnabled: true, swapMultiplier: true },
+      });
+      const groupMap = new Map<string, any>(grpRows.map((g: any) => [g.id, g]));
 
       const globalSyms = await prisma.globalSymbol.findMany({
         where: { symbol: { in: [...new Set(trades.map((t) => t.symbol))] } },
@@ -60,10 +67,14 @@ export async function runSwapRollover(tenantIdFilter?: string): Promise<Rollover
       for (const trade of trades) {
         if (trade.account.swapFree) continue;
 
+        // Group-level Islamic gate: swapEnabled=false → skip entire group
+        const grp = trade.account.groupId ? groupMap.get(trade.account.groupId) : null;
+        if (grp && grp.swapEnabled === false) continue;
+
         const sym = symMap.get(trade.symbol);
-        const swapRate = sym
-          ? Number(trade.type === "BUY" ? sym.swapLong : sym.swapShort)
-          : 0;
+        const baseRate = sym ? Number(trade.type === "BUY" ? sym.swapLong : sym.swapShort) : 0;
+        // Group multiplier: VIP = 0.5×, Standard = 1×
+        const swapRate = baseRate * (grp ? Number(grp.swapMultiplier ?? 1) : 1);
         if (swapRate === 0) continue;
 
         const digits = sym?.digits ?? globalDigits.get(trade.symbol) ?? 5;

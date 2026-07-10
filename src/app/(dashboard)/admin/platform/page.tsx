@@ -1063,23 +1063,28 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   const bid = p != null ? gnum(p, d) : "\u2014";
                   const ask = p != null ? gnum(p + spO * pip, d) : "\u2014";
                   return (
-                    <div style={{ position: "absolute", top: 50, left: 8, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ position: "absolute", top: 8, left: 68, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
                       {showBuySell ? (
-                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                          <button onClick={() => place(sym, "SELL")} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.35)" }}>
-                            Sell <span className="font-mono text-[10px]">{bid}</span>
+                        <div style={{ display: "flex", gap: 5, alignItems: "center", background: "rgba(10,13,20,0.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 10, padding: "5px 7px", boxShadow: "0 4px 18px rgba(0,0,0,0.45)" }}>
+                          <button onClick={() => place(sym, "SELL")} className="hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", border: "none", borderRadius: 7, padding: "5px 11px", fontSize: 12, fontWeight: 700, lineHeight: 1, cursor: "pointer", boxShadow: `0 2px 8px ${SELLBTN}66`, display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minWidth: 62 }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.85 }}>SELL</span>
+                            <span style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", letterSpacing: "0.02em" }}>{bid}</span>
                           </button>
-                          <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} onClick={(e) => e.stopPropagation()} className="w-14 rounded border text-center font-mono text-[11px]" style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", padding: "2px 4px", outline: "none" }} title="Lots" />
-                          <button onClick={() => place(sym, "BUY")} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.35)" }}>
-                            Buy <span className="font-mono text-[10px]">{ask}</span>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                            <span style={{ fontSize: 8, color: "rgba(255,255,255,0.45)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Lots</span>
+                            <input type="number" step="0.01" min="0.01" value={lot} onChange={(e) => setLot(Number(e.target.value))} onClick={(e) => e.stopPropagation()} style={{ width: 52, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", borderRadius: 6, padding: "4px 5px", fontSize: 12, fontWeight: 700, fontFamily: "monospace", textAlign: "center", outline: "none" }} title="Lots" />
+                          </div>
+                          <button onClick={() => place(sym, "BUY")} className="hover:brightness-110 active:scale-95" style={{ background: BUYBTN, color: "#fff", border: "none", borderRadius: 7, padding: "5px 11px", fontSize: 12, fontWeight: 700, lineHeight: 1, cursor: "pointer", boxShadow: `0 2px 8px ${BUYBTN}66`, display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minWidth: 62 }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.85 }}>BUY</span>
+                            <span style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", letterSpacing: "0.02em" }}>{ask}</span>
                           </button>
-                          <button onClick={() => setShowBuySell(false)} title="Hide trade panel" className="flex h-5 w-5 items-center justify-center rounded" style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.6)", fontSize: 9, border: "1px solid rgba(255,255,255,0.12)" }}>
+                          <button onClick={() => setShowBuySell(false)} title="Hide" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.5)", borderRadius: 6, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 9, flexShrink: 0 }}>
                             <i className="fa-solid fa-chevron-left" />
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => setShowBuySell(true)} title="Show trade panel" className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}>
-                          <i className="fa-solid fa-chart-line text-[9px]" /> Trade
+                        <button onClick={() => setShowBuySell(true)} title="Show trade panel" style={{ background: "rgba(10,13,20,0.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "4px 10px", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.7)", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                          <i className="fa-solid fa-right-left" style={{ fontSize: 9 }} /> Trade
                         </button>
                       )}
                     </div>
@@ -1857,6 +1862,20 @@ const [selAcc, setSelAcc] = useState<any>(null);
                           </select>
                           <div className={lbl} style={{ color: "var(--muted)" }}>Spread Markup (pips)</div>
                           <input type="number" min={0} step={0.1} value={grpEdit?.spread ?? grpForm.spread ?? ""} onChange={(e) => grpEdit ? setGrpEdit((g: any) => ({ ...g, spread: e.target.value })) : setGrpForm((f: any) => ({ ...f, spread: e.target.value }))} placeholder="0" className={inp} />
+                          {/* Swap settings */}
+                          <div className="mb-1 mt-2 text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Swap</div>
+                          <div className="mb-2 flex items-center justify-between">
+                            <div className={lbl} style={{ color: "var(--muted)", marginBottom: 0 }}>Swap Enabled <span className="font-normal opacity-60">(off = Islamic)</span></div>
+                            <button onClick={() => grpEdit ? setGrpEdit((g: any) => ({ ...g, swapEnabled: !(g.swapEnabled !== false) })) : setGrpForm((f: any) => ({ ...f, swapEnabled: !(f.swapEnabled !== false) }))} className="relative h-5 w-9 rounded-full transition-colors" style={{ background: (grpEdit ? grpEdit.swapEnabled !== false : grpForm.swapEnabled !== false) ? "var(--accent)" : "var(--border)" }}>
+                              <span className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform" style={{ left: (grpEdit ? grpEdit.swapEnabled !== false : grpForm.swapEnabled !== false) ? "calc(100% - 18px)" : 2, boxShadow: "0 1px 2px rgba(0,0,0,0.3)" }} />
+                            </button>
+                          </div>
+                          <div className={lbl} style={{ color: "var(--muted)" }}>Swap Multiplier <span className="font-normal opacity-60">(1=standard, 0.5=VIP half)</span></div>
+                          <input type="number" min={0} max={10} step={0.1} value={grpEdit?.swapMultiplier ?? grpForm.swapMultiplier ?? 1} onChange={(e) => grpEdit ? setGrpEdit((g: any) => ({ ...g, swapMultiplier: e.target.value })) : setGrpForm((f: any) => ({ ...f, swapMultiplier: e.target.value }))} className={inp} />
+                          {/* Commission */}
+                          <div className="mb-1 mt-2 text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Commission</div>
+                          <div className={lbl} style={{ color: "var(--muted)" }}>Commission/Lot Override <span className="font-normal opacity-60">(-1 = use symbol default)</span></div>
+                          <input type="number" min={-1} step={0.5} value={grpEdit?.commissionPerLot ?? grpForm.commissionPerLot ?? -1} onChange={(e) => grpEdit ? setGrpEdit((g: any) => ({ ...g, commissionPerLot: e.target.value })) : setGrpForm((f: any) => ({ ...f, commissionPerLot: e.target.value }))} className={inp} />
                           <div className={lbl} style={{ color: "var(--muted)" }}>Default Leverage</div>
                           <select value={cfgVal("leverage") ?? ""} onChange={(e) => setCfg("leverage", e.target.value ? Number(e.target.value) : null)} className={inp}>
                             <option value="">Inherit from account</option>
@@ -1886,14 +1905,14 @@ const [selAcc, setSelAcc] = useState<any>(null);
                     <div className="flex gap-1.5 pt-1">
                       {grpEdit ? (<>
                         <button onClick={async () => {
-                          const r = await fetch("/api/admin/groups/" + grpEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpEdit.name, managerId: grpEdit.managerId || null, spread: Number(grpEdit.spread) || 0, config: grpEdit.config || {} }) }).then((x) => x.json());
+                          const r = await fetch("/api/admin/groups/" + grpEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpEdit.name, managerId: grpEdit.managerId || null, spread: Number(grpEdit.spread) || 0, config: grpEdit.config || {}, swapEnabled: grpEdit.swapEnabled !== false, swapMultiplier: Number(grpEdit.swapMultiplier ?? 1), commissionPerLot: Number(grpEdit.commissionPerLot ?? -1) }) }).then((x) => x.json());
                           if (r.ok) { setOk("Group updated"); setGrpEdit(null); loadAll(); } else setErr(r.error || "Failed");
                         }} className="flex-1 rounded py-1.5 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
                         <button onClick={() => setGrpEdit(null)} className="rounded border border-[var(--border)] px-2 py-1.5 text-[11px]">Cancel</button>
                       </>) : (
                         <button onClick={async () => {
                           if (!grpForm.name) return;
-                          const r = await fetch("/api/admin/groups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpForm.name, managerId: grpForm.managerId || null, spread: Number(grpForm.spread) || 0, config: grpForm.config || {} }) }).then((x) => x.json());
+                          const r = await fetch("/api/admin/groups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: grpForm.name, managerId: grpForm.managerId || null, spread: Number(grpForm.spread) || 0, config: grpForm.config || {}, swapEnabled: grpForm.swapEnabled !== false, swapMultiplier: Number(grpForm.swapMultiplier ?? 1), commissionPerLot: Number(grpForm.commissionPerLot ?? -1) }) }).then((x) => x.json());
                           if (r.ok) { setOk("Group created"); setGrpForm({}); loadAll(); } else setErr(r.error || "Failed");
                         }} className="flex-1 rounded py-1.5 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Create Group</button>
                       )}

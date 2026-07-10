@@ -42,6 +42,7 @@ export default function ClientTerminal() {
   useEffect(() => { const t = localStorage.getItem("cubex-theme"); if (t === "light" || t === "dark") setTheme(t); }, []);
   function toggleTheme() { setTheme((t) => { const n = t === "dark" ? "light" : "dark"; localStorage.setItem("cubex-theme", n); return n; }); }
 
+
   const [account, setAccount] = useState<any>(null);
   const [brand, setBrand] = useState<{ name: string; logoUrl: string | null }>({ name: "", logoUrl: null });
   // Branded loading splash: fast brand fetch for the logo/slogan, hidden once the

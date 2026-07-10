@@ -353,6 +353,7 @@ export default function TVChart({
       "create_volume_indicator_by_default", // volume is meaningless for OTC forex; keep sub-pane clean
       "popup_hints",                        // suppress long-press tooltip popup on mobile
       "timeframes_toolbar",                 // hide the bottom period quick-select bar (5y 1y 3m …)
+      "header_widget",                      // remove entire native TV header bar (symbol, undo/redo, indicators, etc.)
       // NOTE: tradingview_logo intentionally NOT disabled — the charting library
       // license requires TradingView branding to remain visible.
     ];
@@ -554,7 +555,16 @@ export default function TVChart({
   // ── Theme change ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const w = widgetRef.current; if (!w) return;
-    try { w.changeTheme(theme === "dark" ? "Dark" : "Light"); } catch {}
+    const tvTheme = theme === "dark" ? "Dark" : "Light";
+    const gridColors = theme === "dark"
+      ? { "paneProperties.vertGridProperties.color": "rgba(255,255,255,0.04)", "paneProperties.horzGridProperties.color": "rgba(255,255,255,0.04)" }
+      : { "paneProperties.vertGridProperties.color": "rgba(0,0,0,0.04)", "paneProperties.horzGridProperties.color": "rgba(0,0,0,0.04)" };
+    const applyOvr = () => { try { w.applyOverrides(gridColors); } catch {} };
+    try {
+      const p = (w as any).changeTheme(tvTheme);
+      if (p && typeof p.then === "function") p.then(applyOvr).catch(applyOvr);
+      else applyOvr();
+    } catch { applyOvr(); }
   }, [theme]);
 
   // ── Position / SL / TP / spread lines (MT5 style) ───────────────────────────
