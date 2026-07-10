@@ -124,6 +124,7 @@ export default function ClientTerminal() {
   const [calendar, setCalendar] = useState<any[]>([]);
   const [calendarLoaded, setCalendarLoaded] = useState(false);
   const [calImpact, setCalImpact] = useState<"all" | "high" | "medium" | "low">("all");
+  const [calTick, setCalTick] = useState(0);
   const [oneClick, setOneClick] = useState(false);
   const mwSearchRef = useRef<HTMLInputElement>(null);
   const volInputRef  = useRef<HTMLInputElement>(null);
@@ -187,6 +188,12 @@ export default function ClientTerminal() {
   const Sth = ({ tbl, k, label, align, cls }: { tbl: string; k: string; label: any; align?: "right"; cls?: string }) => { const cfg = sortBy[tbl]; const active = !!cfg && cfg.k === k; return (<th className={(cls || "px-2 py-1 font-normal") + (align === "right" ? " text-right" : " text-left") + " cursor-pointer select-none"} onClick={() => toggleSort(tbl, k)}><span className={"inline-flex items-center gap-1 " + (align === "right" ? "flex-row-reverse" : "")}>{label}<i className={"fa-solid text-[8px] " + (active ? (cfg!.d === 1 ? "fa-arrow-up-long" : "fa-arrow-down-long") : "fa-sort")} style={{ opacity: active ? 1 : 0.3 }} /></span></th>); };
   useEffect(() => { if (rightTab === "NEWS" && !newsLoaded) { fetch("/api/client/news?category=forex").then((r) => r.json()).then((dd) => { if (dd.ok) { setNews(dd.items || []); setNewsLoaded(true); } }).catch(() => { setNewsLoaded(true); }); } }, [rightTab, newsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (rightTab === "CALENDAR" && !calendarLoaded) { fetch("/api/client/calendar").then((r) => r.json()).then((dd) => { if (dd.ok) { setCalendar(dd.events || []); setCalendarLoaded(true); } }).catch(() => {}); } }, [rightTab, calendarLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Tick every second while calendar is open so countdown timers refresh live.
+  useEffect(() => {
+    if (rightTab !== "CALENDAR") return;
+    const t = setInterval(() => setCalTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [rightTab]);
   useEffect(() => { if (rightTab === "SIGNALS" && !signalsLoaded) { fetch("/api/client/signals").then((r) => r.json()).then((dd) => { if (dd.ok) { setSignals(dd.signals || []); setSignalsLoaded(true); } }).catch(() => { setSignalsLoaded(true); }); } }, [rightTab, signalsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -1430,9 +1437,14 @@ export default function ClientTerminal() {
                   const impColor = ev.impact === "high" ? "#ef4444" : ev.impact === "medium" ? "#f97316" : ev.impact === "low" ? "#22c55e" : "var(--muted)";
                   const showDate = dateStr !== lastDate; lastDate = dateStr;
                   const isToday = dt ? dt.toDateString() === new Date().toDateString() : false;
-                  const isFuture = dt ? dt.getTime() > Date.now() : false;
-                  const minutesUntil = dt && isFuture ? Math.floor((dt.getTime() - Date.now()) / 60000) : null;
-                  const timeUntil = minutesUntil != null ? (minutesUntil < 60 ? minutesUntil + "m" : Math.floor(minutesUntil / 60) + "h " + (minutesUntil % 60) + "m") : null;
+                  const nowMs = Date.now(); void calTick; // calTick forces re-render each second
+                  const isFuture = dt ? dt.getTime() > nowMs : false;
+                  const secsUntil = dt && isFuture ? Math.floor((dt.getTime() - nowMs) / 1000) : null;
+                  const timeUntil = secsUntil != null ? (
+                    secsUntil < 60 ? secsUntil + "s" :
+                    secsUntil < 3600 ? Math.floor(secsUntil / 60) + "m " + (secsUntil % 60) + "s" :
+                    Math.floor(secsUntil / 3600) + "h " + Math.floor((secsUntil % 3600) / 60) + "m " + (secsUntil % 60) + "s"
+                  ) : null;
                   return (
                     <div key={i}>
                       {showDate && <div className="border-b border-[var(--border)] px-2 py-1 text-[9px] font-bold uppercase tracking-wide" style={{ background: isToday ? "rgba(22,199,154,0.1)" : "var(--soft)", color: isToday ? "var(--accent)" : "var(--muted)", borderLeft: isToday ? "3px solid var(--accent)" : undefined }}>{isToday ? "▸ TODAY — " : ""}{dateStr}</div>}

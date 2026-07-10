@@ -345,7 +345,7 @@ export default function SATenantsPage() {
             <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tenant Details</div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <input className={inp} placeholder="Company name *" autoComplete="off" value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <input className={inp} placeholder="Brand name (portal)" autoComplete="off" value={form.brandName || ""} onChange={(e) => setForm({ ...form, brandName: e.target.value })} />
+              <input className={inp} placeholder="App / Brand name (PWA & portal title)" autoComplete="off" value={form.brandName || ""} onChange={(e) => setForm({ ...form, brandName: e.target.value })} />
               <input className={inp} placeholder="Subdomain * — e.g. infinity" autoComplete="off" value={form.subdomain || ""} onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} />
               <input className={inp} placeholder="Custom domain (optional)" autoComplete="off" value={form.customDomain || ""} onChange={(e) => setForm({ ...form, customDomain: e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\s/g, "") })} />
               <input className={inp + " col-span-2"} placeholder="Slogan / Tagline" autoComplete="off" value={form.slogan || ""} onChange={(e) => setForm({ ...form, slogan: e.target.value })} />
@@ -467,7 +467,7 @@ export default function SATenantsPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className="text-xs text-gray-500 block mb-1">Company Name *</label><input className={inp} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
-              <div><label className="text-xs text-gray-500 block mb-1">Brand Name</label><input className={inp} value={editForm.brandName} onChange={(e) => setEditForm({ ...editForm, brandName: e.target.value })} /></div>
+              <div><label className="text-xs text-gray-500 block mb-1">App / Brand Name <span className="text-gray-400">(PWA &amp; portal title)</span></label><input className={inp} value={editForm.brandName} onChange={(e) => setEditForm({ ...editForm, brandName: e.target.value })} /></div>
               <div><label className="text-xs text-gray-500 block mb-1">Subdomain *</label><input className={inp} value={editForm.subdomain} onChange={(e) => setEditForm({ ...editForm, subdomain: e.target.value })} /></div>
               <div><label className="text-xs text-gray-500 block mb-1">Custom Domain{isTrial && lockHint}</label><input className={inp + (isTrial ? " opacity-50 cursor-not-allowed" : "")} disabled={isTrial} placeholder={isTrial ? "Available after converting to paid" : "e.g. trade.acme.com"} value={editForm.customDomain} onChange={(e) => setEditForm({ ...editForm, customDomain: e.target.value.toLowerCase().replace(/^https?:\/\//, "").replace(/\s/g, "") })} /></div>
               <div className="col-span-2"><label className="text-xs text-gray-500 block mb-1">Website URL <span className="text-gray-400">(for the "Back to website" link — blank = use the domain)</span></label><input className={inp} placeholder="https://acme.com" value={editForm.websiteUrl} onChange={(e) => setEditForm({ ...editForm, websiteUrl: e.target.value })} /></div>

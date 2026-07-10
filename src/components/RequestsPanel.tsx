@@ -65,7 +65,10 @@ export default function RequestsPanel() {
           <tbody>
             {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={7}>No account requests.</td></tr> : rows.map((p) => (
               <tr key={p.id} className="ui-row border-b border-[var(--border)]">
-                <td className={td + " font-medium"}>{p.name}<span className="ml-1.5 text-[var(--muted)]">{p.email}</span></td>
+                <td className={td + " font-medium"}>
+                  {p.name && p.name !== "—" ? p.name : <span className="text-[var(--muted)] italic">Deleted account</span>}
+                  {p.email ? <span className="ml-1.5 text-[var(--muted)]">{p.email}</span> : null}
+                </td>
                 <td className={td + " text-[var(--muted)]"}><span className="font-medium text-[var(--text)]">{p.login || "-"}</span></td>
                 <td className={td}><span className="rounded px-1 py-0.5 text-[8px] font-semibold" style={{ background: "rgba(38,166,154,0.18)", color: BUY }}>{p.type}</span> <span className="text-[var(--muted)]">{p.currency}</span></td>
                 <td className={td + " text-[var(--muted)]"}>1:{p.leverage}</td>

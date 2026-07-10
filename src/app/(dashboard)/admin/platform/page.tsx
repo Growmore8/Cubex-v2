@@ -216,6 +216,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
     );
   };
   const [auditCat, setAuditCat] = useState("ALL");
+  const [auditQ, setAuditQ] = useState("");
   const [navTab, setNavTab] = useState<"live" | "demo">("live");
   const [chartInd, setChartInd] = useState({ sma: false, ema: false, bb: false, rsi: false, macd: false, psar: false, cdl: false, stoch: false, atr: false, adx: false, sig: false, ribbon: false });
   const [chartCfg, setChartCfg] = useState<any>({ ma: 20, rsi: 14, bb: 20, macdF: 12, macdS: 26, macdSig: 9 });
@@ -1619,7 +1620,20 @@ const [selAcc, setSelAcc] = useState<any>(null);
             {tab === "audit" && (() => {
               const AUDIT_CATS = ["ALL", "SUPERADMIN", "ADMIN", "MANAGER", "CLIENT"];
               const AUDIT_COL: Record<string, string> = { SUPERADMIN: "#a78bfa", ADMIN: GOLD, MANAGER: "#38bdf8", CLIENT: BUY };
-              const auditRows = audit.filter((l) => auditCat === "ALL" || (l.category || "ADMIN").toUpperCase() === auditCat);
+              const auditRows = audit.filter((l: any) => {
+                if (auditCat !== "ALL" && (l.category || "ADMIN").toUpperCase() !== auditCat) return false;
+                if (!auditQ) return true;
+                const q = auditQ.toLowerCase();
+                return (l.targetLogin || "").toLowerCase().includes(q) ||
+                  (l.targetName || "").toLowerCase().includes(q) ||
+                  (l.targetEmail || "").toLowerCase().includes(q) ||
+                  (l.performedBy || "").toLowerCase().includes(q) ||
+                  (l.actorName || "").toLowerCase().includes(q) ||
+                  (l.action || "").toLowerCase().includes(q) ||
+                  (l.detail || "").toLowerCase().includes(q);
+              });
+              const th = "px-2 py-1.5 text-left text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)] whitespace-nowrap";
+              const td = "px-2 py-1.5 align-top";
               return (
                 <div className="flex h-full flex-col text-[10px]">
                   <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border)] px-2 py-1.5">
@@ -1627,26 +1641,46 @@ const [selAcc, setSelAcc] = useState<any>(null);
                       <button key={c} onClick={() => setAuditCat(c)} className="rounded px-2 py-0.5" style={auditCat === c ? { background: AUDIT_COL[c] || "var(--accent)", color: "#fff" } : { border: "1px solid var(--border)", color: "var(--muted)" }}>{c}</button>
                     ))}
                     <span className="text-[var(--muted)]">{auditRows.length} entries</span>
+                    <input value={auditQ} onChange={(e: any) => setAuditQ(e.target.value)} placeholder="Search…" className="ml-2 rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[var(--text)]" style={{ width: 140 }} />
                     <a href={"/api/admin/export/audit" + (auditCat !== "ALL" ? "?category=" + auditCat : "")} download className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-[10px]" style={{ background: BUY + "22", color: BUY, border: "1px solid " + BUY + "44" }} title="Export audit log as CSV"><i className="fa-solid fa-download" /> Export CSV</a>
                   </div>
-                  <div className="flex-1 overflow-auto px-2 py-1">
-                    {auditRows.length === 0 ? <div className="py-4 text-center text-[var(--muted)]">No activity.</div> : auditRows.slice(0, 150).map((l) => {
-                      const cat = (l.category || "ADMIN").toUpperCase();
-                      const col = AUDIT_COL[cat] || "var(--muted)";
-                      return (
-                        <div key={l.id} className="flex items-start gap-2 border-b border-[var(--border)] py-1.5">
-                          <span className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold tracking-wide" style={{ background: col + "22", color: col }}>{cat}</span>
-                          <div className="min-w-0 flex-1 leading-snug">
-                            <span className="text-[var(--muted)]">{l.performedBy}</span>
-                            <span className="mx-1 opacity-30">·</span>
-                            <span className="font-semibold" style={{ color: "var(--accent)" }}>{l.action}</span>
-                            <span className="mx-1 opacity-30">·</span>
-                            <span className="text-[var(--text)]">{l.detail}</span>
-                          </div>
-                          {l.createdAt && <span className="shrink-0 text-[var(--muted)]">{new Date(l.createdAt).toLocaleString()}</span>}
-                        </div>
-                      );
-                    })}
+                  <div className="flex-1 overflow-auto">
+                    <table className="w-full">
+                      <thead className="sticky top-0 z-10" style={{ background: "var(--panel)" }}>
+                        <tr className="border-b border-[var(--border)]">
+                          <th className={th}>Cat</th>
+                          <th className={th}>Account ID</th>
+                          <th className={th}>Name</th>
+                          <th className={th}>Email</th>
+                          <th className={th}>Actor</th>
+                          <th className={th}>Action</th>
+                          <th className={th}>Detail</th>
+                          <th className={th + " text-right"}>Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {auditRows.length === 0 ? (
+                          <tr><td className="px-2 py-4 text-center text-[var(--muted)]" colSpan={8}>No activity.</td></tr>
+                        ) : auditRows.slice(0, 200).map((l: any) => {
+                          const cat = (l.category || "ADMIN").toUpperCase();
+                          const col = AUDIT_COL[cat] || "var(--muted)";
+                          // Strip login prefix from detail to avoid duplication
+                          const detailClean = l.targetLogin ? (l.detail || "").replace(new RegExp("^" + l.targetLogin + "\\s*"), "") : (l.detail || "");
+                          return (
+                            <tr key={l.id} className="border-b border-[var(--border)] hover:bg-[var(--soft)]">
+                              <td className={td}><span className="rounded px-1.5 py-0.5 text-[8px] font-bold tracking-wide" style={{ background: col + "22", color: col }}>{cat}</span></td>
+                              <td className={td + " font-mono font-semibold"} style={{ color: "var(--accent)" }}>{l.targetLogin || <span className="text-[var(--muted)]">—</span>}</td>
+                              <td className={td + " font-medium"}>{l.targetName || <span className="text-[var(--muted)]">—</span>}</td>
+                              <td className={td} style={{ color: "var(--muted)" }}>{l.targetEmail || <span className="text-[var(--muted)]">—</span>}</td>
+                              <td className={td} style={{ color: "var(--muted)" }}>{l.actorName ? <><span className="font-medium" style={{ color: "var(--text)" }}>{l.actorName}</span><br /><span>{l.performedBy}</span></> : l.performedBy}</td>
+                              <td className={td}><span className="font-semibold" style={{ color: "var(--accent)" }}>{l.action}</span></td>
+                              <td className={td} style={{ color: "var(--muted)", maxWidth: 220, wordBreak: "break-all" }}>{detailClean}</td>
+                              <td className={td + " text-right whitespace-nowrap"} style={{ color: "var(--muted)" }}>{l.createdAt ? new Date(l.createdAt).toLocaleString() : ""}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               );
@@ -1708,9 +1742,9 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
                     {statCard("fa-users", "Total Accounts", totalClients, undefined, `${liveClients} Live · ${demoClients} Demo`, "#2f81f7")}
                     {statCard("fa-chart-line", "Open Positions", totalPositions, undefined, `${gnum(totalFloating, 2)} floating P/L`, "#f59e0b")}
-                    {statCard("fa-dollar-sign", "Floating P/L", (totalFloating >= 0 ? "+" : "") + gnum(totalFloating, 2), totalFloating >= 0 ? BUY : SELL, "All open positions", totalFloating >= 0 ? BUY : SELL)}
-                    {statCard("fa-arrow-down-to-bracket", "Total Deposits", gnum(totalDeposits, 2), BUY, undefined, BUY)}
-                    {statCard("fa-arrow-up-from-bracket", "Total Withdrawals", gnum(totalWithdrawals, 2), SELL, undefined, SELL)}
+                    {statCard(totalFloating >= 0 ? "fa-arrow-trend-up" : "fa-arrow-trend-down", "Floating P/L", (totalFloating >= 0 ? "+" : "") + gnum(totalFloating, 2), totalFloating >= 0 ? BUY : SELL, "All open positions", totalFloating >= 0 ? BUY : SELL)}
+                    {statCard("fa-download", "Total Deposits", gnum(totalDeposits, 2), BUY, undefined, BUY)}
+                    {statCard("fa-upload", "Total Withdrawals", gnum(totalWithdrawals, 2), SELL, undefined, SELL)}
                     {statCard("fa-wallet", "Total Equity", gnum(totalEquity, 2), totalEquity >= 0 ? BUY : SELL, "Net across all accounts", totalEquity >= 0 ? BUY : SELL)}
                     {statCard("fa-triangle-exclamation", "Near Margin Call", nearMC, nearMC > 0 ? SELL : "var(--muted)", "Below 150% margin level", nearMC > 0 ? SELL : undefined)}
                     {statCard("fa-bars-progress", "Closed Today", todayTrades.length, undefined, (todayPnl >= 0 ? "+" : "") + gnum(todayPnl, 2) + " net P/L", "#8b5cf6")}
