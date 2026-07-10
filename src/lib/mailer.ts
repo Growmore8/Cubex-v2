@@ -68,7 +68,9 @@ export async function sendTenantMail(
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
-      ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+      // Always reply-to a noreply address so clients cannot reply back to
+      // the authenticated mailbox. Callers may override with an explicit replyTo.
+      replyTo: opts.replyTo ?? noReplyAddress(smtpEmail),
       ...(opts.attachments ? { attachments: opts.attachments } : {}),
       // Discourage auto-responders / out-of-office replies to automated mail.
       headers: { "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All" },

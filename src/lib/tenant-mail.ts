@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { sendTenantMail } from "@/lib/mailer";
+import { sendTenantMail, noReplyAddress } from "@/lib/mailer";
 import type { BrandInfo } from "@/lib/email-templates";
 
 export interface TenantBrand extends BrandInfo {
@@ -56,7 +56,7 @@ export async function sendUserMail(
     await sendTenantMail(
       brand.smtpEmail,
       brand.smtpPassword,
-      { to: user.email, subject, html },
+      { to: user.email, subject, html, fromName: brand.brandName, replyTo: noReplyAddress(brand.smtpEmail) },
       brand.smtpHost ?? undefined
     );
   } catch {
@@ -81,7 +81,7 @@ export async function sendToEmail(
     await sendTenantMail(
       brand.smtpEmail,
       brand.smtpPassword,
-      { to: toEmail, subject, html },
+      { to: toEmail, subject, html, fromName: brand.brandName, replyTo: noReplyAddress(brand.smtpEmail) },
       brand.smtpHost ?? undefined
     );
   } catch {

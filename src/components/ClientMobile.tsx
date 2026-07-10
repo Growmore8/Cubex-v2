@@ -733,10 +733,10 @@ export default function ClientMobile({ t }: { t: any }) {
                 if (dx < 0 && cur < ids.length - 1) switchAcc(ids[cur + 1]);
                 else if (dx > 0 && cur > 0) switchAcc(ids[cur - 1]);
               }}>
-              <div className="cp-card relative overflow-hidden rounded-[20px] p-5" style={{
+              <div className="cp-card relative overflow-hidden rounded-[20px] px-5 py-7" style={{
                 backgroundImage: cIsLive
-                  ? "radial-gradient(circle at 18% 82%, rgba(232,121,249,0.65) 0%, transparent 45%), radial-gradient(circle at 78% 20%, rgba(186,230,253,0.6) 0%, transparent 48%), linear-gradient(140deg,#f5d0fe 0%,#e9d5ff 28%,#c7d2fe 62%,#bae6fd 100%)"
-                  : "radial-gradient(circle at 58% 52%, rgba(251,146,60,0.72) 0%, transparent 42%), radial-gradient(circle at 82% 78%, rgba(251,113,133,0.48) 0%, transparent 38%), linear-gradient(140deg,#d9f99d 0%,#fef08a 38%,#fde68a 65%,#fca5a5 100%)",
+                  ? "radial-gradient(ellipse 70% 60% at 78% 22%, rgba(186,230,252,0.92) 0%, transparent 58%), radial-gradient(ellipse 65% 70% at 20% 75%, rgba(192,132,252,0.72) 0%, transparent 55%), linear-gradient(140deg,#f0e7ff 0%,#ddd6fe 30%,#bae6fd 65%,#e0f2fe 100%)"
+                  : "radial-gradient(ellipse 65% 55% at 18% 35%, rgba(190,242,100,0.90) 0%, transparent 52%), radial-gradient(ellipse 60% 58% at 72% 50%, rgba(251,146,60,0.84) 0%, transparent 50%), radial-gradient(ellipse 50% 55% at 88% 82%, rgba(251,113,133,0.60) 0%, transparent 45%), linear-gradient(140deg,#c4f27a 0%,#fef08a 38%,#fed7aa 62%,#fda4af 100%)",
                 color: "#1a1d21",
                 boxShadow: "0 0 8px rgba(0,0,0,0.12), 0 2px 16px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.12), 0 12px 28px rgba(0,0,0,0.12)",
               }}>
