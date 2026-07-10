@@ -1550,9 +1550,6 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Profit</span><span style={{ color: Number(account?.pnl || 0) >= 0 ? BUY : SELL }}>{_cSym}{fmt(Number(account?.pnl || 0))}</span></div>
             </div>
 
-            {/* referral — only shown when feature is enabled */}
-            {ft.referralProgram !== false && <ReferralCard cSym={_cSym} />}
-
             {/* running trade summary */}
             <div className="glass-card p-4">
               <div className="mb-2 text-[11px] font-bold tracking-wide">RUNNING TRADE SUMMARY</div>
@@ -1642,6 +1639,9 @@ export default function ClientMobile({ t }: { t: any }) {
                 <button onClick={() => openAccount("DEMO")} className="mt-2 w-full rounded-lg py-2 text-[12px] font-semibold text-white" style={{ background: BLUE }}><i className="fa-solid fa-plus mr-1" /> Create Demo Account</button>
               )}
             </div>
+
+            {/* referral — only shown when feature is enabled */}
+            {ft.referralProgram !== false && <ReferralCard cSym={_cSym} />}
 
             {/* security */}
             <div className="glass-card p-4">
