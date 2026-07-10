@@ -16,9 +16,11 @@ export async function GET() {
       take: 100,
     });
 
-    // Enrich with referrer name
+    // Enrich with referrer + referee names/emails
     const referrerIds = [...new Set(referrals.map((r: any) => r.referrerId))] as string[];
-    const users = await prisma.user.findMany({ where: { id: { in: referrerIds } }, select: { id: true, name: true, email: true } });
+    const refereeIds  = [...new Set(referrals.map((r: any) => r.refereeId))]  as string[];
+    const allIds      = [...new Set([...referrerIds, ...refereeIds])];
+    const users = await prisma.user.findMany({ where: { id: { in: allIds } }, select: { id: true, name: true, email: true } });
     const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
 
     return NextResponse.json({
@@ -26,9 +28,11 @@ export async function GET() {
       config,
       referrals: referrals.map((r: any) => ({
         ...r,
-        totalEarned: Number(r.totalEarned),
-        referrerName: userMap[r.referrerId]?.name || "—",
+        totalEarned:   Number(r.totalEarned),
+        referrerName:  userMap[r.referrerId]?.name  || "—",
         referrerEmail: userMap[r.referrerId]?.email || "—",
+        refereeName:   userMap[r.refereeId]?.name   || "—",
+        refereeEmail:  userMap[r.refereeId]?.email  || "—",
       })),
     });
   } catch (e: any) {
