@@ -150,7 +150,7 @@ function LotStepper({ vol, setVol, small }: { vol: number; setVol: (v: number) =
 
 // Mini line chart (sparkline) — builds from a rolling price history; falls back
 // to a gentle directional slope until enough points have streamed in.
-function Sparkline({ data, up, w = 50, h = 20 }: { data?: number[]; up: boolean; w?: number; h?: number }) {
+function Sparkline({ data, up, w = 50, h = 20, full }: { data?: number[]; up: boolean; w?: number; h?: number; full?: boolean }) {
   const col = up ? "#2dd4a7" : "#ff5b6b";
   let pairs: [number, number][];
   if (data && data.length >= 2) {
@@ -161,7 +161,7 @@ function Sparkline({ data, up, w = 50, h = 20 }: { data?: number[]; up: boolean;
   }
   const pts = pairs.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0">
+    <svg width={full ? "100%" : w} height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="shrink-0">
       <polyline points={pts} fill="none" stroke={col} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -214,8 +214,10 @@ export default function ClientMobile({ t }: { t: any }) {
   const [tradeView, setTradeView] = useState<"positions" | "history">("positions");
   const [mobNews, setMobNews] = useState<any[]>([]);
   const [mobNewsLoading, setMobNewsLoading] = useState(false);
-  const [discoverTab, setDiscoverTab] = useState<"discover"|"signals"|"news">("discover");
+  const [discoverTab, setDiscoverTab] = useState<"discover"|"following"|"calendar">("discover");
   const [actCarouselIdx, setActCarouselIdx] = useState(0);
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [calendarLoaded, setCalendarLoaded] = useState(false);
   const [mobSignals, setMobSignals] = useState<any[]>([]);
   const [mobSignalsLoaded, setMobSignalsLoaded] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
@@ -324,6 +326,7 @@ export default function ClientMobile({ t }: { t: any }) {
   useEffect(() => { if (tab === "dashboard" && mobNews.length === 0 && !mobNewsLoading) { setMobNewsLoading(true); fetch("/api/client/news?category=forex").then((r) => r.json()).then((d) => { if (d.ok) setMobNews(d.items || []); }).catch(() => {}).finally(() => setMobNewsLoading(false)); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === "dashboard" && !mobSignalsLoaded) { fetch("/api/client/signals").then((r) => r.json()).then((d) => { if (d.ok) setMobSignals(d.signals || []); setMobSignalsLoaded(true); }).catch(() => { setMobSignalsLoaded(true); }); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab !== "dashboard") return; const t = setInterval(() => setActCarouselIdx((i) => i + 1), 3500); return () => clearInterval(t); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tab !== "dashboard" || discoverTab !== "calendar" || calendarLoaded) return; fetch("/api/client/calendar").then((r) => r.json()).then((d) => { if (d.ok) setCalendarEvents(d.events || []); setCalendarLoaded(true); }).catch(() => setCalendarLoaded(true)); }, [tab, discoverTab, calendarLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   async function openTotpSetup() {
     setTotpErr(""); setTotpMsg(""); setTotpCode(""); setTotpQr(""); setTotpSecret("");
     setTotpBusy(true);
@@ -1017,7 +1020,7 @@ export default function ClientMobile({ t }: { t: any }) {
                         </div>
                         {/* sparkline chart */}
                         <div className="my-1 w-full">
-                          <Sparkline data={spark} up={isUp} w={100} h={28} />
+                          <Sparkline data={spark} up={isUp} w={100} h={30} full />
                         </div>
                         {/* price */}
                         <div className="text-[15px] font-extrabold tabular-nums leading-none" style={{ color: col }}>
@@ -1028,7 +1031,9 @@ export default function ClientMobile({ t }: { t: any }) {
                   })}
 
                   {/* activity dot-carousel cell */}
-                  <div className="glass-card flex flex-col p-3" style={{ minHeight: 110 }}>
+                  <div className="glass-card flex flex-col p-3" style={{ minHeight: 110 }}
+                    onTouchStart={(e) => { (e.currentTarget as any)._sx = e.touches[0].clientX; }}
+                    onTouchEnd={(e) => { const dx = e.changedTouches[0].clientX - (e.currentTarget as any)._sx; if (Math.abs(dx) > 28) setActCarouselIdx((i) => i + (dx < 0 ? 1 : -1)); }}>
                     <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
                       <i className="fa-solid fa-clock-rotate-left mr-1" />Activity
                     </div>
@@ -1099,132 +1104,168 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               )}
             </div>}
-            {/* ── DISCOVER FEED ── Binance-style social feed of signals + news ── */}
+            {/* ── DISCOVER FEED ── */}
             {(ft.copyTrading !== false || ft.marketNewsFeed !== false) && (() => {
               const timeAgoSec = (d: any) => {
                 if (!d) return "";
                 const ms = Date.now() - (typeof d === "number" ? d * 1000 : new Date(d).getTime());
                 const m = Math.floor(ms / 60000);
                 if (m < 60) return m + "m ago";
-                const h = Math.floor(m / 60);
-                if (h < 24) return h + "h ago";
+                const h2 = Math.floor(m / 60);
+                if (h2 < 24) return h2 + "h ago";
                 return new Date(typeof d === "number" ? d * 1000 : d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
               };
               const sigPosts = ft.copyTrading !== false ? (mobSignals || []).map((s: any) => ({ kind: "signal", ...s })) : [];
               const newsPosts = ft.marketNewsFeed !== false ? (mobNews || []).map((n: any) => ({ kind: "news", ...n })) : [];
-              // stable interleave — no Math.random() in render
-              const interleaved: any[] = [];
-              const sLen = sigPosts.length, nLen = newsPosts.length;
-              for (let i = 0; i < Math.max(sLen, nLen); i++) {
-                if (i < sLen) interleaved.push(sigPosts[i]);
-                if (i < nLen) interleaved.push(newsPosts[i]);
-              }
-              const allPosts = discoverTab === "signals" ? sigPosts
-                : discoverTab === "news" ? newsPosts
-                : interleaved.slice(0, 8);
+              const allPosts = discoverTab === "following" ? sigPosts : newsPosts;
+
+              const impactCol: Record<string, string> = { high: "#ef4444", medium: "#f59e0b", low: "#6b7280" };
+
               return (
-                <div className="glass-card overflow-hidden p-0">
-                  {/* header + tabs */}
-                  <div className="px-3 pt-3 pb-0">
+                <div className="overflow-hidden rounded-2xl" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                  {/* sticky tab header — locks to top of scroll container once it scrolls there */}
+                  <div className="sticky top-0 z-10 px-3 pt-3 pb-0" style={{ background: "var(--card)", borderBottom: "1px solid var(--border)" }}>
                     <div className="mb-2 text-[11px] font-bold tracking-wide">
                       <i className="fa-solid fa-compass mr-1.5" style={{ color: "var(--accent)" }} />DISCOVER
                     </div>
-                    <div className="flex gap-0 overflow-x-auto border-b" style={{ borderColor: "var(--border)", scrollbarWidth: "none" }}>
-                      {(["discover", "signals", "news"] as const).map((t) => (
+                    <div className="flex gap-0 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+                      {(["discover", "following", "calendar"] as const).map((t) => (
                         <button key={t} onClick={() => setDiscoverTab(t)}
-                          className="shrink-0 pb-2 pr-4 text-[12px] font-semibold capitalize transition-colors"
+                          className="shrink-0 pb-2 pr-5 text-[12px] font-semibold transition-colors"
                           style={{ color: discoverTab === t ? "var(--accent)" : "var(--muted)", borderBottom: discoverTab === t ? "2px solid var(--accent)" : "2px solid transparent" }}>
-                          {t === "discover" ? "Discover" : t === "signals" ? "Signals" : "News"}
+                          {t === "discover" ? "Discover" : t === "following" ? "Following" : "Calendar"}
                         </button>
                       ))}
                     </div>
                   </div>
-                  {/* posts */}
-                  <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-                    {allPosts.length === 0 && (
-                      <div className="py-6 text-center text-[11px]" style={{ color: "var(--muted)" }}>Nothing here yet</div>
-                    )}
-                    {allPosts.slice(0, 6).map((p: any, i: number) => {
-                      const isSig = p.kind === "signal";
-                      const isBuy = p.direction === "BUY";
-                      const sentCol = isSig ? (isBuy ? BUY : SELL) : "var(--accent)";
-                      const initials = isSig ? (p.analyst || "AI").slice(0, 2).toUpperCase() : (p.source || "FX").slice(0, 2).toUpperCase();
-                      const name = isSig ? (p.analyst || "Analyst Signal") : p.source;
-                      const time = isSig ? p.createdAt : p.datetime;
-                      const sentiment = isSig ? (isBuy ? "Bullish" : "Bearish") : null;
-                      const body = isSig ? p.rationale : p.headline;
-                      return (
-                        <div key={i} className="p-3">
-                          {/* post header */}
-                          <div className="mb-2 flex items-start gap-2.5">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                              style={{ background: isSig ? sentCol : "var(--accent)" }}>
-                              {initials}
+
+                  {/* ── Calendar tab ── */}
+                  {discoverTab === "calendar" && (
+                    <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                      {!calendarLoaded && (
+                        <div className="flex items-center justify-center py-8 gap-2 text-[11px]" style={{ color: "var(--muted)" }}>
+                          <i className="fa-solid fa-circle-notch fa-spin" />Loading events…
+                        </div>
+                      )}
+                      {calendarLoaded && calendarEvents.length === 0 && (
+                        <div className="py-8 text-center text-[11px]" style={{ color: "var(--muted)" }}>No events found</div>
+                      )}
+                      {calendarEvents.slice(0, 20).map((ev: any, i: number) => {
+                        const evDate = ev.time ? new Date(ev.time + "Z") : null;
+                        const now = new Date();
+                        const isPast = evDate ? evDate < now : false;
+                        const timeStr = evDate
+                          ? evDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                          : "All Day";
+                        const dateStr = evDate
+                          ? evDate.toLocaleDateString([], { month: "short", day: "numeric" })
+                          : "";
+                        const col = impactCol[ev.impact] || "#6b7280";
+                        return (
+                          <div key={i} className="flex items-start gap-3 px-3 py-2.5" style={{ opacity: isPast ? 0.55 : 1 }}>
+                            {/* impact dot */}
+                            <div className="mt-1 flex flex-col items-center gap-0.5 shrink-0">
+                              <div className="h-2.5 w-2.5 rounded-full" style={{ background: col }} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-[13px] font-bold" style={{ color: "var(--text)" }}>{name}</span>
-                                {sentiment && (
-                                  <span className="rounded px-1.5 py-0.5 text-[9px] font-bold text-white" style={{ background: sentCol }}>
-                                    {sentiment}
-                                  </span>
-                                )}
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[12px] font-semibold leading-snug line-clamp-2" style={{ color: "var(--text)" }}>{ev.event}</span>
+                                <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ background: col + "22", color: col }}>{ev.country}</span>
                               </div>
-                              <div className="text-[10px]" style={{ color: "var(--muted)" }}>{timeAgoSec(time)}</div>
+                              <div className="mt-0.5 flex items-center gap-2 text-[10px]" style={{ color: "var(--muted)" }}>
+                                <span><i className="fa-regular fa-clock mr-0.5" />{dateStr} {timeStr}</span>
+                                {ev.actual != null && <span style={{ color: BUY }}>A: {ev.actual}</span>}
+                                {ev.estimate != null && <span>F: {ev.estimate}</span>}
+                                {ev.prev != null && <span>P: {ev.prev}</span>}
+                              </div>
                             </div>
                           </div>
-                          {/* post body */}
-                          {body && <p className="mb-2 text-[12px] leading-snug line-clamp-3" style={{ color: "var(--text)" }}>{body}</p>}
-                          {/* news image */}
-                          {!isSig && p.image && (
-                            <img src={p.image} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                              className="mb-2 w-full rounded-xl object-cover" style={{ maxHeight: 160 }} />
-                          )}
-                          {/* signal embed card */}
-                          {isSig && (
-                            <button onClick={() => { setSelSym(p.symbol); setTab("chart"); }}
-                              className="mb-2 flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left"
-                              style={{ borderColor: sentCol + "44", background: sentCol + "08" }}>
-                              <div className="flex items-center gap-2">
-                                <SymIcon symbol={p.symbol} size={22} />
-                                <div>
-                                  <div className="text-[12px] font-bold">{p.symbol}</div>
-                                  <div className="text-[9px]" style={{ color: "var(--muted)" }}>
-                                    {Number(p.sl) > 0 && `SL ${Number(p.sl).toFixed(5)}`}
-                                    {Number(p.sl) > 0 && Number(p.tp) > 0 && "  "}
-                                    {Number(p.tp) > 0 && `TP ${Number(p.tp).toFixed(5)}`}
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* ── Discover / Following posts ── */}
+                  {discoverTab !== "calendar" && (
+                    <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                      {allPosts.length === 0 && (
+                        <div className="py-6 text-center text-[11px]" style={{ color: "var(--muted)" }}>Nothing here yet</div>
+                      )}
+                      {allPosts.slice(0, 8).map((p: any, i: number) => {
+                        const isSig = p.kind === "signal";
+                        const isBuy = p.direction === "BUY";
+                        const sentCol = isSig ? (isBuy ? BUY : SELL) : "var(--accent)";
+                        const initials = isSig ? (p.analyst || "AI").slice(0, 2).toUpperCase() : (p.source || "FX").slice(0, 2).toUpperCase();
+                        const name = isSig ? (p.analyst || "Analyst Signal") : p.source;
+                        const time = isSig ? p.createdAt : p.datetime;
+                        const sentiment = isSig ? (isBuy ? "Bullish" : "Bearish") : null;
+                        const body = isSig ? p.rationale : p.headline;
+                        return (
+                          <div key={i} className="p-3">
+                            <div className="mb-2 flex items-start gap-2.5">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                                style={{ background: isSig ? sentCol : "var(--accent)" }}>
+                                {initials}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[13px] font-bold" style={{ color: "var(--text)" }}>{name}</span>
+                                  {sentiment && (
+                                    <span className="rounded px-1.5 py-0.5 text-[9px] font-bold text-white" style={{ background: sentCol }}>{sentiment}</span>
+                                  )}
+                                </div>
+                                <div className="text-[10px]" style={{ color: "var(--muted)" }}>{timeAgoSec(time)}</div>
+                              </div>
+                            </div>
+                            {body && <p className="mb-2 text-[12px] leading-snug line-clamp-3" style={{ color: "var(--text)" }}>{body}</p>}
+                            {!isSig && p.image && (
+                              <img src={p.image} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                className="mb-2 w-full rounded-xl object-cover" style={{ maxHeight: 160 }} />
+                            )}
+                            {isSig && (
+                              <button onClick={() => { setSelSym(p.symbol); setTab("chart"); }}
+                                className="mb-2 flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left"
+                                style={{ borderColor: sentCol + "44", background: sentCol + "08" }}>
+                                <div className="flex items-center gap-2">
+                                  <SymIcon symbol={p.symbol} size={22} />
+                                  <div>
+                                    <div className="text-[12px] font-bold">{p.symbol}</div>
+                                    <div className="text-[9px]" style={{ color: "var(--muted)" }}>
+                                      {Number(p.sl) > 0 && `SL ${Number(p.sl).toFixed(5)}`}
+                                      {Number(p.sl) > 0 && Number(p.tp) > 0 && "  "}
+                                      {Number(p.tp) > 0 && `TP ${Number(p.tp).toFixed(5)}`}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                              <span className="rounded-lg px-2.5 py-1 text-[11px] font-bold text-white" style={{ background: sentCol }}>
-                                {p.direction} @ {Number(p.entryPrice).toFixed(5)}
-                              </span>
-                            </button>
-                          )}
-                          {/* engagement row — stable deterministic counts based on index */}
-                          <div className="flex items-center gap-4 pt-1">
-                            <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
-                              <i className="fa-regular fa-comment" /><span>{5 + (i * 13) % 75}</span>
-                            </button>
-                            <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
-                              <i className="fa-solid fa-retweet" /><span>{1 + (i * 7) % 29}</span>
-                            </button>
-                            <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
-                              <i className="fa-regular fa-thumbs-up" /><span>{10 + (i * 31) % 190}</span>
-                            </button>
-                            <div className="flex items-center gap-1 ml-auto text-[11px]" style={{ color: "var(--muted)" }}>
-                              <i className="fa-solid fa-chart-simple" /><span>{(100 + (i * 97) % 900).toLocaleString()}K</span>
-                            </div>
-                            {!isSig && p.url && (
-                              <a href={p.url} target="_blank" rel="noreferrer" className="text-[11px]" style={{ color: "var(--muted)" }}>
-                                <i className="fa-solid fa-arrow-up-right-from-square" />
-                              </a>
+                                <span className="rounded-lg px-2.5 py-1 text-[11px] font-bold text-white" style={{ background: sentCol }}>
+                                  {p.direction} @ {Number(p.entryPrice).toFixed(5)}
+                                </span>
+                              </button>
                             )}
+                            <div className="flex items-center gap-4 pt-1">
+                              <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                                <i className="fa-regular fa-comment" /><span>{5 + (i * 13) % 75}</span>
+                              </button>
+                              <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                                <i className="fa-solid fa-retweet" /><span>{1 + (i * 7) % 29}</span>
+                              </button>
+                              <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                                <i className="fa-regular fa-thumbs-up" /><span>{10 + (i * 31) % 190}</span>
+                              </button>
+                              <div className="flex items-center gap-1 ml-auto text-[11px]" style={{ color: "var(--muted)" }}>
+                                <i className="fa-solid fa-chart-simple" /><span>{(100 + (i * 97) % 900).toLocaleString()}K</span>
+                              </div>
+                              {!isSig && p.url && (
+                                <a href={p.url} target="_blank" rel="noreferrer" className="text-[11px]" style={{ color: "var(--muted)" }}>
+                                  <i className="fa-solid fa-arrow-up-right-from-square" />
+                                </a>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })()}
