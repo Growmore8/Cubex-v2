@@ -36,6 +36,7 @@ export default function SATenantsPage() {
   const [form, setForm] = useState<any>({ plan: "STARTER", seats: 5, primaryColor: "#2563eb", accentColor: "#22c55e" });
   const [permFor, setPermFor] = useState<any>(null);
   const [perms, setPerms] = useState<any>({});
+  const [feats, setFeats] = useState<any>({});
   const [subFor, setSubFor] = useState<any>(null);
   const [subForm, setSubForm] = useState<any>({});
   const [editFor, setEditFor] = useState<any>(null);
@@ -138,10 +139,11 @@ export default function SATenantsPage() {
     setSmtpTest(r.ok ? (r.sent ? `✓ Sent to ${r.sent} (host ${r.host})` : `✓ Login OK (host ${r.host})`) : `✗ ${r.error}`);
   }
 
-  function openPerms(t: any) { setPermFor(t); setPerms(t.permissions || {}); }
+  function openPerms(t: any) { setPermFor(t); setPerms(t.permissions || {}); setFeats(t.features || {}); }
   async function savePerms() {
     if (!permFor) return;
     await act(permFor.id, "perms", { perms });
+    await act(permFor.id, "edit", { features: feats });
     setPermFor(null);
   }
 
@@ -561,6 +563,21 @@ export default function SATenantsPage() {
                 </div>
               </div>
             ))}
+            <div className="mb-3 border-t border-gray-200 pt-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Feature Flags</div>
+              <div className="text-xs text-gray-400 mb-2">Disabled features are completely hidden from all users under this tenant.</div>
+              <div className="grid grid-cols-1 gap-1">
+                {FEATURE_FLAGS.map(({ key, label, desc }) => (
+                  <label key={key} className="flex cursor-pointer select-none items-start gap-2 text-sm">
+                    <input type="checkbox" className="mt-0.5 h-4 w-4 flex-shrink-0" checked={!!feats[key]} onChange={(e) => setFeats({ ...feats, [key]: e.target.checked })} />
+                    <span>
+                      <span className="font-medium">{label}</span>
+                      <span className="ml-1.5 text-gray-400 text-[11px]">{desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="mt-3 flex justify-end gap-2">
               <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setPermFor(null)}>Cancel</button>
               <button className="ui-btn ui-btn-primary px-3 py-1.5 text-sm" onClick={savePerms}>Save Permissions</button>

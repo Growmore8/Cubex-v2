@@ -157,14 +157,17 @@ export default function TVChart({
             if (!pl?.setPrice) throw new Error("invalid");
             if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
             pl.setPrice(price)
-              .setQuantity("")
-              .setText(body)
+              .setQuantity(body)
+              .setQuantityBackgroundColor(bg)
+              .setQuantityTextColor("#fff")
+              .setQuantityBorderColor(bg)
+              .setText("")
               .setLineColor(lineColor)
               .setLineStyle(lineStyle)
               .setLineWidth(lineWidth)
-              .setBodyBackgroundColor(bg)
+              .setBodyBackgroundColor("transparent")
               .setBodyTextColor("#fff")
-              .setBodyBorderColor(bg);
+              .setBodyBorderColor("transparent");
             linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
           } catch {
             await addShape(price, {
@@ -425,7 +428,7 @@ export default function TVChart({
       try {
         widget.activeChart().crosshairMoved().subscribe(null, (param: any) => {
           const el = ohlcOverlayRef.current; if (!el) return;
-          if (!param?.time || !param.point) { el.style.display = "none"; return; }
+          if (!param?.time) { el.style.display = "none"; return; }
           const tRaw = Number(param.time);
           // Normalize both to seconds before comparing (TV gives seconds; bars stored in ms)
           const tSec = tRaw > 1e10 ? Math.floor(tRaw / 1000) : tRaw;
