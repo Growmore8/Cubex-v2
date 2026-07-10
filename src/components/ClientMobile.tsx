@@ -1178,6 +1178,11 @@ export default function ClientMobile({ t }: { t: any }) {
                           </div>
                           {/* post body */}
                           {body && <p className="mb-2 text-[12px] leading-snug line-clamp-3" style={{ color: "var(--text)" }}>{body}</p>}
+                          {/* news image */}
+                          {!isSig && p.image && (
+                            <img src={p.image} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              className="mb-2 w-full rounded-xl object-cover" style={{ maxHeight: 160 }} />
+                          )}
                           {/* signal embed card */}
                           {isSig && (
                             <button onClick={() => { setSelSym(p.symbol); setTab("chart"); }}
