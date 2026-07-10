@@ -184,18 +184,16 @@ export default function TVChart({
           const isBuy  = p.type === "BUY";
           const isPend = !!p.kind;
           const color  = isPend ? "#f59e0b" : (isBuy ? "#2962ff" : "#f23645");
-          const tkt    = p.ticket != null ? String(p.ticket) : "";
-          const pnlStr = (!isPend && p.pnl !== undefined)
-            ? ` ${p.pnl >= 0 ? "+" : ""}${Number(p.pnl).toFixed(2)}` : "";
-          const label  = !isPend && tkt
-            ? `#${p.type} ${tkt}${pnlStr}`
+          const tkt   = p.ticket != null ? String(p.ticket) : "";
+          const label = !isPend && tkt
+            ? `#${p.type} ${tkt}`
             : `${p.kind ? p.kind + " " : ""}${p.type} ${Number(p.lots).toFixed(2)}`;
 
           await makeLine(p.openPrice, label, color, color, isPend ? 2 : 0, isPend ? 1 : 2);
           if (p.sl && p.sl > 0)
-            await makeLine(p.sl, `SL${tkt ? " " + tkt : ""}  ${fmt(p.sl)}`, "#f43f5e", "#f43f5e", 2, 1);
+            await makeLine(p.sl, `SL`, "#f43f5e", "#f43f5e", 2, 1);
           if (p.tp && p.tp > 0)
-            await makeLine(p.tp, `TP${tkt ? " " + tkt : ""}  ${fmt(p.tp)}`, "#10b981", "#10b981", 2, 1);
+            await makeLine(p.tp, `TP`, "#10b981", "#10b981", 2, 1);
         }
 
         // Ask spread line — teal dashed
@@ -259,8 +257,8 @@ export default function TVChart({
         const tf = TV_TO_TF[resolution] || "1M";
         // Use larger limits for slower timeframes to cover ~1 year of history
         const limit = firstDataRequest
-          ? (["1D","1W"].includes(tf) ? 500 : ["4H","1H"].includes(tf) ? 1000 : 500)
-          : 1500;
+          ? (["1D","1W"].includes(tf) ? 2000 : ["4H","1H"].includes(tf) ? 2000 : 2000)
+          : 2000;
         const beforeParam = firstDataRequest ? "" : `&before=${to}`;
         try {
           const d = await fetch(
@@ -356,6 +354,7 @@ export default function TVChart({
       "create_volume_indicator_by_default", // volume is meaningless for OTC forex; keep sub-pane clean
       "popup_hints",                        // suppress long-press tooltip popup on mobile
       "timeframes_toolbar",                 // hide the bottom period quick-select bar (5y 1y 3m …)
+      "header_undo_redo",                   // remove just the undo/redo arrows; full header stays
       // NOTE: tradingview_logo intentionally NOT disabled — the charting library
       // license requires TradingView branding to remain visible.
     ];
@@ -416,9 +415,12 @@ export default function TVChart({
         }
       } catch {}
 
-      // Redraw position lines every time TV finishes loading data (symbol changes clear shapes).
+      // Show all loaded historical candles on first data load, then redraw position lines.
       try {
-        widget.activeChart().onDataLoaded().subscribe(null, () => { drawRef.current(); });
+        widget.activeChart().onDataLoaded().subscribe(null, () => {
+          try { widget.activeChart().executeActionById("timeScaleReset"); } catch {}
+          drawRef.current();
+        });
       } catch {}
 
       drawRef.current(); // initial draw

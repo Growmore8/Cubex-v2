@@ -375,7 +375,7 @@ function LWChart({
         if (el) el.style.display = "none";
       }
     });
-    if (barsRef.current.length) { series.setData(barsRef.current); const n = barsRef.current.length; try { chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { try { chart.timeScale().scrollToRealTime(); } catch { chart.timeScale().fitContent(); } } }
+    if (barsRef.current.length) { series.setData(barsRef.current); try { chart.timeScale().fitContent(); } catch { try { chart.timeScale().scrollToRealTime(); } catch {} } }
     // Trigger load-more when user scrolls to the left edge of loaded bars
     chart.timeScale().subscribeVisibleLogicalRangeChange((range: any) => {
       if (range && range.from <= 2) try { loadMoreRef.current?.(); } catch {}
@@ -606,7 +606,7 @@ function LWChart({
         .sort((a: any, b: any) => a.time - b.time)
         .filter((c: any) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
       if (!bars.length) return false;
-      try { seriesRef.current.setData(bars); barsRef.current = bars; const n = bars.length; try { chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 100), to: n + 5 }); } catch { chartRef.current?.timeScale().fitContent(); } onBarsLoaded.current(); onCandleUpdateRef.current?.(bars[n - 1]); return true; }
+      try { seriesRef.current.setData(bars); barsRef.current = bars; try { chartRef.current?.timeScale().fitContent(); } catch {} onBarsLoaded.current(); onCandleUpdateRef.current?.(bars[bars.length - 1]); return true; }
       catch { return false; }
     }
     // Build a plausible `count`-bar history (random walk) ending at `lastPrice`,
