@@ -145,34 +145,40 @@ export default function TVChart({
           } catch {}
         };
 
-        // Colored filled label box near price axis — createPositionLine gives a native TV
-        // colored body box (matching LW chart's createPriceLine style). Empty quantity hides
-        // the left MT5-style box. Falls back to addShape if createPositionLine is unavailable.
+        // createPositionLine — safe individual calls (no chaining so one missing
+        // method can't poison the rest). Falls back to addShape only if the line
+        // object itself is unavailable.
+        const safeCall = (fn: () => void) => { try { fn(); } catch {} };
         const makeLine = async (
           price: number, body: string, lineColor: string, bg: string, lineStyle: number, lineWidth: number,
         ) => {
+          let usedPositionLine = false;
           try {
             const raw = (chart as any).createPositionLine?.();
             if (raw == null) throw new Error("n/a");
             const pl: any = (raw && typeof (raw as any).then === "function") ? await raw : raw;
-            if (!pl?.setPrice) throw new Error("invalid");
-            if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
-            pl.setPrice(price)
-              .setQuantity("")
-              .setQuantityBackgroundColor("transparent")
-              .setQuantityTextColor("transparent")
-              .setQuantityBorderColor("transparent")
-              .setText(body)
-              .setBodyBackgroundColor(bg)
-              .setBodyTextColor("#fff")
-              .setBodyBorderColor(bg)
-              .setLineColor(lineColor)
-              .setLineStyle(lineStyle)
-              .setLineWidth(lineWidth);
-            try { (pl as any).setLineLength?.(0); } catch {}
-            try { (pl as any).setExtendLeft?.(true); } catch {}
-            linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
-          } catch {
+            if (typeof pl?.setPrice !== "function") throw new Error("invalid");
+            if (drawSeqRef.current !== seq) { safeCall(() => pl.remove()); return; }
+            // Apply each property independently — a missing method in TV v32 won't
+            // abort the whole sequence.
+            safeCall(() => pl.setPrice(price));
+            safeCall(() => pl.setQuantity(""));
+            safeCall(() => pl.setQuantityBackgroundColor("transparent"));
+            safeCall(() => pl.setQuantityTextColor("transparent"));
+            safeCall(() => pl.setQuantityBorderColor("transparent"));
+            safeCall(() => pl.setText(body));
+            safeCall(() => pl.setBodyBackgroundColor(bg));
+            safeCall(() => pl.setBodyTextColor("#fff"));
+            safeCall(() => pl.setBodyBorderColor(bg));
+            safeCall(() => pl.setLineColor(lineColor));
+            safeCall(() => pl.setLineStyle(lineStyle));
+            safeCall(() => pl.setLineWidth(lineWidth));
+            safeCall(() => (pl as any).setLineLength?.(0));
+            safeCall(() => (pl as any).setExtendLeft?.(true));
+            linesRef.current.push({ remove: () => safeCall(() => pl.remove()) });
+            usedPositionLine = true;
+          } catch { /* fall through to addShape */ }
+          if (!usedPositionLine) {
             await addShape(price, {
               linecolor: lineColor, linewidth: lineWidth, linestyle: lineStyle,
               showLabel: true, text: body, textcolor: "#fff",
