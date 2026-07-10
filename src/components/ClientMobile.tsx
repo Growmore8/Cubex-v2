@@ -215,6 +215,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mobNews, setMobNews] = useState<any[]>([]);
   const [mobNewsLoading, setMobNewsLoading] = useState(false);
   const [discoverTab, setDiscoverTab] = useState<"discover"|"signals"|"news">("discover");
+  const [actCarouselIdx, setActCarouselIdx] = useState(0);
   const [mobSignals, setMobSignals] = useState<any[]>([]);
   const [mobSignalsLoaded, setMobSignalsLoaded] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
@@ -322,6 +323,7 @@ export default function ClientMobile({ t }: { t: any }) {
   useEffect(() => { fetch("/api/auth/totp/status").then((r) => r.json()).then((d) => { if (d.ok) setTotpEnabled(d.totpEnabled); }).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === "dashboard" && mobNews.length === 0 && !mobNewsLoading) { setMobNewsLoading(true); fetch("/api/client/news?category=forex").then((r) => r.json()).then((d) => { if (d.ok) setMobNews(d.items || []); }).catch(() => {}).finally(() => setMobNewsLoading(false)); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === "dashboard" && !mobSignalsLoaded) { fetch("/api/client/signals").then((r) => r.json()).then((d) => { if (d.ok) setMobSignals(d.signals || []); setMobSignalsLoaded(true); }).catch(() => { setMobSignalsLoaded(true); }); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tab !== "dashboard") return; const t = setInterval(() => setActCarouselIdx((i) => i + 1), 3500); return () => clearInterval(t); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   async function openTotpSetup() {
     setTotpErr(""); setTotpMsg(""); setTotpCode(""); setTotpQr(""); setTotpSecret("");
     setTotpBusy(true);
@@ -736,10 +738,10 @@ export default function ClientMobile({ t }: { t: any }) {
               }}>
               <div className="cp-card relative overflow-hidden rounded-[20px] px-5 py-7" style={{
                 backgroundImage: cIsLive
-                  /* LIVE — Columbia Blue: lavender left · white centre glow · ice-blue right */
-                  ? "radial-gradient(ellipse 60% 58% at 5% 48%, rgba(178,140,252,0.88) 0%, rgba(178,140,252,0.32) 44%, transparent 66%), radial-gradient(ellipse 38% 36% at 22% 10%, rgba(210,188,255,0.60) 0%, transparent 50%), radial-gradient(ellipse 60% 58% at 92% 50%, rgba(148,194,255,0.86) 0%, rgba(148,194,255,0.28) 44%, transparent 66%), radial-gradient(ellipse 48% 46% at 50% 46%, rgba(255,255,255,0.90) 0%, transparent 54%), linear-gradient(115deg,#d8c4ff 0%,#ecd8ff 24%,#f4f0ff 44%,#c8dcff 70%,#a8ccff 100%)"
-                  /* DEMO — Egg-Sour: vivid lime top-left · warm orange centre · soft peach bottom-right · cream-white corner */
-                  : "radial-gradient(ellipse 54% 52% at 10% 8%, rgba(168,220,0,0.96) 0%, rgba(168,220,0,0.40) 44%, transparent 68%), radial-gradient(ellipse 34% 32% at 35% 28%, rgba(238,252,80,0.50) 0%, transparent 50%), radial-gradient(ellipse 66% 62% at 63% 58%, rgba(252,138,26,0.92) 0%, rgba(252,138,26,0.26) 52%, transparent 72%), radial-gradient(ellipse 46% 44% at 90% 90%, rgba(252,148,118,0.80) 0%, rgba(252,148,118,0.18) 46%, transparent 68%), radial-gradient(ellipse 42% 40% at 96% 4%, rgba(255,255,255,0.88) 0%, transparent 52%), linear-gradient(138deg,#eefab0 0%,#fef6c0 22%,#fed898 50%,#fecab8 78%,#fff4ee 100%)",
+                  /* LIVE — Dusk: deep indigo top-left · vivid rose-pink centre · warm gold bottom-right · soft cream highlight */
+                  ? "radial-gradient(ellipse 62% 58% at 4% 8%, rgba(88,60,196,0.95) 0%, rgba(88,60,196,0.42) 46%, transparent 70%), radial-gradient(ellipse 40% 38% at 18% 40%, rgba(140,80,220,0.60) 0%, transparent 52%), radial-gradient(ellipse 58% 54% at 54% 52%, rgba(238,110,180,0.90) 0%, rgba(238,110,180,0.30) 48%, transparent 70%), radial-gradient(ellipse 50% 48% at 88% 78%, rgba(252,196,80,0.88) 0%, rgba(252,196,80,0.28) 46%, transparent 68%), radial-gradient(ellipse 36% 34% at 92% 10%, rgba(255,220,170,0.72) 0%, transparent 50%), linear-gradient(128deg,#2c1e6e 0%,#7b3fa0 28%,#e87ab4 54%,#f5c96e 80%,#fff4d8 100%)"
+                  /* DEMO — Buttercup: bright golden yellow left · warm amber centre · soft cream-white right · light honey glow */
+                  : "radial-gradient(ellipse 62% 58% at 6% 44%, rgba(255,210,0,0.98) 0%, rgba(255,210,0,0.44) 46%, transparent 70%), radial-gradient(ellipse 40% 38% at 28% 12%, rgba(255,235,80,0.70) 0%, transparent 50%), radial-gradient(ellipse 54% 52% at 56% 58%, rgba(255,168,20,0.88) 0%, rgba(255,168,20,0.28) 48%, transparent 70%), radial-gradient(ellipse 48% 46% at 88% 80%, rgba(255,230,160,0.80) 0%, transparent 56%), radial-gradient(ellipse 42% 40% at 94% 8%, rgba(255,252,220,0.90) 0%, transparent 52%), linear-gradient(128deg,#ffe44a 0%,#ffd020 20%,#ffb830 44%,#ffe8a0 72%,#fffbe8 100%)",
                 color: "#1a1d21",
                 boxShadow: "0 0 8px rgba(0,0,0,0.12), 0 2px 16px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.12), 0 12px 28px rgba(0,0,0,0.12)",
               }}>
@@ -960,121 +962,116 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
             )}
 
-            {/* ── HOT SYMBOLS — top 3 by absolute % change ── */}
-            {movers.any && (() => {
+            {/* ── 2×2 GRID: 3 hot symbols with sparkline + 1 activity dot-carousel ── */}
+            {(() => {
               const top3 = [...movers.gainers, ...movers.losers]
                 .sort((a: any, b: any) => Math.abs(b.pct) - Math.abs(a.pct))
                 .slice(0, 3);
-              if (!top3.length) return null;
-              return (
-                <div className="glass-card overflow-hidden p-0">
-                  <div className="flex items-center justify-between px-3 pt-3 pb-2">
-                    <div className="text-[11px] font-bold tracking-wide"><i className="fa-solid fa-fire mr-1.5" style={{ color: "#ff6b35" }} />HOT SYMBOLS</div>
-                    <span className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: "rgba(255,107,53,0.12)", color: "#ff6b35" }}>TOP 3</span>
-                  </div>
-                  <div className="border-t" style={{ borderColor: "var(--border)" }}>
-                    <div className="grid px-3 py-1.5" style={{ gridTemplateColumns: "1fr auto 72px" }}>
-                      <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Name</span>
-                      <span className="mr-3 text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Last Price</span>
-                      <span className="text-center text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>24h Chg%</span>
-                    </div>
-                    {top3.map((s: any) => {
-                      const isUp = s.pct >= 0;
-                      return (
-                        <button key={s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }}
-                          className="grid w-full items-center border-t px-3 py-2.5 transition-colors active:bg-[var(--soft)]"
-                          style={{ gridTemplateColumns: "1fr auto 72px", borderColor: "var(--border)" }}>
-                          <div className="flex items-center gap-2 text-left">
-                            <SymIcon symbol={s.symbol} size={28} />
-                            <div>
-                              <div className="text-[12px] font-bold leading-none">{s.display || s.symbol}</div>
-                              <div className="mt-0.5 text-[9px]" style={{ color: "var(--muted)" }}>{s.symbol}</div>
-                            </div>
-                          </div>
-                          <div className="mr-3 text-right">
-                            <div className="text-[12px] font-bold tabular-nums">{s.price != null ? gnum(s.price, dg(s.symbol)) : "—"}</div>
-                          </div>
-                          <div className="rounded-lg py-1 text-center text-[11px] font-bold tabular-nums text-white"
-                            style={{ background: isUp ? BUY : SELL }}>
-                            {isUp ? "+" : ""}{s.pct.toFixed(2)}%
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* ── LAST ACTIVITY carousel — 5 most recent trades + fund requests ── */}
-            {(() => {
               const tradePL = (history || []).filter((h: any) => h.kind === "TRADE" || !h.kind);
               const acts: any[] = [
                 ...tradePL.map((h: any) => ({
-                  type: "trade",
-                  symbol: h.symbol,
-                  side: h.type || h.direction,
-                  pnl: Number(h.pnl || 0),
-                  lot: h.lot || h.volume,
+                  type: "trade", symbol: h.symbol, side: h.type || h.direction,
+                  pnl: Number(h.pnl || 0), lot: h.lot || h.volume,
                   time: h.closeTime || h.closedAt || h.closeDate || h.createdAt,
                 })),
                 ...(myReqs || []).map((r: any) => ({
                   type: (r.type || r.requestType || "fund").toLowerCase(),
-                  amount: Number(r.amount || 0),
-                  status: r.status,
-                  time: r.createdAt,
+                  amount: Number(r.amount || 0), status: r.status, time: r.createdAt,
                 })),
-              ]
-                .sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime())
-                .slice(0, 5);
-              if (!acts.length) return null;
+              ].sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime()).slice(0, 5);
+
+              if (!top3.length && !acts.length) return null;
+
               const timeAgo = (d: any) => {
                 if (!d) return "";
                 const ms = Date.now() - new Date(d).getTime();
                 const m = Math.floor(ms / 60000);
-                if (m < 60) return m + "m ago";
-                const h = Math.floor(m / 60);
-                if (h < 24) return h + "h ago";
+                if (m < 60) return m + "m";
+                const h2 = Math.floor(m / 60);
+                if (h2 < 24) return h2 + "h";
                 return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
               };
+
+              const curAct = acts[actCarouselIdx % Math.max(acts.length, 1)];
+
               return (
-                <div className="glass-card p-3">
-                  <div className="mb-3 text-[11px] font-bold tracking-wide">
-                    <i className="fa-solid fa-clock-rotate-left mr-1.5" style={{ color: "var(--accent)" }} />LAST ACTIVITY
-                  </div>
-                  <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
-                    {acts.map((a: any, i: number) => {
-                      const isTrade = a.type === "trade";
-                      const isPos = isTrade ? a.pnl >= 0 : a.type === "deposit";
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* 3 hot symbol cells */}
+                  {top3.map((s: any) => {
+                    const isUp = s.pct >= 0;
+                    const col = isUp ? BUY : SELL;
+                    const spark = sparkRef.current[s.symbol];
+                    return (
+                      <button key={s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }}
+                        className="glass-card flex flex-col p-3 text-left active:opacity-80">
+                        {/* symbol + % badge */}
+                        <div className="mb-1.5 flex items-center justify-between gap-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <SymIcon symbol={s.symbol} size={20} />
+                            <span className="truncate text-[11px] font-bold">{s.display || s.symbol}</span>
+                          </div>
+                          <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold"
+                            style={{ background: col + "20", color: col }}>
+                            {isUp ? "+" : ""}{s.pct.toFixed(2)}%
+                          </span>
+                        </div>
+                        {/* sparkline chart */}
+                        <div className="my-1 w-full">
+                          <Sparkline data={spark} up={isUp} w={100} h={28} />
+                        </div>
+                        {/* price */}
+                        <div className="text-[15px] font-extrabold tabular-nums leading-none" style={{ color: col }}>
+                          {s.price != null ? gnum(s.price, dg(s.symbol)) : "—"}
+                        </div>
+                      </button>
+                    );
+                  })}
+
+                  {/* activity dot-carousel cell */}
+                  <div className="glass-card flex flex-col p-3" style={{ minHeight: 110 }}>
+                    <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+                      <i className="fa-solid fa-clock-rotate-left mr-1" />Activity
+                    </div>
+                    {acts.length === 0 ? (
+                      <div className="flex flex-1 items-center justify-center text-[10px]" style={{ color: "var(--muted)" }}>No activity yet</div>
+                    ) : curAct && (() => {
+                      const isTrade = curAct.type === "trade";
+                      const isPos = isTrade ? curAct.pnl >= 0 : curAct.type === "deposit";
                       const col = isPos ? BUY : SELL;
                       const icon = isTrade
-                        ? (a.side === "BUY" ? "fa-arrow-trend-up" : "fa-arrow-trend-down")
-                        : a.type === "deposit" ? "fa-circle-dollar-to-slot"
-                        : a.type === "withdrawal" ? "fa-hand-holding-dollar"
+                        ? (curAct.side === "BUY" ? "fa-arrow-trend-up" : "fa-arrow-trend-down")
+                        : curAct.type === "deposit" ? "fa-circle-dollar-to-slot"
+                        : curAct.type === "withdrawal" ? "fa-hand-holding-dollar"
                         : "fa-money-bill-transfer";
-                      const statusCol = a.status === "APPROVED" ? BUY : a.status === "REJECTED" ? SELL : "var(--muted)";
                       return (
-                        <div key={i} className="flex-shrink-0 rounded-xl border p-2.5" style={{ width: 112, borderColor: "var(--border)", background: "var(--soft)" }}>
-                          <div className="mb-2 flex items-center justify-between">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: col + "20" }}>
-                              <i className={`fa-solid ${icon} text-[10px]`} style={{ color: col }} />
+                        <div className="flex flex-1 flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: col + "20" }}>
+                                <i className={`fa-solid ${icon} text-[9px]`} style={{ color: col }} />
+                              </div>
+                              <span className="text-[11px] font-bold truncate" style={{ color: "var(--text)" }}>
+                                {isTrade ? (curAct.symbol || "—") : (curAct.type.charAt(0).toUpperCase() + curAct.type.slice(1))}
+                              </span>
                             </div>
-                            <span className="text-[9px]" style={{ color: "var(--muted)" }}>{timeAgo(a.time)}</span>
+                            <div className="text-[15px] font-extrabold tabular-nums" style={{ color: col }}>
+                              {isTrade ? (curAct.pnl >= 0 ? "+" : "") + _cSym + fmt(Math.abs(curAct.pnl)) : _cSym + fmt(curAct.amount)}
+                            </div>
+                            <div className="mt-0.5 text-[9px]" style={{ color: isTrade ? "var(--muted)" : (curAct.status === "APPROVED" ? BUY : curAct.status === "REJECTED" ? SELL : "var(--muted)") }}>
+                              {isTrade ? `${curAct.side} ${curAct.lot}L` : (curAct.status || "PENDING")} · {timeAgo(curAct.time)}
+                            </div>
                           </div>
-                          <div className="truncate text-[10px] font-bold" style={{ color: "var(--text)" }}>
-                            {isTrade ? (a.symbol || "—") : (a.type.charAt(0).toUpperCase() + a.type.slice(1))}
-                          </div>
-                          <div className="mt-0.5 text-[11px] font-bold tabular-nums" style={{ color: col }}>
-                            {isTrade
-                              ? (a.pnl >= 0 ? "+" : "") + _cSym + fmt(Math.abs(a.pnl))
-                              : _cSym + fmt(a.amount)}
-                          </div>
-                          <div className="mt-0.5 text-[9px]" style={{ color: isTrade ? "var(--muted)" : statusCol }}>
-                            {isTrade ? `${a.side} ${a.lot}L` : (a.status || "PENDING")}
+                          {/* dot indicators */}
+                          <div className="mt-2 flex items-center justify-center gap-1">
+                            {acts.map((_: any, di: number) => (
+                              <button key={di} onClick={(e) => { e.stopPropagation(); setActCarouselIdx(di); }}
+                                className="rounded-full transition-all"
+                                style={{ width: di === actCarouselIdx % acts.length ? 14 : 6, height: 5, background: di === actCarouselIdx % acts.length ? "var(--accent)" : "var(--border)" }} />
+                            ))}
                           </div>
                         </div>
                       );
-                    })}
+                    })()}
                   </div>
                 </div>
               );
