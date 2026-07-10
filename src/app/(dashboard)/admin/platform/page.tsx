@@ -239,6 +239,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [brand, setBrand] = useState<{ name: string; logoUrl: string | null }>({ name: "", logoUrl: null });
   const [trial, setTrial] = useState<{ active: boolean; daysLeft: number } | null>(null);
   const [swapEnabled, setSwapEnabled] = useState(true);
+  const [features, setFeatures] = useState<Record<string, boolean>>({});
   const can = (k: string) => perms[k] !== false; // default allow until /me resolves
   const [fundPnlOnly, setFundPnlOnly] = useState(false);
   useEffect(() => { fetch("/api/admin/fund-settings").then((r) => r.json()).then((d) => { if (d.ok) setFundPnlOnly(!!d.pnlOnly); }).catch(() => {}); }, []);
@@ -358,9 +359,13 @@ const [selAcc, setSelAcc] = useState<any>(null);
   }
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((d) => {
-      if (d.ok && d.user) { roleRef.current = d.user.role; setRole(d.user.role); setPerms(d.perms || {}); if (d.brand) setBrand(d.brand); setTrial(d.trial || null); setSwapEnabled(d.swapEnabled !== false); }
+      if (d.ok && d.user) { roleRef.current = d.user.role; setRole(d.user.role); setPerms(d.perms || {}); if (d.brand) setBrand(d.brand); setTrial(d.trial || null); setSwapEnabled(d.swapEnabled !== false); if (d.features) setFeatures(d.features); }
     }).catch(() => {}).finally(() => loadAll());
   }, []);
+  // If the active tab is feature-gated (SA disabled it), fall back to Trade.
+  useEffect(() => {
+    if ((tab === "copy" || tab === "signals") && features.copyTrading === false) setTab("trade");
+  }, [features]); // eslint-disable-line react-hooks/exhaustive-deps
   const notifSeen = useRef<Set<string>>(new Set());
   const notifPrimed = useRef(false);
   async function loadNotifs() {
@@ -1145,7 +1150,12 @@ const [selAcc, setSelAcc] = useState<any>(null);
         <div className="flex shrink-0 flex-col" style={{ height: tbH }}>
           <div className="flex items-end gap-1 border-b border-[var(--border)] px-2 pt-1">
             <div className="flex flex-1 items-end gap-0.5 overflow-auto">
-              {TABS.filter(([k]) => tabState[k] && (k !== "audit" || can("viewAudit"))).map(([k, lbl]) => {
+              {TABS.filter(([k]) =>
+                tabState[k] &&
+                (k !== "audit"   || can("viewAudit")) &&
+                (k !== "copy"    || features.copyTrading    !== false) &&
+                (k !== "signals" || features.copyTrading    !== false)
+              ).map(([k, lbl]) => {
                 const active = tab === k;
                 return (
                   <div key={k} onClick={() => setTab(k)} className="group relative flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap rounded-t-lg px-3 py-1.5 text-xs font-semibold transition-colors"
