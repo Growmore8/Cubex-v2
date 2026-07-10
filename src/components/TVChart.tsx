@@ -167,6 +167,9 @@ export default function TVChart({
             safeCall(() => pl.setQuantityTextColor("transparent"));
             safeCall(() => pl.setQuantityBorderColor("transparent"));
             safeCall(() => pl.setText(body));
+            safeCall(() => pl.setLabelBackgroundColor(bg));
+            safeCall(() => pl.setLabelTextColor("#fff"));
+            safeCall(() => (pl as any).setLabelBorderColor?.(bg));
             safeCall(() => pl.setBodyBackgroundColor(bg));
             safeCall(() => pl.setBodyTextColor("#fff"));
             safeCall(() => pl.setBodyBorderColor(bg));
