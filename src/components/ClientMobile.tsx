@@ -749,7 +749,12 @@ export default function ClientMobile({ t }: { t: any }) {
                       <div className="text-[11px] font-bold tracking-[0.2em]" style={{ color: "rgba(26,29,33,0.85)" }}>{(brand?.name || "").toUpperCase() || "TRADING"}</div>
                       <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(26,29,33,0.12)", color: "#1a1d21" }}>{account?.type}</span>
                     </div>
-                    <div className="h-7 w-9 rounded-[6px]" style={{ background: "linear-gradient(135deg,#f4e3a1,#caa54e 45%,#9c7c2e 70%,#e9d27f)" }} />
+                    <svg width="36" height="28" viewBox="0 0 24 22" fill="none">
+                      <circle cx="3.5" cy="11" r="2" fill="rgba(26,29,33,0.68)" />
+                      <path d="M 8 7.2 A 5.5 5.5 0 0 1 8 14.8" stroke="rgba(26,29,33,0.68)" strokeWidth="2.2" strokeLinecap="round" />
+                      <path d="M 12.5 4 A 9.5 9.5 0 0 1 12.5 18" stroke="rgba(26,29,33,0.68)" strokeWidth="2.2" strokeLinecap="round" />
+                      <path d="M 17 1.5 A 13 13 0 0 1 17 20.5" stroke="rgba(26,29,33,0.68)" strokeWidth="2.2" strokeLinecap="round" />
+                    </svg>
                   </div>
                   <div className="mt-5">
                     <div className="text-[9px] font-semibold tracking-[0.18em]" style={{ color: "rgba(26,29,33,0.5)" }}>TOTAL BALANCE</div>
