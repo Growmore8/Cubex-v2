@@ -4,6 +4,14 @@ import { useDialog } from "@/components/ui/ConfirmDialog";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { PACKAGES, PLAN_KEYS } from "@/config/packages";
 
+const FEATURE_FLAGS: { key: string; label: string; desc: string }[] = [
+  { key: "copyTrading", label: "Copy Trading", desc: "Clients can subscribe to signal providers and auto-copy trades" },
+  { key: "referral", label: "Referral Program", desc: "Clients can invite others and earn referral bonuses" },
+  { key: "analytics", label: "Advanced Analytics", desc: "Show detailed trading analytics and performance reports to clients" },
+  { key: "news", label: "Market News Feed", desc: "Show live market news in the client trading panel" },
+  { key: "economic", label: "Economic Calendar", desc: "Show the economic events calendar in the client panel" },
+];
+
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
   { sec: "Users", items: [["createClients", "Create Clients"], ["deleteClients", "Delete Clients"], ["manageManagers", "Manage Managers"]] },
   { sec: "Funds", items: [["processDeposits", "Process Deposits"], ["processWithdrawals", "Process Withdrawals"], ["creditBonus", "Credit / Bonus / Insurance"], ["transferFunds", "Transfer Funds"], ["editFinancial", "Edit Financial History"], ["deleteFinancial", "Delete Financial History"]] },
@@ -111,6 +119,7 @@ export default function SATenantsPage() {
       contactName: t.contactName || "", contactPhone: t.contactPhone || "",
       allowRegistration: t.allowRegistration !== false,
       swapEnabled: !!t.swapEnabled,
+      features: (t.features as Record<string, boolean>) || {},
     });
     setSmtpTest("");
     setEditFor(t);
@@ -500,6 +509,27 @@ export default function SATenantsPage() {
                   </label>
                 </>
               )}
+              {/* ── Feature Flags ── */}
+              <div className="col-span-2 mt-4 border-t border-gray-200 pt-3">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Feature Flags</div>
+                <div className="text-[11px] text-gray-400 mb-2">Enable or disable platform features for this tenant. Disabled features are completely hidden from all users.</div>
+                <div className="grid grid-cols-1 gap-1.5">
+                  {FEATURE_FLAGS.map(({ key, label, desc }) => (
+                    <label key={key} className="flex cursor-pointer select-none items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 flex-shrink-0"
+                        checked={!!((editForm as any).features?.[key])}
+                        onChange={(e) => setEditForm({ ...editForm, features: { ...((editForm as any).features || {}), [key]: e.target.checked } } as any)}
+                      />
+                      <span>
+                        <span className="font-medium">{label}</span>
+                        <span className="ml-1.5 text-gray-400 text-[11px]">{desc}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button className="ui-btn px-3 py-1.5 text-sm" onClick={() => setEditFor(null)}>Cancel</button>

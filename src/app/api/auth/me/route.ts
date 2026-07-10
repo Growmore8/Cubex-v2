@@ -10,10 +10,15 @@ export async function GET() {
   // brand shown in the app header — tenant's brand name/logo (never "CubeX" for a tenant)
   let brand: { name: string; logoUrl: string | null } = { name: process.env.APP_NAME || "CubeX", logoUrl: null };
   let trial: { active: boolean; daysLeft: number; endsAt: string | null } | null = null;
+  let features: Record<string, boolean> = {};
   if (s.tenantId) {
     try {
-      const t = await prisma.tenant.findUnique({ where: { id: s.tenantId }, select: { name: true, brandName: true, logoUrl: true, swapEnabled: true } });
-      if (t) { brand = { name: t.brandName || t.name, logoUrl: t.logoUrl }; (brand as any).swapEnabled = !!(t as any).swapEnabled; }
+      const t = await prisma.tenant.findUnique({ where: { id: s.tenantId }, select: { name: true, brandName: true, logoUrl: true, swapEnabled: true, features: true } as any }) as any;
+      if (t) {
+        brand = { name: t.brandName || t.name, logoUrl: t.logoUrl };
+        (brand as any).swapEnabled = !!(t as any).swapEnabled;
+        features = ((t.features as Record<string, boolean>) || {});
+      }
       const sub = await prisma.subscription.findUnique({ where: { tenantId: s.tenantId }, select: { status: true, endsAt: true } });
       if (sub && sub.status === "TRIALING" && sub.endsAt) {
         const msLeft = new Date(sub.endsAt).getTime() - Date.now();
@@ -28,5 +33,6 @@ export async function GET() {
     brand,
     trial,
     swapEnabled: (brand as any).swapEnabled ?? true,
+    features,
   });
 }

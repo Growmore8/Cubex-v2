@@ -42,6 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (b.allowRegistration !== undefined && currentSub?.status !== "TRIALING") data.allowRegistration = !!b.allowRegistration;
       if (currentSub?.status === "TRIALING") data.allowRegistration = false;
       if (b.swapEnabled !== undefined) data.swapEnabled = !!b.swapEnabled;
+      if (b.features && typeof b.features === "object") data.features = b.features;
       await prisma.tenant.update({ where: { id: t.id }, data });
       // Plan can also be changed here; seats follow the (live) package limit.
       if (b.plan) {

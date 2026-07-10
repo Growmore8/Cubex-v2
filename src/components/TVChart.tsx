@@ -98,6 +98,7 @@ export default function TVChart({
   const positionsRef   = useRef(positions); positionsRef.current = positions;
   const allBarsRef     = useRef<Bar[]>([]);
   const ohlcOverlayRef = useRef<HTMLDivElement | null>(null);
+  const mousePosRef    = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const bareRef        = useRef(bare); bareRef.current = bare;
 
   // Debounce coalesces rapid price-tick renders; version counter discards stale callbacks.
@@ -143,17 +144,36 @@ export default function TVChart({
           } catch {}
         };
 
-        // Right-aligned price label — same visual style as LW chart's createPriceLine title.
-        // horzLabelsAlign:"right" pins the label to the right edge (near price axis).
+        // Colored filled label box near price axis — createPositionLine gives a native TV
+        // colored body box (matching LW chart's createPriceLine style). Empty quantity hides
+        // the left MT5-style box. Falls back to addShape if createPositionLine is unavailable.
         const makeLine = async (
           price: number, body: string, lineColor: string, bg: string, lineStyle: number, lineWidth: number,
         ) => {
-          await addShape(price, {
-            linecolor: lineColor, linewidth: lineWidth, linestyle: lineStyle,
-            showLabel: true, text: body, textcolor: "#fff",
-            fillBackground: true, backgroundColor: bg, backgroundTransparency: 0,
-            horzLabelsAlign: "right",
-          });
+          try {
+            const raw = (chart as any).createPositionLine?.();
+            if (raw == null) throw new Error("n/a");
+            const pl: any = (raw && typeof (raw as any).then === "function") ? await raw : raw;
+            if (!pl?.setPrice) throw new Error("invalid");
+            if (drawSeqRef.current !== seq) { try { pl.remove(); } catch {}; return; }
+            pl.setPrice(price)
+              .setQuantity("")
+              .setText(body)
+              .setLineColor(lineColor)
+              .setLineStyle(lineStyle)
+              .setLineWidth(lineWidth)
+              .setBodyBackgroundColor(bg)
+              .setBodyTextColor("#fff")
+              .setBodyBorderColor(bg);
+            linesRef.current.push({ remove: () => { try { pl.remove(); } catch {} } });
+          } catch {
+            await addShape(price, {
+              linecolor: lineColor, linewidth: lineWidth, linestyle: lineStyle,
+              showLabel: true, text: body, textcolor: "#fff",
+              fillBackground: true, backgroundColor: bg, backgroundTransparency: 0,
+              horzLabelsAlign: "right",
+            });
+          }
         };
 
         for (const p of positionsRef.current || []) {
@@ -431,9 +451,9 @@ export default function TVChart({
           const cont = el.parentElement;
           const cw = cont ? cont.clientWidth : 500, ch = cont ? cont.clientHeight : 500;
           const TW = 172, TH = 92;
-          // param.point is relative to chart pane; add header/toolbar offsets for non-bare charts
-          const offX = bareRef.current ? 0 : 40, offY = bareRef.current ? 0 : 38;
-          const cx = (param.point.x ?? 0) + offX, cy = (param.point.y ?? 0) + offY;
+          // Use actual DOM mouse position (tracked via onMouseMove on the wrapper) — avoids
+          // the brittle header/toolbar offset calculation from param.point.
+          const cx = mousePosRef.current.x, cy = mousePosRef.current.y;
           const x = cx + 14 + TW > cw ? Math.max(0, cx - TW - 8) : cx + 14;
           const y = cy + 10 + TH > ch ? Math.max(0, cy - TH - 6) : cy + 10;
           el.style.left = x + "px"; el.style.top = y + "px"; el.style.display = "block";
@@ -543,7 +563,14 @@ export default function TVChart({
   }, [positions, symbol, digits, spreadPips]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ position: "absolute", inset: 0 }}>
+    <div
+      style={{ position: "absolute", inset: 0 }}
+      onMouseMove={(e) => {
+        const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+        mousePosRef.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+      }}
+      onMouseLeave={() => { if (ohlcOverlayRef.current) ohlcOverlayRef.current.style.display = "none"; }}
+    >
       <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
       <div ref={ohlcOverlayRef} style={{
         display: "none", position: "absolute", pointerEvents: "none", zIndex: 10,

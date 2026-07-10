@@ -51,6 +51,7 @@ export async function GET() {
       createdAt: t.createdAt,
       allowRegistration: t.allowRegistration,
       swapEnabled: !!t.swapEnabled,
+      features: (t.features as Record<string, boolean>) || {},
     };
   }));
 

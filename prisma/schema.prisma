@@ -27,6 +27,7 @@ model Tenant {
   smtpPassword String?
   smtpHost     String? // explicit SMTP server (e.g. mail.privateemail.com); blank = auto-detect from email domain
   permissions  Json          @default("{}")
+  features     Json          @default("{}") // SuperAdmin feature flags per tenant (copyTrading, etc.)
   allowRegistration Boolean   @default(true) // show the client Register link on this tenant's login
   swapEnabled  Boolean       @default(false) // SuperAdmin controls: enables overnight swap charges for this tenant
   subscription     Subscription?
