@@ -1825,36 +1825,45 @@ export default function ClientMobile({ t }: { t: any }) {
         </div>
       )}
 
-      {/* BOTTOM NAV — floating pill */}
+      {/* BOTTOM NAV — flat full-width iOS style */}
       {!chartFs && (
-        <div style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom))", paddingLeft: 10, paddingRight: 10, paddingTop: 6, flexShrink: 0 }}>
-          <div style={{
-            background: theme === "dark" ? "rgba(14,18,30,0.90)" : "rgba(248,250,255,0.92)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
-            borderRadius: 22,
-            border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.07)"}`,
-            boxShadow: theme === "dark" ? "0 4px 28px rgba(0,0,0,0.55), inset 0 0.5px 0 rgba(255,255,255,0.06)" : "0 4px 20px rgba(0,0,0,0.13), inset 0 0.5px 0 rgba(255,255,255,0.9)",
-            padding: "3px 4px",
-          }}>
-            <div className="flex items-stretch justify-around">
-              {navItems.map(([k, icon, label]) => {
-                const active = tab === k;
-                const col = active ? A1 : "var(--muted)";
-                const badge = k === "trades" && (positions || []).length > 0 ? (positions || []).length : k === "account" && needKyc ? "!" : null;
-                return (
-                  <button key={k} onClick={() => startTransition(() => setTab(k as any))} aria-label={label}
-                    className="relative flex flex-1 flex-col items-center gap-0.5 py-1.5 active:opacity-70">
-                    <span className="absolute inset-x-1 top-0.5 bottom-0.5 rounded-[18px] transition-all duration-300" style={{ background: active ? `${A1}1a` : "transparent" }} />
-                    <span className="relative flex items-center justify-center">
-                      <i className={`fa-solid ${icon}`} style={{ fontSize: 18, color: col, transition: "color .2s, transform .25s cubic-bezier(.34,1.56,.64,1)", transform: active ? "scale(1.14)" : "scale(1)" }} />
-                      {badge && <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white" style={{ background: badge === "!" ? "#f59e0b" : A1, border: "1.5px solid var(--bg)" }}>{badge}</span>}
-                    </span>
-                    <span className="relative text-[9px] font-bold tracking-wide" style={{ color: col, transition: "color .2s" }}>{label}</span>
-                  </button>
-                );
-              })}
-            </div>
+        <div style={{
+          flexShrink: 0,
+          background: "var(--panel)",
+          borderTop: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.07)"}`,
+          paddingBottom: "max(6px, env(safe-area-inset-bottom))",
+          paddingTop: 6,
+        }}>
+          <div className="flex items-stretch justify-around">
+            {navItems.map(([k, icon, label]) => {
+              const active = tab === k;
+              const badge = k === "trades" && (positions || []).length > 0 ? (positions || []).length : k === "account" && needKyc ? "!" : null;
+              return (
+                <button key={k} onClick={() => startTransition(() => setTab(k as any))} aria-label={label}
+                  className="relative flex flex-1 flex-col items-center gap-[3px] py-1 active:scale-95 transition-transform duration-100">
+                  <span className="relative flex items-center justify-center">
+                    <i className={`fa-solid ${icon}`} style={{
+                      fontSize: 20,
+                      color: active ? A1 : (theme === "dark" ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.28)"),
+                      transition: "color .18s",
+                    }} />
+                    {badge && (
+                      <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-bold text-white"
+                        style={{ background: badge === "!" ? "#f59e0b" : A1, border: "1.5px solid var(--panel)" }}>
+                        {badge}
+                      </span>
+                    )}
+                  </span>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: active ? 700 : 500,
+                    color: active ? A1 : (theme === "dark" ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.28)"),
+                    letterSpacing: active ? "0.01em" : "0",
+                    transition: "color .18s, font-weight .18s",
+                  }}>{label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
