@@ -795,9 +795,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
                       <div className="text-[11px] font-bold tracking-[0.2em]" style={{ color: "rgba(26,29,33,0.85)" }}>{(brand?.name || "").toUpperCase() || "TRADING"}</div>
-                      {cIsLive
-                        ? <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "#166534" }}><span className="cp-live-dot" />Live</span>
-                        : <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(26,29,33,0.12)", color: "#1a1d21" }}>Demo</span>}
+                      <span className="rounded-full px-2 py-0.5 text-[8px] font-bold" style={{ background: "rgba(26,29,33,0.12)", color: "#1a1d21" }}>{account?.type}</span>
                     </div>
                     <svg width="36" height="28" viewBox="0 0 24 22" fill="none">
                       <circle cx="3.5" cy="11" r="2" fill="rgba(26,29,33,0.68)" />

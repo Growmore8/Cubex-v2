@@ -68,11 +68,6 @@
   50%  { background-position: 100% 91%; }
   100% { background-position: 0% 10%; }
 }
-@keyframes cpLivePulse {
-  0%   { box-shadow: 0 0 0 0 rgba(23,201,100,.55); }
-  70%  { box-shadow: 0 0 0 8px rgba(23,201,100,0); }
-  100% { box-shadow: 0 0 0 0 rgba(23,201,100,0); }
-}
 .cp-card {
   background-color: #2a292d;
   background-size: 100% 100%;
@@ -103,13 +98,8 @@
   z-index: 2;
   pointer-events: none;
 }
-.cp-live-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: #17c964;
-  animation: cpLivePulse 1.8s infinite;
-  flex-shrink: 0;
-}
 @media (prefers-reduced-motion: reduce) {
-  .cp-card, .cp-card::after, .cp-live-dot { animation: none !important; }
+  .cp-card, .cp-card::after { animation: none !important; }
 }
 
 /* ---- iOS "Liquid Glass" surfaces + nav ---- */
