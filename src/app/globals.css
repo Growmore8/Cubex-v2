@@ -60,9 +60,9 @@
 
 /* ---- CodePen card (trilm/raBGaQQ) ---- */
 @keyframes cpCardBg {
-  0%   { background-size: 100% auto; background-position: 50% 50%; }
-  60%  { background-size: 111% auto; background-position: 60% 60%; }
-  100% { background-size: 100% auto; background-position: 50% 50%; }
+  0%   { background-size: 100% 100%; background-position: 50% 50%; }
+  60%  { background-size: 114% 114%; background-position: 60% 60%; }
+  100% { background-size: 100% 100%; background-position: 50% 50%; }
 }
 @keyframes cpCardShimmer {
   0%   { background-position: 0% 10%; }
@@ -70,10 +70,11 @@
   100% { background-position: 0% 10%; }
 }
 .cp-card {
-  background-size: 100% auto;
+  background-size: 100% 100%;
   background-position: 50% 50%;
   animation: cpCardBg 10s ease-in-out infinite;
   transform: translateZ(0);
+  will-change: background-size, background-position;
 }
 .cp-card::before {
   content: "";
@@ -90,10 +91,10 @@
   inset: 0;
   border-radius: 20px;
   background:
-    linear-gradient(120deg, rgba(255,255,255,0.02) 30%, rgba(255,255,255,0.25) 40%, rgba(255,255,255,0.08) 40%),
-    linear-gradient(0deg, rgba(255,255,255,0.20), rgba(255,255,255,0.30));
-  background-size: 150% 150%;
-  animation: cpCardShimmer 45s ease-in-out infinite;
+    linear-gradient(120deg, rgba(255,255,255,0.04) 28%, rgba(255,255,255,0.52) 40%, rgba(255,255,255,0.12) 52%),
+    linear-gradient(0deg, rgba(255,255,255,0.22), rgba(255,255,255,0.38));
+  background-size: 200% 200%;
+  animation: cpCardShimmer 20s ease-in-out infinite;
   transform: translateZ(0);
   z-index: 2;
   pointer-events: none;

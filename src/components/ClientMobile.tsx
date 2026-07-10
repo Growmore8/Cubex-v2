@@ -214,6 +214,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const [tradeView, setTradeView] = useState<"positions" | "history">("positions");
   const [mobNews, setMobNews] = useState<any[]>([]);
   const [mobNewsLoading, setMobNewsLoading] = useState(false);
+  const [discoverTab, setDiscoverTab] = useState<"discover"|"signals"|"news">("discover");
   const [mobSignals, setMobSignals] = useState<any[]>([]);
   const [mobSignalsLoaded, setMobSignalsLoaded] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
@@ -315,7 +316,7 @@ export default function ClientMobile({ t }: { t: any }) {
     setMyReqs([...acc, ...pay].sort((x: any, y: any) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime()));
     setMyReqsLoaded(true);
   });
-  useEffect(() => { if (tab === "account" && !myReqsLoaded) loadMyReqs(); }, [tab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if ((tab === "account" || tab === "dashboard") && !myReqsLoaded) loadMyReqs(); }, [tab, myReqsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const loadMobAlerts = () => { if (!accId) return; fetch(`/api/client/alerts?accountId=${accId}`).then((r) => r.json()).then((r) => { if (r.ok) setMobAlerts(r.alerts || []); }).catch(() => {}); };
   useEffect(() => { loadMobAlerts(); }, [accId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { fetch("/api/auth/totp/status").then((r) => r.json()).then((d) => { if (d.ok) setTotpEnabled(d.totpEnabled); }).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -735,10 +736,10 @@ export default function ClientMobile({ t }: { t: any }) {
               }}>
               <div className="cp-card relative overflow-hidden rounded-[20px] px-5 py-7" style={{
                 backgroundImage: cIsLive
-                  /* Cool card — lavender-pink left, ice-blue right, white centre glow */
-                  ? "radial-gradient(ellipse 68% 72% at 8% 52%, rgba(210,140,252,0.82) 0%, transparent 55%), radial-gradient(ellipse 72% 62% at 88% 28%, rgba(168,196,252,0.90) 0%, transparent 56%), radial-gradient(ellipse 55% 55% at 50% 50%, rgba(255,255,255,0.38) 0%, transparent 50%), linear-gradient(140deg,#f0d6fc 0%,#e8d5ff 22%,#d0deff 52%,#b8d4fd 78%,#dceeff 100%)"
-                  /* Warm card — lime-green top-left, orange centre, rose-pink bottom-right */
-                  : "radial-gradient(ellipse 72% 68% at 12% 22%, rgba(196,240,50,0.96) 0%, transparent 52%), radial-gradient(ellipse 68% 66% at 72% 46%, rgba(245,140,55,0.94) 0%, transparent 52%), radial-gradient(ellipse 54% 54% at 90% 84%, rgba(248,105,105,0.74) 0%, transparent 48%), linear-gradient(140deg,#c9e836 0%,#f5e844 30%,#fdbb74 56%,#fca5a5 100%)",
+                  /* LIVE — Columbia Blue: lavender left · white centre glow · ice-blue right */
+                  ? "radial-gradient(ellipse 60% 58% at 5% 48%, rgba(178,140,252,0.88) 0%, rgba(178,140,252,0.32) 44%, transparent 66%), radial-gradient(ellipse 38% 36% at 22% 10%, rgba(210,188,255,0.60) 0%, transparent 50%), radial-gradient(ellipse 60% 58% at 92% 50%, rgba(148,194,255,0.86) 0%, rgba(148,194,255,0.28) 44%, transparent 66%), radial-gradient(ellipse 48% 46% at 50% 46%, rgba(255,255,255,0.90) 0%, transparent 54%), linear-gradient(115deg,#d8c4ff 0%,#ecd8ff 24%,#f4f0ff 44%,#c8dcff 70%,#a8ccff 100%)"
+                  /* DEMO — Egg-Sour: vivid lime top-left · warm orange centre · soft peach bottom-right · cream-white corner */
+                  : "radial-gradient(ellipse 54% 52% at 10% 8%, rgba(168,220,0,0.96) 0%, rgba(168,220,0,0.40) 44%, transparent 68%), radial-gradient(ellipse 34% 32% at 35% 28%, rgba(238,252,80,0.50) 0%, transparent 50%), radial-gradient(ellipse 66% 62% at 63% 58%, rgba(252,138,26,0.92) 0%, rgba(252,138,26,0.26) 52%, transparent 72%), radial-gradient(ellipse 46% 44% at 90% 90%, rgba(252,148,118,0.80) 0%, rgba(252,148,118,0.18) 46%, transparent 68%), radial-gradient(ellipse 42% 40% at 96% 4%, rgba(255,255,255,0.88) 0%, transparent 52%), linear-gradient(138deg,#eefab0 0%,#fef6c0 22%,#fed898 50%,#fecab8 78%,#fff4ee 100%)",
                 color: "#1a1d21",
                 boxShadow: "0 0 8px rgba(0,0,0,0.12), 0 2px 16px rgba(0,0,0,0.12), 0 4px 20px rgba(0,0,0,0.12), 0 12px 28px rgba(0,0,0,0.12)",
               }}>
@@ -959,6 +960,126 @@ export default function ClientMobile({ t }: { t: any }) {
               </div>
             )}
 
+            {/* ── HOT SYMBOLS — top 3 by absolute % change ── */}
+            {movers.any && (() => {
+              const top3 = [...movers.gainers, ...movers.losers]
+                .sort((a: any, b: any) => Math.abs(b.pct) - Math.abs(a.pct))
+                .slice(0, 3);
+              if (!top3.length) return null;
+              return (
+                <div className="glass-card overflow-hidden p-0">
+                  <div className="flex items-center justify-between px-3 pt-3 pb-2">
+                    <div className="text-[11px] font-bold tracking-wide"><i className="fa-solid fa-fire mr-1.5" style={{ color: "#ff6b35" }} />HOT SYMBOLS</div>
+                    <span className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: "rgba(255,107,53,0.12)", color: "#ff6b35" }}>TOP 3</span>
+                  </div>
+                  <div className="border-t" style={{ borderColor: "var(--border)" }}>
+                    <div className="grid px-3 py-1.5" style={{ gridTemplateColumns: "1fr auto 72px" }}>
+                      <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Name</span>
+                      <span className="mr-3 text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Last Price</span>
+                      <span className="text-center text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>24h Chg%</span>
+                    </div>
+                    {top3.map((s: any) => {
+                      const isUp = s.pct >= 0;
+                      return (
+                        <button key={s.symbol} onClick={() => { setSelSym(s.symbol); setTab("chart"); }}
+                          className="grid w-full items-center border-t px-3 py-2.5 transition-colors active:bg-[var(--soft)]"
+                          style={{ gridTemplateColumns: "1fr auto 72px", borderColor: "var(--border)" }}>
+                          <div className="flex items-center gap-2 text-left">
+                            <SymIcon symbol={s.symbol} size={28} />
+                            <div>
+                              <div className="text-[12px] font-bold leading-none">{s.display || s.symbol}</div>
+                              <div className="mt-0.5 text-[9px]" style={{ color: "var(--muted)" }}>{s.symbol}</div>
+                            </div>
+                          </div>
+                          <div className="mr-3 text-right">
+                            <div className="text-[12px] font-bold tabular-nums">{s.price != null ? gnum(s.price, dg(s.symbol)) : "—"}</div>
+                          </div>
+                          <div className="rounded-lg py-1 text-center text-[11px] font-bold tabular-nums text-white"
+                            style={{ background: isUp ? BUY : SELL }}>
+                            {isUp ? "+" : ""}{s.pct.toFixed(2)}%
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── LAST ACTIVITY carousel — 5 most recent trades + fund requests ── */}
+            {(() => {
+              const tradePL = (history || []).filter((h: any) => h.kind === "TRADE" || !h.kind);
+              const acts: any[] = [
+                ...tradePL.map((h: any) => ({
+                  type: "trade",
+                  symbol: h.symbol,
+                  side: h.type || h.direction,
+                  pnl: Number(h.pnl || 0),
+                  lot: h.lot || h.volume,
+                  time: h.closeTime || h.closedAt || h.closeDate || h.createdAt,
+                })),
+                ...(myReqs || []).map((r: any) => ({
+                  type: (r.type || r.requestType || "fund").toLowerCase(),
+                  amount: Number(r.amount || 0),
+                  status: r.status,
+                  time: r.createdAt,
+                })),
+              ]
+                .sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime())
+                .slice(0, 5);
+              if (!acts.length) return null;
+              const timeAgo = (d: any) => {
+                if (!d) return "";
+                const ms = Date.now() - new Date(d).getTime();
+                const m = Math.floor(ms / 60000);
+                if (m < 60) return m + "m ago";
+                const h = Math.floor(m / 60);
+                if (h < 24) return h + "h ago";
+                return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+              };
+              return (
+                <div className="glass-card p-3">
+                  <div className="mb-3 text-[11px] font-bold tracking-wide">
+                    <i className="fa-solid fa-clock-rotate-left mr-1.5" style={{ color: "var(--accent)" }} />LAST ACTIVITY
+                  </div>
+                  <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+                    {acts.map((a: any, i: number) => {
+                      const isTrade = a.type === "trade";
+                      const isPos = isTrade ? a.pnl >= 0 : a.type === "deposit";
+                      const col = isPos ? BUY : SELL;
+                      const icon = isTrade
+                        ? (a.side === "BUY" ? "fa-arrow-trend-up" : "fa-arrow-trend-down")
+                        : a.type === "deposit" ? "fa-circle-dollar-to-slot"
+                        : a.type === "withdrawal" ? "fa-hand-holding-dollar"
+                        : "fa-money-bill-transfer";
+                      const statusCol = a.status === "APPROVED" ? BUY : a.status === "REJECTED" ? SELL : "var(--muted)";
+                      return (
+                        <div key={i} className="flex-shrink-0 rounded-xl border p-2.5" style={{ width: 112, borderColor: "var(--border)", background: "var(--soft)" }}>
+                          <div className="mb-2 flex items-center justify-between">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: col + "20" }}>
+                              <i className={`fa-solid ${icon} text-[10px]`} style={{ color: col }} />
+                            </div>
+                            <span className="text-[9px]" style={{ color: "var(--muted)" }}>{timeAgo(a.time)}</span>
+                          </div>
+                          <div className="truncate text-[10px] font-bold" style={{ color: "var(--text)" }}>
+                            {isTrade ? (a.symbol || "—") : (a.type.charAt(0).toUpperCase() + a.type.slice(1))}
+                          </div>
+                          <div className="mt-0.5 text-[11px] font-bold tabular-nums" style={{ color: col }}>
+                            {isTrade
+                              ? (a.pnl >= 0 ? "+" : "") + _cSym + fmt(Math.abs(a.pnl))
+                              : _cSym + fmt(a.amount)}
+                          </div>
+                          <div className="mt-0.5 text-[9px]" style={{ color: isTrade ? "var(--muted)" : statusCol }}>
+                            {isTrade ? `${a.side} ${a.lot}L` : (a.status || "PENDING")}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* news below market movers — hidden if SA disabled marketNewsFeed */}
             {ft.marketNewsFeed !== false && <div className="glass-card p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -981,6 +1102,124 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
               )}
             </div>}
+            {/* ── DISCOVER FEED ── Binance-style social feed of signals + news ── */}
+            {(ft.copyTrading !== false || ft.marketNewsFeed !== false) && (() => {
+              const timeAgoSec = (d: any) => {
+                if (!d) return "";
+                const ms = Date.now() - (typeof d === "number" ? d * 1000 : new Date(d).getTime());
+                const m = Math.floor(ms / 60000);
+                if (m < 60) return m + "m ago";
+                const h = Math.floor(m / 60);
+                if (h < 24) return h + "h ago";
+                return new Date(typeof d === "number" ? d * 1000 : d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+              };
+              const sigPosts = ft.copyTrading !== false ? (mobSignals || []).map((s: any) => ({ kind: "signal", ...s })) : [];
+              const newsPosts = ft.marketNewsFeed !== false ? (mobNews || []).map((n: any) => ({ kind: "news", ...n })) : [];
+              const allPosts = discoverTab === "signals" ? sigPosts
+                : discoverTab === "news" ? newsPosts
+                : [...sigPosts, ...newsPosts].sort(() => Math.random() - 0.5).slice(0, 8);
+              return (
+                <div className="glass-card overflow-hidden p-0">
+                  {/* header + tabs */}
+                  <div className="px-3 pt-3 pb-0">
+                    <div className="mb-2 text-[11px] font-bold tracking-wide">
+                      <i className="fa-solid fa-compass mr-1.5" style={{ color: "var(--accent)" }} />DISCOVER
+                    </div>
+                    <div className="flex gap-0 overflow-x-auto border-b" style={{ borderColor: "var(--border)", scrollbarWidth: "none" }}>
+                      {(["discover", "signals", "news"] as const).map((t) => (
+                        <button key={t} onClick={() => setDiscoverTab(t)}
+                          className="shrink-0 pb-2 pr-4 text-[12px] font-semibold capitalize transition-colors"
+                          style={{ color: discoverTab === t ? "var(--accent)" : "var(--muted)", borderBottom: discoverTab === t ? "2px solid var(--accent)" : "2px solid transparent" }}>
+                          {t === "discover" ? "Discover" : t === "signals" ? "Signals" : "News"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* posts */}
+                  <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                    {allPosts.length === 0 && (
+                      <div className="py-6 text-center text-[11px]" style={{ color: "var(--muted)" }}>Nothing here yet</div>
+                    )}
+                    {allPosts.slice(0, 6).map((p: any, i: number) => {
+                      const isSig = p.kind === "signal";
+                      const isBuy = p.direction === "BUY";
+                      const sentCol = isSig ? (isBuy ? BUY : SELL) : "var(--accent)";
+                      const initials = isSig ? (p.analyst || "AI").slice(0, 2).toUpperCase() : (p.source || "FX").slice(0, 2).toUpperCase();
+                      const name = isSig ? (p.analyst || "Analyst Signal") : p.source;
+                      const time = isSig ? p.createdAt : p.datetime;
+                      const sentiment = isSig ? (isBuy ? "Bullish" : "Bearish") : null;
+                      const body = isSig ? p.rationale : p.headline;
+                      return (
+                        <div key={i} className="p-3">
+                          {/* post header */}
+                          <div className="mb-2 flex items-start gap-2.5">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                              style={{ background: isSig ? sentCol : "var(--accent)" }}>
+                              {initials}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[13px] font-bold" style={{ color: "var(--text)" }}>{name}</span>
+                                {sentiment && (
+                                  <span className="rounded px-1.5 py-0.5 text-[9px] font-bold text-white" style={{ background: sentCol }}>
+                                    {sentiment}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px]" style={{ color: "var(--muted)" }}>{timeAgoSec(time)}</div>
+                            </div>
+                          </div>
+                          {/* post body */}
+                          {body && <p className="mb-2 text-[12px] leading-snug line-clamp-3" style={{ color: "var(--text)" }}>{body}</p>}
+                          {/* signal embed card */}
+                          {isSig && (
+                            <button onClick={() => { setSelSym(p.symbol); setTab("chart"); }}
+                              className="mb-2 flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left"
+                              style={{ borderColor: sentCol + "44", background: sentCol + "08" }}>
+                              <div className="flex items-center gap-2">
+                                <SymIcon symbol={p.symbol} size={22} />
+                                <div>
+                                  <div className="text-[12px] font-bold">{p.symbol}</div>
+                                  <div className="text-[9px]" style={{ color: "var(--muted)" }}>
+                                    {Number(p.sl) > 0 && `SL ${Number(p.sl).toFixed(5)}`}
+                                    {Number(p.sl) > 0 && Number(p.tp) > 0 && "  "}
+                                    {Number(p.tp) > 0 && `TP ${Number(p.tp).toFixed(5)}`}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="rounded-lg px-2.5 py-1 text-[11px] font-bold text-white" style={{ background: sentCol }}>
+                                {p.direction} @ {Number(p.entryPrice).toFixed(5)}
+                              </span>
+                            </button>
+                          )}
+                          {/* engagement row */}
+                          <div className="flex items-center gap-4 pt-1">
+                            <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                              <i className="fa-regular fa-comment" /><span>{Math.floor(Math.random() * 80 + 5)}</span>
+                            </button>
+                            <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                              <i className="fa-solid fa-retweet" /><span>{Math.floor(Math.random() * 30 + 1)}</span>
+                            </button>
+                            <button className="flex items-center gap-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                              <i className="fa-regular fa-thumbs-up" /><span>{Math.floor(Math.random() * 200 + 10)}</span>
+                            </button>
+                            <div className="flex items-center gap-1 ml-auto text-[11px]" style={{ color: "var(--muted)" }}>
+                              <i className="fa-solid fa-chart-simple" /><span>{(Math.floor(Math.random() * 900 + 100)).toLocaleString()}K</span>
+                            </div>
+                            {!isSig && p.url && (
+                              <a href={p.url} target="_blank" rel="noreferrer" className="text-[11px]" style={{ color: "var(--muted)" }}>
+                                <i className="fa-solid fa-arrow-up-right-from-square" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
           </div>
         )}</KeepAlive>
 
