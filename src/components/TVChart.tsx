@@ -191,23 +191,29 @@ export default function TVChart({
           }
         };
 
+        // Build all position-line promises in parallel — avoids sequential await
+        // delay when many trades are open (each createPositionLine may round-trip).
+        const linePromises: Promise<void>[] = [];
         for (const p of positionsRef.current || []) {
           if (drawSeqRef.current !== seq) return;
           const isBuy  = p.type === "BUY";
           const isPend = !!p.kind;
           const color  = isPend ? "#f59e0b" : (isBuy ? "#2962ff" : "#f23645");
-          const tkt   = p.ticket != null ? String(p.ticket) : "";
+          const tkt    = p.ticket != null ? String(p.ticket) : "";
           const priceStr = fmt(p.openPrice);
           const label = !isPend && tkt
             ? `#${p.type} ${tkt}  ${priceStr}`
             : `${p.kind ? p.kind + " " : ""}${p.type} ${Number(p.lots).toFixed(2)}  ${priceStr}`;
 
-          await makeLine(p.openPrice, label, color, color, isPend ? 2 : 0, isPend ? 1 : 2);
+          // Width 3 for main line — makes it bleed through fat candle bodies (TV always
+          // renders position lines below candles; wider line = more visible at overlap).
+          linePromises.push(makeLine(p.openPrice, label, color, color, isPend ? 2 : 0, isPend ? 1 : 3));
           if (p.sl && p.sl > 0)
-            await makeLine(p.sl, `SL  ${fmt(p.sl)}`, "#f43f5e", "#f43f5e", 2, 1);
+            linePromises.push(makeLine(p.sl, `SL  ${fmt(p.sl)}`, "#f43f5e", "#f43f5e", 2, 1));
           if (p.tp && p.tp > 0)
-            await makeLine(p.tp, `TP  ${fmt(p.tp)}`, "#10b981", "#10b981", 2, 1);
+            linePromises.push(makeLine(p.tp, `TP  ${fmt(p.tp)}`, "#10b981", "#10b981", 2, 1));
         }
+        await Promise.all(linePromises);
 
         // Ask spread line — teal dotted, minimal label so it doesn't crowd position labels
         if (spreadRef.current > 0 && lastBarRef.current && drawSeqRef.current === seq) {
@@ -221,7 +227,7 @@ export default function TVChart({
           });
         }
       } catch {}
-    }, 150);
+    }, 30);
   };
 
   // ── Build and mount the widget (once per mount) ──────────────────────────────
