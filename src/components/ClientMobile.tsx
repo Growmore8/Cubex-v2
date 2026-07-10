@@ -472,29 +472,10 @@ export default function ClientMobile({ t }: { t: any }) {
     setModifyId(null); setExpanded(null);
   };
 
-  // Account-card palette — FIXED premium dark gradients from the reference cards
   const cIsLive = account?.type === "LIVE";
   const cardDark = theme === "dark";
-  // Interactive-card fluid-art backgrounds.
-  // DEMO = maroon/pink/cream (exact match to reference image).
-  // LIVE = deep navy/cyan/indigo (same fluid-art style, blue palette).
-  const cardFrontBg = cIsLive
-    ? [
-        "radial-gradient(ellipse at 22% 75%, rgba(6,182,212,0.88) 0%, transparent 48%)",
-        "radial-gradient(ellipse at 80% 20%, rgba(55,80,230,0.82) 0%, transparent 44%)",
-        "radial-gradient(ellipse at 55% 50%, rgba(14,165,233,0.48) 0%, transparent 42%)",
-        "radial-gradient(ellipse at 65% 70%, rgba(160,230,255,0.20) 0%, transparent 32%)",
-        "linear-gradient(145deg, #030c1c 0%, #060f28 55%, #04091a 100%)",
-      ].join(",")
-    : [
-        // Deep maroon base with pink/rose fluid swirls + cream centre highlight
-        "radial-gradient(ellipse at 50% 52%, rgba(245,215,185,0.28) 0%, transparent 30%)",
-        "radial-gradient(ellipse at 28% 68%, rgba(200,45,85,0.90) 0%, transparent 46%)",
-        "radial-gradient(ellipse at 76% 24%, rgba(160,20,55,0.85) 0%, transparent 42%)",
-        "radial-gradient(ellipse at 55% 42%, rgba(230,90,120,0.50) 0%, transparent 38%)",
-        "radial-gradient(ellipse at 15% 20%, rgba(110,10,30,0.70) 0%, transparent 35%)",
-        "linear-gradient(145deg, #2a0610 0%, #3d0c1a 50%, #220408 100%)",
-      ].join(",");
+  // Solid dark base — fluid art blobs are rendered as JSX inside the card.
+  const cardBaseBg = cIsLive ? "#030c1c" : "#180308";
 
   return (
     <>
@@ -679,19 +660,32 @@ export default function ClientMobile({ t }: { t: any }) {
                 else if (dx > 0 && cur > 0) switchAcc(ids[cur - 1]);
               }}>
               <div className="relative overflow-hidden rounded-[20px] p-5 text-white" style={{
-                background: cardFrontBg,
+                background: cardBaseBg,
                 border: `1px solid ${cIsLive ? "rgba(6,182,212,0.22)" : "rgba(200,45,85,0.28)"}`,
                 boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
               }}>
-                <WorldMapBg opacity={0.16} />
-                <div className="card-sheen pointer-events-none absolute inset-0" />
-                {/* Interactive-card signature circle ring decorations */}
-                <svg className="pointer-events-none absolute" width="210" height="180" viewBox="0 0 210 180" fill="none" style={{ top: -24, right: -24, opacity: 0.15 }}>
-                  <circle cx="145" cy="58" r="98" stroke="white" strokeWidth="1.5" />
-                  <circle cx="170" cy="28" r="72" stroke="white" strokeWidth="1" />
-                </svg>
-                {/* Thin accent top bar matching card color */}
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ background: cIsLive ? "linear-gradient(90deg, transparent, rgba(6,182,212,0.8), transparent)" : "linear-gradient(90deg, transparent, rgba(220,80,110,0.85), transparent)" }} />
+                {/* Fluid-art blob layer — organic shapes + blur = liquid painting look */}
+                <div className="pointer-events-none absolute inset-0" style={{ zIndex: 0 }}>
+                  {cIsLive ? (<>
+                    {/* LIVE — ocean blue / cyan / electric indigo */}
+                    <div style={{ position:"absolute", width:"75%", height:"90%", top:"5%", left:"-15%", background:"rgba(6,155,210,0.88)", borderRadius:"42% 58% 65% 35% / 45% 52% 48% 55%", filter:"blur(34px)" }} />
+                    <div style={{ position:"absolute", width:"60%", height:"80%", top:"-15%", left:"50%", background:"rgba(55,72,230,0.82)", borderRadius:"68% 32% 48% 52% / 32% 62% 38% 68%", filter:"blur(28px)" }} />
+                    <div style={{ position:"absolute", width:"40%", height:"55%", top:"28%", left:"30%", background:"rgba(160,228,255,0.38)", borderRadius:"55% 45% 38% 62% / 58% 44% 56% 42%", filter:"blur(20px)" }} />
+                    <div style={{ position:"absolute", width:"30%", height:"40%", top:"55%", left:"62%", background:"rgba(8,40,120,0.70)", borderRadius:"50% 50% 70% 30% / 40% 60% 40% 60%", filter:"blur(18px)" }} />
+                  </>) : (<>
+                    {/* DEMO — deep crimson / rose / cream (matches reference photo) */}
+                    <div style={{ position:"absolute", width:"72%", height:"88%", top:"8%", left:"-12%", background:"rgba(185,25,60,0.92)", borderRadius:"42% 58% 62% 38% / 48% 54% 46% 52%", filter:"blur(32px)" }} />
+                    <div style={{ position:"absolute", width:"58%", height:"78%", top:"-18%", left:"48%", background:"rgba(140,12,40,0.88)", borderRadius:"65% 35% 50% 50% / 35% 65% 35% 65%", filter:"blur(26px)" }} />
+                    <div style={{ position:"absolute", width:"42%", height:"58%", top:"22%", left:"28%", background:"rgba(238,95,130,0.52)", borderRadius:"55% 45% 40% 60% / 60% 42% 58% 40%", filter:"blur(20px)" }} />
+                    {/* cream/ivory centre highlight — the "flower" swirl */}
+                    <div style={{ position:"absolute", width:"38%", height:"48%", top:"30%", left:"33%", background:"rgba(248,215,178,0.32)", borderRadius:"50% 50% 55% 45% / 45% 55% 45% 55%", filter:"blur(16px)" }} />
+                    <div style={{ position:"absolute", width:"22%", height:"28%", top:"35%", left:"42%", background:"rgba(255,240,210,0.22)", borderRadius:"50%", filter:"blur(10px)" }} />
+                  </>)}
+                </div>
+                <WorldMapBg opacity={0.08} />
+                <div className="card-sheen pointer-events-none absolute inset-0" style={{ zIndex: 2 }} />
+                {/* Thin accent top bar */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ zIndex: 3, background: cIsLive ? "linear-gradient(90deg, transparent, rgba(6,182,212,0.8), transparent)" : "linear-gradient(90deg, transparent, rgba(220,80,110,0.85), transparent)" }} />
                 <div className="relative flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <div className="text-[11px] font-bold tracking-[0.2em] text-white/90">{(brand?.name || "").toUpperCase() || "TRADING"}</div>
