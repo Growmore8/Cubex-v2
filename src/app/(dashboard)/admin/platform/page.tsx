@@ -5,6 +5,7 @@ import PriceCell from "@/components/PriceCell";
 import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds";
 import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
+import ReferralPanel from "@/components/ReferralPanel";
 import RequestsPanel from "@/components/RequestsPanel";
 import KLineProChart from "@/components/KLineProChart";
 import ManagersModal from "@/components/admin/ManagersModal";
@@ -22,7 +23,7 @@ import { gnum, gmoney, titleCaseName } from "@/lib/format";
 import { ADSS_DARK, ADSS_LIGHT, ADSS_FONT, BUY, SELL, GOLD, BUYBTN, SELLBTN } from "@/config/theme";
 
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
-const TABS: [string, string][] = [["overview", "Overview"], ["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"], ["symbols", "Symbols"], ["groups", "Groups"], ["risk", "Risk"], ["copy", "Copy Trading"], ["signals", "Signals"], ["broadcast", "Broadcast"]];
+const TABS: [string, string][] = [["overview", "Overview"], ["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"], ["symbols", "Symbols"], ["groups", "Groups"], ["risk", "Risk"], ["copy", "Copy Trading"], ["signals", "Signals"], ["broadcast", "Broadcast"], ["referral", "Referral"]];
 
 function pnlOf(p: any, price: number, cs: number) {
   const sym = String(p.symbol || "");
@@ -136,7 +137,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   }, [clients]);
   const sl = 0, tp = 0;
   const [tab, setTab] = useState("trade");
-  const [tabState, setTabState] = useState<Record<string, boolean>>({ overview: true, trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true, requests: true, symbols: true, groups: true, risk: true, copy: true, signals: true, broadcast: true });
+  const [tabState, setTabState] = useState<Record<string, boolean>>({ overview: true, trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true, requests: true, symbols: true, groups: true, risk: true, copy: true, signals: true, broadcast: true, referral: true });
   const [copyRelations, setCopyRelations] = useState<any[]>([]);
   const [copyForm, setCopyForm] = useState({ masterAccId: "", followerAccId: "", ratio: "1.0" });
   const [copyErr, setCopyErr] = useState("");
@@ -1153,9 +1154,10 @@ const [selAcc, setSelAcc] = useState<any>(null);
             <div className="flex flex-1 items-end gap-0.5 overflow-auto">
               {TABS.filter(([k]) =>
                 tabState[k] &&
-                (k !== "audit"   || can("viewAudit")) &&
-                (k !== "copy"    || (features.copyTrading !== false && perms.copyTrading !== false)) &&
-                (k !== "signals" || (features.copyTrading !== false && perms.copyTrading !== false))
+                (k !== "audit"    || can("viewAudit")) &&
+                (k !== "copy"     || (features.copyTrading !== false && perms.copyTrading !== false)) &&
+                (k !== "signals"  || (features.copyTrading !== false && perms.copyTrading !== false)) &&
+                (k !== "referral" || features.referralProgram !== false)
               ).map(([k, lbl]) => {
                 const active = tab === k;
                 return (
@@ -2426,6 +2428,16 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 </div>
               );
             })()}
+
+            {/* ── REFERRAL tab ── */}
+            {tab === "referral" && features.referralProgram !== false && <ReferralPanel />}
+            {tab === "referral" && features.referralProgram === false && (
+              <div className="flex h-full flex-col items-center justify-center gap-2" style={{ color: "var(--muted)" }}>
+                <i className="fa-solid fa-gift text-3xl" />
+                <div className="text-[13px] font-semibold">Referral Program Disabled</div>
+                <div className="text-[11px]">Enable it in Super Admin → Tenant → Feature Flags.</div>
+              </div>
+            )}
 
             {/* ── BROADCAST tab ── */}
             {tab === "broadcast" && (
