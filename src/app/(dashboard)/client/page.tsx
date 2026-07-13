@@ -156,7 +156,6 @@ export default function ClientTerminal() {
   const [pinForm, setPinForm] = useState<any>({});
   const [pinErr, setPinErr] = useState("");
   const [notis, setNotis] = useState<any[]>([]);
-  const [signals, setSignals] = useState<any[]>([]);
   const [pendingPrice, setPendingPrice] = useState("");
   const [gtdExpiry, setGtdExpiry] = useState("");
   const [pending, setPending] = useState<any[]>([]);
@@ -299,7 +298,7 @@ export default function ClientTerminal() {
   // the bell updates live without reloading the whole account).
   function loadNotifs() {
     fetch("/api/client/notifications").then((r) => r.json()).then((nd) => { if (!nd.ok) return; const items = nd.items || []; if (notifPrimed.current) { for (const n of items) { const id = String(n.id); if (!notifSeen.current.has(id)) { playSound(soundForNotification(n)); pushToast(n); } } } items.forEach((n: any) => notifSeen.current.add(String(n.id))); notifPrimed.current = true; setNotis(items); }).catch(() => {});
-    fetch("/api/client/signals").then((r) => r.json()).then((d) => { if (d.ok) setSignals(d.signals || []); }).catch(() => {});
+    fetch("/api/client/signals").then((r) => r.json()).then((d) => { if (d.ok) { setSignals(d.signals || []); setSignalsLoaded(true); } }).catch(() => {});
   }
   async function markAllNotifsRead() {
     await fetch("/api/client/notifications", { method: "POST" }).catch(() => {});
