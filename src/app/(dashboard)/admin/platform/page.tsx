@@ -1184,27 +1184,6 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 );
               })}
             </div>
-            {/* History summary \u2014 moved up into the tab bar (top-right) */}
-            {tab === "history" && selAcc && (() => {
-              const hdt = (h: any) => h.closeTime || h.closedAt || h.closeDate || h.createdAt || h.date || h.time;
-              const inR = (h: any) => { const d = hdt(h); if (!d) return hfPreset === "ALL" && !hfFrom && !hfTo; const dt = new Date(d); const now = new Date(); if (hfPreset === "TODAY") return dt.toDateString() === now.toDateString(); if (hfPreset === "WEEK") { const wk = new Date(now); wk.setDate(now.getDate() - 7); return dt >= wk; } if (hfPreset === "MONTH") { const mo = new Date(now); mo.setMonth(now.getMonth() - 1); return dt >= mo; } if (hfFrom && dt < new Date(hfFrom)) return false; if (hfTo && dt > new Date(hfTo + "T23:59:59")) return false; return true; };
-              const hType = (h: any) => String(h.side || h.type || "").toUpperCase();
-              const rows = accHistory.filter((h) => (hfType === "ALL" || hType(h) === hfType)).filter(inR);
-              const fin = (types: string[]) => rows.filter((r: any) => r.kind === "FIN" && types.includes(String(r.type))).reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
-              const plRows = rows.filter((r: any) => r.kind === "TRADE" || (r.kind === "FIN" && String(r.type) === "PNL_ADJUST"));
-              const tradePL = plRows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
-              const deposits = fin(["DEPOSIT"]); const withdrawals = fin(["WITHDRAWAL"]); const credit = fin(["CREDIT_IN", "CREDIT_OUT", "BONUS", "INSURANCE"]);
-              const net = rows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
-              const cell = (label: string, val: number) => (<span className="whitespace-nowrap"><span className="text-[var(--muted)]">{label} </span><span style={{ color: val > 0 ? BUY : val < 0 ? SELL : "var(--text)", fontWeight: 700 }}>{val > 0 ? "+" : ""}{gnum(val, 2)}</span></span>);
-              return (
-                <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap pb-1 pr-2 text-[10px]" style={{ scrollbarWidth: "none", maxWidth: "62vw" }}>
-                  <span><span className="text-[var(--muted)]">Records </span><b>{rows.length}</b></span>
-                  {cell("Deposits", deposits)}{cell("Withdrawals", withdrawals)}{cell("Credit/Bonus", credit)}
-                  <span><span className="text-[var(--muted)]">Trade P/L </span><span style={{ color: tradePL >= 0 ? BUY : SELL, fontWeight: 700 }}>{tradePL >= 0 ? "+" : ""}{gnum(tradePL, 2)}</span></span>
-                  <span className="rounded px-2 py-0.5" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)" }}><span className="text-[var(--muted)]">Net </span><span style={{ color: net >= 0 ? BUY : SELL, fontWeight: 800 }}>{net >= 0 ? "+" : ""}{gnum(net, 2)}</span></span>
-                </div>
-              );
-            })()}
             <button onClick={toggleTabCloseX} title={tabCloseX ? "Hide tab close (\u00D7) marks" : "Show tab close (\u00D7) marks"} className="pb-1 px-1.5 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-circle-xmark text-[11px]" style={{ opacity: tabCloseX ? 1 : 0.35 }} /></button>
             <button onClick={() => togglePanel("toolbox")} title="Close toolbox" className="pb-1 px-1.5 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-chevron-down text-[11px]" /></button>
           </div>
@@ -1367,7 +1346,23 @@ const [selAcc, setSelAcc] = useState<any>(null);
                     <a href={"/api/admin/export/trades?" + new URLSearchParams(Object.fromEntries([["accountId", selAcc?.id || ""], hfFrom ? ["from", hfFrom] : ["",""], hfTo ? ["to", hfTo] : ["",""]].filter(([k]) => k))).toString()} download className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 font-semibold" style={{ background: BUY + "22", color: BUY, border: "1px solid " + BUY + "44" }} title="Export filtered trades as CSV"><i className="fa-solid fa-download" /> Export CSV</a>
                     {Object.keys(histSel).filter((k) => histSel[k]).length > 0 && <button onClick={delHistBulk} className="rounded px-2 py-0.5" style={{ background: SELL, color: "#1a0606" }}>Delete Selected ({Object.keys(histSel).filter((k) => histSel[k]).length})</button>}
                   </div>
-                  {/* (Period summary moved up into the toolbox tab bar) */}
+                  {/* Period summary — below the filter row */}
+                  {selAcc && (() => {
+                    const fin2 = (types: string[]) => rows.filter((r: any) => r.kind === "FIN" && types.includes(String(r.type))).reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
+                    const plRows2 = rows.filter((r: any) => r.kind === "TRADE" || (r.kind === "FIN" && String(r.type) === "PNL_ADJUST"));
+                    const tradePL2 = plRows2.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
+                    const deposits2 = fin2(["DEPOSIT"]); const withdrawals2 = fin2(["WITHDRAWAL"]); const credit2 = fin2(["CREDIT_IN", "CREDIT_OUT", "BONUS", "INSURANCE"]);
+                    const net2 = rows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
+                    const cell2 = (label: string, val: number) => (<span className="whitespace-nowrap"><span style={{ color: "var(--muted)" }}>{label} </span><span style={{ color: val > 0 ? BUY : val < 0 ? SELL : "var(--text)", fontWeight: 700 }}>{val > 0 ? "+" : ""}{gnum(val, 2)}</span></span>);
+                    return (
+                      <div className="flex items-center gap-3 overflow-x-auto border-b border-[var(--border)] px-2 py-1 text-[10px]" style={{ scrollbarWidth: "none" }}>
+                        <span><span style={{ color: "var(--muted)" }}>Records </span><b>{rows.length}</b></span>
+                        {cell2("Deposits", deposits2)}{cell2("Withdrawals", withdrawals2)}{cell2("Credit/Bonus", credit2)}
+                        <span><span style={{ color: "var(--muted)" }}>Trade P/L </span><span style={{ color: tradePL2 >= 0 ? BUY : SELL, fontWeight: 700 }}>{tradePL2 >= 0 ? "+" : ""}{gnum(tradePL2, 2)}</span></span>
+                        <span className="rounded px-2 py-0.5" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)" }}><span style={{ color: "var(--muted)" }}>Net </span><span style={{ color: net2 >= 0 ? BUY : SELL, fontWeight: 800 }}>{net2 >= 0 ? "+" : ""}{gnum(net2, 2)}</span></span>
+                      </div>
+                    );
+                  })()}
                   <div className="flex-1 overflow-auto">
                     <table className="w-full border-collapse [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-1.5 [&_th]:px-1.5">
                       <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
