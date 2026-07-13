@@ -30,16 +30,21 @@ export async function listOpen(s: any) {
   }));
 }
 
-export async function listHistory(s: any) {
+export async function listHistory(s: any, accountId?: string) {
+  const baseWhere = accountWhere(s);
+  const accountFilter = accountId
+    ? { account: { ...baseWhere, id: BigInt(accountId) } }
+    : { account: baseWhere };
+  const takeLimit = accountId ? 1000 : 200;
   const [rows, fins] = await Promise.all([
     prisma.tradeHistory.findMany({
-      where: { account: accountWhere(s) },
-      orderBy: { closedAt: "desc" }, take: 100,
+      where: accountFilter,
+      orderBy: { closedAt: "desc" }, take: takeLimit,
       include: { account: { select: { login: true, name: true } } },
     }),
     prisma.financialHistory.findMany({
-      where: { account: accountWhere(s) },
-      orderBy: { appliedAt: "desc" }, take: 100,
+      where: accountFilter,
+      orderBy: { appliedAt: "desc" }, take: takeLimit,
       include: { account: { select: { login: true, name: true } } },
     }),
   ]);
@@ -69,7 +74,7 @@ export async function listHistory(s: any) {
     };
   });
   const all = [...tradeRows, ...finRows].sort((a: any, b: any) => new Date(b.at).getTime() - new Date(a.at).getTime());
-  return all.slice(0, 150);
+  return accountId ? all : all.slice(0, 300);
 }
 
 export async function reports(s: any) {

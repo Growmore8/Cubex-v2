@@ -122,6 +122,7 @@ export default function AdminDeskPage() {
   const [allSymEdit, setAllSymEdit] = useState<{ type: string; pips: number } | null>(null);
   const [open, setOpen] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [accHistory, setAccHistory] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
@@ -277,6 +278,14 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [accAlerts, setAccAlerts] = useState<any[]>([]);
   async function loadAccAlerts(accId: string) { try { const d = await fetch("/api/admin/clients/" + accId + "/alerts").then((r) => r.json()); if (d.ok) setAccAlerts(d.alerts || []); } catch {} }
   useEffect(() => { if (selAcc?.id) loadAccAlerts(selAcc.id); else setAccAlerts([]); }, [selAcc?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function loadAccHistory(accId?: string) {
+    const id = accId ?? selAcc?.id;
+    if (!id) { setAccHistory([]); return; }
+    try { const d = await fetch("/api/desk/history?accountId=" + id).then((r) => r.json()); if (d.ok) setAccHistory(d.history || []); } catch {}
+  }
+  useEffect(() => {
+    loadAccHistory(selAcc?.id);
+  }, [selAcc?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   async function loadPending() { try { const d = await fetch("/api/desk/pending").then((r) => r.json()); if (d.ok) setPendingOrders(d.pending || []); } catch {} }
   useEffect(() => { loadPending(); const t = setInterval(loadPending, 6000); return () => clearInterval(t); }, []);
@@ -624,7 +633,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
     askDelete("Delete this history row? Balance will be reversed.", async () => {
       const r = await fetch("/api/desk/history/" + h.id, { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false }));
       if (!r.ok) { setErr(r.error || "Delete failed"); return; }
-      loadAll();
+      loadAll(); loadAccHistory();
     });
   }
   function delHistBulk() {
@@ -633,7 +642,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
     askDelete(`Delete ${ids.length} row(s)? Balances will be reversed.`, async () => {
       const r = await fetch("/api/desk/history/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) }).then((x) => x.json()).catch(() => ({ ok: false }));
       if (!r.ok) { setErr(r.error || "Bulk delete failed"); return; }
-      setHistSel({}); loadAll();
+      setHistSel({}); loadAll(); loadAccHistory();
     });
   }
   function openHEdit(h: any) { setHEdit({ ...h, amt: Math.abs(Number(h.pnl) || 0) }); }
@@ -645,7 +654,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
       : { closePrice: Number(hEdit.closePrice), pnl: Number(hEdit.pnl), sl: Number(hEdit.sl), tp: Number(hEdit.tp) };
     const r = await fetch("/api/desk/history/" + hEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { setErr(r.error || "Save failed"); return; }
-    setHEdit(null); loadAll();
+    setHEdit(null); loadAll(); loadAccHistory();
   }
   async function openMT(acc: any) {
     setMenu(null); setMtMin(false);
@@ -1180,7 +1189,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
               const hdt = (h: any) => h.closeTime || h.closedAt || h.closeDate || h.createdAt || h.date || h.time;
               const inR = (h: any) => { const d = hdt(h); if (!d) return hfPreset === "ALL" && !hfFrom && !hfTo; const dt = new Date(d); const now = new Date(); if (hfPreset === "TODAY") return dt.toDateString() === now.toDateString(); if (hfPreset === "WEEK") { const wk = new Date(now); wk.setDate(now.getDate() - 7); return dt >= wk; } if (hfPreset === "MONTH") { const mo = new Date(now); mo.setMonth(now.getMonth() - 1); return dt >= mo; } if (hfFrom && dt < new Date(hfFrom)) return false; if (hfTo && dt > new Date(hfTo + "T23:59:59")) return false; return true; };
               const hType = (h: any) => String(h.side || h.type || "").toUpperCase();
-              const rows = history.filter((h) => h.accountLogin === selAcc.login).filter((h) => (hfType === "ALL" || hType(h) === hfType)).filter(inR);
+              const rows = accHistory.filter((h) => (hfType === "ALL" || hType(h) === hfType)).filter(inR);
               const fin = (types: string[]) => rows.filter((r: any) => r.kind === "FIN" && types.includes(String(r.type))).reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
               const plRows = rows.filter((r: any) => r.kind === "TRADE" || (r.kind === "FIN" && String(r.type) === "PNL_ADJUST"));
               const tradePL = plRows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
@@ -1345,7 +1354,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 return true;
               };
               const hType = (h: any) => String(h.side || h.type || "").toUpperCase();
-              const rows = history.filter((h) => h.accountLogin === selAcc.login).filter((h) => (hfType === "ALL" || hType(h) === hfType)).filter(inRange);
+              const rows = accHistory.filter((h) => (hfType === "ALL" || hType(h) === hfType)).filter(inRange);
               const hAllOn = rows.length > 0 && rows.every((h) => histSel[h.id]);
               const hToggleAll = () => { if (hAllOn) setHistSel({}); else { const n: Record<string, boolean> = {}; rows.forEach((h) => (n[h.id] = true)); setHistSel(n); } };
               return (
