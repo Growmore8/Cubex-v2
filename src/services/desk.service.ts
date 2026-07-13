@@ -32,8 +32,9 @@ export async function listOpen(s: any) {
 
 export async function listHistory(s: any, accountId?: string) {
   const baseWhere = accountWhere(s);
-  const accountFilter = accountId
-    ? { account: { ...baseWhere, id: BigInt(accountId) } }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const accountFilter: any = accountId
+    ? { account: { ...baseWhere, id: accountId } }
     : { account: baseWhere };
   const takeLimit = accountId ? 1000 : 200;
   const [rows, fins] = await Promise.all([
