@@ -260,8 +260,7 @@ export default function ClientMobile({ t }: { t: any }) {
     try { localStorage.setItem("cx_followed", JSON.stringify([...next])); } catch {}
     return next;
   });
-  const [mobSignals, setMobSignals] = useState<any[]>([]);
-  const [mobSignalsLoaded, setMobSignalsLoaded] = useState(false);
+  const mobSignals: any[] = t.signals || [];
   const [profileModal, setProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: "", phone: "", country: "" });
   const [profileSaving, setProfileSaving] = useState(false);
@@ -366,7 +365,6 @@ export default function ClientMobile({ t }: { t: any }) {
   useEffect(() => { loadMobAlerts(); }, [accId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { fetch("/api/auth/totp/status").then((r) => r.json()).then((d) => { if (d.ok) setTotpEnabled(d.totpEnabled); }).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === "dashboard" && mobNews.length === 0 && !mobNewsLoading) { setMobNewsLoading(true); fetch("/api/client/news?category=forex").then((r) => r.json()).then((d) => { if (d.ok) setMobNews(d.items || []); }).catch(() => {}).finally(() => setMobNewsLoading(false)); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (tab === "dashboard" && !mobSignalsLoaded) { fetch("/api/client/signals").then((r) => r.json()).then((d) => { if (d.ok) setMobSignals(d.signals || []); setMobSignalsLoaded(true); }).catch(() => { setMobSignalsLoaded(true); }); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab !== "dashboard") return; const t = setInterval(() => setActCarouselIdx((i) => i + 1), 3500); return () => clearInterval(t); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab !== "dashboard" || discoverTab !== "calendar" || calendarLoaded) return; fetch("/api/client/calendar").then((r) => r.json()).then((d) => { if (d.ok) setCalendarEvents(d.events || []); setCalendarLoaded(true); }).catch(() => setCalendarLoaded(true)); }, [tab, discoverTab, calendarLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   async function openTotpSetup() {
@@ -972,7 +970,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
 
             {/* signals above news — hidden if SA disabled copyTrading */}
-            {ft.copyTrading !== false && mobSignalsLoaded && mobSignals.length > 0 && (
+            {ft.copyTrading !== false && mobSignals.length > 0 && (
               <div className="glass-card p-3">
                 <div className="mb-2 text-[11px] font-bold tracking-wide"><i className="fa-solid fa-signal mr-1.5" style={{ color: "#2f81f7" }} />ANALYST SIGNALS <span className="ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: "#2f81f722", color: "#2f81f7" }}>{mobSignals.length}</span></div>
                 <div className="space-y-2">
@@ -1137,7 +1135,11 @@ export default function ClientMobile({ t }: { t: any }) {
               };
               const sigPosts = ft.copyTrading !== false ? (mobSignals || []).map((s: any) => ({ kind: "signal", ...s })) : [];
               const newsPosts = ft.marketNewsFeed !== false ? (mobNews || []).map((n: any) => ({ kind: "news", ...n })) : [];
-              const allPosts = newsPosts;
+              // Interleave signals into news feed: 1 signal every 3 news items
+              const allPosts: any[] = [];
+              let si = 0;
+              newsPosts.forEach((p, i) => { if (si < sigPosts.length && i % 3 === 0) allPosts.push(sigPosts[si++]); allPosts.push(p); });
+              while (si < sigPosts.length) allPosts.push(sigPosts[si++]);
 
               const impactCol: Record<string, string> = { high: "#ef4444", medium: "#f59e0b", low: "#6b7280" };
 
