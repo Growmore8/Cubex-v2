@@ -1367,7 +1367,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                     <table className="w-full border-collapse [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-1.5 [&_th]:px-1.5">
                       <thead><tr className="border-b border-[var(--border)] sticky top-0 z-10 bg-[var(--panel)]">
                         <th className={thc}><input type="checkbox" checked={hAllOn} onChange={hToggleAll} /></th>
-                        <SortTh tbl="hist" k="date" label="Date/Time" cls={thc} /><SortTh tbl="hist" k="ref" label="Order/Ref" cls={thc} /><SortTh tbl="hist" k="type" label="Type" cls={thc} /><SortTh tbl="hist" k="symbol" label="Symbol" cls={thc} /><SortTh tbl="hist" k="desc" label="Desc" cls={thc} />
+                        <SortTh tbl="hist" k="date" label="Date/Time" cls={thc} /><SortTh tbl="hist" k="ref" label="Order/Ref" cls={thc} /><SortTh tbl="hist" k="type" label="Type" cls={thc} /><SortTh tbl="hist" k="symbol" label="Symbol" cls={thc} /><SortTh tbl="hist" k="lots" label="Lots" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="desc" label="Desc" cls={thc} />
                         <SortTh tbl="hist" k="openPx" label="Open Px" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="closePx" label="Close Px" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="sl" label="S/L" align="right" cls={thc + " text-right"} /><SortTh tbl="hist" k="tp" label="T/P" align="right" cls={thc + " text-right"} />
                         <SortTh tbl="hist" k="closeTime" label="Close Time" cls={thc} /><SortTh tbl="hist" k="pnl" label="Gross P&L" align="right" cls={thc + " text-right"} />{swapEnabled && <><th className={thc + " text-right"}>Swap</th><th className={thc + " text-right"}>Comm</th></>}<th className={thc + " text-right"}>{swapEnabled ? "Net P&L" : "P&L"}</th><th className={thc + " text-right"}>Edit</th>
                       </tr></thead>
@@ -1375,7 +1375,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                         {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={16}>No history.</td></tr> : sortRows("hist", rows, {
                           date: (h) => { const v = h.openedAt || h.openTime || h.at || h.createdAt; return v ? new Date(v).getTime() : null; },
                           ref: (h) => h.ticket ?? h.orderId ?? h.id,
-                          type: (h) => hType(h), symbol: (h) => h.symbol, desc: (h) => h.closeReason || h.description || h.desc,
+                          type: (h) => hType(h), symbol: (h) => h.symbol, lots: (h) => Number(h.lots), desc: (h) => h.closeReason || h.description || h.desc,
                           openPx: (h) => Number(h.openPrice), closePx: (h) => Number(h.closePrice), sl: (h) => Number(h.sl), tp: (h) => Number(h.tp),
                           closeTime: (h) => { const v = hdt(h); return v ? new Date(v).getTime() : null; }, pnl: (h) => Number(h.pnl),
                         }).map((h) => (
@@ -1385,6 +1385,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                             <td className="px-2 py-1">{h.ticket ?? h.orderId ?? h.id}</td>
                             <td className="px-2 py-1" style={{ color: hType(h) === "BUY" ? BUY : SELL }}>{h.side || h.type || "-"}</td>
                             <td className="px-2 py-1">{h.symbol}</td>
+                            <td className="px-2 py-1 text-right tabular-nums">{h.kind === "TRADE" && h.lots ? Number(h.lots).toFixed(2) : "—"}</td>
                             <td className="px-2 py-1">{(() => { const r = h.closeReason || h.description || h.desc; const col = r === "TP" ? "#10b981" : r === "SL" ? "#f43f5e" : r === "MC" ? "#f59e0b" : "var(--muted)"; return <span style={{ color: col, fontWeight: r && r !== "MANUAL" ? 600 : "normal" }}>{r || "—"}</span>; })()}</td>
                             <td className="px-2 py-1 text-right">{h.openPrice != null && Number(h.openPrice) !== 0 ? pxFmt(h.symbol, h.openPrice) : "-"}</td>
                             <td className="px-2 py-1 text-right">{h.closePrice != null && Number(h.closePrice) !== 0 ? pxFmt(h.symbol, h.closePrice) : "-"}</td>

@@ -74,10 +74,11 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     // would fall back to their first/primary account — often the demo).
     if (accountId) fd.set("accountId", accountId);
     setSending(true);
-    const r = await fetch("/api/client/payments", { method: "POST", body: fd });
-    const d = await r.json(); setSending(false);
+    let d: any;
+    try { d = await fetch("/api/client/payments", { method: "POST", body: fd }).then((r) => r.json()); } catch { setSending(false); setErr("Network error — please try again"); return; }
+    setSending(false);
     if (!d.ok) { setErr(d.error || "Failed"); return; }
-    (e.target as HTMLFormElement).reset(); setDAmount(""); setDepSel(null); setMsg("Deposit request submitted"); load();
+    (e.target as HTMLFormElement).reset(); setDAmount(""); setMsg("Deposit request submitted — we will review and credit your account."); load();
   }
 
   async function submitWithdraw(e: React.FormEvent) {
@@ -108,11 +109,12 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const [kycDocType, setKycDocType] = useState("Passport");
 
   async function uploadKyc(e: React.FormEvent) {
-    e.preventDefault(); setErr(""); setMsg("");
-    const fd = new FormData(e.target as HTMLFormElement); fd.set("docType", kycDocType);
-    const r = await fetch("/api/client/kyc", { method: "POST", body: fd });
-    const d = await r.json(); if (!d.ok) { setErr(d.error || "Upload failed"); return; }
-    (e.target as HTMLFormElement).reset(); setMsg("Submitted for review"); load();
+    e.preventDefault(); setErr(""); setMsg(""); setSending(true);
+    let d: any;
+    try { d = await fetch("/api/client/kyc", { method: "POST", body: new FormData(e.target as HTMLFormElement) }).then((r) => r.json()); } catch { setSending(false); setErr("Network error — please try again"); return; }
+    setSending(false);
+    if (!d.ok) { setErr(d.error || "Upload failed"); return; }
+    (e.target as HTMLFormElement).reset(); setMsg("Documents submitted for review. We will notify you once verified."); load();
   }
 
   const input = "ui-input w-full px-3 py-2 text-sm";
@@ -261,7 +263,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
             <div><div className="mb-1 text-xs font-medium text-[var(--muted)]">Address Proof <span className="text-red-500">*</span></div><input className={input} type="file" name="back" accept="image/*,application/pdf" required /></div>
           </div>
           <p className="text-xs text-[var(--muted)]">Upload a clear photo/scan of your ID (front) and a recent utility bill or bank statement as address proof.</p>
-          <button className="ui-btn ui-btn-primary px-4 py-2 text-sm">Submit for review</button>
+          <button className="ui-btn ui-btn-primary px-4 py-2 text-sm" disabled={sending}>{sending ? "Uploading…" : "Submit for review"}</button>
         </form>)}
       </div>);
     })()}
