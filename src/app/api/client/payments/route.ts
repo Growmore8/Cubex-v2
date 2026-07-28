@@ -38,10 +38,20 @@ export async function POST(req: Request) {
     const amount = Number(form.get("amount"));
     const method = form.get("method") ? String(form.get("method")) : undefined;
     const note = form.get("note") ? String(form.get("note")) : undefined;
-    if (!["DEPOSIT", "WITHDRAWAL"].includes(kind)) throw new Error("Invalid kind");
+    if (!["DEPOSIT", "WITHDRAWAL", "CREDIT_REQUEST", "CREDIT_CLEAR"].includes(kind)) throw new Error("Invalid kind");
     if (!(amount > 0)) throw new Error("Amount must be positive");
-    // Demo accounts have no real funds — no deposits/withdrawals.
-    if (account.type === "DEMO") throw new Error("Deposits and withdrawals are not available for demo accounts.");
+    // Demo accounts have no real funds — no deposits/withdrawals/credit.
+    if (account.type === "DEMO") throw new Error("This action is not available for demo accounts.");
+    // CREDIT_REQUEST: 250–1000, one pending at a time
+    if (kind === "CREDIT_REQUEST") {
+      if (amount < 250 || amount > 1000) throw new Error("Instant credit amount must be between $250 and $1,000");
+      const existing = await prisma.paymentRequest.findFirst({ where: { accountId: account.id, kind: "CREDIT_REQUEST" as any, status: "PENDING" } });
+      if (existing) throw new Error("You already have a pending credit request. Please wait for approval or cancel it.");
+    }
+    // CREDIT_CLEAR: only if there is outstanding credit
+    if (kind === "CREDIT_CLEAR") {
+      if (Number(account.credit) <= 0) throw new Error("No outstanding credit to clear.");
+    }
     if (kind === "WITHDRAWAL") {
       const pnlOnly = await getFundsPnlOnly(s.tenantId!);
       const movable = withdrawableBalance(account as any, pnlOnly);
@@ -51,8 +61,9 @@ export async function POST(req: Request) {
     const file = form.get("file") as File | null;
     if (file && file.size > 0) slipUrl = await saveUpload(file, "slips/" + account.id);
     await createPayment(s.tenantId!, account.id, kind, amount, method, slipUrl, note);
+    const kindLabel: Record<string, string> = { DEPOSIT: "Deposit request", WITHDRAWAL: "Withdrawal request", CREDIT_REQUEST: "Instant Credit request", CREDIT_CLEAR: "Credit Clearance request" };
     await audit(s.tenantId!, "payment.request", account.login + " " + kind + " " + amount + (method ? " via " + method : ""), s.email || account.login, "CLIENT");
-    await notifyStaff(s.tenantId!, { type: "FUNDS", title: kind === "DEPOSIT" ? "Deposit request" : "Withdrawal request", body: account.login + " requested " + amount }, (account as any).managerId);
+    await notifyStaff(s.tenantId!, { type: "FUNDS", title: kindLabel[kind] || kind, body: account.login + " requested $" + amount }, (account as any).managerId);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Request failed" }, { status: 400 });

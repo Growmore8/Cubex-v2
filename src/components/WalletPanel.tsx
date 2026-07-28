@@ -19,6 +19,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const [pnlOnly, setPnlOnly] = useState(false);
   const [acctName, setAcctName] = useState("");
   const [acctType, setAcctType] = useState(""); // DEMO accounts can't deposit/withdraw/transfer
+  const [acctCredit, setAcctCredit] = useState(0); // outstanding credit balance
   // Bank Transfer fields
   const [bankAcctNo, setBankAcctNo] = useState("");
   const [bankName, setBankName] = useState("");
@@ -27,7 +28,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const [sending, setSending] = useState(false);
 
   // Deposit: which method is open (null = list view)
-  const [depSel, setDepSel] = useState<{ kind: "crypto" | "upi" | "bank"; id: string } | null>(null);
+  const [depSel, setDepSel] = useState<{ kind: "crypto" | "upi" | "bank" | "credit_clear"; id: string } | null>(null);
   const [dAmount, setDAmount] = useState("");
 
   // Withdraw: inline destination
@@ -50,6 +51,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
       setPnlOnly(!!ac.pnlOnly);
       setAcctName(ac.account.name || ac.account.ownerName || "");
       setAcctType(ac.account.type || "");
+      setAcctCredit(Number(ac.account.credit || 0));
     }
   }
   useEffect(() => { load(); }, []);
@@ -60,6 +62,21 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const depUpi = depSel?.kind === "upi" ? upi.find((u) => u.id === depSel.id) : null;
   const depBank = depSel?.kind === "bank" ? bank.find((b) => b.id === depSel.id) : null;
   const copy = (text: string, what: string) => { navigator.clipboard.writeText(text); setMsg(what + " copied"); };
+
+  async function submitCreditClear(e: React.FormEvent) {
+    e.preventDefault(); setErr(""); setMsg("");
+    const amt = Number(dAmount); if (!(amt > 0)) { setErr("Enter an amount"); return; }
+    const fd = new FormData(e.target as HTMLFormElement);
+    fd.set("kind", "CREDIT_CLEAR"); fd.set("amount", String(amt));
+    if (accountId) fd.set("accountId", accountId);
+    setSending(true);
+    let d: any;
+    try { d = await fetch("/api/client/payments", { method: "POST", body: fd }).then((r) => r.json()); } catch { setSending(false); setErr("Network error — please try again"); return; }
+    setSending(false);
+    if (!d.ok) { setErr(d.error || "Failed"); return; }
+    (e.target as HTMLFormElement).reset(); setDAmount(""); setDepSel(null);
+    setMsg("Credit clearance request submitted — admin will review and clear your credit."); load();
+  }
 
   async function submitDeposit(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setMsg("");
@@ -157,7 +174,25 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
 
     {/* ── DEPOSIT ── */}
     {tab === "deposit" && isDemo && demoNotice}
-    {tab === "deposit" && !isDemo && (depSel ? (
+    {tab === "deposit" && !isDemo && (depSel?.kind === "credit_clear" ? (
+      <form onSubmit={submitCreditClear} className="ui-card ui-fade-up space-y-3 p-4">
+        <button type="button" onClick={() => setDepSel(null)} className="text-sm font-medium text-blue-600 hover:text-blue-700"><i className="fa-solid fa-chevron-left mr-1" />Back</button>
+        <div className="rounded-xl border p-3" style={{ borderColor: "rgba(239,83,80,0.4)", background: "rgba(239,83,80,0.07)" }}>
+          <div className="text-xs font-semibold" style={{ color: "#ef5350" }}>Outstanding Credit</div>
+          <div className="text-xl font-bold tabular-nums" style={{ color: "#ef5350" }}>${acctCredit.toFixed(2)}</div>
+          <div className="text-[10px] text-[var(--muted)]">Upload your payment slip to clear this credit.</div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><div className={lbl}>Amount (USD)</div><input className={input} type="number" step="0.01" value={dAmount} onChange={(e) => setDAmount(e.target.value)} placeholder={acctCredit.toFixed(2)} required /></div>
+          <div><div className={lbl}>Payment Slip *</div><input className={input} type="file" name="file" accept="image/*,application/pdf" required /></div>
+        </div>
+        <div><div className={lbl}>Note (optional)</div><textarea name="note" rows={2} className={input} placeholder="Reference, transaction hash…" /></div>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setDepSel(null)} className="flex-1 rounded-lg border py-2 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
+          <button disabled={sending} className="flex-1 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-60" style={{ background: "#ef5350" }}><i className="fa-solid fa-paper-plane mr-1" /> {sending ? "Submitting…" : "Submit Clearance"}</button>
+        </div>
+      </form>
+    ) : depSel ? (
       <form onSubmit={submitDeposit} className="ui-card ui-fade-up space-y-3 p-4">
         <button type="button" onClick={() => setDepSel(null)} className="text-sm font-medium text-blue-600 hover:text-blue-700"><i className="fa-solid fa-chevron-left mr-1" />Back</button>
         {depWallet && (<>
@@ -194,13 +229,22 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
           {upi.length > 0 && (<><div className={lbl}>UPI</div><div className="space-y-2">{upi.map((u) => methodRow(u.id, <span className="rounded bg-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white">UPI</span>, u.label || "UPI", u.address, () => { setDepSel({ kind: "upi", id: u.id }); setMsg(""); setErr(""); }))}</div></>)}
           {bank.length > 0 && (<><div className={lbl}>Bank Transfer</div><div className="space-y-2">{bank.map((b) => methodRow(b.id, <span className="rounded bg-indigo-500 px-2 py-0.5 text-[10px] font-bold text-white">BANK</span>, b.bankName || "Bank Transfer", "A/C " + b.accountNumber, () => { setDepSel({ kind: "bank", id: b.id }); setMsg(""); setErr(""); }))}</div></>)}
           {links.length > 0 && (<><div className={lbl}>Local Payment</div><div className="space-y-2">{links.map((l) => (<a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="ui-transition flex w-full items-center gap-3 rounded-xl border p-3 hover:bg-[var(--soft)]" style={{ borderColor: "var(--border)", background: "var(--card)" }}><span className="rounded bg-blue-500 px-2 py-0.5 text-[10px] font-bold text-white">{(l.label || "Pay").split(" ")[0]}</span><div className="flex-1 text-sm font-semibold">{l.label}</div><i className="fa-solid fa-chevron-right text-[var(--muted)]" /></a>))}</div></>)}
+          {acctCredit > 0 && (<><div className={lbl} style={{ color: "#ef5350" }}>Clear Outstanding Credit</div><div className="space-y-2">{methodRow("credit_clear", <span className="rounded px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: "#ef5350" }}>CREDIT</span>, "Clear Instant Credit", "$" + acctCredit.toFixed(2) + " outstanding — upload payment slip", () => { setDepSel({ kind: "credit_clear", id: "credit_clear" }); setDAmount(acctCredit.toFixed(2)); setMsg(""); setErr(""); })}</div></>)}
         </>)}
       </div>
     ))}
 
     {/* ── WITHDRAW ── */}
     {tab === "withdraw" && isDemo && demoNotice}
-    {tab === "withdraw" && !isDemo && (<form onSubmit={submitWithdraw} className="ui-card ui-fade-up space-y-3 p-4">
+    {tab === "withdraw" && !isDemo && acctCredit > 0 && (
+      <div className="ui-card ui-fade-up space-y-3 p-4">
+        <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "rgba(239,83,80,0.4)", background: "rgba(239,83,80,0.08)", color: "#ef5350" }}>
+          <i className="fa-solid fa-lock mr-2" /><b>Withdrawal Disabled</b>
+          <p className="mt-1 text-xs">Please clear your outstanding credit of <b>${acctCredit.toFixed(2)}</b> before making a withdrawal. Use the <b>Deposit</b> tab → <b>Clear Instant Credit</b> to settle.</p>
+        </div>
+      </div>
+    )}
+    {tab === "withdraw" && !isDemo && acctCredit <= 0 && (<form onSubmit={submitWithdraw} className="ui-card ui-fade-up space-y-3 p-4">
       <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--border)", background: "var(--soft)" }}>
         <div className={lbl + " text-center"}>{pnlOnly ? "Available Profit To Withdraw" : "Available Balance To Withdraw"}</div>
         <div className="text-xl font-bold" style={{ color: "#22d3ee" }}>{withdrawable != null ? fmtUsd(withdrawable) : "—"}</div>

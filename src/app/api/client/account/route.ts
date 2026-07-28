@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { getDisabledSetFor } from "@/services/symbolPerms.service";
 import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
 import { getAccountFxRate } from "@/lib/prices";
+import { audit } from "@/lib/audit";
+import { Prisma } from "@prisma/client";
 
 export async function GET(req: Request) {
   const { session: s, suspended } = await getClientSession();
@@ -110,6 +112,26 @@ export async function GET(req: Request) {
     if (t) { brand = { name: t.brandName || t.name, logoUrl: t.logoUrl, primaryColor: (t as any).primaryColor || null, accentColor: (t as any).accentColor || null }; (brand as any).swapEnabled = !!(t as any).swapEnabled; }
   } catch {}
 
+  // Auto-deduct expired bonus
+  if (account && Number((account as any).bonus || 0) > 0 && (account as any).bonusExpiryAt && new Date((account as any).bonusExpiryAt) < new Date()) {
+    const bonusAmt = Number((account as any).bonus);
+    try {
+      await prisma.$transaction([
+        prisma.account.update({ where: { id: account.id }, data: { bonus: new Prisma.Decimal(0) } }),
+        prisma.financialHistory.create({ data: { accountId: account.id, type: "BONUS", amount: new Prisma.Decimal(-bonusAmt), description: "Bonus expired", mode: "REALTIME", createdBy: "system" } }),
+      ]);
+      await audit(s.tenantId!, "bonus.expire", account.login + " bonus expired $" + bonusAmt, "system");
+      // Refresh account after bonus deduction
+      (account as any).bonus = new Prisma.Decimal(0);
+    } catch {}
+  }
+
+  // Active instant credit request (PENDING) for this account
+  const creditRequest = account ? await prisma.paymentRequest.findFirst({ where: { accountId: account.id, kind: "CREDIT_REQUEST" as any, status: "PENDING" }, select: { id: true, amount: true, status: true, createdAt: true } }).catch(() => null) : null;
+
+  // Credit lock: credit outstanding and settlement due date passed
+  const creditLocked = account && Number((account as any).credit || 0) > 0 && (account as any).creditSettleTo && new Date((account as any).creditSettleTo) < new Date();
+
   // Withdraw/transfer cap for THIS (selected) account, per tenant pnl-only setting.
   const pnlOnly = await getFundsPnlOnly(s.tenantId!).catch(() => false);
   const withdrawable = account ? withdrawableBalance(account as any, pnlOnly) : 0;
@@ -126,14 +148,20 @@ export async function GET(req: Request) {
     swapEnabled: !!(brand as any).swapEnabled,
     pnlOnly,
     withdrawable,
+    creditRequest: creditRequest ? { id: creditRequest.id, amount: Number(creditRequest.amount), status: creditRequest.status, createdAt: creditRequest.createdAt } : null,
+    creditLocked: !!creditLocked,
     account: account ? {
-      login: account.login, type: account.type, currency: account.currency, leverage: account.leverage, locked: account.locked,
+      login: account.login, type: account.type, currency: account.currency, leverage: account.leverage,
+      locked: account.locked || !!creditLocked,
       name: parentDisplay?.name || account.name,
       email: parentDisplay?.email || account.email || account.user?.email || null,
       phone: parentDisplay?.phone || account.phone || null, country: parentDisplay?.country || account.country || null,
       ownerName: account.user?.name || account.name,
       deposit: Number(account.deposit), withdrawal: Number(account.withdrawal),
       credit: Number(account.credit), bonus: Number(account.bonus), pnl: Number(account.pnl), insurance: Number((account as any).insurance || 0),
+      creditSettleFrom: (account as any).creditSettleFrom || null,
+      creditSettleTo: (account as any).creditSettleTo || null,
+      bonusExpiryAt: (account as any).bonusExpiryAt || null,
     } : null,
     financials: account ? account.financials.map((f) => ({
       id: f.id.toString(), type: f.type, amount: Number(f.amount), description: f.description, appliedAt: f.appliedAt,

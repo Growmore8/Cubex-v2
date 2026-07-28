@@ -47,6 +47,9 @@ export async function assertMargin(account: any, newTrade: { symbol: string; typ
   missing.forEach((s, i) => { priceMap[s] = fetched[i] ?? Number(existing.find((t) => t.symbol === s)?.openPrice ?? 0); });
   let floating = 0;
   for (const t of existing) floating += pnlFor(t.symbol, t.type as any, Number(t.openPrice), priceMap[t.symbol], Number(t.lots));
+  if (Number(account.credit) > 0 && account.creditSettleTo && new Date(account.creditSettleTo) < new Date()) {
+    throw new Error("Trading suspended — please clear your outstanding credit before resuming.");
+  }
   const balance = Number(account.deposit) + Number(account.pnl) - Number(account.withdrawal);
   // Convert account-currency balance to USD so it can be compared to USD floating P&L and margin.
   const fxRate = await getAccountFxRate(account.currency as string);

@@ -156,9 +156,12 @@ model Account {
   priceAlerts         PriceAlert[]
   copyMasterRelations CopyRelation[]     @relation("CopyMaster")
   copyFollowerRelations CopyRelation[]   @relation("CopyFollower")
-  expiresAt       DateTime?          // DEMO only: set to createdAt+30d; null = never expires (LIVE)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  expiresAt        DateTime?          // DEMO only: set to createdAt+30d; null = never expires (LIVE)
+  bonusExpiryAt    DateTime?          // when set, bonus auto-deducted on expiry
+  creditSettleFrom DateTime?          // credit settlement period start
+  creditSettleTo   DateTime?          // credit settlement period end; account locked read-only if overdue
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
   @@unique([tenantId, login])
   @@index([tenantId])
   @@index([expiresAt])
@@ -651,6 +654,8 @@ enum AuditCategory {
 enum PaymentKind {
   DEPOSIT
   WITHDRAWAL
+  CREDIT_REQUEST
+  CREDIT_CLEAR
 }
 enum RequestStatus {
   PENDING

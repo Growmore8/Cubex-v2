@@ -44,6 +44,14 @@ export default function ClientTerminal() {
 
 
   const [account, setAccount] = useState<any>(null);
+  const [creditRequest, setCreditRequest] = useState<any>(null);
+  const [creditLocked, setCreditLocked] = useState(false);
+  const [instantCreditModal, setInstantCreditModal] = useState(false);
+  const [icAmount, setIcAmount] = useState("500");
+  const [icNote, setIcNote] = useState("");
+  const [icErr, setIcErr] = useState("");
+  const [icMsg, setIcMsg] = useState("");
+  const [icSending, setIcSending] = useState(false);
   const [brand, setBrand] = useState<{ name: string; logoUrl: string | null }>({ name: "", logoUrl: null });
   // Branded loading splash: fast brand fetch for the logo/slogan, hidden once the
   // first account/prices load completes.
@@ -287,6 +295,7 @@ export default function ClientTerminal() {
       setErr(d.error || "Failed"); return;
     }
     setAccount(d.account); setKycVerified(!!d.kycVerified); setSwapEnabled(d.swapEnabled !== false); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); setPnlOnly(!!d.pnlOnly); if (d.brand) setBrand(d.brand); if (d.symbolSpreads) setSymbolSpreads(d.symbolSpreads); if (d.groupSpread != null) setGroupSpread(Number(d.groupSpread)); if (d.accountSpreadMarkup != null) setAccountSpreadMarkup(Number(d.accountSpreadMarkup)); if (d.fxRate != null) setFxRate(Number(d.fxRate) || 1);
+    setCreditRequest(d.creditRequest || null); setCreditLocked(!!d.creditLocked);
     (d.symbols || []).forEach((s: any) => { DIGITS[s.symbol] = s.digits; });
     if (!selSymRef.current && d.symbols.length) setSelSym((d.symbols.find((s: any) => s.symbol === "BTCUSD") || d.symbols[0]).symbol);
     fetch("/api/client/accounts").then((r) => r.json()).then((ad) => { if (ad.ok) { setAccts(ad.accounts || []); if (!accIdRef.current && ad.accounts && ad.accounts.length) { accIdRef.current = ad.accounts[0].id; setAccId(ad.accounts[0].id); } } }).catch((e) => console.warn("[client] accounts fetch failed", e));
@@ -708,7 +717,22 @@ export default function ClientTerminal() {
 
   const unread = notis.filter((n: any) => !n.read).length;
   const curAcct = accts.find((a) => a.id === accId);
-  const readOnly = !!account?.locked;
+  const readOnly = !!account?.locked || creditLocked;
+
+  async function submitInstantCredit() {
+    const amt = Number(icAmount);
+    if (amt < 250 || amt > 1000) { setIcErr("Amount must be between $250 and $1,000"); return; }
+    setIcSending(true); setIcErr(""); setIcMsg("");
+    const fd = new FormData();
+    fd.set("kind", "CREDIT_REQUEST"); fd.set("amount", String(amt));
+    if (icNote) fd.set("note", icNote);
+    if (accId) fd.set("accountId", accId);
+    try {
+      const d = await fetch("/api/client/payments", { method: "POST", body: fd }).then((r) => r.json());
+      if (!d.ok) { setIcErr(d.error || "Failed"); } else { setIcMsg("Credit request submitted — awaiting admin approval."); setInstantCreditModal(false); load(); }
+    } catch { setIcErr("Network error — try again"); }
+    setIcSending(false);
+  }
   const [isTrial, setIsTrial] = useState(false);
   // Live accounts require KYC; demo accounts never do. Drives the banner + trade gate.
   const needKyc = account?.type === "LIVE" && !kycVerified;
@@ -978,6 +1002,7 @@ export default function ClientTerminal() {
                     { icon: "fa-circle-dollar-to-slot", label: "Deposit", color: BUY, onClick: () => { setProfileOpen(false); setWalletModal("deposit"); } },
                     { icon: "fa-hand-holding-dollar", label: "Withdraw", color: GOLD, onClick: () => { setProfileOpen(false); setWalletModal("withdraw"); } },
                     ...(accts.length >= 2 ? [{ icon: "fa-money-bill-transfer", label: "Transfer", color: undefined, onClick: () => { setProfileOpen(false); setXferErr(""); setXfer({ fromId: accId }); setXferModal(true); } }] : []),
+                    { icon: "fa-bolt-lightning", label: "Credit", color: "#a855f7", onClick: () => { setProfileOpen(false); setIcErr(""); setIcMsg(""); setInstantCreditModal(true); } },
                   ].map((item) => (
                     <button key={item.label} onClick={item.onClick} disabled={readOnly} className="flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold hover:bg-[var(--soft)] disabled:opacity-40">
                       <i className={"fa-solid " + item.icon} style={{ color: item.color || "var(--muted)" }} />
@@ -2028,6 +2053,49 @@ export default function ClientTerminal() {
                 setRepMsg(r.ok ? "✓ Sent to " + r.to : (r.error || "Failed to send"));
               }} className="flex-1 rounded py-2 text-[11px] font-semibold disabled:opacity-60" style={{ background: BUY, color: "#04140e" }}><i className="fa-solid fa-envelope mr-1" /> {repSending ? "…" : "Email"}</button>
             </div>
+          </div>
+        </div>
+      )}
+      {instantCreditModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => setInstantCreditModal(false)}>
+          <div className="ui-pop w-full max-w-sm rounded-xl border p-5 shadow-2xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2"><i className="fa-solid fa-bolt-lightning" style={{ color: "#a855f7" }} /><span className="text-sm font-bold">Instant Credit</span></div>
+              <button onClick={() => setInstantCreditModal(false)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
+            </div>
+            {creditRequest ? (
+              <div className="space-y-3">
+                <div className="rounded-lg border px-3 py-2.5 text-xs" style={{ borderColor: "rgba(240,180,41,0.4)", background: "rgba(240,180,41,0.08)", color: GOLD }}>
+                  <i className="fa-solid fa-clock mr-1" /><b>Request Pending</b>
+                  <div className="mt-1">You have a pending credit request for <b>${Number(creditRequest.amount).toFixed(2)}</b>. Please wait for admin approval.</div>
+                </div>
+              </div>
+            ) : Number(account?.credit || 0) > 0 ? (
+              <div className="space-y-3">
+                <div className="rounded-lg border px-3 py-2.5 text-xs" style={{ borderColor: "rgba(239,83,80,0.4)", background: "rgba(239,83,80,0.08)", color: SELL }}>
+                  <i className="fa-solid fa-lock mr-1" /><b>Outstanding Credit: ${Number(account.credit).toFixed(2)}</b>
+                  <div className="mt-1">Please clear your existing credit balance before requesting a new one. Use Deposit → Clear Instant Credit.</div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-[11px] text-[var(--muted)]">Request instant credit between <b>$250</b> and <b>$1,000</b>. The credit will be added to your equity upon admin approval.</div>
+                {icErr && <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{icErr}</div>}
+                {icMsg && <div className="rounded-lg bg-green-50 px-3 py-2 text-xs text-green-600">{icMsg}</div>}
+                <div>
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">Amount (USD)</div>
+                  <input type="number" min={250} max={1000} step={50} value={icAmount} onChange={(e) => setIcAmount(e.target.value)} className="ui-input w-full px-3 py-2 text-sm" placeholder="500" />
+                  <div className="mt-1 text-[10px] text-[var(--muted)]">Min $250 · Max $1,000</div>
+                </div>
+                <div>
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">Note (optional)</div>
+                  <input value={icNote} onChange={(e) => setIcNote(e.target.value)} className="ui-input w-full px-3 py-2 text-sm" placeholder="Reason for credit request…" />
+                </div>
+                <button disabled={icSending} onClick={submitInstantCredit} className="w-full rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-60" style={{ background: "#a855f7" }}>
+                  <i className="fa-solid fa-bolt-lightning mr-1" />{icSending ? "Submitting…" : "Request Instant Credit"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
