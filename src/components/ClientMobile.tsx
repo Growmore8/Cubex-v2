@@ -1927,6 +1927,9 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Deposit</span><span>{_cSym}{fmt(Number(account?.deposit || 0))}</span></div>
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Withdrawal</span><span>{_cSym}{fmt(Number(account?.withdrawal || 0))}</span></div>
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Profit</span><span style={{ color: Number(account?.pnl || 0) >= 0 ? BUY : SELL }}>{_cSym}{fmt(Number(account?.pnl || 0))}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Credit</span><span style={{ color: Number(account?.credit || 0) > 0 ? "#a855f7" : "var(--muted)" }}>{_cSym}{fmt(Number(account?.credit || 0))}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Bonus</span><span style={{ color: Number(account?.bonus || 0) > 0 ? GOLD : "var(--muted)" }}>{_cSym}{fmt(Number(account?.bonus || 0))}</span></div>
+              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Insurance</span><span style={{ color: Number(account?.insurance || 0) > 0 ? "#06b6d4" : "var(--muted)" }}>{_cSym}{fmt(Number(account?.insurance || 0))}</span></div>
             </div>
 
             {/* running trade summary */}
