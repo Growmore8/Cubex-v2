@@ -16,16 +16,17 @@ export async function POST(req: Request) {
       throw new Error("Notify.lk credentials not configured. Save them first.");
     }
 
-    const serviceId = (cfg.notifyLkServiceId as string) || "NotifyDEMO";
+    const serviceId = (cfg.notifyLkServiceId as string || "").trim();
     const message = "CubeX test SMS — notification system working correctly.";
 
+    const toPhone = String(phone).replace(/^\+/, "");
     const params = new URLSearchParams({
       user_id: String(cfg.notifyLkUserId),
       api_key: String(cfg.notifyLkApiKey),
-      service_id: serviceId,
-      to: String(phone).replace(/^\+/, ""),
+      to: toPhone,
       message,
     });
+    if (serviceId) params.set("service_id", serviceId);
 
     const res = await fetch("https://app.notify.lk/api/v1/send?" + params.toString());
     const text = await res.text().catch(() => "");
