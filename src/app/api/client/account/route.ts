@@ -15,17 +15,26 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const reqAccId = url.searchParams.get("accountId");
 
-  // Instant-logout on deactivation: if the client has no active (non-deactivated)
-  // account, signal the client to log out.
-  const activeCount = await prisma.account.count({ where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false } });
-  if (activeCount === 0) {
-    const total = await prisma.account.count({ where: { tenantId: s.tenantId!, userId: s.sub } });
-    if (total > 0) return NextResponse.json({ ok: false, code: "DEACTIVATED", error: "Your account has been deactivated. Please contact support." }, { status: 403 });
+  // Kick out if the tenant trial has ended (subscription expired).
+  const sub = await prisma.subscription.findUnique({ where: { tenantId: s.tenantId! }, select: { status: true, endsAt: true } });
+  if (sub?.status === "TRIALING" && sub.endsAt && new Date(sub.endsAt) < new Date()) {
+    return NextResponse.json({ ok: false, code: "DEACTIVATED", error: "Your demo period has ended. Please contact support to continue." }, { status: 403 });
   }
 
-  // Resolve the requested account, but never land on a deactivated one if an active exists.
+  // Instant-logout on deactivation or expiry: count accounts that are active AND not past expiresAt.
+  const now = new Date();
+  const activeCount = await prisma.account.count({
+    where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+  });
+  if (activeCount === 0) {
+    // No valid accounts left (deactivated, expired, or cron-deleted) → force logout.
+    return NextResponse.json({ ok: false, code: "DEACTIVATED", error: "Your account has expired or been deactivated. Please contact support." }, { status: 403 });
+  }
+
+  // Resolve the requested account, but never land on a deactivated or expired one.
+  const notExpired = { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] };
   let account = await prisma.account.findFirst({
-    where: reqAccId ? { tenantId: s.tenantId!, userId: s.sub, id: reqAccId, deactivated: false } : { tenantId: s.tenantId!, userId: s.sub, deactivated: false },
+    where: reqAccId ? { tenantId: s.tenantId!, userId: s.sub, id: reqAccId, deactivated: false, ...notExpired } : { tenantId: s.tenantId!, userId: s.sub, deactivated: false, ...notExpired },
     orderBy: { createdAt: "asc" },
     include: {
       trades: { orderBy: { openedAt: "desc" } },
@@ -36,7 +45,7 @@ export async function GET(req: Request) {
   });
   if (!account) {
     account = await prisma.account.findFirst({
-      where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false },
+      where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false, ...notExpired },
       orderBy: { createdAt: "asc" },
       include: {
         trades: { orderBy: { openedAt: "desc" } },
