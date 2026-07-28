@@ -2407,7 +2407,7 @@ export default function ClientMobile({ t }: { t: any }) {
             ) : Number(account?.credit || 0) > 0 ? (
               <div className="rounded-xl border px-4 py-3 text-[12px]" style={{ borderColor: "rgba(239,83,80,0.4)", background: "rgba(239,83,80,0.08)", color: SELL }}>
                 <div className="font-bold"><i className="fa-solid fa-lock mr-1.5" />Outstanding Credit: ${Number(account.credit).toFixed(2)}</div>
-                <div className="mt-1 text-[11px]">Please clear your existing credit before requesting a new one. Use Deposit → Clear Instant Credit.</div>
+                <div className="mt-1 text-[11px]">Please clear your existing credit before requesting a new one. Use Deposit → Clear Credit.</div>
               </div>
             ) : (
               <div className="space-y-3">

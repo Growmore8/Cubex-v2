@@ -235,7 +235,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
           {upi.length > 0 && (<><div className={lbl}>UPI</div><div className="space-y-2">{upi.map((u) => methodRow(u.id, <span className="rounded bg-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white">UPI</span>, u.label || "UPI", u.address, () => { setDepSel({ kind: "upi", id: u.id }); setMsg(""); setErr(""); }))}</div></>)}
           {bank.length > 0 && (<><div className={lbl}>Bank Transfer</div><div className="space-y-2">{bank.map((b) => methodRow(b.id, <span className="rounded bg-indigo-500 px-2 py-0.5 text-[10px] font-bold text-white">BANK</span>, b.bankName || "Bank Transfer", "A/C " + b.accountNumber, () => { setDepSel({ kind: "bank", id: b.id }); setMsg(""); setErr(""); }))}</div></>)}
           {links.length > 0 && (<><div className={lbl}>Local Payment</div><div className="space-y-2">{links.map((l) => (<a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="ui-transition flex w-full items-center gap-3 rounded-xl border p-3 hover:bg-[var(--soft)]" style={{ borderColor: "var(--border)", background: "var(--card)" }}><span className="rounded bg-blue-500 px-2 py-0.5 text-[10px] font-bold text-white">{(l.label || "Pay").split(" ")[0]}</span><div className="flex-1 text-sm font-semibold">{l.label}</div><i className="fa-solid fa-chevron-right text-[var(--muted)]" /></a>))}</div></>)}
-          {acctCredit > 0 && (<><div className={lbl} style={{ color: "#ef5350" }}>Clear Outstanding Credit</div><div className="space-y-2">{methodRow("credit_clear", <span className="rounded px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: "#ef5350" }}>CREDIT</span>, "Clear Instant Credit", "$" + acctCredit.toFixed(2) + " outstanding — upload payment slip", () => { setDepSel({ kind: "credit_clear", id: "credit_clear" }); setDAmount(acctCredit.toFixed(2)); setMsg(""); setErr(""); })}</div></>)}
+          {acctCredit > 0 && (<><div className={lbl} style={{ color: "#ef5350" }}>Clear Outstanding Credit</div><div className="space-y-2">{methodRow("credit_clear", <span className="rounded px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: "#ef5350" }}>CREDIT</span>, "Clear Credit", "$" + acctCredit.toFixed(2) + " outstanding — upload payment slip", () => { setDepSel({ kind: "credit_clear", id: "credit_clear" }); setDAmount(acctCredit.toFixed(2)); setMsg(""); setErr(""); })}</div></>)}
         </>)}
       </div>
     ))}
@@ -246,7 +246,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
       <div className="ui-card ui-fade-up space-y-3 p-4">
         <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "rgba(239,83,80,0.4)", background: "rgba(239,83,80,0.08)", color: "#ef5350" }}>
           <i className="fa-solid fa-lock mr-2" /><b>Withdrawal Disabled</b>
-          <p className="mt-1 text-xs">Please clear your outstanding credit of <b>${acctCredit.toFixed(2)}</b> before making a withdrawal. Use the <b>Deposit</b> tab → <b>Clear Instant Credit</b> to settle.</p>
+          <p className="mt-1 text-xs">Please clear your outstanding credit of <b>${acctCredit.toFixed(2)}</b> before making a withdrawal. Use the <b>Deposit</b> tab → <b>Clear Credit</b> to settle.</p>
         </div>
       </div>
     )}

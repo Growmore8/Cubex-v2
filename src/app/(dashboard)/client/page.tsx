@@ -2074,7 +2074,7 @@ export default function ClientTerminal() {
               <div className="space-y-3">
                 <div className="rounded-lg border px-3 py-2.5 text-xs" style={{ borderColor: "rgba(239,83,80,0.4)", background: "rgba(239,83,80,0.08)", color: SELL }}>
                   <i className="fa-solid fa-lock mr-1" /><b>Outstanding Credit: ${Number(account.credit).toFixed(2)}</b>
-                  <div className="mt-1">Please clear your existing credit balance before requesting a new one. Use Deposit → Clear Instant Credit.</div>
+                  <div className="mt-1">Please clear your existing credit balance before requesting a new one. Use Deposit → Clear Credit.</div>
                 </div>
               </div>
             ) : (
