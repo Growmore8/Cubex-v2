@@ -53,6 +53,7 @@ export async function POST(req: Request) {
       if (Number(account.credit) <= 0) throw new Error("No outstanding credit to clear.");
     }
     if (kind === "WITHDRAWAL") {
+      if (Number(account.credit) > 0) throw new Error("Please clear your outstanding credit before making a withdrawal.");
       const pnlOnly = await getFundsPnlOnly(s.tenantId!);
       const movable = withdrawableBalance(account as any, pnlOnly);
       if (amount > movable) throw new Error(pnlOnly ? `Only your profit (PNL) balance is withdrawable (max ${movable.toFixed(2)})` : "Insufficient balance");

@@ -167,7 +167,13 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     {shown.length > 1 && (
       <div className="flex gap-1 border-b" style={{ borderColor: "var(--border)" }}>
         {shown.includes("deposit") && <button className={tabBtn("deposit")} onClick={() => { setTab("deposit"); setDepSel(null); }}>Deposit</button>}
-        {shown.includes("withdraw") && <button className={tabBtn("withdraw")} onClick={() => setTab("withdraw")}>Withdraw</button>}
+        {shown.includes("withdraw") && (
+          acctCredit > 0
+            ? <button className={tabBtn("withdraw")} onClick={() => setTab("withdraw")} title="Withdrawal locked — clear outstanding credit first" style={{ opacity: 0.5, cursor: "not-allowed" }}>
+                <i className="fa-solid fa-lock mr-1 text-[10px]" />Withdraw
+              </button>
+            : <button className={tabBtn("withdraw")} onClick={() => setTab("withdraw")}>Withdraw</button>
+        )}
         {shown.includes("kyc") && <button className={tabBtn("kyc")} onClick={() => setTab("kyc")}>KYC</button>}
       </div>
     )}

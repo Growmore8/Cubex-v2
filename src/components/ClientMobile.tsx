@@ -859,14 +859,14 @@ export default function ClientMobile({ t }: { t: any }) {
             {account?.type === "LIVE" ? (
               <div className="grid grid-cols-4 gap-2">
                 {([
-                  { label: "Deposit", icon: "fa-circle-dollar-to-slot", col: BUY, on: () => setWalletTab("deposit") },
-                  { label: "Withdraw", icon: "fa-hand-holding-dollar", col: SELL, on: () => setWalletTab("withdraw") },
-                  { label: "Transfer", icon: "fa-money-bill-transfer", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); } },
-                  { label: "Credit", icon: "fa-bolt", col: "#a855f7", on: () => { setIcErr(""); setIcMsg(""); setIcModal(true); } },
+                  { label: "Deposit", icon: "fa-circle-dollar-to-slot", col: BUY, on: () => setWalletTab("deposit"), locked: false },
+                  { label: "Withdraw", icon: "fa-hand-holding-dollar", col: SELL, on: () => setWalletTab("withdraw"), locked: Number(account?.credit || 0) > 0 },
+                  { label: "Transfer", icon: "fa-money-bill-transfer", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); }, locked: false },
+                  { label: "Credit", icon: "fa-bolt", col: "#a855f7", on: () => { setIcErr(""); setIcMsg(""); setIcModal(true); }, locked: false },
                 ]).map((b) => (
-                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-1.5 rounded-2xl py-3 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, var(--card), var(--soft))", border: "1px solid var(--border)", boxShadow: cardDark ? "inset 0 1px 0 rgba(255,255,255,0.06)" : "0 1px 2px rgba(0,0,0,0.05)" }}>
+                  <button key={b.label} onClick={b.locked ? undefined : b.on} className="gbtn flex flex-col items-center gap-1.5 rounded-2xl py-3 font-semibold" style={{ color: b.locked ? "var(--muted)" : "var(--text)", opacity: b.locked ? 0.55 : 1, cursor: b.locked ? "not-allowed" : undefined, background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, var(--card), var(--soft))", border: "1px solid var(--border)", boxShadow: cardDark ? "inset 0 1px 0 rgba(255,255,255,0.06)" : "0 1px 2px rgba(0,0,0,0.05)" }}>
                     <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#f7f9fc,#cfd6e2 42%,#9aa3b4 72%,#eef1f6)" }}>
-                      <i className={"fa-solid " + b.icon} style={{ color: b.col, fontSize: 13 }} />
+                      <i className={"fa-solid " + (b.locked ? "fa-lock" : b.icon)} style={{ color: b.locked ? "#64748b" : b.col, fontSize: 13 }} />
                     </span>
                     <span className="text-[10px]">{b.label}</span>
                   </button>
