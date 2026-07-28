@@ -24,12 +24,12 @@ export default function SASmsPage() {
     fetch("/api/superadmin/sms").then((r) => r.json()).then((d) => {
       if (d.ok && Array.isArray(d.tenants)) {
         setTenants(d.tenants);
-        if (d.tenants.length > 0) selectTenant(d.tenants[0], d.tenants);
+        if (d.tenants.length > 0) selectTenant(d.tenants[0]);
       }
     }).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function selectTenant(t: { id: string; name: string; enabled: boolean; phones: string[] }, list?: typeof tenants) {
+  function selectTenant(t: { id: string; name: string; enabled: boolean; phones: string[] }) {
     setSelId(t.id);
     setEnabled(t.enabled);
     setPhones(t.phones);
@@ -76,79 +76,86 @@ export default function SASmsPage() {
 
   function addPhone() {
     const p = newPhone.trim();
-    if (p && !phones.includes(p)) { setPhones((ps) => [...ps, p]); setNewPhone(""); }
+    if (p && !phones.includes(p)) {
+      const updated = [...phones, p];
+      setPhones(updated);
+      setNewPhone("");
+      setTenants((ts) => ts.map((t) => t.id === selId ? { ...t, phones: updated } : t));
+    }
+  }
+
+  function removePhone(i: number) {
+    const updated = phones.filter((_, j) => j !== i);
+    setPhones(updated);
+    setTenants((ts) => ts.map((t) => t.id === selId ? { ...t, phones: updated } : t));
   }
 
   const sel = tenants.find((t) => t.id === selId);
   const inp = "ui-input rounded-md border px-3 py-2 text-sm w-full";
-  const G = "#16a34a";
 
   return (
     <div className="max-w-3xl space-y-4 ui-fade-up">
       <div>
-        <h1 className="text-2xl font-bold">Notify.lk SMS</h1>
-        <p className="text-sm text-gray-500">Manage SMS notification credentials and per-tenant phone numbers</p>
+        <h1 className="page-title">Notify.lk SMS</h1>
+        <p className="page-sub">Manage SMS notification credentials and per-tenant phone numbers</p>
       </div>
 
       {/* ── API Credentials ── */}
-      <div className="space-y-3 ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
-        <div className="flex items-center gap-2">
-          <i className="fa-solid fa-key text-sm text-gray-500" />
-          <div className="text-sm font-semibold text-gray-700">API Credentials</div>
-          <span className="rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">Global</span>
+      <div className="card space-y-3">
+        <div className="card-title">
+          <span><i className="fa-solid fa-key mr-2" />API Credentials</span>
+          <span className="badge" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>Global</span>
         </div>
-        <p className="text-xs text-gray-500">
+        <p style={{ fontSize: 12, color: "var(--text2)" }}>
           These credentials are used to send all SMS notifications across all tenants via Notify.lk.
         </p>
-        <div className="grid grid-cols-3 gap-3">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
           <div>
-            <div className="text-xs text-gray-500 mb-1">User ID</div>
+            <div style={{ fontSize: 11, color: "var(--text2)", marginBottom: 4 }}>User ID</div>
             <input className={inp} placeholder="29207" value={creds.notifyLkUserId} onChange={(e) => setCreds({ ...creds, notifyLkUserId: e.target.value })} />
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">API Key</div>
+            <div style={{ fontSize: 11, color: "var(--text2)", marginBottom: 4 }}>API Key</div>
             <PasswordInput className={inp} placeholder="API Key" value={creds.notifyLkApiKey} onChange={(e: any) => setCreds({ ...creds, notifyLkApiKey: e.target.value })} />
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Service ID (Sender)</div>
+            <div style={{ fontSize: 11, color: "var(--text2)", marginBottom: 4 }}>Service ID (Sender)</div>
             <input className={inp} placeholder="NotifyDEMO" value={creds.notifyLkServiceId} onChange={(e) => setCreds({ ...creds, notifyLkServiceId: e.target.value })} />
           </div>
         </div>
         {credsMsg && (
-          <div className="rounded px-3 py-2 text-xs" style={{ background: credsMsg.ok ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", color: credsMsg.ok ? G : "#dc2626" }}>
+          <div style={{ borderRadius: 8, padding: "8px 12px", fontSize: 12, background: credsMsg.ok ? "rgba(22,199,154,0.12)" : "rgba(239,68,68,0.1)", color: credsMsg.ok ? "var(--accent)" : "#f87171" }}>
             {credsMsg.text}
           </div>
         )}
-        <button className="ui-btn ui-btn-primary px-3 py-1.5 text-sm disabled:opacity-50" onClick={saveCreds} disabled={credsSaving}>
-          {credsSaving ? <><i className="fa-solid fa-circle-notch fa-spin mr-1" />Saving…</> : <><i className="fa-solid fa-floppy-disk mr-1" />Save Credentials</>}
+        <button className="btn btn-gold" onClick={saveCreds} disabled={credsSaving}>
+          {credsSaving ? <><i className="fa-solid fa-circle-notch fa-spin" /> Saving…</> : <><i className="fa-solid fa-floppy-disk" /> Save Credentials</>}
         </button>
       </div>
 
       {/* ── Tenant selector + phone management ── */}
-      <div className="ui-card bg-white p-4 space-y-4" style={{ borderColor: "#e2e8f0" }}>
-        <div className="flex items-center gap-2">
-          <i className="fa-solid fa-building text-sm text-gray-500" />
-          <div className="text-sm font-semibold text-gray-700">Tenant Numbers</div>
+      <div className="card space-y-4">
+        <div className="card-title">
+          <span><i className="fa-solid fa-building mr-2" />Tenant Numbers</span>
         </div>
 
         {tenants.length === 0 ? (
-          <div className="text-xs text-gray-400 italic py-4 text-center">No tenants found</div>
+          <div style={{ fontSize: 12, color: "var(--text3)", fontStyle: "italic", textAlign: "center", padding: "16px 0" }}>No tenants found</div>
         ) : (
           <>
             {/* Tenant tabs */}
-            <div className="flex flex-wrap gap-2">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {tenants.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => selectTenant(t)}
-                  className="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors border"
                   style={selId === t.id
-                    ? { background: "#16c79a22", borderColor: "#16c79a", color: "#0a6b52" }
-                    : { background: "#f8fafc", borderColor: "#e2e8f0", color: "#64748b" }}
+                    ? { background: "rgba(22,199,154,0.15)", border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }
+                    : { background: "var(--bg2)", border: "1px solid var(--border)", color: "var(--text2)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
                 >
                   {t.name}
                   {t.enabled && t.phones.length > 0 && (
-                    <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-green-100 px-1.5 text-[9px] font-bold text-green-700">
+                    <span style={{ marginLeft: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 999, background: "rgba(22,199,154,0.2)", color: "var(--accent)", fontSize: 9, fontWeight: 700, padding: "1px 5px" }}>
                       {t.phones.length}
                     </span>
                   )}
@@ -157,65 +164,62 @@ export default function SASmsPage() {
             </div>
 
             {sel && (
-              <div className="space-y-3 rounded-lg border p-3" style={{ borderColor: "#e2e8f0" }}>
+              <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
                 {/* Enable toggle */}
-                <div className="flex items-center justify-between">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
-                    <div className="text-xs font-semibold text-gray-700">Enable SMS for {sel.name}</div>
-                    <div className="text-[10px] text-gray-500">When disabled, no SMS will be sent for this tenant</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Enable SMS for {sel.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>When disabled, no SMS will be sent for this tenant</div>
                   </div>
                   <button
                     onClick={() => setEnabled((v) => !v)}
-                    className="relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors"
-                    style={{ background: enabled ? "#16c79a" : "#d1d5db" }}
+                    style={{ position: "relative", display: "inline-flex", alignItems: "center", width: 36, height: 20, borderRadius: 999, border: "none", cursor: "pointer", background: enabled ? "var(--accent)" : "var(--border)", flexShrink: 0, transition: "background .2s" }}
                   >
-                    <span className="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform" style={{ transform: enabled ? "translateX(18px)" : "translateX(2px)" }} />
+                    <span style={{ position: "absolute", left: enabled ? 18 : 2, width: 14, height: 14, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,.25)", transition: "left .2s" }} />
                   </button>
                 </div>
 
                 {/* Phone list */}
-                <div className="space-y-1.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Notification Numbers</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text3)" }}>Notification Numbers</div>
                   {phones.length === 0 && (
-                    <div className="py-1 text-xs italic text-gray-400">No numbers added yet</div>
+                    <div style={{ fontSize: 11, color: "var(--text3)", fontStyle: "italic", padding: "4px 0" }}>No numbers added yet</div>
                   )}
                   {phones.map((phone, i) => {
                     const ts = testState[phone];
                     return (
-                      <div key={i} className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="flex-1 rounded border px-2 py-1 text-xs font-mono tabular-nums text-gray-700" style={{ borderColor: "#e2e8f0", background: "#f8fafc" }}>
+                      <div key={i}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ flex: 1, borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--text)", padding: "5px 10px", fontSize: 12, fontFamily: "monospace" }}>
                             {phone}
                           </span>
                           <button
                             disabled={ts?.loading}
                             onClick={() => testPhone(phone)}
-                            className="rounded px-2 py-1 text-[10px] font-semibold disabled:opacity-50 transition-opacity"
-                            style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", border: "1px solid rgba(59,130,246,0.25)" }}
                             title="Send test SMS to this number"
+                            style={{ borderRadius: 7, padding: "5px 10px", fontSize: 10, fontWeight: 700, background: "rgba(59,130,246,0.12)", color: "#3b82f6", border: "1px solid rgba(59,130,246,0.25)", cursor: "pointer", opacity: ts?.loading ? 0.5 : 1 }}
                           >
                             {ts?.loading ? <i className="fa-solid fa-circle-notch fa-spin" /> : "Test"}
                           </button>
                           <button
-                            onClick={() => setPhones((ps) => ps.filter((_, j) => j !== i))}
-                            className="flex h-6 w-6 items-center justify-center rounded text-xs text-red-400 hover:bg-red-50 transition-colors"
+                            onClick={() => removePhone(i)}
                             title="Remove"
+                            style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: "none", background: "transparent", color: "#f87171", cursor: "pointer", fontSize: 12 }}
                           >
                             <i className="fa-solid fa-xmark" />
                           </button>
                         </div>
                         {ts && !ts.loading && ts.text && (
-                          <div className="pl-1 text-[10px]" style={{ color: ts.ok ? G : "#dc2626" }}>{ts.text}</div>
+                          <div style={{ fontSize: 10, paddingLeft: 4, marginTop: 2, color: ts.ok ? "var(--accent)" : "#f87171" }}>{ts.text}</div>
                         )}
                       </div>
                     );
                   })}
 
-                  {/* Add phone input */}
-                  <div className="flex gap-2 pt-1">
+                  {/* Add phone */}
+                  <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
                     <input
-                      className="flex-1 rounded-md border px-2 py-1.5 text-xs outline-none focus:border-[#16c79a]"
-                      style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#1e293b" }}
+                      style={{ flex: 1, borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--text)", padding: "7px 10px", fontSize: 12, outline: "none" }}
                       placeholder="+94771234567"
                       value={newPhone}
                       onChange={(e) => setNewPhone(e.target.value)}
@@ -223,27 +227,23 @@ export default function SASmsPage() {
                     />
                     <button
                       onClick={addPhone}
-                      className="rounded-md px-3 py-1.5 text-xs font-semibold text-white"
-                      style={{ background: "#16c79a" }}
+                      className="btn btn-gold"
                     >
                       Add
                     </button>
                   </div>
                 </div>
 
-                {/* Save row */}
                 {saveMsg && (
-                  <div className="rounded px-3 py-2 text-xs" style={{ background: saveMsg.ok ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", color: saveMsg.ok ? G : "#dc2626" }}>
+                  <div style={{ borderRadius: 8, padding: "8px 12px", fontSize: 12, background: saveMsg.ok ? "rgba(22,199,154,0.12)" : "rgba(239,68,68,0.1)", color: saveMsg.ok ? "var(--accent)" : "#f87171" }}>
                     {saveMsg.text}
                   </div>
                 )}
-                <button
-                  onClick={saveTenant}
-                  disabled={saving}
-                  className="ui-btn ui-btn-primary px-3 py-1.5 text-sm disabled:opacity-50"
-                >
-                  {saving ? <><i className="fa-solid fa-circle-notch fa-spin mr-1" />Saving…</> : <><i className="fa-solid fa-floppy-disk mr-1" />Save</>}
-                </button>
+                <div>
+                  <button onClick={saveTenant} disabled={saving} className="btn btn-gold">
+                    {saving ? <><i className="fa-solid fa-circle-notch fa-spin" /> Saving…</> : <><i className="fa-solid fa-floppy-disk" /> Save</>}
+                  </button>
+                </div>
               </div>
             )}
           </>
