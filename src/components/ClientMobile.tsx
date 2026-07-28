@@ -1932,17 +1932,6 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Insurance</span><span style={{ color: Number(account?.insurance || 0) > 0 ? "#06b6d4" : "var(--muted)" }}>{_cSym}{fmt(Number(account?.insurance || 0))}</span></div>
             </div>
 
-            {/* running trade summary */}
-            <div className="glass-card p-4">
-              <div className="mb-2 text-[11px] font-bold tracking-wide">RUNNING TRADE SUMMARY</div>
-              <div className="mb-2 text-[10px] text-[var(--muted)]">Showing: {account?.login} · {account?.type} · {(positions || []).length} open</div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Equity</span><span style={{ color: equity >= balance ? BUY : SELL }}>{_cSym}{fmt(equity)}</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Margin</span><span>{_cSym}{fmt(used)}</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Free Margin</span><span>{_cSym}{fmt(free)}</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Margin Level</span><span>{level ? level.toFixed(2) : "0.00"}%</span></div>
-              <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Profit</span><span style={{ color: floating >= 0 ? BUY : SELL }}>{_cSym}{fmt(floating)}</span></div>
-            </div>
-
             {/* by direction */}
             <div className="glass-card p-4">
               <div className="mb-2 text-[11px] font-bold tracking-wide">BY DIRECTION</div>
