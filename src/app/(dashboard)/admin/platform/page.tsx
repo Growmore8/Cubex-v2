@@ -303,6 +303,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [smsNewPhone, setSmsNewPhone] = useState("");
   const [smsSaving, setSmsSaving] = useState(false);
   const [smsMsg, setSmsMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [smsTestState, setSmsTestState] = useState<Record<string, { loading: boolean; ok?: boolean; text?: string }>>({});
   // Signals state
   const [adminSignals, setAdminSignals] = useState<any[]>([]);
   const [sigForm, setSigForm] = useState({ symbol: "", direction: "BUY", entryPrice: "", sl: "", tp: "", rationale: "" });
@@ -2534,19 +2535,41 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   {smsPhones.length === 0 && (
                     <div className="text-[11px] italic py-1" style={{ color: "var(--muted)" }}>No numbers added yet</div>
                   )}
-                  {smsPhones.map((phone, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="flex-1 rounded border px-2 py-1 text-[11px] tabular-nums" style={{ borderColor: "var(--border)", background: "var(--soft)" }}>{phone}</span>
-                      <button
-                        onClick={() => setSmsPhones((ps) => ps.filter((_, j) => j !== i))}
-                        className="flex h-6 w-6 items-center justify-center rounded text-[10px] hover:bg-red-50"
-                        style={{ color: SELL }}
-                        title="Remove"
-                      >
-                        <i className="fa-solid fa-xmark" />
-                      </button>
-                    </div>
-                  ))}
+                  {smsPhones.map((phone, i) => {
+                    const ts = smsTestState[phone];
+                    return (
+                      <div key={i} className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="flex-1 rounded border px-2 py-1 text-[11px] tabular-nums" style={{ borderColor: "var(--border)", background: "var(--soft)" }}>{phone}</span>
+                          <button
+                            disabled={ts?.loading}
+                            onClick={async () => {
+                              setSmsTestState((s) => ({ ...s, [phone]: { loading: true } }));
+                              const r = await fetch("/api/admin/sms-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone }) }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
+                              setSmsTestState((s) => ({ ...s, [phone]: { loading: false, ok: r.ok, text: r.ok ? "Sent ✓" : (r.error || "Failed") } }));
+                              setTimeout(() => setSmsTestState((s) => { const n = { ...s }; delete n[phone]; return n; }), 4000);
+                            }}
+                            className="rounded px-2 py-1 text-[10px] font-semibold disabled:opacity-50"
+                            style={{ background: "rgba(59,130,246,0.12)", color: "#3b82f6", border: "1px solid rgba(59,130,246,0.3)" }}
+                            title="Send test SMS to this number"
+                          >
+                            {ts?.loading ? <i className="fa-solid fa-circle-notch fa-spin" /> : "Test"}
+                          </button>
+                          <button
+                            onClick={() => setSmsPhones((ps) => ps.filter((_, j) => j !== i))}
+                            className="flex h-6 w-6 items-center justify-center rounded text-[10px] hover:bg-red-50"
+                            style={{ color: SELL }}
+                            title="Remove"
+                          >
+                            <i className="fa-solid fa-xmark" />
+                          </button>
+                        </div>
+                        {ts && !ts.loading && ts.text && (
+                          <div className="text-[10px] pl-1" style={{ color: ts.ok ? "#16a34a" : SELL }}>{ts.text}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                   <div className="flex gap-2 pt-1">
                     <input
                       className="flex-1 rounded border px-2 py-1.5 text-[11px] outline-none focus:border-[var(--accent)]"
