@@ -26,7 +26,7 @@ export async function sendTenantSms(tenantId: string, message: string) {
           user_id: String(cfg.notifyLkUserId),
           api_key: String(cfg.notifyLkApiKey),
           service_id: serviceId,
-          to: phone,
+          to: phone.replace(/^\+/, ""),
           message: text,
         });
         return fetch("https://app.notify.lk/api/v1/send?" + params.toString());

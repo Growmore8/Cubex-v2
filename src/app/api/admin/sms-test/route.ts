@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       user_id: String(cfg.notifyLkUserId),
       api_key: String(cfg.notifyLkApiKey),
       service_id: serviceId,
-      to: String(phone),
+      to: String(phone).replace(/^\+/, ""),
       message,
     });
 
