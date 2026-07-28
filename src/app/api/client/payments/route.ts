@@ -7,6 +7,7 @@ import { notifyStaff } from "@/services/notification.service";
 import { saveUpload } from "@/lib/upload";
 import { audit } from "@/lib/audit";
 import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.service";
+import { sendTenantSms } from "@/lib/sms";
 
 export async function GET() {
   const s = await requireClient();
@@ -65,6 +66,7 @@ export async function POST(req: Request) {
     const kindLabel: Record<string, string> = { DEPOSIT: "Deposit request", WITHDRAWAL: "Withdrawal request", CREDIT_REQUEST: "Instant Credit request", CREDIT_CLEAR: "Credit Clearance request" };
     await audit(s.tenantId!, "payment.request", account.login + " " + kind + " " + amount + (method ? " via " + method : ""), s.email || account.login, "CLIENT");
     await notifyStaff(s.tenantId!, { type: "FUNDS", title: kindLabel[kind] || kind, body: account.login + " requested $" + amount }, (account as any).managerId);
+    sendTenantSms(s.tenantId!, (kindLabel[kind] || kind) + ": " + account.login + " requested $" + amount).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Request failed" }, { status: 400 });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { clientAccount, listClientKyc, createKyc } from "@/services/kyc.service";
 import { notifyStaff } from "@/services/notification.service";
+import { sendTenantSms } from "@/lib/sms";
 import { saveUpload } from "@/lib/upload";
 import { audit } from "@/lib/audit";
 
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
     const backKey = await saveUpload(back, "kyc/" + account.id);
     const doc = await createKyc(account.id, docType, key, backKey);
     await notifyStaff(s.tenantId!, { title: "New KYC submitted", body: account.login + " uploaded " + docType + " (front + back)", type: "NOTICE" }, (account as any).managerId);
+    sendTenantSms(s.tenantId!, "New KYC: " + account.login + " submitted " + docType).catch(() => {});
     await audit(s.tenantId!, "kyc.submit", account.login + " uploaded " + docType + " (front + back)", s.email || account.login, "CLIENT");
     return NextResponse.json({ ok: true, doc });
   } catch (e: any) {

@@ -8,7 +8,13 @@ export async function GET() {
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   const rec = await prisma.setting.findUnique({ where: { key: "sa_config" } }).catch(() => null);
   const cfg = (rec?.value as any) || {};
-  return NextResponse.json({ ok: true, publicApiUrl: cfg.publicApiUrl || "" });
+  return NextResponse.json({
+    ok: true,
+    publicApiUrl: cfg.publicApiUrl || "",
+    notifyLkUserId: cfg.notifyLkUserId || "",
+    notifyLkApiKey: cfg.notifyLkApiKey || "",
+    notifyLkServiceId: cfg.notifyLkServiceId || "",
+  });
 }
 
 export async function POST(req: Request) {
@@ -22,17 +28,20 @@ export async function POST(req: Request) {
     if (b.password) { if (b.password.length < 6) throw new Error("Password too short"); data.passwordHash = await hashPassword(b.password); }
     if (Object.keys(data).length > 0) await prisma.user.update({ where: { id: s.sub }, data });
 
-    // Save non-profile settings (publicApiUrl etc.) to sa_config setting row
-    if (b.publicApiUrl !== undefined) {
+    // Save non-profile settings to sa_config setting row
+    const configFields = ["publicApiUrl", "notifyLkUserId", "notifyLkApiKey", "notifyLkServiceId"];
+    if (configFields.some((k) => b[k] !== undefined)) {
       const existing: any = (await prisma.setting.findUnique({ where: { key: "sa_config" } }).catch(() => null))?.value || {};
+      const patch: any = { ...existing };
+      for (const k of configFields) { if (b[k] !== undefined) patch[k] = String(b[k]).trim(); }
       await prisma.setting.upsert({
         where: { key: "sa_config" },
-        create: { key: "sa_config", value: { ...existing, publicApiUrl: String(b.publicApiUrl).trim() } },
-        update: { value: { ...existing, publicApiUrl: String(b.publicApiUrl).trim() } },
+        create: { key: "sa_config", value: patch },
+        update: { value: patch },
       });
     }
 
-    if (Object.keys(data).length === 0 && b.publicApiUrl === undefined) throw new Error("Nothing to update");
+    if (Object.keys(data).length === 0 && configFields.every((k) => b[k] === undefined)) throw new Error("Nothing to update");
     return NextResponse.json({ ok: true });
   } catch (e: any) { return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 }); }
 }

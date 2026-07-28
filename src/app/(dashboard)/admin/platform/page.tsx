@@ -23,7 +23,7 @@ import { gnum, gmoney, titleCaseName } from "@/lib/format";
 import { ADSS_DARK, ADSS_LIGHT, ADSS_FONT, BUY, SELL, GOLD, BUYBTN, SELLBTN } from "@/config/theme";
 
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
-const TABS: [string, string][] = [["overview", "Overview"], ["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"], ["symbols", "Symbols"], ["groups", "Groups"], ["risk", "Risk"], ["copy", "Copy Trading"], ["signals", "Signals"], ["broadcast", "Broadcast"], ["referral", "Referral"]];
+const TABS: [string, string][] = [["overview", "Overview"], ["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"], ["symbols", "Symbols"], ["groups", "Groups"], ["risk", "Risk"], ["copy", "Copy Trading"], ["signals", "Signals"], ["broadcast", "Broadcast"], ["referral", "Referral"], ["sms", "SMS"]];
 
 function pnlOf(p: any, price: number, cs: number) {
   const sym = String(p.symbol || "");
@@ -138,7 +138,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   }, [clients]);
   const sl = 0, tp = 0;
   const [tab, setTab] = useState("trade");
-  const [tabState, setTabState] = useState<Record<string, boolean>>({ overview: true, trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true, requests: true, symbols: true, groups: true, risk: true, copy: true, signals: true, broadcast: true, referral: true });
+  const [tabState, setTabState] = useState<Record<string, boolean>>({ overview: true, trade: true, history: true, summary: true, clients: true, audit: true, payments: true, kyc: true, requests: true, symbols: true, groups: true, risk: true, copy: true, signals: true, broadcast: true, referral: true, sms: true });
   const [copyRelations, setCopyRelations] = useState<any[]>([]);
   const [copyForm, setCopyForm] = useState({ masterAccId: "", followerAccId: "", ratio: "1.0" });
   const [copyErr, setCopyErr] = useState("");
@@ -249,6 +249,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const can = (k: string) => perms[k] !== false; // default allow until /me resolves
   const [fundPnlOnly, setFundPnlOnly] = useState(false);
   useEffect(() => { fetch("/api/admin/fund-settings").then((r) => r.json()).then((d) => { if (d.ok) setFundPnlOnly(!!d.pnlOnly); }).catch(() => {}); }, []);
+  useEffect(() => { fetch("/api/admin/sms-settings").then((r) => r.json()).then((d) => { if (d.ok) { setSmsEnabled(!!d.enabled); setSmsPhones(Array.isArray(d.phones) ? d.phones : []); } }).catch(() => {}); }, []);
   async function toggleFundPnlOnly() {
     setTopMenu("");
     const next = !fundPnlOnly;
@@ -297,6 +298,11 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [bcBody, setBcBody] = useState("");
   const [bcSending, setBcSending] = useState(false);
   const [bcMsg, setBcMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [smsPhones, setSmsPhones] = useState<string[]>([]);
+  const [smsNewPhone, setSmsNewPhone] = useState("");
+  const [smsSaving, setSmsSaving] = useState(false);
+  const [smsMsg, setSmsMsg] = useState<{ ok: boolean; text: string } | null>(null);
   // Signals state
   const [adminSignals, setAdminSignals] = useState<any[]>([]);
   const [sigForm, setSigForm] = useState({ symbol: "", direction: "BUY", entryPrice: "", sl: "", tp: "", rationale: "" });
@@ -2498,6 +2504,93 @@ const [selAcc, setSelAcc] = useState<any>(null);
                     }
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* ── SMS NOTIFICATIONS tab ── */}
+            {tab === "sms" && (
+              <div className="space-y-4 p-4 max-w-lg">
+                <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>SMS Notifications (Notify.lk)</div>
+                <p className="text-[11px]" style={{ color: "var(--muted)" }}>Send SMS to admin numbers when clients submit deposit, withdrawal, KYC, or credit requests. Credentials are configured by Super Admin.</p>
+
+                {/* Enable toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+                  <div>
+                    <div className="text-[12px] font-semibold">Enable SMS Notifications</div>
+                    <div className="text-[10px]" style={{ color: "var(--muted)" }}>When disabled no SMS will be sent for this account</div>
+                  </div>
+                  <button
+                    onClick={() => setSmsEnabled((v) => !v)}
+                    className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+                    style={{ background: smsEnabled ? BUY : "var(--border)" }}
+                  >
+                    <span className="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform" style={{ transform: smsEnabled ? "translateX(18px)" : "translateX(2px)" }} />
+                  </button>
+                </div>
+
+                {/* Phone number list */}
+                <div className="rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Notification Numbers</div>
+                  {smsPhones.length === 0 && (
+                    <div className="text-[11px] italic py-1" style={{ color: "var(--muted)" }}>No numbers added yet</div>
+                  )}
+                  {smsPhones.map((phone, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="flex-1 rounded border px-2 py-1 text-[11px] tabular-nums" style={{ borderColor: "var(--border)", background: "var(--soft)" }}>{phone}</span>
+                      <button
+                        onClick={() => setSmsPhones((ps) => ps.filter((_, j) => j !== i))}
+                        className="flex h-6 w-6 items-center justify-center rounded text-[10px] hover:bg-red-50"
+                        style={{ color: SELL }}
+                        title="Remove"
+                      >
+                        <i className="fa-solid fa-xmark" />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-1">
+                    <input
+                      className="flex-1 rounded border px-2 py-1.5 text-[11px] outline-none focus:border-[var(--accent)]"
+                      style={{ borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" }}
+                      placeholder="+94771234567"
+                      value={smsNewPhone}
+                      onChange={(e) => setSmsNewPhone(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const p = smsNewPhone.trim();
+                          if (p && !smsPhones.includes(p)) { setSmsPhones((ps) => [...ps, p]); setSmsNewPhone(""); }
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const p = smsNewPhone.trim();
+                        if (p && !smsPhones.includes(p)) { setSmsPhones((ps) => [...ps, p]); setSmsNewPhone(""); }
+                      }}
+                      className="rounded px-3 py-1.5 text-[11px] font-semibold text-white"
+                      style={{ background: "var(--accent)" }}
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                {smsMsg && <div className="rounded px-3 py-2 text-[11px]" style={{ background: smsMsg.ok ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", color: smsMsg.ok ? "#16a34a" : SELL }}>{smsMsg.text}</div>}
+
+                <button
+                  disabled={smsSaving}
+                  onClick={async () => {
+                    setSmsSaving(true); setSmsMsg(null);
+                    const r = await fetch("/api/admin/sms-settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: smsEnabled, phones: smsPhones }) }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
+                    setSmsSaving(false);
+                    setSmsMsg(r.ok ? { ok: true, text: "SMS settings saved" } : { ok: false, text: r.error || "Failed" });
+                    if (r.ok) setTimeout(() => setSmsMsg(null), 2000);
+                  }}
+                  className="rounded py-2 px-5 text-[11px] font-semibold text-white disabled:opacity-50"
+                  style={{ background: BUY }}
+                >
+                  {smsSaving ? "Saving…" : "Save SMS Settings"}
+                </button>
               </div>
             )}
 
