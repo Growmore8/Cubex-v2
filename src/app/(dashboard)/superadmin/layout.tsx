@@ -30,6 +30,7 @@ const NAV: Item[] = [
   { href: "/superadmin/api-keys", label: "API Keys", icon: "fa-key", sub: true },
   { href: "/superadmin/audit", label: "Audit Log", icon: "fa-clipboard-list", sub: true },
   { href: "/superadmin/notify", label: "Send Notification", icon: "fa-paper-plane", sub: true },
+  { href: "/superadmin/sms", label: "Notify.lk SMS", icon: "fa-comment-sms", sub: true },
   { href: "/superadmin/settings", label: "SA Settings", icon: "fa-sliders", sub: true },
 ];
 

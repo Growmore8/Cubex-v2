@@ -41,13 +41,7 @@ export default function SASettings() {
 
   useEffect(() => {
     fetch("/api/superadmin/settings").then((r) => r.json()).then((d) => {
-      if (d.ok) setForm((f: any) => ({
-        ...f,
-        publicApiUrl: d.publicApiUrl || "",
-        notifyLkUserId: d.notifyLkUserId || "",
-        notifyLkApiKey: d.notifyLkApiKey || "",
-        notifyLkServiceId: d.notifyLkServiceId || "",
-      }));
+      if (d.ok) setForm((f: any) => ({ ...f, publicApiUrl: d.publicApiUrl || "" }));
     }).catch(() => {});
   }, []);
 
@@ -75,27 +69,6 @@ export default function SASettings() {
         <div className="text-xs text-gray-500 mb-1">Public API URL</div>
         <input className={inp} placeholder="https://orbitfxsolution.com" value={form.publicApiUrl || ""} onChange={(e) => setForm({ ...form, publicApiUrl: e.target.value })} />
         <div className="text-xs text-gray-400 mt-1">Leave blank to use the current server URL (not recommended for production)</div>
-      </div>
-    </div>
-    <div className="space-y-3 ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
-      <div className="flex items-center gap-2">
-        <div className="text-sm font-semibold text-gray-700">Notify.lk SMS</div>
-        <span className="rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">Global</span>
-      </div>
-      <p className="text-xs text-gray-500">Credentials used to send SMS notifications to tenant admin numbers when clients submit deposit, withdrawal, KYC, or credit requests. Each tenant controls which numbers receive SMS and whether it is enabled.</p>
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <div className="text-xs text-gray-500 mb-1">User ID</div>
-          <input className={inp} placeholder="29207" value={form.notifyLkUserId || ""} onChange={(e) => setForm({ ...form, notifyLkUserId: e.target.value })} />
-        </div>
-        <div>
-          <div className="text-xs text-gray-500 mb-1">API Key</div>
-          <PasswordInput className={inp} placeholder="API Key" value={form.notifyLkApiKey || ""} onChange={(e: any) => setForm({ ...form, notifyLkApiKey: e.target.value })} />
-        </div>
-        <div>
-          <div className="text-xs text-gray-500 mb-1">Service ID (Sender)</div>
-          <input className={inp} placeholder="NotifyDEMO" value={form.notifyLkServiceId || ""} onChange={(e) => setForm({ ...form, notifyLkServiceId: e.target.value })} />
-        </div>
       </div>
     </div>
     <button className="ui-btn ui-btn-primary px-4 py-2 text-sm" onClick={save}>Save Changes</button>
