@@ -522,7 +522,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
     };
     return m[act.kind] || { label: "Confirm", color: BUY, fg: "#04140e" };
   }
-  const acctBal = (c: any) => c ? (Number(c.deposit || 0) - Number(c.withdrawal || 0) + Number(c.credit || 0) + Number(c.bonus || 0) + Number(c.pnl || 0)) : 0;
+  const acctBal = (c: any) => c ? (Number(c.deposit || 0) + Number(c.pnl || 0) - Number(c.withdrawal || 0)) : 0;
   const af = (k: string, v: any) => setAform((o: any) => ({ ...o, [k]: v }));
   async function submitAct() {
     if (!act) return; setErr("");
@@ -711,10 +711,10 @@ const [selAcc, setSelAcc] = useState<any>(null);
 
   const accOpen = selAcc ? open.filter((o) => o.accountLogin === selAcc.login) : [];
   const accPending = selAcc ? pendingOrders.filter((o) => o.accountLogin === selAcc.login) : [];
-  const balOfFn = (a: any) => a ? Number(a.deposit) - Number(a.withdrawal) + Number(a.credit) + Number(a.bonus) + Number(a.pnl) : 0;
+  const balOfFn = (a: any) => a ? Number(a.deposit) + Number(a.pnl) - Number(a.withdrawal) : 0;
   const floating = accOpen.reduce((s, p) => s + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
   const balance = balOfFn(selAcc);
-  const equity = balance + floating;
+  const equity = balance + floating + Number(selAcc?.credit || 0) + Number(selAcc?.bonus || 0) + Number(selAcc?.insurance || 0);
   const used = selAcc ? (() => {
     // hedged (net) margin: net BUY−SELL lots per symbol, charge margin on |net| only
     const net: Record<string, number> = {};
@@ -2010,8 +2010,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 if (!accPos.length) return null;
                 const fl = accPos.reduce((s: number, p: any) =>
                   s + pnlOf(p, prices[p.symbol] ?? Number(p.openPrice), contractFor(catMap[p.symbol] || "forex", p.symbol)), 0);
-                const balance = Number(c.deposit ?? 0) - Number(c.withdrawal ?? 0) + Number(c.credit ?? 0) + Number(c.bonus ?? 0) + Number(c.pnl ?? 0);
-                const eq = balance + fl;
+                const balance = Number(c.deposit ?? 0) + Number(c.pnl ?? 0) - Number(c.withdrawal ?? 0);
+                const eq = balance + fl + Number(c.credit ?? 0) + Number(c.bonus ?? 0) + Number(c.insurance ?? 0);
                 const usedM = accPos.reduce((s: number, p: any) => {
                   const pr = prices[p.symbol] ?? Number(p.openPrice);
                   const m = (Number(p.lots) * contractFor(catMap[p.symbol] || "forex", p.symbol) * pr) / (Number(c.leverage) || 100);

@@ -110,7 +110,7 @@ function KeepAlive({ active, children }: { active: boolean; children: React.Reac
   if (!seen.current) return null;
   return <div style={{ display: active ? "contents" : "none" }}>{children}</div>;
 }
-const acctBal = (a: any) => Number(a?.deposit || 0) - Number(a?.withdrawal || 0) + Number(a?.credit || 0) + Number(a?.bonus || 0) + Number(a?.pnl || 0);
+const acctBal = (a: any) => Number(a?.deposit || 0) + Number(a?.pnl || 0) - Number(a?.withdrawal || 0);
 
 const ORDER_KINDS: [string, string, string][] = [
   ["MARKET", "BUY", "Market"],

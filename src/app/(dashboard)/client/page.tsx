@@ -725,8 +725,8 @@ export default function ClientTerminal() {
   // Account-currency P&L wrapper: divides USD result by fxRate so all live P&L is in account currency.
   const pnlOfAcc = (p: any, price: number, cs: number) => pnlOf(p, price, cs) / fxRate;
   const floating = positions.reduce((s, p) => s + pnlOfAcc(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
-  const balance = account ? account.deposit - account.withdrawal + account.credit + account.bonus + account.pnl : 0;
-  const equity = balance + floating;
+  const balance = account ? account.deposit + account.pnl - account.withdrawal : 0;
+  const equity = balance + floating + (account ? account.credit + account.bonus + (account.insurance || 0) : 0);
   const used = account ? (() => {
     // hedged (net) margin: net BUY−SELL lots per symbol, charge margin on |net| only.
     // usedMargin() returns USD; divide by fxRate to display in account currency.

@@ -47,10 +47,10 @@ export async function assertMargin(account: any, newTrade: { symbol: string; typ
   missing.forEach((s, i) => { priceMap[s] = fetched[i] ?? Number(existing.find((t) => t.symbol === s)?.openPrice ?? 0); });
   let floating = 0;
   for (const t of existing) floating += pnlFor(t.symbol, t.type as any, Number(t.openPrice), priceMap[t.symbol], Number(t.lots));
-  const balance = Number(account.deposit) - Number(account.withdrawal) + Number(account.credit) + Number(account.bonus) + Number(account.pnl);
+  const balance = Number(account.deposit) + Number(account.pnl) - Number(account.withdrawal);
   // Convert account-currency balance to USD so it can be compared to USD floating P&L and margin.
   const fxRate = await getAccountFxRate(account.currency as string);
-  const equity = balance * fxRate + floating;
+  const equity = (balance + Number(account.credit || 0) + Number(account.bonus || 0) + Number(account.insurance || 0)) * fxRate + floating;
   const usedBefore = usedMargin(existing.map((t) => ({ symbol: t.symbol, type: t.type as "BUY" | "SELL", lots: Number(t.lots) })), lev, (sym) => priceMap[sym] ?? price);
   const after = [...existing.map((t) => ({ symbol: t.symbol, type: t.type as "BUY" | "SELL", lots: Number(t.lots) })), { symbol: newTrade.symbol, type: newTrade.type, lots: newTrade.lots }];
   const usedAfter = usedMargin(after, lev, (sym) => priceMap[sym] ?? price);
@@ -169,8 +169,8 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
         missing2.forEach((s, i) => { priceMap[s] = fetched2[i] ?? 0; });
         let floating2 = 0;
         for (const t of openTrades) floating2 += pnlFor(t.symbol, t.type as any, Number(t.openPrice), priceMap[t.symbol] ?? 0, Number(t.lots));
-        const bal = Number(accNow.deposit) - Number(accNow.withdrawal) + Number(accNow.credit) + Number(accNow.bonus) + Number(accNow.pnl);
-        const eq = bal + floating2;
+        const bal = Number(accNow.deposit) + Number(accNow.pnl) - Number(accNow.withdrawal);
+        const eq = bal + Number(accNow.credit || 0) + Number(accNow.bonus || 0) + Number(accNow.insurance || 0) + floating2;
         const lev = accNow.leverage || 100;
         const used = usedMargin(openTrades.map((t) => ({ symbol: t.symbol, type: t.type as "BUY" | "SELL", lots: Number(t.lots) })), lev, (s) => priceMap[s] ?? 0);
         const marginLevel = used > 0 ? (eq / used) * 100 : 9999;

@@ -133,7 +133,7 @@ export async function GET(req: Request) {
       phone: parentDisplay?.phone || account.phone || null, country: parentDisplay?.country || account.country || null,
       ownerName: account.user?.name || account.name,
       deposit: Number(account.deposit), withdrawal: Number(account.withdrawal),
-      credit: Number(account.credit), bonus: Number(account.bonus), pnl: Number(account.pnl),
+      credit: Number(account.credit), bonus: Number(account.bonus), pnl: Number(account.pnl), insurance: Number((account as any).insurance || 0),
     } : null,
     financials: account ? account.financials.map((f) => ({
       id: f.id.toString(), type: f.type, amount: Number(f.amount), description: f.description, appliedAt: f.appliedAt,
