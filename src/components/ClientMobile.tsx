@@ -293,7 +293,7 @@ export default function ClientMobile({ t }: { t: any }) {
   }, [theme]);
 
   useEffect(() => {
-    if (account && !profilePrompted && (!account.phone || !account.country)) {
+    if (account && !profilePrompted && (!(account.ownerName || account.name) || !account.phone || !account.country)) {
       setProfilePrompted(true);
       setProfileForm({ name: account?.ownerName || account?.name || "", phone: account?.phone || "", country: account?.country || "" });
       setProfileErr("");
