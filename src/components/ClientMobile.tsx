@@ -267,6 +267,16 @@ export default function ClientMobile({ t }: { t: any }) {
   const [profileErr, setProfileErr] = useState("");
   const [profilePrompted, setProfilePrompted] = useState(false);
   function openProfileEdit() { setProfileForm({ name: account?.ownerName || account?.name || "", phone: account?.phone || "", country: account?.country || "" }); setProfileErr(""); setProfileModal(true); }
+  async function submitInstantCredit() {
+    setIcErr(""); setIcMsg(""); setIcSending(true);
+    const amt = Number(icAmount);
+    if (!amt || amt < 250 || amt > 1000) { setIcErr("Amount must be between $250 and $1,000"); setIcSending(false); return; }
+    const fd = new FormData(); fd.append("kind", "CREDIT_REQUEST"); fd.append("amount", String(amt)); if (icNote) fd.append("note", icNote);
+    const r = await fetch("/api/client/payments", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
+    setIcSending(false);
+    if (!r.ok) { setIcErr(r.error || "Request failed"); return; }
+    setIcMsg("Credit request submitted — pending admin approval."); setIcNote(""); setIcAmount("500");
+  }
   async function saveProfile() {
     setProfileSaving(true); setProfileErr("");
     const r = await fetch("/api/client/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profileForm) }).then((x) => x.json()).catch(() => ({ ok: false, error: "Network error" }));
@@ -322,6 +332,13 @@ export default function ClientMobile({ t }: { t: any }) {
   const [mobAlertErr, setMobAlertErr] = useState("");
   const [notisOpen, setNotisOpen] = useState(false);
   const [reqsOpen, setReqsOpen] = useState(false);
+  // Instant credit modal (mobile-local)
+  const [icModal, setIcModal] = useState(false);
+  const [icAmount, setIcAmount] = useState("500");
+  const [icNote, setIcNote] = useState("");
+  const [icErr, setIcErr] = useState("");
+  const [icMsg, setIcMsg] = useState("");
+  const [icSending, setIcSending] = useState(false);
   const [cfgSheet, setCfgSheet] = useState(false);
   const [tfPickerOpen, setTfPickerOpen] = useState(false);
   const chartWrapRef = useRef<HTMLDivElement>(null);
@@ -402,8 +419,10 @@ export default function ClientMobile({ t }: { t: any }) {
 
   const reqRow = (req: any) => {
     const isAcc = req.kind === "ACCOUNT";
-    const ic = isAcc ? "fa-circle-plus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";
-    const col = isAcc ? BLUE : req.kind === "DEPOSIT" ? BUY : SELL;
+    const isCredit = req.kind === "CREDIT_REQUEST" || req.kind === "CREDIT_CLEAR";
+    const ic = isAcc ? "fa-circle-plus" : req.kind === "CREDIT_REQUEST" ? "fa-bolt" : req.kind === "CREDIT_CLEAR" ? "fa-circle-minus" : req.kind === "DEPOSIT" ? "fa-arrow-down" : "fa-arrow-up";
+    const col = isAcc ? BLUE : isCredit ? "#a855f7" : req.kind === "DEPOSIT" ? BUY : SELL;
+    const kindLabel = isAcc ? null : req.kind === "CREDIT_REQUEST" ? "Instant Credit Request" : req.kind === "CREDIT_CLEAR" ? "Credit Clearance" : req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal";
     return (
       <div key={req.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] px-3 py-2.5">
         <div className="flex items-center gap-2.5">
@@ -411,7 +430,7 @@ export default function ClientMobile({ t }: { t: any }) {
             <i className={"fa-solid text-sm " + ic} style={{ color: col }} />
           </div>
           <div>
-            <div className="text-[12px] font-semibold">{isAcc ? <>New {req.type === "DEMO" ? "Demo" : "Live"} Account <span className="font-normal text-[var(--muted)]">{req.currency}</span></> : <>{req.kind === "DEPOSIT" ? "Deposit" : "Withdrawal"} <span className="font-bold">{_cSym}{gnum(req.amount, 2)}</span></>}</div>
+            <div className="text-[12px] font-semibold">{isAcc ? <>New {req.type === "DEMO" ? "Demo" : "Live"} Account <span className="font-normal text-[var(--muted)]">{req.currency}</span></> : <>{kindLabel} <span className="font-bold">{_cSym}{gnum(req.amount, 2)}</span></>}</div>
             <div className="text-[10px] text-[var(--muted)]">{isAcc ? `1:${req.leverage}` : (req.method || "—")} · {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : "—"}</div>
           </div>
         </div>
@@ -836,19 +855,20 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="text-[9px] text-[var(--muted)]">← swipe to switch account →</div>
             </div>
 
-            {/* action buttons — LIVE: deposit/withdraw/transfer · DEMO: top-up only */}
+            {/* action buttons — LIVE: deposit/withdraw/transfer/credit · DEMO: top-up only */}
             {account?.type === "LIVE" ? (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {([
                   { label: "Deposit", icon: "fa-circle-dollar-to-slot", col: BUY, on: () => setWalletTab("deposit") },
                   { label: "Withdraw", icon: "fa-hand-holding-dollar", col: SELL, on: () => setWalletTab("withdraw") },
                   { label: "Transfer", icon: "fa-money-bill-transfer", col: BLUE, on: () => { setXfer({ ...(xfer || {}), fromId: accId }); setXferModal(true); } },
+                  { label: "Credit", icon: "fa-bolt", col: "#a855f7", on: () => { setIcErr(""); setIcMsg(""); setIcModal(true); } },
                 ]).map((b) => (
-                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-2 rounded-2xl py-3.5 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, var(--card), var(--soft))", border: "1px solid var(--border)", boxShadow: cardDark ? "inset 0 1px 0 rgba(255,255,255,0.06)" : "0 1px 2px rgba(0,0,0,0.05)" }}>
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#f7f9fc,#cfd6e2 42%,#9aa3b4 72%,#eef1f6)" }}>
-                      <i className={"fa-solid " + b.icon} style={{ color: b.col, fontSize: 15 }} />
+                  <button key={b.label} onClick={b.on} className="gbtn flex flex-col items-center gap-1.5 rounded-2xl py-3 font-semibold" style={{ color: "var(--text)", background: cardDark ? "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))" : "linear-gradient(160deg, var(--card), var(--soft))", border: "1px solid var(--border)", boxShadow: cardDark ? "inset 0 1px 0 rgba(255,255,255,0.06)" : "0 1px 2px rgba(0,0,0,0.05)" }}>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "linear-gradient(145deg,#f7f9fc,#cfd6e2 42%,#9aa3b4 72%,#eef1f6)" }}>
+                      <i className={"fa-solid " + b.icon} style={{ color: b.col, fontSize: 13 }} />
                     </span>
-                    <span className="text-[11px]">{b.label}</span>
+                    <span className="text-[10px]">{b.label}</span>
                   </button>
                 ))}
               </div>
@@ -2362,6 +2382,52 @@ export default function ClientMobile({ t }: { t: any }) {
                 </button>
               </div>
             </>)}
+          </div>
+        </div>
+      )}
+
+      {/* Instant Credit modal */}
+      {icModal && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => setIcModal(false)}>
+          <div className="w-full max-w-sm rounded-2xl border p-5 shadow-2xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: "rgba(168,85,247,0.15)" }}>
+                  <i className="fa-solid fa-bolt text-sm" style={{ color: "#a855f7" }} />
+                </div>
+                <span className="text-[15px] font-bold">Instant Credit</span>
+              </div>
+              <button onClick={() => setIcModal(false)} className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: "var(--soft)", color: "var(--muted)" }}><i className="fa-solid fa-xmark" /></button>
+            </div>
+            {(t as any).creditRequest ? (
+              <div className="rounded-xl border px-4 py-3 text-[12px]" style={{ borderColor: "rgba(240,180,41,0.4)", background: "rgba(240,180,41,0.08)", color: GOLD }}>
+                <div className="font-bold"><i className="fa-solid fa-clock mr-1.5" />Request Pending</div>
+                <div className="mt-1 text-[11px]">You have a pending credit request for <b>${Number((t as any).creditRequest.amount).toFixed(2)}</b>. Please wait for admin approval.</div>
+              </div>
+            ) : Number(account?.credit || 0) > 0 ? (
+              <div className="rounded-xl border px-4 py-3 text-[12px]" style={{ borderColor: "rgba(239,83,80,0.4)", background: "rgba(239,83,80,0.08)", color: SELL }}>
+                <div className="font-bold"><i className="fa-solid fa-lock mr-1.5" />Outstanding Credit: ${Number(account.credit).toFixed(2)}</div>
+                <div className="mt-1 text-[11px]">Please clear your existing credit before requesting a new one. Use Deposit → Clear Instant Credit.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-[12px]" style={{ color: "var(--muted)" }}>Request between <b style={{ color: "var(--text)" }}>$250</b> and <b style={{ color: "var(--text)" }}>$1,000</b>. Credit is added to your equity upon admin approval.</div>
+                {icErr && <div className="rounded-xl px-3 py-2 text-[12px]" style={{ background: "rgba(239,83,80,0.1)", color: SELL }}>{icErr}</div>}
+                {icMsg && <div className="rounded-xl px-3 py-2 text-[12px]" style={{ background: "rgba(22,163,74,0.1)", color: BUY }}>{icMsg}</div>}
+                <div>
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Amount (USD)</div>
+                  <input type="number" inputMode="decimal" min={250} max={1000} step={50} value={icAmount} onChange={(e) => setIcAmount(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-sm text-[var(--text)]" placeholder="500" />
+                  <div className="mt-1 text-[10px]" style={{ color: "var(--muted)" }}>Min $250 · Max $1,000</div>
+                </div>
+                <div>
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>Note (optional)</div>
+                  <input value={icNote} onChange={(e) => setIcNote(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-sm text-[var(--text)]" placeholder="Reason for credit request…" />
+                </div>
+                <button disabled={icSending} onClick={submitInstantCredit} className="w-full rounded-xl py-3 text-[13px] font-bold text-white disabled:opacity-60 active:scale-95 transition-transform" style={{ background: "#a855f7" }}>
+                  <i className="fa-solid fa-bolt mr-1.5" />{icSending ? "Submitting…" : "Request Instant Credit"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
