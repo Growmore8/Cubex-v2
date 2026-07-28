@@ -54,10 +54,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         ops.push(prisma.financialHistory.create({ data: { accountId: rec.accountId, type: "WITHDRAWAL", amount: amt, description: rec.method ? `Withdrawal via ${rec.method}` : "Withdrawal", mode: "REALTIME", createdBy: by } }));
       } else if (kind === "CREDIT_REQUEST") {
         // Add instant credit to account
-        const settleFrom = b.settleFrom ? new Date(b.settleFrom) : null;
         const settleTo = b.settleTo ? new Date(b.settleTo) : null;
         const acc = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true, login: true, managerId: true, name: true } });
-        ops.push(prisma.account.update({ where: { id: rec.accountId }, data: { credit: { increment: amt }, ...(settleFrom ? { creditSettleFrom: settleFrom } : {}), ...(settleTo ? { creditSettleTo: settleTo } : {}) } }));
+        ops.push(prisma.account.update({ where: { id: rec.accountId }, data: { credit: { increment: amt }, ...(settleTo ? { creditSettleFrom: new Date(), creditSettleTo: settleTo } : {}) } }));
         ops.push(prisma.financialHistory.create({ data: { accountId: rec.accountId, type: "CREDIT_IN", amount: amt, description: "Instant Credit — $" + Number(rec.amount).toFixed(2) + (settleTo ? " (due " + settleTo.toISOString().slice(0, 10) + ")" : ""), mode: "REALTIME", createdBy: by } }));
         await prisma.$transaction(ops);
         await audit(tenantId, "credit.instant.approved", (acc?.login || rec.accountId) + " instant credit $" + rec.amount + (settleTo ? " due " + settleTo.toISOString().slice(0, 10) : ""), by);

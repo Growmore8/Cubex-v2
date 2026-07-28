@@ -15,7 +15,7 @@ export default function PaymentsPanel() {
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [expand, setExpand] = useState("");
   // Settlement date modal for approving CREDIT_REQUEST
-  const [settleModal, setSettleModal] = useState<{ p: any; settleFrom: string; settleTo: string } | null>(null);
+  const [settleModal, setSettleModal] = useState<{ p: any; settleTo: string } | null>(null);
 
   async function load() {
     const r = await fetch("/api/admin/payments").then((x) => x.json()).catch(() => ({ ok: false }));
@@ -53,7 +53,7 @@ export default function PaymentsPanel() {
 
   function tryApprove(p: any) {
     if (kind(p) === "CREDIT_REQUEST") {
-      setSettleModal({ p, settleFrom: "", settleTo: "" });
+      setSettleModal({ p, settleTo: "" });
     } else {
       act(p, "approve");
     }
@@ -62,7 +62,6 @@ export default function PaymentsPanel() {
   async function confirmSettle() {
     if (!settleModal) return;
     await act(settleModal.p, "approve", {
-      settleFrom: settleModal.settleFrom || "",
       settleTo: settleModal.settleTo || "",
     });
     setSettleModal(null);
@@ -185,11 +184,10 @@ export default function PaymentsPanel() {
               <button onClick={() => setSettleModal(null)} className="text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
             </div>
             <div className="mb-3 text-[11px] text-[var(--muted)]">
-              Approving credit of <b className="text-[var(--text)]">${Number(settleModal.p.amount).toFixed(2)}</b> for <b className="text-[var(--text)]">{login(settleModal.p) || name(settleModal.p)}</b>. Optionally set a settlement period.
+              Approving credit of <b className="text-[var(--text)]">${Number(settleModal.p.amount).toFixed(2)}</b> for <b className="text-[var(--text)]">{login(settleModal.p) || name(settleModal.p)}</b>. Optionally set a due date for repayment.
             </div>
             <div className="space-y-2">
-              <div><div className={flab}>Settlement From (optional)</div><input type="date" className={inp} value={settleModal.settleFrom} onChange={(e) => setSettleModal({ ...settleModal, settleFrom: e.target.value })} /></div>
-              <div><div className={flab}>Settlement To / Due Date (optional)</div><input type="date" className={inp} value={settleModal.settleTo} onChange={(e) => setSettleModal({ ...settleModal, settleTo: e.target.value })} /></div>
+              <div><div className={flab}>Due Date (optional)</div><input type="date" className={inp} value={settleModal.settleTo} onChange={(e) => setSettleModal({ ...settleModal, settleTo: e.target.value })} /></div>
             </div>
             <div className="mt-3 flex gap-2">
               <button onClick={() => setSettleModal(null)} className="flex-1 rounded border py-1.5 text-xs" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>

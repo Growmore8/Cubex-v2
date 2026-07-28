@@ -10,8 +10,7 @@ const schema = z.object({
   amount: z.number().positive(),
   description: z.string().optional(),
   appliedAt: z.string().optional(),
-  // Credit settlement period (optional, only used with CREDIT_IN)
-  settleFrom: z.string().optional(),
+  // Credit due date (optional, only used with CREDIT_IN; start date auto-set to today)
   settleTo: z.string().optional(),
   // Bonus expiry date (optional, only used with BONUS)
   bonusExpiryAt: z.string().optional(),
@@ -23,14 +22,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     await assertWritable(s);
-    const { type, amount, description, appliedAt, settleFrom, settleTo, bonusExpiryAt } = schema.parse(await req.json());
+    const { type, amount, description, appliedAt, settleTo, bonusExpiryAt } = schema.parse(await req.json());
     const balMap: Record<string, string> = { DEPOSIT: "processDeposits", WITHDRAWAL: "processWithdrawals", CREDIT_IN: "creditBonus", CREDIT_OUT: "creditBonus", BONUS: "creditBonus", INSURANCE: "creditBonus" };
     await assertCan(s, balMap[type] || "adjustBalance");
     const when = appliedAt ? new Date(appliedAt) : null;
     const account = await adjustBalance(s.tenantId!, id, type, amount, description || "", s.email, when);
-    // After credit added: optionally update settlement period
-    if (type === "CREDIT_IN" && (settleFrom || settleTo)) {
-      await prisma.account.update({ where: { id }, data: { ...(settleFrom ? { creditSettleFrom: new Date(settleFrom) } : {}), ...(settleTo ? { creditSettleTo: new Date(settleTo) } : {}) } });
+    // After credit added: optionally update due date (start = today automatically)
+    if (type === "CREDIT_IN" && settleTo) {
+      await prisma.account.update({ where: { id }, data: { creditSettleFrom: new Date(), creditSettleTo: new Date(settleTo) } });
     }
     // After bonus added: optionally update bonus expiry
     if (type === "BONUS" && bonusExpiryAt) {

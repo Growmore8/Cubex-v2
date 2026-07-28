@@ -533,10 +533,9 @@ const [selAcc, setSelAcc] = useState<any>(null);
       let desc = (aform.desc ?? act.label ?? act.finType) as string; if (ref) desc = desc + " (ref: " + ref + ")";
       let appliedAt: string | undefined;
       if (aform.dateMode === "manual") { if (!aform.appliedAt) { setErr("Pick a date & time"); return; } appliedAt = new Date(aform.appliedAt).toISOString(); }
-      const settleFrom = aform.settleFrom || undefined;
       const settleTo = aform.settleTo || undefined;
       const bonusExpiryAt = aform.bonusExpiryAt || undefined;
-      url = "/api/admin/clients/" + id + "/balance"; body = { type: act.finType, amount: amt, description: desc, appliedAt, settleFrom, settleTo, bonusExpiryAt };
+      url = "/api/admin/clients/" + id + "/balance"; body = { type: act.finType, amount: amt, description: desc, appliedAt, settleTo, bonusExpiryAt };
     }
     else if (act.kind === "manualpnl") { const amt = Number(aform.amount); if (!amt) { setErr("Enter an amount (use - for a loss)"); return; } url = "/api/admin/clients/" + id + "/manage"; body = { action: "manualPnl", amount: amt, description: aform.note || "Manual P/L" }; }
     else if (act.kind === "transfer") {
@@ -3192,9 +3191,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 <div><div className={flab}>Amount</div><input type="number" step="0.01" className={inp} value={aform.amount || ""} onChange={(e) => af("amount", e.target.value)} placeholder="0.00" autoFocus /></div>
                 <div><div className={flab}>Description</div><input className={inp} value={aform.desc ?? (act.label || "")} onChange={(e) => af("desc", e.target.value)} /></div>
               </div>
-              {act.finType === "CREDIT_IN" && (<div className="grid grid-cols-2 gap-2">
-                <div><div className={flab}>Settlement From (optional)</div><input type="date" className={inp} value={aform.settleFrom || ""} onChange={(e) => af("settleFrom", e.target.value)} /></div>
-                <div><div className={flab}>Settlement To (optional)</div><input type="date" className={inp} value={aform.settleTo || ""} onChange={(e) => af("settleTo", e.target.value)} /></div>
+              {act.finType === "CREDIT_IN" && (<div>
+                <div className={flab}>Due Date (optional)</div><input type="date" className={inp} value={aform.settleTo || ""} onChange={(e) => af("settleTo", e.target.value)} />
               </div>)}
               {act.finType === "BONUS" && (<div>
                 <div className={flab}>Bonus Expiry Date (optional)</div><input type="date" className={inp} value={aform.bonusExpiryAt || ""} onChange={(e) => af("bonusExpiryAt", e.target.value)} />
