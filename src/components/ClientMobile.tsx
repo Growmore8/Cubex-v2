@@ -616,6 +616,49 @@ export default function ClientMobile({ t }: { t: any }) {
   const cIsLive = account?.type === "LIVE";
   const cardDark = theme === "dark";
 
+  // ── PROFILE GATE — blocks the entire app until name/phone/country are set ──
+  if (profileModal) {
+    return (
+      <>
+        <div style={{ position: "fixed", inset: 0, zIndex: 0, background: theme === "dark" ? "#06080f" : "#dfe5ee" }} />
+        <div style={{ ...(theme === "dark" ? DARK : LIGHT), colorScheme: theme === "dark" ? "dark" : "light", fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", position: "fixed", top: 0, bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 540, zIndex: 1, paddingTop: "env(safe-area-inset-top)", background: "var(--bg)" }} className="flex flex-col overflow-hidden text-[var(--text)]">
+          <div className="flex flex-1 flex-col justify-center overflow-y-auto px-6 py-10">
+            {/* Icon */}
+            <div className="mb-6 flex justify-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: "rgba(22,163,74,0.12)" }}>
+                <i className="fa-solid fa-user-check text-2xl" style={{ color: BUY }} />
+              </div>
+            </div>
+            <div className="mb-1 text-center text-xl font-bold">Complete Your Profile</div>
+            <p className="mb-6 text-center text-[12px]" style={{ color: "var(--muted)" }}>This information is required to access the platform. It must match your government-issued ID and cannot be changed after submission.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold" style={{ color: "var(--muted)" }}>Full Name <span style={{ color: SELL }}>*</span></label>
+                <input value={profileForm.name} onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))} className="w-full rounded-xl border px-3 py-3 text-[14px] outline-none" style={{ borderColor: "var(--border)", background: "var(--card)", color: "var(--text)" }} placeholder="As it appears on your ID" />
+                <p className="mt-1 text-[10px]" style={{ color: "var(--muted)" }}>Must match your government-issued ID exactly.</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold" style={{ color: "var(--muted)" }}>Phone Number <span style={{ color: SELL }}>*</span></label>
+                <input value={profileForm.phone} onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))} className="w-full rounded-xl border px-3 py-3 text-[14px] outline-none" style={{ borderColor: "var(--border)", background: "var(--card)", color: "var(--text)" }} placeholder="+1 234 567 8900" type="tel" />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold" style={{ color: "var(--muted)" }}>Country <span style={{ color: SELL }}>*</span></label>
+                <select value={profileForm.country} onChange={(e) => setProfileForm((f) => ({ ...f, country: e.target.value }))} className="w-full rounded-xl border px-3 py-3 text-[14px] outline-none" style={{ borderColor: "var(--border)", background: "var(--card)", color: "var(--text)" }}>
+                  <option value="">Select country…</option>
+                  {COUNTRIES.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
+                </select>
+              </div>
+              {profileErr && <div className="rounded-lg px-3 py-2 text-[12px]" style={{ background: "rgba(220,38,38,0.1)", color: SELL }}>{profileErr}</div>}
+              <button onClick={saveProfile} disabled={profileSaving} className="w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white disabled:opacity-60" style={{ background: BUY }}>
+                {profileSaving ? <><i className="fa-solid fa-circle-notch fa-spin mr-2" />Saving…</> : "Submit & Continue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
     {/* Dark backdrop behind the phone-width app column (fills desktop sides). */}
@@ -2504,37 +2547,6 @@ export default function ClientMobile({ t }: { t: any }) {
             <input type="password" inputMode="numeric" value={pin.pinForm.pin || ""} onChange={(e) => pin.setPinForm({ ...pin.pinForm, pin: e.target.value })} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-center text-[var(--text)]" />
             {pin.pinErr && <div className="mt-2 text-[10px]" style={{ color: SELL }}>{pin.pinErr}</div>}
             <button onClick={pin.savePin} className="mt-3 w-full rounded-lg py-2 text-xs font-semibold text-white" style={{ background: BUY }}>Save PIN</button>
-          </div>
-        </div>
-      )}
-
-      {profileModal && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center p-0" style={{ background: "rgba(0,0,0,0.6)" }}>
-          <div className="w-full rounded-t-3xl border-t p-5 pb-8" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
-            <div className="mb-1 text-base font-bold">Complete Your Profile</div>
-            <p className="mb-4 text-[11px] text-[var(--muted)]">Required for withdrawals and KYC. This information cannot be changed after submission.</p>
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Full Name <span style={{ color: SELL }}>*</span></label>
-                <input value={profileForm.name} onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[14px] text-[var(--text)] outline-none" placeholder="As it appears on your ID" />
-                <p className="mt-1 text-[10px] text-[var(--muted)]">Must match your government-issued ID exactly.</p>
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Phone Number <span style={{ color: SELL }}>*</span></label>
-                <input value={profileForm.phone} onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[14px] text-[var(--text)] outline-none" placeholder="+1 234 567 8900" type="tel" />
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold text-[var(--muted)]">Country <span style={{ color: SELL }}>*</span></label>
-                <select value={profileForm.country} onChange={(e) => setProfileForm((f) => ({ ...f, country: e.target.value }))} className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[14px] text-[var(--text)] outline-none">
-                  <option value="">Select country…</option>
-                  {COUNTRIES.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
-                </select>
-              </div>
-              {profileErr && <div className="text-[12px]" style={{ color: SELL }}>{profileErr}</div>}
-              <button onClick={saveProfile} disabled={profileSaving} className="w-full rounded-2xl py-3 text-[15px] font-semibold text-white disabled:opacity-60" style={{ background: BUY }}>
-                {profileSaving ? "Saving…" : "Submit & Continue"}
-              </button>
-            </div>
           </div>
         </div>
       )}
