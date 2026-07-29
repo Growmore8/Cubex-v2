@@ -4,8 +4,6 @@ import { pnlFor, usedMargin } from "@/lib/trademath";
 import { getPrice, getBid } from "@/lib/prices";
 import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
-import { sendUserMail } from "@/lib/tenant-mail";
-import { stopOutEmail } from "@/lib/email-templates";
 import { gnum, gprice } from "@/lib/format";
 
 export interface StopOutResult {
@@ -174,25 +172,6 @@ async function processAccount(tenantId: string, account: any): Promise<number> {
     const label = `STOP-OUT ${account.login} ${worstTrade.type} ${sym} ${lots}L @ ${gprice(closePrice)} | P&L ${gnum(pnl, 2)} | MarginLevel was ${marginLevel.toFixed(1)}%`;
     audit(tenantId, "trade.stopout", label, account.login, "CLIENT" as any).catch(() => {});
     notifyStaff(tenantId, { type: "TRADE", title: "⛔ Stop-Out Executed", body: label }, account.managerId).catch(() => {});
-
-    if (account.userId && account.type === "LIVE") {
-      sendUserMail(
-        tenantId,
-        account.userId,
-        `⛔ Stop-Out Executed — Account ${account.login}`,
-        (brand) => stopOutEmail(brand, {
-          holderName: account.name,
-          login: account.login,
-          symbol: sym,
-          side: worstTrade.type,
-          lots,
-          openPrice: Number(worstTrade.openPrice),
-          closePrice,
-          pnl,
-          marginLevel,
-        }),
-      ).catch(() => {});
-    }
 
     closed++;
   }

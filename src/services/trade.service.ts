@@ -8,8 +8,6 @@ import { getAccountFxRate } from "@/lib/prices";
 import { notifyStaff } from "@/services/notification.service";
 import { audit } from "@/lib/audit";
 import { gnum, gprice } from "@/lib/format";
-import { sendUserMail } from "@/lib/tenant-mail";
-import { tradeOpenEmail, tradeCloseEmail, marginCallEmail } from "@/lib/email-templates";
 import { getSpreadPips, pipForDigits } from "@/lib/spread";
 import { isMarketOpen } from "@/lib/market";
 import { replicateTrade, closeCopiedTrades } from "@/services/copy.service";
@@ -148,48 +146,6 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   audit(tenantId, "trade.open", label, account.login, "CLIENT" as any);
   notifyStaff(tenantId, { type: "TRADE", title: "Trade opened", body: label }, (account as any).managerId).catch(() => {});
 
-  // Email notifications — LIVE accounts only, fire-and-forget
-  if (account.type === "LIVE" && account.userId) {
-    const uid = account.userId;
-    const tInfo = {
-      ticket: trade.ticket.toString(), symbol: input.symbol, side: input.side,
-      lots: Number(input.lots), openPrice, login: account.login, holderName: account.name,
-    };
-    sendUserMail(tenantId, uid,
-      `Trade opened – ${input.side} ${input.symbol} ${input.lots}L`,
-      (brand) => tradeOpenEmail(brand, tInfo)
-    ).catch(() => {});
-
-    // Margin call warning — check margin level after placing
-    (async () => {
-      try {
-        const accNow = await prisma.account.findUnique({ where: { id: account.id } });
-        if (!accNow) return;
-        const openTrades = await prisma.trade.findMany({ where: { accountId: account.id } });
-        const priceMap: Record<string, number> = { [input.symbol]: ask };
-        const missing2 = [...new Set(openTrades.map((t) => t.symbol).filter((s) => priceMap[s] == null))];
-        const fetched2 = await Promise.all(missing2.map((s) => getPrice(s)));
-        missing2.forEach((s, i) => { priceMap[s] = fetched2[i] ?? 0; });
-        let floating2 = 0;
-        for (const t of openTrades) floating2 += pnlFor(t.symbol, t.type as any, Number(t.openPrice), priceMap[t.symbol] ?? 0, Number(t.lots));
-        const bal = Number(accNow.deposit) + Number(accNow.pnl) - Number(accNow.withdrawal);
-        const eq = bal + Number(accNow.credit || 0) + Number(accNow.bonus || 0) + Number(accNow.insurance || 0) + floating2;
-        const lev = accNow.leverage || 100;
-        const used = usedMargin(openTrades.map((t) => ({ symbol: t.symbol, type: t.type as "BUY" | "SELL", lots: Number(t.lots) })), lev, (s) => priceMap[s] ?? 0);
-        const marginLevel = used > 0 ? (eq / used) * 100 : 9999;
-        const mcThreshold = Number((accNow as any).mcLevel ?? 50);
-        if (marginLevel < mcThreshold * 2) {
-          await sendUserMail(tenantId, uid,
-            `⚠️ Margin Call Warning – Account ${account.login}`,
-            (brand) => marginCallEmail(brand, {
-              holderName: account.name, login: account.login,
-              marginLevel, equity: eq, usedMargin: used,
-            })
-          );
-        }
-      } catch { /* silent */ }
-    })();
-  }
 
   // Replicate to copy followers — fire-and-forget so master trade response isn't delayed
   replicateTrade(
@@ -258,19 +214,6 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
     closeCopiedTrades(trade.id, tenantId).catch(() => {});
   }
 
-  // Email notification — LIVE accounts only, fire-and-forget
-  if (trade.account.type === "LIVE" && trade.account.userId) {
-    const tInfo = {
-      ticket: trade.ticket.toString(), symbol: trade.symbol, side: trade.type,
-      lots, openPrice: Number(trade.openPrice), closePrice: price,
-      pnl, closeReason: "Manual close",
-      login: trade.account.login, holderName: (trade.account as any).name,
-    };
-    sendUserMail(tenantId, trade.account.userId,
-      `Trade closed – ${trade.symbol} P/L ${pnl >= 0 ? "+" : ""}$${Math.abs(pnl).toFixed(2)}`,
-      (brand) => tradeCloseEmail(brand, tInfo)
-    ).catch(() => {});
-  }
 
   return { pnl, lots, isPartial };
 }

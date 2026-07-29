@@ -18,18 +18,18 @@ export async function sendTenantSms(tenantId: string, message: string) {
     const [cfg, tenant] = await Promise.all([getSaConfig(), getTenantSms(tenantId)]);
     if (!cfg.notifyLkUserId || !cfg.notifyLkApiKey) return;
     if (!tenant.enabled || !tenant.phones.length) return;
-    const serviceId = (cfg.notifyLkServiceId as string || "").trim();
+    const senderId = (cfg.notifyLkServiceId as string || "").trim();
     const text = message.slice(0, 160);
     await Promise.allSettled(
       tenant.phones.map((phone: string) => {
-        const params = new URLSearchParams({
+        const body = new URLSearchParams({
           user_id: String(cfg.notifyLkUserId),
           api_key: String(cfg.notifyLkApiKey),
           to: phone.replace(/^\+/, ""),
           message: text,
         });
-        if (serviceId) params.set("service_id", serviceId);
-        return fetch("https://app.notify.lk/api/v1/send?" + params.toString());
+        if (senderId) body.set("sender_id", senderId);
+        return fetch("https://app.notify.lk/api/v1/send", { method: "POST", body });
       })
     );
   } catch {}
