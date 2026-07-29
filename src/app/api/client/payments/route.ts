@@ -66,7 +66,13 @@ export async function POST(req: Request) {
     const kindLabel: Record<string, string> = { DEPOSIT: "Deposit request", WITHDRAWAL: "Withdrawal request", CREDIT_REQUEST: "Instant Credit request", CREDIT_CLEAR: "Credit Clearance request" };
     await audit(s.tenantId!, "payment.request", account.login + " " + kind + " " + amount + (method ? " via " + method : ""), s.email || account.login, "CLIENT");
     await notifyStaff(s.tenantId!, { type: "FUNDS", title: kindLabel[kind] || kind, body: account.login + " requested $" + amount }, (account as any).managerId);
-    sendTenantSms(s.tenantId!, (kindLabel[kind] || kind) + ": " + account.login + " requested $" + amount).catch(() => {});
+    const smsTemplates: Record<string, string> = {
+      DEPOSIT: `New Deposit Request\nClient: ${account.name} (${account.login})\nAmount: $${amount}\nPlease review in the admin panel.`,
+      WITHDRAWAL: `New Withdrawal Request\nClient: ${account.name} (${account.login})\nAmount: $${amount}\nPlease review in the admin panel.`,
+      CREDIT_REQUEST: `New Credit Request\nClient: ${account.name} (${account.login})\nAmount: $${amount}\nPlease review in the admin panel.`,
+      CREDIT_CLEAR: `Credit Clearance Request\nClient: ${account.name} (${account.login})\nAmount: $${amount}\nPlease review in the admin panel.`,
+    };
+    sendTenantSms(s.tenantId!, smsTemplates[kind] || `${kindLabel[kind] || kind}: ${account.name} (${account.login}) requested $${amount}`).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Request failed" }, { status: 400 });

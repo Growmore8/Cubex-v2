@@ -11,17 +11,22 @@ async function getTenantSms(tenantId: string) {
   return { enabled: !!v.enabled, phones: Array.isArray(v.phones) ? (v.phones as string[]) : [] };
 }
 
+async function getTenantName(tenantId: string): Promise<string> {
+  const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }).catch(() => null);
+  return t?.name || "OrbitFX";
+}
+
 // Send an SMS to all configured admin numbers for a tenant via Notify.lk.
 // Silently no-ops if credentials are missing or SMS is disabled for the tenant.
 export async function sendTenantSms(tenantId: string, message: string) {
   try {
-    const [cfg, tenant] = await Promise.all([getSaConfig(), getTenantSms(tenantId)]);
+    const [cfg, tenantSms, brandName] = await Promise.all([getSaConfig(), getTenantSms(tenantId), getTenantName(tenantId)]);
     if (!cfg.notifyLkUserId || !cfg.notifyLkApiKey) return;
-    if (!tenant.enabled || !tenant.phones.length) return;
+    if (!tenantSms.enabled || !tenantSms.phones.length) return;
     const senderId = (cfg.notifyLkServiceId as string || "").trim();
-    const text = message.slice(0, 160);
+    const text = (`[${brandName}] ` + message).slice(0, 160);
     await Promise.allSettled(
-      tenant.phones.map((phone: string) => {
+      tenantSms.phones.map((phone: string) => {
         const body = new URLSearchParams({
           user_id: String(cfg.notifyLkUserId),
           api_key: String(cfg.notifyLkApiKey),

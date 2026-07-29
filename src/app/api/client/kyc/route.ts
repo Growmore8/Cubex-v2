@@ -32,7 +32,8 @@ export async function POST(req: Request) {
     const backKey = await saveUpload(back, "kyc/" + account.id);
     const doc = await createKyc(account.id, docType, key, backKey);
     await notifyStaff(s.tenantId!, { title: "New KYC submitted", body: account.login + " uploaded " + docType + " (front + back)", type: "NOTICE" }, (account as any).managerId);
-    sendTenantSms(s.tenantId!, "New KYC: " + account.login + " submitted " + docType).catch(() => {});
+    const docLabel = docType === "IDENTITY" ? "Identity Document" : docType === "ADDRESS" ? "Address Document" : docType;
+    sendTenantSms(s.tenantId!, `KYC Document Submitted\nClient: ${account.name} (${account.login})\nDocument: ${docLabel}\nPlease review in the admin panel.`).catch(() => {});
     await audit(s.tenantId!, "kyc.submit", account.login + " uploaded " + docType + " (front + back)", s.email || account.login, "CLIENT");
     return NextResponse.json({ ok: true, doc });
   } catch (e: any) {
