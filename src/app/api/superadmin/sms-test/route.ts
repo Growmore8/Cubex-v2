@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     }
 
     const senderId = (cfg.notifyLkServiceId as string || "").trim();
-    const message = "CubeX test SMS — notification system working correctly.";
+    const message = "OrbitFX test SMS — notification system working correctly.";
 
     const body = new URLSearchParams({
       user_id: String(cfg.notifyLkUserId),
