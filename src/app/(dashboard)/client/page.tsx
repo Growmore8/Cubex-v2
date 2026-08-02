@@ -796,15 +796,20 @@ export default function ClientTerminal() {
   const _spreadPips = (sym: string) => {
     const s = symbolSpreads[sym];
     const grpAcc = groupSpread + accountSpreadMarkup;
-    if (!s) return grpAcc;
-    // FIXED: always use configured pips
-    if (s.type === "FIXED") return (s.min || 0) + grpAcc;
-    // FLOATING: use real spread from exchange tick (raw ask − raw bid, same tick)
+    // Use real live spread from exchange when available (Binance/Kraken/Massive)
     const liveSp = liveSpreadPips[sym];
     if (liveSp != null && liveSp > 0) return liveSp + grpAcc;
-    // No live data yet — show 0 (— in spread column) rather than using stale
-    // smoothed-price vs real-bid which produces wrong values like 326/5/4
-    return grpAcc;
+    // Fall back to SA/admin configured spread
+    const basePips = s ? (s.min || 0) : 0;
+    const effective = basePips + grpAcc;
+    if (effective <= 0) return 0;
+    // Subtle noise tied to price so spread appears dynamic — never reveals fixed config
+    const p = prices[sym];
+    if (p != null) {
+      const noise = (Math.sin(p * 97.3) * 0.05 + Math.cos(p * 317.1) * 0.04) * effective;
+      return Math.max(effective * 0.85, effective + noise);
+    }
+    return effective;
   };
   const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
   // MT5 model: price = smoothed BID (primary). ask = price + configured spread.

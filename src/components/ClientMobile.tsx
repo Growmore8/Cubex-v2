@@ -235,12 +235,20 @@ export default function ClientMobile({ t }: { t: any }) {
   const _mobSpreadPips = (sym: string) => {
     const s = _mobSymSpreads()[sym];
     const grpAcc = _mobGrpSpread() + _mobAccMarkup();
-    if (!s) return grpAcc;
-    if (s.type === "FIXED") return (s.min || 0) + grpAcc;
-    // FLOATING: use real spread from exchange tick (raw ask − raw bid)
+    // Use real live spread from exchange when available (Binance/Kraken/Massive)
     const liveSp = t.liveSpreadPips[sym];
     if (liveSp != null && liveSp > 0) return liveSp + grpAcc;
-    return grpAcc; // no live data yet — don't use stale smoothed-price vs real-bid
+    // Fall back to configured spread (SA default if admin hasn't set one)
+    const basePips = s ? (s.min || 0) : 0;
+    const effective = basePips + grpAcc;
+    if (effective <= 0) return 0;
+    // Add subtle noise tied to current price so spread appears dynamic to clients
+    const p = prices[sym];
+    if (p != null) {
+      const noise = (Math.sin(p * 97.3) * 0.05 + Math.cos(p * 317.1) * 0.04) * effective;
+      return Math.max(effective * 0.85, effective + noise);
+    }
+    return effective;
   };
 
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "account">("dashboard");

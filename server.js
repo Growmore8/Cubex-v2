@@ -512,9 +512,14 @@ const KR_CRYPTO_PAIRS = ["XBT/USD","ETH/USD","SOL/USD","XRP/USD","ADA/USD","DOT/
 let krWs = null;
 let krPingTimer = null;
 function connectKraken() {
-  // Don't open a socket unless at least one asset class is assigned to KR
-  if (FOREX_FEED !== "KR" && COMM_FEED !== "KR" && CRYPTO_FEED !== "KR") {
-    console.log("[KR] not needed — no asset class assigned to KR, skipping");
+  // Kraken runs as a FREE supplemental bid/ask source even when not the assigned primary feed.
+  // Rule: skip only when Massive is already covering the same category (Massive is better/paid).
+  // Binance is always better for crypto so skip KR crypto when BN or MV is the crypto feed.
+  const needsForex  = FOREX_FEED  !== "MV";
+  const needsMetals = COMM_FEED   !== "MV";
+  const needsCrypto = CRYPTO_FEED !== "BN" && CRYPTO_FEED !== "MV";
+  if (!needsForex && !needsMetals && !needsCrypto) {
+    console.log("[KR] not needed — Massive/Binance covers all Kraken categories");
     return;
   }
   if (krWs) { try { krWs.removeAllListeners(); krWs.terminate(); } catch (_) {} krWs = null; }
@@ -522,9 +527,9 @@ function connectKraken() {
   krWs = new WebSocket("wss://ws.kraken.com");
   krWs.on("open", () => {
     const pairs = [
-      ...(FOREX_FEED === "KR" ? KR_FOREX_PAIRS : []),
-      ...(COMM_FEED  === "KR" ? KR_METAL_PAIRS : []),
-      ...(CRYPTO_FEED === "KR" ? KR_CRYPTO_PAIRS : []),
+      ...(needsForex  ? KR_FOREX_PAIRS  : []),
+      ...(needsMetals ? KR_METAL_PAIRS  : []),
+      ...(needsCrypto ? KR_CRYPTO_PAIRS : []),
     ];
     krWs.send(JSON.stringify({ event: "subscribe", pair: pairs, subscription: { name: "spread" } }));
     console.log("[KR] connected, subscribed spread for", pairs.length, "pairs");
