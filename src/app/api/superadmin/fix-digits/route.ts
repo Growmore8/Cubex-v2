@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireSA } from "@/lib/auth";
+import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import Redis from "ioredis";
 
@@ -7,9 +7,9 @@ import Redis from "ioredis";
 // Scans all globalSymbols, reads their current price from Redis, and corrects
 // any digits value that would give a pip larger than 0.1% of the price.
 // Targets cheap crypto tokens (e.g. STRKUSD at $0.01 with digits=2 → pip=$0.10).
-export async function POST(req: Request) {
-  const auth = await requireSA(req);
-  if (!auth) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+export async function POST() {
+  const s = await requireSuperAdmin();
+  if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
 
   const globals = await prisma.globalSymbol.findMany({
     select: { symbol: true, digits: true, category: true },
