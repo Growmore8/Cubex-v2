@@ -472,11 +472,11 @@ function connectBinance() {
       if (!sym || !state[sym]) return;
       const bid = parseFloat(d.b), ask = parseFloat(d.a);
       if (bid > 0 && ask > 0 && ask > bid) {
-        const digits = meta[sym] ? meta[sym].digits : 2;
-        // Always set bid/ask/realAt from Binance — it's the only source with real bid/ask
-        // for crypto spread (Massive XQ has no data). applyPrice is feed-guarded separately.
-        state[sym].bid = r(bid, digits);
-        state[sym].ask = r(ask, digits);
+        // Store RAW unrounded bid/ask so commitPrice comparison (rawReal > emitBid) works
+        // for small-value tokens (e.g. STRKUSD $0.01) where rounding to digits=2 would
+        // collapse both values to the same number and suppress the real ask.
+        state[sym].bid = bid;
+        state[sym].ask = ask;
         state[sym].realAt = Date.now(); // required for commitPrice to emit real=ask (live spread)
         applyPrice(sym, bid, "BN"); // price only accepted when BN preferred (MV guard inside)
       }
@@ -558,9 +558,10 @@ function connectKraken() {
           const pctSpread = (ask - bid) / bid;
           const isMetal = /^(XAU|XAG|XPT|XPD)/.test(sym);
           const spreadOk = isMetal || pctSpread < 0.005;
-          state[sym].bid = r(bid, meta[sym] ? meta[sym].digits : 5);
+          // Store RAW unrounded bid/ask so commitPrice comparison works correctly
+          state[sym].bid = bid;
           if (spreadOk) {
-            state[sym].ask = r(ask, meta[sym] ? meta[sym].digits : 5);
+            state[sym].ask = ask;
             // Always mark realAt so commitPrice emits real=ask (live spread for clients).
             // applyPrice's preferred-feed guard prevents KR from overriding TD/MV prices.
             state[sym].realAt = Date.now();
