@@ -190,11 +190,21 @@ export default function SAFeeds() {
             {/* Always-on WebSocket feeds */}
             <div className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>WebSocket Feeds · Real Bid/Ask</div>
             <div className="flex gap-2 flex-wrap mb-4">
-              {[
-                { key: "BN", name: "Binance WS", icon: "fa-brands fa-bitcoin", color: "#f59e0b", desc: "Crypto bid/ask",        inUse: Object.values(feeds).includes("BN") },
-                { key: "KR", name: "Kraken WS",  icon: "fa-solid fa-anchor",   color: "#5b21b6", desc: "Forex + metals bid/ask", inUse: Object.values(feeds).includes("KR") },
-                { key: "MV_WS", name: "Massive WS", icon: "fa-solid fa-bolt",  color: "#ec4899", desc: "All categories",         inUse: Object.values(feeds).includes("MV") && !!keys.massiveKey },
-              ].map((f) => (
+              {(() => {
+                const krForex = feeds.forexFeed !== "MV";
+                const krMetals = feeds.commFeed !== "MV";
+                const krCovering = [krForex && "Forex", krMetals && "XAU/XAG"].filter(Boolean).join(" + ") || "—";
+                const krInUse = krForex || krMetals || Object.values(feeds).includes("KR");
+                return [
+                  { key: "BN", name: "Binance WS", icon: "fa-brands fa-bitcoin", color: "#f59e0b",
+                    desc: "Crypto bid/ask", inUse: Object.values(feeds).includes("BN") },
+                  { key: "KR", name: "Kraken WS",  icon: "fa-solid fa-anchor",   color: "#5b21b6",
+                    // Auto-starts when forex or commodities feed ≠ Massive (server mirrors this logic)
+                    desc: krInUse ? `${krCovering} bid/ask` : "Not needed", inUse: krInUse },
+                  { key: "MV_WS", name: "Massive WS", icon: "fa-solid fa-bolt",  color: "#ec4899",
+                    desc: "All categories", inUse: Object.values(feeds).includes("MV") && !!keys.massiveKey },
+                ];
+              })().map((f) => (
                 <div key={f.key} className="flex-1 min-w-[110px] rounded-lg border px-3 py-2"
                   style={{ background: f.inUse ? `${f.color}12` : "var(--bg)", borderColor: f.inUse ? `${f.color}55` : "var(--border)" }}>
                   <div className="flex items-center gap-1.5 mb-0.5">
