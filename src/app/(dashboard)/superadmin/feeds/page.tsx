@@ -18,7 +18,7 @@ const CAT_FEEDS: Record<string, { key: string; name: string; free: boolean; hasB
     { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "Price only · key required" },
   ],
   commodities: [
-    { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · metals (XBT/XAU) · free" },
+    { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · XAU/USD & XAG/USD only · free" },
     { key: "MV", name: "Massive.com",  free: false, hasBidAsk: true,  info: "Real bid/ask · metals as forex pairs" },
     { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Metals + energy · key required" },
   ],
