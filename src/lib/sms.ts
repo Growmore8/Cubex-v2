@@ -11,20 +11,21 @@ async function getTenantSms(tenantId: string) {
   return { enabled: !!v.enabled, phones: Array.isArray(v.phones) ? (v.phones as string[]) : [] };
 }
 
-async function getTenantName(tenantId: string): Promise<string> {
-  const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }).catch(() => null);
-  return t?.name || "OrbitFX";
+async function getTenantInfo(tenantId: string): Promise<{ name: string; brandName: string | null }> {
+  const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, brandName: true } }).catch(() => null);
+  return { name: t?.name || "OrbitFX", brandName: t?.brandName || null };
 }
 
 // Send an SMS to all configured admin numbers for a tenant via Notify.lk.
 // Silently no-ops if credentials are missing or SMS is disabled for the tenant.
 export async function sendTenantSms(tenantId: string, message: string) {
   try {
-    const [cfg, tenantSms, brandName] = await Promise.all([getSaConfig(), getTenantSms(tenantId), getTenantName(tenantId)]);
+    const [cfg, tenantSms, tenant] = await Promise.all([getSaConfig(), getTenantSms(tenantId), getTenantInfo(tenantId)]);
     if (!cfg.notifyLkUserId || !cfg.notifyLkApiKey) return;
     if (!tenantSms.enabled || !tenantSms.phones.length) return;
     const senderId = (cfg.notifyLkServiceId as string || "").trim();
-    const text = (`[${brandName}] ` + message).slice(0, 160);
+    const prefix = tenant.brandName ? `${tenant.brandName} | ${tenant.name}` : tenant.name;
+    const text = (prefix + "\n" + message).slice(0, 160);
     await Promise.allSettled(
       tenantSms.phones.map((phone: string) => {
         const body = new URLSearchParams({
