@@ -161,6 +161,29 @@ export default function SAFeeds() {
 
   const inp = "w-full rounded-lg border px-3 py-2 text-sm font-mono bg-[var(--bg)] border-[var(--border)] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
 
+  // Derived: which WebSocket feeds are actually running (mirrors server.js smart-startup logic)
+  const krForex  = feeds.forexFeed !== "MV";
+  const krMetals = feeds.commFeed  !== "MV";
+  const krInUse  = krForex || krMetals || Object.values(feeds).includes("KR");
+  const krCovering = [krForex && "Forex", krMetals && "XAU/XAG"].filter(Boolean).join(" + ") || "—";
+  const wsFeedCards = [
+    { key: "BN",    name: "Binance WS",  icon: "fa-brands fa-bitcoin", color: "#f59e0b",
+      desc: "Crypto bid/ask",        inUse: Object.values(feeds).includes("BN") },
+    { key: "KR",    name: "Kraken WS",   icon: "fa-solid fa-anchor",   color: "#5b21b6",
+      desc: krInUse ? `${krCovering} bid/ask` : "Not needed", inUse: krInUse },
+    { key: "MV_WS", name: "Massive WS",  icon: "fa-solid fa-bolt",     color: "#ec4899",
+      desc: "All categories",         inUse: Object.values(feeds).includes("MV") && !!keys.massiveKey },
+  ];
+
+  async function fixDigits() {
+    setMsg("Running digit fix…");
+    const r = await fetch("/api/superadmin/fix-digits", { method: "POST" });
+    const d = await r.json();
+    if (d.ok) setMsg(`Digit fix done — ${d.updated} symbol(s) updated.`);
+    else setErr(d.error || "Fix failed");
+    setTimeout(() => { setMsg(""); setErr(""); }, 5000);
+  }
+
   return (
     <div className="ui-fade-up">
       <div className="mb-4">
@@ -190,21 +213,7 @@ export default function SAFeeds() {
             {/* Always-on WebSocket feeds */}
             <div className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>WebSocket Feeds · Real Bid/Ask</div>
             <div className="flex gap-2 flex-wrap mb-4">
-              {(() => {
-                const krForex = feeds.forexFeed !== "MV";
-                const krMetals = feeds.commFeed !== "MV";
-                const krCovering = [krForex && "Forex", krMetals && "XAU/XAG"].filter(Boolean).join(" + ") || "—";
-                const krInUse = krForex || krMetals || Object.values(feeds).includes("KR");
-                return [
-                  { key: "BN", name: "Binance WS", icon: "fa-brands fa-bitcoin", color: "#f59e0b",
-                    desc: "Crypto bid/ask", inUse: Object.values(feeds).includes("BN") },
-                  { key: "KR", name: "Kraken WS",  icon: "fa-solid fa-anchor",   color: "#5b21b6",
-                    // Auto-starts when forex or commodities feed ≠ Massive (server mirrors this logic)
-                    desc: krInUse ? `${krCovering} bid/ask` : "Not needed", inUse: krInUse },
-                  { key: "MV_WS", name: "Massive WS", icon: "fa-solid fa-bolt",  color: "#ec4899",
-                    desc: "All categories", inUse: Object.values(feeds).includes("MV") && !!keys.massiveKey },
-                ];
-              })().map((f) => (
+              {wsFeedCards.map((f) => (
                 <div key={f.key} className="flex-1 min-w-[110px] rounded-lg border px-3 py-2"
                   style={{ background: f.inUse ? `${f.color}12` : "var(--bg)", borderColor: f.inUse ? `${f.color}55` : "var(--border)" }}>
                   <div className="flex items-center gap-1.5 mb-0.5">
@@ -369,6 +378,15 @@ export default function SAFeeds() {
               disabled={loading}
             >
               Save &amp; Apply
+            </button>
+            <button
+              className="rounded-lg px-4 py-2 text-sm font-semibold transition-opacity hover:opacity-90"
+              style={{ background: "var(--soft)", color: "var(--text)", border: "1px solid var(--border)" }}
+              onClick={fixDigits}
+              title="Auto-correct digits precision for cheap tokens (price < $1). Run once after setup."
+            >
+              <i className="fa-solid fa-wand-magic-sparkles mr-1.5 text-[11px]" style={{ color: "var(--accent)" }} />
+              Fix Digits
             </button>
           </div>
 
