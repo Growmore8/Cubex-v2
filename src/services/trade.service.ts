@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen } from "@/lib/perms";
-import { getPrice } from "@/lib/prices";
+import { getPrice, getBid, getAsk } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
 import { pnlFor, validateSlTp, usedMargin } from "@/lib/trademath";
@@ -8,7 +8,7 @@ import { getAccountFxRate } from "@/lib/prices";
 import { notifyStaff } from "@/services/notification.service";
 import { audit } from "@/lib/audit";
 import { gnum, gprice } from "@/lib/format";
-import { getSpreadPips, pipForDigits } from "@/lib/spread";
+import { getSpreadPips, getSaDefaultSpreadPips, pipForDigits } from "@/lib/spread";
 import { isMarketOpen } from "@/lib/market";
 import { replicateTrade, closeCopiedTrades } from "@/services/copy.service";
 
@@ -61,22 +61,38 @@ export async function assertMargin(account: any, newTrade: { symbol: string; typ
 }
 
 async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SELL", account: any) {
-  // Both calls are independent — run in parallel to save ~10ms per market order.
-  // getPrice returns the MT5-model BID price (Redis "price:SYMBOL").
-  const [rawBid, symRow] = await Promise.all([
+  const [rawBid, rawAsk, realBidRaw, symRow, globalSym] = await Promise.all([
     getPrice(symbol),
+    getAsk(symbol),
+    getBid(symbol),
     prisma.symbol.findFirst({ where: { tenantId, symbol }, select: { digits: true, spreadType: true, commissionPerLot: true, swapLong: true, swapShort: true } }).catch(() => null),
+    prisma.globalSymbol.findUnique({ where: { symbol }, select: { category: true } }).catch(() => null),
   ]);
   if (rawBid == null) throw new Error("No price for " + symbol);
   const digits = symRow?.digits ?? 5;
   const pip = pipForDigits(digits);
   const adminPips = await getSpreadPips(tenantId, symbol, (account as any).groupId, account.id);
-  // MT5 model: SELL executes at BID = rawBid (live display price from feed).
-  // BUY executes at ASK = BID + configured spread.
-  // getRealBid is intentionally not used here — it stores a stale exchange bid
-  // in Redis with no freshness guarantee, causing executions at outdated prices.
-  const bid = rawBid;
-  const ask = rawBid + adminPips * pip;
+
+  let bid: number;
+  let ask: number;
+
+  if (rawAsk != null && rawAsk > rawBid) {
+    // Real exchange bid/ask from Massive/Binance/Kraken — use market spread as base.
+    // Tenant admin markup (adminPips) is added on top of the real exchange ask.
+    const realBid = (realBidRaw != null && realBidRaw > 0) ? realBidRaw : rawBid;
+    bid = realBid;
+    ask = rawAsk + adminPips * pip;
+  } else {
+    // Single-price feed (TD/FH): construct spread from tenant config.
+    // If tenant has no spread configured, fall back to SA-level default per category.
+    let effectivePips = adminPips;
+    if (effectivePips <= 0) {
+      effectivePips = await getSaDefaultSpreadPips(globalSym?.category || "forex");
+    }
+    bid = rawBid;
+    ask = rawBid + effectivePips * pip;
+  }
+
   return { ask, bid, symRow };
 }
 

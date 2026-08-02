@@ -22,6 +22,13 @@ export async function GET() {
       stockFeed:    v.stockFeed  || "TD",
       manualPrimary: v.manualPrimary || null,
       currentPrimary: runtimePrimary,
+      defaultSpreads: {
+        forex:       v.defaultSpreads?.forex       ?? 1.5,
+        crypto:      v.defaultSpreads?.crypto      ?? 20,
+        commodities: v.defaultSpreads?.commodities ?? 30,
+        indices:     v.defaultSpreads?.indices     ?? 2,
+        stocks:      v.defaultSpreads?.stocks      ?? 5,
+      },
     },
   });
 }
@@ -42,6 +49,13 @@ export async function POST(req: Request) {
       idxFeed:    ["TD","FH"].includes(b.idxFeed)    ? b.idxFeed  : (existing.idxFeed  || "TD"),
       stockFeed:  ["FH","TD"].includes(b.stockFeed)  ? b.stockFeed : (existing.stockFeed || "TD"),
       manualPrimary: ["TD","FH","MV","BN","KR"].includes(b.manualPrimary) ? b.manualPrimary : (existing.manualPrimary || null),
+      defaultSpreads: b.defaultSpreads ? {
+        forex:       Math.max(0, Number(b.defaultSpreads.forex       ?? existing.defaultSpreads?.forex       ?? 1.5)),
+        crypto:      Math.max(0, Number(b.defaultSpreads.crypto      ?? existing.defaultSpreads?.crypto      ?? 20)),
+        commodities: Math.max(0, Number(b.defaultSpreads.commodities ?? existing.defaultSpreads?.commodities ?? 30)),
+        indices:     Math.max(0, Number(b.defaultSpreads.indices     ?? existing.defaultSpreads?.indices     ?? 2)),
+        stocks:      Math.max(0, Number(b.defaultSpreads.stocks      ?? existing.defaultSpreads?.stocks      ?? 5)),
+      } : (existing.defaultSpreads || null),
     };
     await prisma.setting.upsert({ where: { key: "feeds" }, create: { key: "feeds", value }, update: { value } });
     reloadFeeds();

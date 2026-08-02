@@ -20,7 +20,6 @@ export async function getSpreadPips(
     groupId ? prisma.tradeGroup.findUnique({ where: { id: groupId }, select: { spread: true, spreadType: true } }).catch(() => null) : null,
     accountId ? prisma.account.findUnique({ where: { id: accountId }, select: { spreadMarkup: true } }).catch(() => null) : null,
   ]);
-  // FIXED group = apply markup. FLOATING group = live exchange spread, no extra markup. Default FIXED.
   const grpMarkup = (grp?.spreadType ?? "FIXED") === "FIXED" ? Number(grp?.spread ?? 0) : 0;
   return Number(sym?.spread ?? 0) + grpMarkup + Number(acc?.spreadMarkup ?? 0);
 }
@@ -34,4 +33,36 @@ export function spreadPrice(pips: number, digits: number): number {
 export async function getBidPrice(tenantId: string, symbol: string, groupId: string | null | undefined, ask: number, digits: number, accountId?: string | null): Promise<number> {
   const pips = await getSpreadPips(tenantId, symbol, groupId, accountId);
   return ask - spreadPrice(pips, digits);
+}
+
+// SA-configured minimum spread (pips) per category — stored in `feeds` setting.
+// Applied as fallback when a tenant has no spread configured AND the feed is single-price (no real ask).
+// Built-in defaults: forex 1.5, crypto 20, commodities 30, indices 2, stocks 5.
+let _feedsCfgCache: { v: any; t: number } | null = null;
+async function getFeedsConfig() {
+  if (_feedsCfgCache && Date.now() - _feedsCfgCache.t < 30_000) return _feedsCfgCache.v;
+  const rec = await prisma.setting.findUnique({ where: { key: "feeds" } }).catch(() => null);
+  const v = (rec?.value as any) || {};
+  _feedsCfgCache = { v, t: Date.now() };
+  return v;
+}
+
+const BUILT_IN_DEFAULTS: Record<string, number> = {
+  forex: 1.5,
+  crypto: 20,
+  commodities: 30,
+  indices: 2,
+  stocks: 5,
+};
+
+export async function getSaDefaultSpreadPips(category: string): Promise<number> {
+  try {
+    const cfg = await getFeedsConfig();
+    const ds = cfg.defaultSpreads || {};
+    const cat = (category || "forex").toLowerCase();
+    if (ds[cat] != null && Number(ds[cat]) >= 0) return Number(ds[cat]);
+    return BUILT_IN_DEFAULTS[cat] ?? 1.5;
+  } catch {
+    return 1.5;
+  }
 }

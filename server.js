@@ -399,7 +399,8 @@ function commitPrice(sym, p) {
   } else { candle.high = Math.max(candle.high, p); candle.low = Math.min(candle.low, p); candle.close = p; }
   st.price = p;
   redis.set("price:" + sym, String(p));
-  if (st.bid != null) { redis.set("bid:" + sym, String(st.bid)); realBids[sym] = st.bid; } // real bid for trade execution
+  if (st.bid != null) { redis.set("bid:" + sym, String(st.bid)); realBids[sym] = st.bid; }
+  if (st.ask != null) { redis.set("ask:" + sym, String(st.ask)); } // real exchange ask for trade execution
   // MT5 model: `price` is the smoothed BID (primary chart price).
   // `real` carries the exchange ASK so clients can compute the live spread (ask − bid).
   // Falls back to null when no live feed data within REAL_TTL.

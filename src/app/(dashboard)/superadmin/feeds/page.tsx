@@ -67,6 +67,7 @@ const PRIMARY_CARDS = [
 export default function SAFeeds() {
   const [keys, setKeys] = useState({ tdKey: "", finnhubKey: "", massiveKey: "" });
   const [feeds, setFeeds] = useState({ cryptoFeed: "BN", forexFeed: "KR", commFeed: "KR", idxFeed: "TD" });
+  const [defaultSpreads, setDefaultSpreads] = useState({ forex: 1.5, crypto: 20, commodities: 30, indices: 2, stocks: 5 });
   const [primary, setPrimaryState] = useState("TD");
   const [err,  setErr]  = useState("");
   const [msg,  setMsg]  = useState("");
@@ -82,6 +83,7 @@ export default function SAFeeds() {
         setKeys({ tdKey: d.feeds.tdKey || "", finnhubKey: d.feeds.finnhubKey || "", massiveKey: d.feeds.massiveKey || "" });
         setFeeds({ cryptoFeed: d.feeds.cryptoFeed || "BN", forexFeed: d.feeds.forexFeed || "TD", commFeed: d.feeds.commFeed || "TD", idxFeed: d.feeds.idxFeed || "TD" });
         if (d.feeds.currentPrimary) setPrimaryState(d.feeds.currentPrimary);
+        if (d.feeds.defaultSpreads) setDefaultSpreads(d.feeds.defaultSpreads);
       }
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -132,7 +134,7 @@ export default function SAFeeds() {
     const r = await fetch("/api/superadmin/feeds", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...keys, ...feeds }),
+      body: JSON.stringify({ ...keys, ...feeds, defaultSpreads }),
     });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Failed"); return; }
@@ -270,6 +272,41 @@ export default function SAFeeds() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Minimum Spread (fallback for single-price feeds) */}
+          <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            <div className="px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+              <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>Minimum Spread (pips)</div>
+              <div className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
+                Applied automatically when a single-price feed is active and the tenant has no spread configured.
+                Ignored when a real bid/ask feed (Massive, Binance, Kraken) is providing live market spread.
+              </div>
+            </div>
+            {([
+              { key: "forex",       label: "Forex",       icon: "fa-solid fa-coins",            color: "#3b82f6" },
+              { key: "crypto",      label: "Crypto",      icon: "fa-brands fa-bitcoin",         color: "#f59e0b" },
+              { key: "commodities", label: "Commodities", icon: "fa-solid fa-oil-well",         color: "#8b5cf6" },
+              { key: "indices",     label: "Indices",     icon: "fa-solid fa-chart-line",       color: "#22c55e" },
+              { key: "stocks",      label: "Stocks",      icon: "fa-solid fa-building-columns", color: "#64748b" },
+            ] as { key: keyof typeof defaultSpreads; label: string; icon: string; color: string }[]).map((row) => (
+              <div key={row.key} className="flex items-center gap-3 px-4 py-3 border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                <div className="w-32 shrink-0 flex items-center gap-2">
+                  <i className={row.icon + " text-sm"} style={{ color: row.color }} />
+                  <span className="text-sm font-medium" style={{ color: "var(--text)" }}>{row.label}</span>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={defaultSpreads[row.key]}
+                  onChange={(e) => setDefaultSpreads((p) => ({ ...p, [row.key]: Number(e.target.value) }))}
+                  className="w-24 rounded-lg border px-3 py-1.5 text-sm text-right font-mono"
+                  style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }}
+                />
+                <span className="text-xs" style={{ color: "#94a3b8" }}>pips</span>
+              </div>
+            ))}
           </div>
 
           {/* API Keys */}
