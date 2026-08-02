@@ -129,8 +129,9 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const rawSp = symbolSpreads && symbolSpreads[s.symbol];
               const cfgSpPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
               const isFixed = (symbolTypes as any)?.[s.symbol] === "FIXED";
-              // MT5 model: bid = price (primary), ask = price + spread. No inversion possible.
-              const spPips = isFixed ? cfgSpPips : (hasLive ? liveSp2! : cfgSpPips);
+              // When exchange bid/ask arrives (Binance/Kraken/Massive), show the real market spread.
+              // Fixed/floating only controls trading execution — market watch always shows live when available.
+              const spPips = hasLive ? liveSp2! : cfgSpPips;
               const realSpPips = spPips;
               const ask = p != null ? gnum(p + spPips * pip, d) : "—";
               const bid = p != null ? gnum(p, d) : "—";
