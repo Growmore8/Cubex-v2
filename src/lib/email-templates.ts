@@ -9,6 +9,7 @@ function esc(s: unknown): string {
 
 export interface BrandInfo {
   brandName: string;
+  companyName?: string | null;
   primaryColor?: string | null;
   accentColor?: string | null;
   logoUrl?: string | null;
@@ -16,7 +17,7 @@ export interface BrandInfo {
 
 // Wrap body content in the branded shell (header bar + footer).
 export function brandedEmail(brand: BrandInfo, heading: string, bodyHtml: string): string {
-  const name = esc(brand.brandName || "Statement");
+  const name = brand.companyName ? `${esc(brand.brandName)} | ${esc(brand.companyName)}` : esc(brand.brandName || "Statement");
   const primary = esc(brand.primaryColor || "#2563eb");
   const accent = esc(brand.accentColor || "#22c55e");
   const logo = brand.logoUrl ? `<img src="${esc(brand.logoUrl)}" alt="${name}" style="height:34px;width:auto;display:block;margin-bottom:6px"/>` : "";
@@ -185,7 +186,7 @@ export function statementEmail(brand: BrandInfo, s: StatementSummary): string {
   const row = (k: string, v: string, cls = "") =>
     `<tr><td style="padding:9px 12px;border-bottom:1px solid #eef1f5;color:#6b7280;font-size:13px">${esc(k)}</td><td style="padding:9px 12px;border-bottom:1px solid #eef1f5;text-align:right;font-weight:700;font-size:13px;color:#111827${cls}">${esc(v)}</td></tr>`;
   return brandedEmail(brand, "Your account statement", `
-    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 16px">Dear ${esc(s.holderName)}, please find your account statement for <strong>${esc(s.periodLabel)}</strong> attached as a PDF. A summary is shown below.</p>
+    <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 16px">Dear ${esc(s.holderName)}, please find your account statement for <strong>${esc(s.periodLabel)}</strong> below.</p>
     <table style="width:100%;border-collapse:collapse;margin:6px 0 18px">
       ${row("Account", s.login + " · " + s.type)}
       ${row("Balance", s.balance)}
@@ -193,11 +194,7 @@ export function statementEmail(brand: BrandInfo, s: StatementSummary): string {
       ${row("Open (running) trades", String(s.openCount))}
       ${row("Deposits / Withdrawals", s.deposits + " / " + s.withdrawals)}
     </table>
-    <div style="display:flex;align-items:center;gap:12px;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin:4px 0 20px">
-      <div style="width:38px;height:46px;border-radius:6px;background:#dc2626;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">PDF</div>
-      <div><div style="font-size:13px;font-weight:700;color:#111827">${esc(s.pdfFileName)}</div><div style="font-size:11px;color:#9ca3af">Full statement</div></div>
-    </div>
-    <p style="font-size:12px;color:#9ca3af;margin:0 0 16px">Figures are indicative. The attached PDF is the full record of trades, financials and requests.</p>`);
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 16px">Figures are indicative. The attached PDF contains the full record of trades, financials and requests.</p>`);
 }
 
 // ── Transactional trade + account notification emails ──────────────────────

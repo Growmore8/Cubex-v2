@@ -78,7 +78,7 @@ export function statementRange(preset?: string, from?: string, to?: string): { s
 }
 
 function brandOf(t: any): BrandInfo {
-  return { brandName: t?.brandName || t?.name || "Statement", primaryColor: t?.primaryColor, accentColor: t?.accentColor, logoUrl: t?.logoUrl };
+  return { brandName: t?.brandName || t?.name || "Statement", companyName: t?.name || null, primaryColor: t?.primaryColor, accentColor: t?.accentColor, logoUrl: t?.logoUrl };
 }
 
 // ── PDF generation (pdfkit — built-in fonts, no Chromium) ──
@@ -105,7 +105,8 @@ export function buildStatementPdf(data: StatementData, periodLabel: string): Pro
 
       // ── Header band ──
       doc.save().rect(0, 0, doc.page.width, 60).fill(accent).restore();
-      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(17).text(brand.brandName, left, 16, { width: totalW * 0.6, lineBreak: false });
+      const pdfHeaderName = brand.companyName ? `${brand.brandName} | ${brand.companyName}` : brand.brandName;
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(17).text(pdfHeaderName, left, 16, { width: totalW * 0.6, lineBreak: false });
       if (t.slogan) { doc.fillOpacity(0.85).font("Helvetica").fontSize(8).text(String(t.slogan), left, 38, { width: totalW * 0.6, lineBreak: false }); doc.fillOpacity(1); }
       doc.fillColor("#ffffff").font("Helvetica").fontSize(8)
         .text("ACCOUNT STATEMENT", left, 15, { width: totalW, align: "right" })
@@ -389,7 +390,7 @@ export async function runStatementCron(): Promise<{ weekly: number; monthly: num
   for (const t of tenants as any[]) {
     if (!t.smtpEmail || !t.smtpPassword) continue;
     const accounts = await prisma.account.findMany({
-      where: { tenantId: t.id, deactivated: false, user: { role: "CLIENT" } },
+      where: { tenantId: t.id, deactivated: false, user: { role: "CLIENT", status: "ACTIVE" } },
       include: { user: { select: { id: true, email: true } } },
     });
 
@@ -408,6 +409,8 @@ export async function runStatementCron(): Promise<{ weekly: number; monthly: num
       const { weekday, day, hour, dateKey } = localNow(tz);
       if (hour !== SEND_HOUR) continue;
 
+      const fmtD = (d: Date) => d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
       // Monthly takes precedence on the 1st
       if (day === 1) {
         const groupKey = `${userEmail}:monthly:${dateKey}`;
@@ -415,8 +418,11 @@ export async function runStatementCron(): Promise<{ weekly: number; monthly: num
           sentKeys.add(groupKey);
           // also mark individual accounts to avoid double-send if cron runs again
           userAccounts.forEach((a: any) => sentKeys.add(`${a.id}:monthly:${dateKey}`));
-          const since = new Date(Date.now() - 31 * 86400000);
-          const r = await sendCombinedStatementEmail({ tenantId: t.id, tenant: t, accounts: userAccounts, to: userEmail, since, periodLabel: "Monthly statement" }).catch(() => ({ ok: false }));
+          const now = new Date();
+          const since = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const until = new Date(now.getFullYear(), now.getMonth(), 1);
+          const periodLabel = `Monthly statement · ${fmtD(since)} – ${fmtD(new Date(until.getTime() - 86400000))}`;
+          const r = await sendCombinedStatementEmail({ tenantId: t.id, tenant: t, accounts: userAccounts, to: userEmail, since, until, periodLabel }).catch(() => ({ ok: false }));
           if (r.ok) monthly++;
         }
         continue;
@@ -426,8 +432,11 @@ export async function runStatementCron(): Promise<{ weekly: number; monthly: num
         if (!sentKeys.has(groupKey)) {
           sentKeys.add(groupKey);
           userAccounts.forEach((a: any) => sentKeys.add(`${a.id}:weekly:${dateKey}`));
-          const since = new Date(Date.now() - 7 * 86400000);
-          const r = await sendCombinedStatementEmail({ tenantId: t.id, tenant: t, accounts: userAccounts, to: userEmail, since, periodLabel: "Weekly statement" }).catch(() => ({ ok: false }));
+          const now = new Date();
+          const since = new Date(now.getTime() - 7 * 86400000);
+          const until = now;
+          const periodLabel = `Weekly statement · ${fmtD(since)} – ${fmtD(new Date(until.getTime() - 86400000))}`;
+          const r = await sendCombinedStatementEmail({ tenantId: t.id, tenant: t, accounts: userAccounts, to: userEmail, since, until, periodLabel }).catch(() => ({ ok: false }));
           if (r.ok) weekly++;
         }
       }
