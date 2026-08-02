@@ -107,6 +107,7 @@ export default function AdminDeskPage() {
   const [symbols, setSymbols] = useState<any[]>([]);
   const [adminSymSpreads, setAdminSymSpreads] = useState<Record<string, number>>({});
   const [adminSymTypes, setAdminSymTypes] = useState<Record<string, string>>({});
+  const [saDefaultSpreads, setSaDefaultSpreads] = useState<Record<string, number>>({});
   const [adminSymMax, setAdminSymMax] = useState<Record<string, number>>({});
   const [adminSymIds, setAdminSymIds] = useState<Record<string, string>>({});
   const [adminSymbols, setAdminSymbols] = useState<any[]>([]); // full admin symbol list (includes enabled, swap, commission)
@@ -363,6 +364,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
     if (sy.ok) { const seen = new Set<string>(); const uniq = (sy.symbols || []).filter((s: any) => { if (seen.has(s.symbol)) return false; seen.add(s.symbol); return true; }); setSymbols(uniq); if (!selSymRef.current && uniq.length) setSelSym((uniq.find((s: any) => s.symbol === "BTCUSD") || uniq[0]).symbol); }
     // Load per-symbol spreads for market watch bid/ask display
     fetch("/api/admin/symbols").then((r) => r.json()).then((asr) => { if (asr.ok) { const m: Record<string, number> = {}; const types: Record<string, string> = {}; const maxes: Record<string, number> = {}; const ids: Record<string, string> = {}; (asr.symbols || []).forEach((s: any) => { m[s.symbol] = Number(s.spread ?? 0); types[s.symbol] = s.spreadType || "FIXED"; maxes[s.symbol] = Number(s.spreadMax ?? 0); ids[s.symbol] = s.id; }); setAdminSymSpreads(m); setAdminSymTypes(types); setAdminSymMax(maxes); setAdminSymIds(ids); setAdminSymbols(asr.symbols || []); } }).catch(() => {});
+    // Load SA default spreads (fallback when no exchange bid/ask and no admin spread configured)
+    fetch("/api/admin/spread-defaults").then((r) => r.json()).then((d) => { if (d.ok) setSaDefaultSpreads(d.defaults); }).catch(() => {});
     if (o.ok) setOpen(o.trades);
     if (h.ok) setHistory(h.history);
     if (a.ok) setAudit(a.logs);
@@ -1140,7 +1143,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
             <DeskMarketWatch symbols={symbols} selSym={selSym} onPick={setTile}
               disabledSyms={symPerm?.disabled || []}
               onCategoryEdit={(cat, syms) => { const first = syms[0]; setCatEdit({ cat, syms, spread: adminSymSpreads[first] ?? 0, spreadType: adminSymTypes[first] ?? "FLOATING", spreadMax: adminSymMax[first] ?? 0 }); }}
-              symbolSpreads={adminSymSpreads} symbolTypes={adminSymTypes} groupSpread={deskExtraSpread} />
+              symbolSpreads={adminSymSpreads} symbolTypes={adminSymTypes} groupSpread={deskExtraSpread} saDefaultSpreads={saDefaultSpreads} />
           </aside>
         </>)}
       </div>

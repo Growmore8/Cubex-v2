@@ -22,7 +22,7 @@ const CAT_LABEL: Record<string, string> = {
 
 // Self-contained market watch with its OWN socket + price state, so it ticks
 // pip-by-pip independently of the (heavy) desk re-render — as smooth as the client.
-function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit, symbolSpreads, symbolTypes, groupSpread }: {
+function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit, symbolSpreads, symbolTypes, groupSpread, saDefaultSpreads }: {
   symbols: Sym[];
   selSym?: string;
   onPick: (sym: string) => void;
@@ -31,6 +31,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
   symbolSpreads?: Record<string, { min: number; max: number; type: string } | number>;
   symbolTypes?: Record<string, string>;
   groupSpread?: number;
+  saDefaultSpreads?: Record<string, number>;
 }) {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
@@ -129,9 +130,9 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const rawSp = symbolSpreads && symbolSpreads[s.symbol];
               const cfgSpPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
               const isFixed = (symbolTypes as any)?.[s.symbol] === "FIXED";
-              // When exchange bid/ask arrives (Binance/Kraken/Massive), show the real market spread.
-              // Fixed/floating only controls trading execution — market watch always shows live when available.
-              const spPips = hasLive ? liveSp2! : cfgSpPips;
+              // Spread priority: 1) real exchange bid/ask  2) admin configured  3) SA category default
+              const saDefault = saDefaultSpreads?.[s.category || "forex"] ?? 0;
+              const spPips = hasLive ? liveSp2! : (cfgSpPips > 0 ? cfgSpPips : saDefault);
               const realSpPips = spPips;
               const ask = p != null ? gnum(p + spPips * pip, d) : "—";
               const bid = p != null ? gnum(p, d) : "—";
