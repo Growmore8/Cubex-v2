@@ -178,12 +178,39 @@ export default function SAFeeds() {
         {/* ── LEFT ── */}
         <div className="flex-1 min-w-0 space-y-4">
 
-          {/* Primary feed cards */}
+          {/* Connected Feeds status */}
           <div className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>Active Primary Feed</div>
-              <div className="text-[11px]" style={{ color: "#94a3b8" }}>Click a card to switch manually</div>
+            <div className="mb-3">
+              <div className="text-sm font-semibold" style={{ color: "var(--text)" }}>Connected Feeds</div>
+              <div className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
+                All configured feeds run simultaneously. WebSocket feeds supply real bid/ask prices; the fallback source covers remaining symbols.
+              </div>
             </div>
+
+            {/* Always-on WebSocket feeds */}
+            <div className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>WebSocket Feeds · Real Bid/Ask</div>
+            <div className="flex gap-2 flex-wrap mb-4">
+              {[
+                { key: "BN", name: "Binance WS", icon: "fa-brands fa-bitcoin", color: "#f59e0b", desc: "Crypto bid/ask",        inUse: Object.values(feeds).includes("BN") },
+                { key: "KR", name: "Kraken WS",  icon: "fa-solid fa-anchor",   color: "#5b21b6", desc: "Forex + metals bid/ask", inUse: Object.values(feeds).includes("KR") },
+                { key: "MV_WS", name: "Massive WS", icon: "fa-solid fa-bolt",  color: "#ec4899", desc: "All categories",         inUse: Object.values(feeds).includes("MV") && !!keys.massiveKey },
+              ].map((f) => (
+                <div key={f.key} className="flex-1 min-w-[110px] rounded-lg border px-3 py-2"
+                  style={{ background: f.inUse ? `${f.color}12` : "var(--bg)", borderColor: f.inUse ? `${f.color}55` : "var(--border)" }}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: f.inUse ? "#22c55e" : "#475569" }} />
+                    <i className={"text-[10px] " + f.icon} style={{ color: f.inUse ? f.color : "#64748b" }} />
+                    <span className="text-[11px] font-semibold" style={{ color: f.inUse ? "var(--text)" : "#64748b" }}>{f.name}</span>
+                    {f.inUse && <span className="ml-auto text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "#22c55e22", color: "#22c55e" }}>ON</span>}
+                  </div>
+                  <div className="text-[10px] pl-3" style={{ color: "#94a3b8" }}>{f.inUse ? f.desc : "Not in use"}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Single-price fallback switcher */}
+            <div className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>Single-Price Fallback · Click to Switch</div>
+            <div className="text-[10px] mb-2" style={{ color: "#94a3b8" }}>Used when a WebSocket feed does not cover a symbol. Provides price only — spread comes from SA spread settings.</div>
             <div className="flex gap-2 flex-wrap">
               {PRIMARY_CARDS.map((card) => {
                 const isActive = primary === card.key;
@@ -194,24 +221,23 @@ export default function SAFeeds() {
                   <button
                     key={card.key}
                     onClick={() => hasKey && setManualPrimary(card.key)}
-                    title={!hasKey ? "API key required" : `Set ${card.name} as primary`}
-                    className="flex-1 min-w-[100px] rounded-xl border p-3 text-left transition-all"
+                    title={!hasKey ? "API key required" : `Set ${card.name} as fallback`}
+                    className="flex-1 min-w-[100px] rounded-lg border p-2.5 text-left transition-all"
                     style={{
                       background: isActive ? `${card.color}18` : "var(--bg)",
                       borderColor: isActive ? card.color : "var(--border)",
                       opacity: hasKey ? 1 : 0.45,
                       cursor: hasKey ? "pointer" : "not-allowed",
-                      boxShadow: isActive ? `0 0 0 1px ${card.color}55` : "none",
+                      boxShadow: isActive ? `0 0 0 1px ${card.color}44` : "none",
                     }}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <i className={card.icon + " text-sm"} style={{ color: card.color }} />
-                      <span className="text-xs font-bold" style={{ color: isActive ? card.color : "var(--text)" }}>{card.name}</span>
-                      {isActive && <span className="ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: card.color, color: "#fff" }}>LIVE</span>}
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <i className={card.icon + " text-[10px]"} style={{ color: isActive ? card.color : "#64748b" }} />
+                      <span className="text-[11px] font-semibold" style={{ color: isActive ? card.color : "var(--text)" }}>{card.name}</span>
+                      {isActive && <span className="ml-auto text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: card.color, color: "#fff" }}>ACTIVE</span>}
                     </div>
                     <div className="text-[10px]" style={{ color: "#94a3b8" }}>{card.desc}</div>
                     {!hasKey && <div className="text-[10px] mt-0.5" style={{ color: "#f97316" }}>⚠ key needed</div>}
-                    {card.key === "MV" && !keys.massiveKey && <div className="text-[10px] mt-0.5" style={{ color: "#94a3b8" }}>$49/mo plan</div>}
                   </button>
                 );
               })}

@@ -20,6 +20,14 @@ const CAT_LABEL: Record<string, string> = {
   agriculture: "Agriculture",
 };
 
+// For very cheap tokens (price < $1) the configured digits may be too coarse.
+// Ensure pip (10^-(d-1)) ≤ 0.1% of price — gives at least 3 sig-fig spread precision.
+function effectiveDigits(configDigits: number, price: number | undefined): number {
+  if (price == null || price <= 0 || price >= 1) return configDigits;
+  const minD = Math.ceil(1 - Math.log10(price * 0.001));
+  return Math.max(configDigits, Math.min(minD, 8));
+}
+
 // Self-contained market watch with its OWN socket + price state, so it ticks
 // pip-by-pip independently of the (heavy) desk re-render — as smooth as the client.
 function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit, symbolSpreads, symbolTypes, groupSpread, saDefaultSpreads }: {
@@ -74,7 +82,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
       prev[symbol] = price; pP[symbol] = price;
       // Live spread = real ask − exchange bid (both from same LP tick)
       if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
-        const d = digitsRef.current[symbol] ?? 2;
+        const d = effectiveDigits(digitsRef.current[symbol] ?? 2, price);
         const sp = (real - bid) / Math.pow(10, -(d - 1));
         const prev2 = prevSp[symbol];
         if (prev2 != null && sp !== prev2) pSD[symbol] = sp > prev2 ? 1 : -1;
@@ -97,7 +105,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
     const ia = CAT_ORDER.indexOf(a[0]); const ib = CAT_ORDER.indexOf(b[0]);
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
-  const dgFor = (s: Sym) => (s.digits != null ? s.digits : 2);
+  const dgFor = (s: Sym) => effectiveDigits(s.digits ?? 2, prices[s.symbol]);
   const vw = typeof window !== "undefined" ? window.innerWidth : 9999;
 
   return (

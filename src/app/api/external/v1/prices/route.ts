@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { requireApiKey } from "@/lib/apiKey";
 import { rateLimit } from "@/lib/rateLimit";
 import { prisma } from "@/lib/prisma";
+import Redis from "ioredis";
+
+// Shared Redis client — reused across requests to avoid connection-per-request overhead
+let _redis: Redis | null = null;
+function redisClient(): Redis | null {
+  if (!_redis) { try { _redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379"); } catch { _redis = null; } }
+  return _redis;
+}
 
 // Cache globalSymbols for 60s — they rarely change and this route can be polled frequently.
 let _globalCache: { symbol: string; category: string; digits: number | null }[] = [];
@@ -70,7 +78,7 @@ export async function GET(req: Request) {
   // Fetch display price, real exchange bid, and real exchange ask from Redis.
   // ask:SYMBOL is only written when the feed provides a real separate ask (Binance/Kraken/Massive).
   const symList = syms.map((s) => s.symbol);
-  const rc = (await import("ioredis").then(({ default: Redis }) => new Redis(process.env.REDIS_URL || "redis://localhost:6379")).catch(() => null));
+  const rc = redisClient();
   let rawPrices: (string | null)[] = symList.map(() => null);
   let rawBids:   (string | null)[] = symList.map(() => null);
   let rawAsks:   (string | null)[] = symList.map(() => null);
@@ -82,7 +90,6 @@ export async function GET(req: Request) {
         rc.mget(symList.map((s) => "ask:"   + s)),
       ]);
     } catch {}
-    rc.disconnect();
   }
 
   const round = (n: number, d: number) => Math.round(n * Math.pow(10, d)) / Math.pow(10, d);

@@ -251,6 +251,13 @@ export default function ClientMobile({ t }: { t: any }) {
     return effective;
   };
 
+  const eDg = (sym: string) => {
+    const p = prices[sym]; const base = dg(sym);
+    if (p == null || p <= 0 || p >= 1) return base;
+    const minD = Math.ceil(1 - Math.log10(p * 0.001));
+    return Math.max(base, Math.min(minD, 8));
+  };
+
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "account">("dashboard");
   const [tradeView, setTradeView] = useState<"positions" | "history">("positions");
   const [mobNews, setMobNews] = useState<any[]>([]);
@@ -610,7 +617,7 @@ export default function ClientMobile({ t }: { t: any }) {
         const pips = Number(mTrail) || 0;
         if (pips > 0) {
           const pos = (positions || []).find((p: any) => p.id === id);
-          const pip = Math.pow(10, -(dg(pos?.symbol ?? "") - 1));
+          const pip = Math.pow(10, -(eDg(pos?.symbol ?? "") - 1));
           body.trailingStop = pips * pip;
         } else {
           body.trailingStop = 0;
@@ -1423,7 +1430,7 @@ export default function ClientMobile({ t }: { t: any }) {
             </div>
             <div className="space-y-2.5">
               {quoteList.length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No symbols.</div> : quoteList.map((s: any) => {
-                const dd = dg(s.symbol); const p = prices[s.symbol]; const isFav = (favs || []).includes(s.symbol);
+                const dd = eDg(s.symbol); const p = prices[s.symbol]; const isFav = (favs || []).includes(s.symbol);
                 const spPips = _mobSpreadPips(s.symbol);
                 const spPx = spPips * Math.pow(10, -(dd - 1));
                 const sAsk = p; const sBid = p != null ? p - spPx : null;
@@ -1543,7 +1550,7 @@ export default function ClientMobile({ t }: { t: any }) {
               <div className="flex items-stretch gap-1 px-1.5 py-1.5 min-[380px]:gap-1.5 min-[380px]:px-2.5 min-[380px]:py-2">
                 <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", chartVol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, touchAction: "manipulation" }}>
                   <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Sell</div>
-                  <div className="text-[12px] font-bold tabular-nums min-[380px]:text-[13px]">{bid != null ? gnum(bid, dg(selSym)) : "…"}</div>
+                  <div className="text-[12px] font-bold tabular-nums min-[380px]:text-[13px]">{bid != null ? gnum(bid, eDg(selSym)) : "…"}</div>
                 </button>
                 <div className="flex shrink-0 items-center gap-0.5">
                   <button onClick={() => setChartVol((v) => Math.max(0.01, +(v - 0.01).toFixed(2)))} className="flex h-8 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] active:scale-95 min-[380px]:h-9 min-[380px]:w-8" style={{ background: "var(--soft)", touchAction: "manipulation" }}>−</button>
@@ -1552,7 +1559,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 </div>
                 <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", chartVol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, touchAction: "manipulation" }}>
                   <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Buy</div>
-                  <div className="text-[12px] font-bold tabular-nums min-[380px]:text-[13px]">{ask != null ? gnum(ask, dg(selSym)) : "…"}</div>
+                  <div className="text-[12px] font-bold tabular-nums min-[380px]:text-[13px]">{ask != null ? gnum(ask, eDg(selSym)) : "…"}</div>
                 </button>
               </div>
             </div>
@@ -1560,7 +1567,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
             {/* Full order sheet — slides up from bottom */}
             {orderSheet && (() => {
-              const dd = dg(selSym); const sprd = _mobSpreadPips(selSym);
+              const dd = eDg(selSym); const sprd = _mobSpreadPips(selSym);
               const mobMg = (price != null ? ((chartVol * csz(selSym) * price) / (account?.leverage || 100)) / (/JPY$/i.test(selSym) ? 100 : 1) : 0) / _fxRate;
               const doPlace = async (side: "BUY" | "SELL") => {
                 if (mobOrderType === "MARKET") {
@@ -2165,7 +2172,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
       {/* NEW ORDER / PENDING MODAL */}
       {noOpen && (() => {
-        const dd = dg(selSym);
+        const dd = eDg(selSym);
         const doPlace = async (side: "BUY" | "SELL") => {
           const kind = mobOrderType;
           let ok: boolean;

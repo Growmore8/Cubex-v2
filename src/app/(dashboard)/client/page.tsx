@@ -26,6 +26,11 @@ const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD
 
 const DIGITS: Record<string, number> = {};
 function dg(sym: string, f = 2) { return DIGITS[sym] ?? instruments[sym]?.digits ?? f; }
+function effectiveDg(configDigits: number, price: number | undefined): number {
+  if (price == null || price <= 0 || price >= 1) return configDigits;
+  const minD = Math.ceil(1 - Math.log10(price * 0.001));
+  return Math.max(configDigits, Math.min(minD, 8));
+}
 function pnlOf(p: any, price: number, cs: number) {
   const sym = String(p.symbol || "");
   const dir = p.type === "BUY" ? 1 : -1;
@@ -413,7 +418,7 @@ export default function ClientTerminal() {
     // Client-side SL/TP sanity check before sending to server
     const curBid = prices[selSym]; // prices = smoothed BID (MT5 model)
     if (curBid && orderType === "MARKET") {
-      const spPx = _spreadPips(selSym) * Math.pow(10, -(dg(selSym) - 1));
+      const spPx = _spreadPips(selSym) * Math.pow(10, -(eDg(selSym) - 1));
       const curAsk = curBid + spPx; const dd = dg(selSym);
       const slv = Number(sl) || 0; const tpv = Number(tp) || 0;
       if (slv > 0) {
@@ -428,7 +433,7 @@ export default function ClientTerminal() {
     if (orderType === "LIMIT" || orderType === "STOP") {
       const trig = Number(pendingPrice); if (!trig) { setErr("Enter an entry price"); return; }
       const kind = orderType;
-      const rp = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), price: trig, kind, sl: Number(sl) || 0, tp: Number(tp) || 0, comment: comment || undefined, accountId: accIdRef.current, currentAsk: (prices[selSym] || 0) + _spreadPips(selSym) * Math.pow(10, -(dg(selSym) - 1)) }) });
+      const rp = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), price: trig, kind, sl: Number(sl) || 0, tp: Number(tp) || 0, comment: comment || undefined, accountId: accIdRef.current, currentAsk: (prices[selSym] || 0) + _spreadPips(selSym) * Math.pow(10, -(eDg(selSym) - 1)) }) });
       const dp = await rp.json(); if (!dp.ok) { setErr(dp.error || "Failed"); return; }
       pushToast({ title: `${type} ${kind} ${selSym} placed`, type: "TRADE" }); setPendingPrice(""); load(); return;
     }
@@ -811,7 +816,8 @@ export default function ClientTerminal() {
     }
     return effective;
   };
-  const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(dg(sym) - 1));
+  const eDg = (sym: string) => effectiveDg(dg(sym), prices[sym]);
+  const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(eDg(sym) - 1));
   // MT5 model: price = smoothed BID (primary). ask = price + configured spread.
   // Works for both FIXED and FLOATING — spread source differs, derivation is identical.
   const ask = (price ?? 0) + _spreadPx(selSym);
@@ -1265,7 +1271,7 @@ export default function ClientTerminal() {
             {favs.length > 0 && (
               <div>
                 <div className="mt-1 rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold" style={{ color: GOLD }}>{"\u2605"} FAVOURITES</div>
-                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; const dOpen = dailyOpen[s.symbol]; const pct = dOpen && p ? ((p - dOpen) / dOpen) * 100 : null; return (
+                {symbols.filter((s) => favs.includes(s.symbol)).map((s) => { const p = prices[s.symbol]; const dd = eDg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; const dOpen = dailyOpen[s.symbol]; const pct = dOpen && p ? ((p - dOpen) / dOpen) * 100 : null; return (
                   <div key={"fav-" + s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_58px_58px_26px_40px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
@@ -1278,7 +1284,7 @@ export default function ClientTerminal() {
             {orderedGroups.map(([c, list]) => (
               <div key={c}>
                 <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
-                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = dg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; const dOpen = dailyOpen[s.symbol]; const pct = dOpen && p ? ((p - dOpen) / dOpen) * 100 : null; return (
+                {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = eDg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; const dOpen = dailyOpen[s.symbol]; const pct = dOpen && p ? ((p - dOpen) / dOpen) * 100 : null; return (
                   <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_58px_58px_26px_40px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
@@ -1643,7 +1649,7 @@ export default function ClientTerminal() {
               {/* R/R + P&L estimate — only when both SL and TP are set */}
               {(() => {
                 const ref = orderType === "MARKET" ? (price ?? 0) : (Number(pendingPrice) || (price ?? 0));
-                const pipSz = Math.pow(10, -(dg(selSym) - 1));
+                const pipSz = Math.pow(10, -(eDg(selSym) - 1));
                 const tpPips = tp && ref ? Math.abs(Number(tp) - ref) / pipSz : 0;
                 const slPips = sl && ref ? Math.abs(Number(sl) - ref) / pipSz : 0;
                 if (!tpPips && !slPips) return null;
