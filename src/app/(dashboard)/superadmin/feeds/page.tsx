@@ -6,6 +6,8 @@ import PasswordInput from "@/components/ui/PasswordInput";
 // ── Feed options per asset category ────────────────────────────────────────
 const CAT_FEEDS: Record<string, { key: string; name: string; free: boolean; hasBidAsk: boolean; info: string }[]> = {
   crypto: [
+    { key: "BN", name: "Binance",      free: true,  hasBidAsk: true,  info: "Real bid/ask · free public WebSocket" },
+    { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · free public WebSocket" },
     { key: "MV", name: "Massive.com",  free: false, hasBidAsk: true,  info: "Real bid/ask · $49/mo plan required" },
     { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Price only · key required" },
     { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "Price only · Finnhub key required" },
@@ -16,6 +18,7 @@ const CAT_FEEDS: Record<string, { key: string; name: string; free: boolean; hasB
     { key: "FH", name: "Finnhub",      free: false, hasBidAsk: false, info: "Price only · key required" },
   ],
   commodities: [
+    { key: "KR", name: "Kraken",       free: true,  hasBidAsk: true,  info: "Real bid/ask · metals (XBT/XAU) · free" },
     { key: "MV", name: "Massive.com",  free: false, hasBidAsk: true,  info: "Real bid/ask · metals as forex pairs" },
     { key: "TD", name: "TwelveData",   free: false, hasBidAsk: false, info: "Metals + energy · key required" },
   ],
