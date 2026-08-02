@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiKey } from "@/lib/apiKey";
 import { rateLimit } from "@/lib/rateLimit";
-import { livePrices } from "@/lib/livePrices";
 import { prisma } from "@/lib/prisma";
 
 // Cache globalSymbols for 60s — they rarely change and this route can be polled frequently.
@@ -68,20 +67,49 @@ export async function GET(req: Request) {
 
   if (!syms.length) return NextResponse.json({ ok: true, prices: {}, ts: Date.now() });
 
-  // Fetch all live prices from Redis in one call — feed-agnostic
-  const raw = await livePrices(syms.map((s) => s.symbol));
+  // Fetch display price, real exchange bid, and real exchange ask from Redis.
+  // ask:SYMBOL is only written when the feed provides a real separate ask (Binance/Kraken/Massive).
+  const symList = syms.map((s) => s.symbol);
+  const rc = (await import("ioredis").then(({ default: Redis }) => new Redis(process.env.REDIS_URL || "redis://localhost:6379")).catch(() => null));
+  let rawPrices: (string | null)[] = symList.map(() => null);
+  let rawBids:   (string | null)[] = symList.map(() => null);
+  let rawAsks:   (string | null)[] = symList.map(() => null);
+  if (rc) {
+    try {
+      [rawPrices, rawBids, rawAsks] = await Promise.all([
+        rc.mget(symList.map((s) => "price:" + s)),
+        rc.mget(symList.map((s) => "bid:"   + s)),
+        rc.mget(symList.map((s) => "ask:"   + s)),
+      ]);
+    } catch {}
+    rc.disconnect();
+  }
 
   const round = (n: number, d: number) => Math.round(n * Math.pow(10, d)) / Math.pow(10, d);
 
   const prices: Record<string, { symbol: string; price: number; bid: number; ask: number; category: string }> = {};
-  for (const s of syms) {
-    const price = raw[s.symbol];
-    if (price == null) continue; // no live price yet — skip rather than send stale 0
+  for (let i = 0; i < syms.length; i++) {
+    const s = syms[i];
+    const displayPrice = rawPrices[i] != null ? parseFloat(rawPrices[i] as string) : NaN;
+    if (!isFinite(displayPrice)) continue; // no live price yet — skip rather than send stale 0
     const digits = s.digits ?? 5;
     const pip = Math.pow(10, -(digits - 1));
-    const spreadPips = Number(s.spread) || 0;
-    const bid = round(price, digits);
-    const ask = round(price + spreadPips * pip, digits);
+    const tenantMarkupPips = Number(s.spread) || 0;
+
+    const realBidRaw = rawBids[i] != null ? parseFloat(rawBids[i] as string) : NaN;
+    const realAskRaw = rawAsks[i] != null ? parseFloat(rawAsks[i] as string) : NaN;
+
+    let bid: number;
+    let ask: number;
+    if (isFinite(realBidRaw) && isFinite(realAskRaw) && realAskRaw > realBidRaw) {
+      // Real exchange bid/ask available (Binance/Kraken/Massive) — same logic as trade execution
+      bid = round(realBidRaw, digits);
+      ask = round(realAskRaw + tenantMarkupPips * pip, digits);
+    } else {
+      // Single-price feed (TwelveData/Finnhub) — construct spread from tenant config
+      bid = round(displayPrice, digits);
+      ask = round(displayPrice + tenantMarkupPips * pip, digits);
+    }
     prices[s.symbol] = { symbol: s.symbol, price: bid, bid, ask, category: s.category };
   }
 
