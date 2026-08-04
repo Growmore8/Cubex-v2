@@ -30,7 +30,7 @@ export default function DomPanel({ symbol, bid, ask, spreadPips, digits, onRowCl
     return () => clearInterval(iv);
   }, []);
 
-  const pipSz = Math.pow(10, -(digits - 1));
+  const pipSz = digits >= 3 ? Math.pow(10, -(digits - 1)) : Math.pow(10, -digits);
   const fmt   = (v: number) => v.toFixed(digits);
 
   const asks = Array.from({ length: LEVELS }, (_, i) => ({

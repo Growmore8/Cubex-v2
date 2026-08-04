@@ -28,6 +28,10 @@ function effectiveDigits(configDigits: number, price: number | undefined): numbe
   return Math.max(configDigits, Math.min(minD, 8));
 }
 
+function pipOf(digits: number): number {
+  return digits >= 3 ? Math.pow(10, -(digits - 1)) : Math.pow(10, -digits);
+}
+
 // Self-contained market watch with its OWN socket + price state, so it ticks
 // pip-by-pip independently of the (heavy) desk re-render — as smooth as the client.
 function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit, symbolSpreads, symbolTypes, groupSpread, saDefaultSpreads }: {
@@ -83,7 +87,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
       // Live spread = real ask − exchange bid (both from same LP tick)
       if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
         const d = effectiveDigits(digitsRef.current[symbol] ?? 2, price);
-        const sp = (real - bid) / Math.pow(10, -(d - 1));
+        const sp = (real - bid) / pipOf(d);
         const prev2 = prevSp[symbol];
         if (prev2 != null && sp !== prev2) pSD[symbol] = sp > prev2 ? 1 : -1;
         prevSp[symbol] = sp; pS[symbol] = sp;
@@ -132,7 +136,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
             </div>
             {!collapsed[cat] && list.map((s) => {
               const p = prices[s.symbol]; const d = dgFor(s);
-              const pip = Math.pow(10, -(d - 1));
+              const pip = pipOf(d);
               const liveSp2 = liveSpreadPips[s.symbol];
               const hasLive = liveSp2 != null && liveSp2 > 0;
               const rawSp = symbolSpreads && symbolSpreads[s.symbol];

@@ -716,7 +716,8 @@ function LWChart({
         }
         // MT5: chart draws on BID. Ask line appears ABOVE candles at bid + spread.
         // When spread = 0 hide the line entirely (transparent), never show bid line.
-        const spPx = spreadPipsRef.current * Math.pow(10, -(digits - 1));
+        const pipSzLW = digits >= 3 ? Math.pow(10, -(digits - 1)) : Math.pow(10, -digits);
+        const spPx = spreadPipsRef.current * pipSzLW;
         try {
           askLineRef.current?.applyOptions(spPx > 0
             ? { price: close + spPx, color: "#2196F3", axisLabelVisible: true }

@@ -25,6 +25,10 @@ import { ADSS_DARK, ADSS_LIGHT, ADSS_FONT, BUY, SELL, GOLD, BUYBTN, SELLBTN } fr
 const TFS = ["1M", "5M", "15M", "30M", "1H", "4H", "1D"];
 const TABS: [string, string][] = [["overview", "Overview"], ["trade", "Trade"], ["history", "History"], ["summary", "Summary"], ["clients", "Clients"], ["audit", "Audit"], ["payments", "Payments"], ["kyc", "KYC"], ["requests", "Requests"], ["symbols", "Symbols"], ["groups", "Groups"], ["risk", "Risk"], ["copy", "Copy Trading"], ["signals", "Signals"], ["broadcast", "Broadcast"], ["referral", "Referral"]];
 
+function pipOf(digits: number): number {
+  return digits >= 3 ? Math.pow(10, -(digits - 1)) : Math.pow(10, -digits);
+}
+
 function pnlOf(p: any, price: number, cs: number) {
   const sym = String(p.symbol || "");
   const dir = p.type === "BUY" ? 1 : -1;
@@ -469,7 +473,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
       pP[symbol] = price;
       if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
         const d = dg(symbol);
-        pS[symbol] = (real - bid) / Math.pow(10, -(d - 1));
+        pS[symbol] = (real - bid) / pipOf(d);
       }
     });
     const flushIv = setInterval(flush, 150);
@@ -1081,7 +1085,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
               <div key={"tile" + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
                 {/* Buy/Sell overlay \u2014 top-left, positioned below TV header (~38px) + left sidebar (~40px) */}
                 {(() => {
-                  const p = prices[sym]; const d = dg(sym); const pip = Math.pow(10, -(d - 1));
+                  const p = prices[sym]; const d = dg(sym); const pip = pipOf(d);
                   const isFloatO = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING";
                   const spO = (isFloatO ? (liveSpreadPips[sym] ?? adminSymSpreads[sym] ?? 0) : (adminSymSpreads[sym] ?? 0)) + deskExtraSpread;
                   const bid = p != null ? gnum(p, d) : "\u2014";

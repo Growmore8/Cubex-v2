@@ -100,7 +100,7 @@ export async function GET(req: Request) {
     const displayPrice = rawPrices[i] != null ? parseFloat(rawPrices[i] as string) : NaN;
     if (!isFinite(displayPrice)) continue; // no live price yet — skip rather than send stale 0
     const digits = s.digits ?? 5;
-    const pip = Math.pow(10, -(digits - 1));
+    const pip = digits >= 3 ? Math.pow(10, -(digits - 1)) : Math.pow(10, -digits);
     const tenantMarkupPips = Number(s.spread) || 0;
 
     const realBidRaw = rawBids[i] != null ? parseFloat(rawBids[i] as string) : NaN;

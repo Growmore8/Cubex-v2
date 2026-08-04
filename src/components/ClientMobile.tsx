@@ -13,6 +13,10 @@ const LWMobileChart = dynamic(() => import("@/components/LWChart"), { ssr: false
 
 const INDS: [string, string][] = [["RSI", "RSI@tv-basicstudies"], ["MACD", "MACD@tv-basicstudies"], ["Stoch", "Stochastic@tv-basicstudies"], ["BBands", "BB@tv-basicstudies"], ["MA", "MASimple@tv-basicstudies"], ["ROC", "ROC@tv-basicstudies"]];
 
+function pipOf(digits: number): number {
+  return digits >= 3 ? Math.pow(10, -(digits - 1)) : Math.pow(10, -digits);
+}
+
 // ── Referral card (self-contained, fetches its own data) ──────────────────────
 function ReferralCard({ cSym }: { cSym: string }) {
   const [data, setData] = useState<any>(null);
@@ -617,7 +621,7 @@ export default function ClientMobile({ t }: { t: any }) {
         const pips = Number(mTrail) || 0;
         if (pips > 0) {
           const pos = (positions || []).find((p: any) => p.id === id);
-          const pip = Math.pow(10, -(eDg(pos?.symbol ?? "") - 1));
+          const pip = pipOf(eDg(pos?.symbol ?? ""));
           body.trailingStop = pips * pip;
         } else {
           body.trailingStop = 0;
@@ -1432,7 +1436,7 @@ export default function ClientMobile({ t }: { t: any }) {
               {quoteList.length === 0 ? <div className="py-6 text-center text-[12px] text-[var(--muted)]">No symbols.</div> : quoteList.map((s: any) => {
                 const dd = eDg(s.symbol); const p = prices[s.symbol]; const isFav = (favs || []).includes(s.symbol);
                 const spPips = _mobSpreadPips(s.symbol);
-                const spPx = spPips * Math.pow(10, -(dd - 1));
+                const spPx = spPips * pipOf(dd);
                 const sAsk = p; const sBid = p != null ? p - spPx : null;
                 const spread = spPips;
                 const dr = dirs?.[s.symbol] || 0;
@@ -1771,12 +1775,12 @@ export default function ClientMobile({ t }: { t: any }) {
                         <div><div className="text-[var(--muted)]">S/L</div><div className="font-semibold">{p.sl ? gnum(Number(p.sl), dd) : "—"}</div></div>
                         <div><div className="text-[var(--muted)]">T/P</div><div className="font-semibold">{p.tp ? gnum(Number(p.tp), dd) : "—"}</div></div>
                         <div><div className="text-[var(--muted)]">TYPE</div><div className="font-semibold">{p.type}</div></div>
-                        {Number(p.trailingStop ?? 0) > 0 && <div><div className="text-[var(--muted)]">TRAIL</div><div className="font-semibold" style={{ color: "#f59e0b" }}>{Math.round(Number(p.trailingStop) / Math.pow(10, -(dd - 1)))}p</div></div>}
+                        {Number(p.trailingStop ?? 0) > 0 && <div><div className="text-[var(--muted)]">TRAIL</div><div className="font-semibold" style={{ color: "#f59e0b" }}>{Math.round(Number(p.trailingStop) / pipOf(dd))}p</div></div>}
                         {swapEnabled && Number(p.commission ?? 0) !== 0 && <div><div className="text-[var(--muted)]">COMM</div><div className="font-semibold" style={{ color: SELL }}>-{fmt(Math.abs(Number(p.commission)))}</div></div>}
                         {swapEnabled && Number(p.swap ?? 0) !== 0 && <div><div className="text-[var(--muted)]">SWAP</div><div className="font-semibold" style={{ color: Number(p.swap) >= 0 ? BUY : SELL }}>{Number(p.swap) >= 0 ? "+" : ""}{fmt(Number(p.swap))}</div></div>}
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2">
-                        <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); setMTrail(p.trailingStop > 0 ? String(Math.round(Number(p.trailingStop) / Math.pow(10, -(dd - 1)))) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-pen mr-1" />Modify</button>
+                        <button onClick={() => { setModifyId(p.id); setMSl(p.sl ? String(p.sl) : ""); setMTp(p.tp ? String(p.tp) : ""); setMTrail(p.trailingStop > 0 ? String(Math.round(Number(p.trailingStop) / pipOf(dd))) : ""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-pen mr-1" />Modify</button>
                         {Number(p.lots) > 0.01 ? (
                           <button onClick={() => { setMobPartial({id: p.id, lots: Number(p.lots), sym: p.symbol}); setMobPartialLots(""); }} className="rounded-lg border border-[var(--border)] bg-[var(--soft)] py-2 text-[11px] font-semibold"><i className="fa-solid fa-scissors mr-1" />Partial</button>
                         ) : (

@@ -31,6 +31,11 @@ function effectiveDg(configDigits: number, price: number | undefined): number {
   const minD = Math.ceil(1 - Math.log10(price * 0.001));
   return Math.max(configDigits, Math.min(minD, 8));
 }
+// Same rule as server's pipForDigits: for instruments with ≥3 decimal places (forex)
+// pip = 10^-(digits-1); for 2-decimal instruments (metals, high-priced crypto) pip = 10^-digits.
+function pipOf(digits: number): number {
+  return digits >= 3 ? Math.pow(10, -(digits - 1)) : Math.pow(10, -digits);
+}
 function pnlOf(p: any, price: number, cs: number) {
   const sym = String(p.symbol || "");
   const dir = p.type === "BUY" ? 1 : -1;
@@ -377,7 +382,7 @@ export default function ClientTerminal() {
       // Compute live exchange spread from real ask vs exchange bid for FLOATING display
       if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
         const d = DIGITS[symbol] ?? 2;
-        const sp2 = (real - bid) / Math.pow(10, -(d - 1));
+        const sp2 = (real - bid) / pipOf(d);
         const pv2 = prevSp[symbol];
         if (pv2 != null && sp2 !== pv2) pSD[symbol] = sp2 > pv2 ? 1 : -1;
         prevSp[symbol] = sp2;
@@ -418,8 +423,7 @@ export default function ClientTerminal() {
     // Client-side SL/TP sanity check before sending to server
     const curBid = prices[selSym]; // prices = smoothed BID (MT5 model)
     if (curBid && orderType === "MARKET") {
-      const spPx = _spreadPips(selSym) * Math.pow(10, -(eDg(selSym) - 1));
-      const curAsk = curBid + spPx; const dd = dg(selSym);
+      const curAsk = ask; const dd = dg(selSym);
       const slv = Number(sl) || 0; const tpv = Number(tp) || 0;
       if (slv > 0) {
         if (type === "BUY" && slv >= curAsk) { setErr(`SL must be below ask ${gnum(curAsk, dd)}`); return; }
@@ -433,7 +437,7 @@ export default function ClientTerminal() {
     if (orderType === "LIMIT" || orderType === "STOP") {
       const trig = Number(pendingPrice); if (!trig) { setErr("Enter an entry price"); return; }
       const kind = orderType;
-      const rp = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), price: trig, kind, sl: Number(sl) || 0, tp: Number(tp) || 0, comment: comment || undefined, accountId: accIdRef.current, currentAsk: (prices[selSym] || 0) + _spreadPips(selSym) * Math.pow(10, -(eDg(selSym) - 1)) }) });
+      const rp = await fetch("/api/client/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), price: trig, kind, sl: Number(sl) || 0, tp: Number(tp) || 0, comment: comment || undefined, accountId: accIdRef.current, currentAsk: ask }) });
       const dp = await rp.json(); if (!dp.ok) { setErr(dp.error || "Failed"); return; }
       pushToast({ title: `${type} ${kind} ${selSym} placed`, type: "TRADE" }); setPendingPrice(""); load(); return;
     }
@@ -445,21 +449,33 @@ export default function ClientTerminal() {
       const dp = await rp.json(); if (!dp.ok) { setErr(dp.error || "Failed"); return; }
       pushToast({ title: `${type} STOP_LIMIT ${selSym} placed`, type: "TRADE" }); setPendingPrice(""); setStopLimitEntry(""); load(); return;
     }
-    const r = await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), sl: Number(sl) || 0, tp: Number(tp) || 0, trailingStop: Number(trail) || 0, comment: comment || undefined, accountId: accIdRef.current }) });
-    const d = await r.json();
-    if (!d.ok) { setErr(d.error || "Order failed"); return; }
-    pushToast({ title: `${type} ${selSym} ${vol}L opened`, type: "TRADE" }); load();
+    try {
+      const r = await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: selSym, side: type, lots: Number(vol), sl: Number(sl) || 0, tp: Number(tp) || 0, trailingStop: Number(trail) || 0, comment: comment || undefined, accountId: accIdRef.current }) });
+      const d = await r.json();
+      if (!d.ok) { setErr(d.error || "Order failed"); pushToast({ title: d.error || "Order failed", type: "NOTICE" }); return; }
+      pushToast({ title: `${type} ${selSym} ${vol}L opened`, type: "TRADE" });
+      // Optimistic update — add position immediately so the table doesn't wait 4 s for load()
+      if (d.id && d.ticket) {
+        setPositions((prev) => [...prev, { id: d.id, ticket: d.ticket, symbol: d.symbol ?? selSym, type: d.type ?? type, lots: d.lots ?? vol, openPrice: d.openPrice ?? ask, sl: d.sl ?? 0, tp: d.tp ?? 0, commission: d.commission ?? 0, swap: 0, openedAt: d.openedAt ?? new Date().toISOString() }]);
+      }
+      load();
+    } catch (e: any) {
+      setErr(e?.message || "Order failed — check your connection");
+      pushToast({ title: "Order failed — check your connection", type: "NOTICE" });
+    }
   }
   async function quickTrade(sym: string, side: "BUY" | "SELL", lots?: number) {
     setSelSym(sym); setErr("");
     if (account?.locked) { setErr("Account is read-only."); return false; }
     if (needKyc) { setErr("Verify your KYC to trade on a live account."); setWalletModal("kyc"); return false; }
-    const r = await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol: sym, side, lots: Number(lots ?? vol), sl: 0, tp: 0, accountId: accIdRef.current }) });
-    const d = await r.json();
-    if (!d.ok) { setErr(d.error || "Order failed"); return false; }
-    pushToast({ title: `${side} ${sym} ${Number(lots ?? vol)}L opened`, type: "TRADE" }); load(); return true;
+    try {
+      const r = await fetch("/api/client/orders", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: sym, side, lots: Number(lots ?? vol), sl: 0, tp: 0, accountId: accIdRef.current }) });
+      const d = await r.json();
+      if (!d.ok) { setErr(d.error || "Order failed"); pushToast({ title: d.error || "Order failed", type: "NOTICE" }); return false; }
+      pushToast({ title: `${side} ${sym} ${Number(lots ?? vol)}L opened`, type: "TRADE" }); load(); return true;
+    } catch (e: any) { setErr(e?.message || "Order failed"); pushToast({ title: "Order failed — check connection", type: "NOTICE" }); return false; }
   }
   // Mobile/explicit pending order: kind = LIMIT | STOP
   async function placePending(sym: string, side: "BUY" | "SELL", kind: "LIMIT" | "STOP", trigger: number, lots: number, slv = 0, tpv = 0, expiresAt?: string) {
@@ -575,7 +591,7 @@ export default function ClientTerminal() {
     let sendVal: number = isNaN(val) ? 0 : val;
     if (tpSlEdit.field === "trailingStop" && sendVal > 0) {
       const pos = positions.find((p: any) => p.id === tpSlEdit.id);
-      if (pos) sendVal = sendVal * Math.pow(10, -(dg(pos.symbol) - 1));
+      if (pos) sendVal = sendVal * pipOf(dg(pos.symbol));
     }
     const body: any = { [tpSlEdit.field]: sendVal };
     const r = await fetch("/api/client/orders/" + tpSlEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -817,7 +833,7 @@ export default function ClientTerminal() {
     return effective;
   };
   const eDg = (sym: string) => effectiveDg(dg(sym), prices[sym]);
-  const _spreadPx = (sym: string) => _spreadPips(sym) * Math.pow(10, -(eDg(sym) - 1));
+  const _spreadPx = (sym: string) => _spreadPips(sym) * pipOf(eDg(sym));
   // MT5 model: price = smoothed BID (primary). ask = price + configured spread.
   // Works for both FIXED and FLOATING — spread source differs, derivation is identical.
   const ask = (price ?? 0) + _spreadPx(selSym);
@@ -1276,7 +1292,7 @@ export default function ClientTerminal() {
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
-                    <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: spDir !== 0 ? 700 : 500, color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)", transition: "color 0.55s ease-out" }}>{sp > 0 ? Math.round(sp * 10) : "\u2014"}</span>
+                    <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: spDir !== 0 ? 700 : 500, color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)", transition: "color 0.55s ease-out" }}>{sp > 0 ? Math.round(sp * (dg(s.symbol) >= 3 ? 10 : 1)) : "\u2014"}</span>
                     <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: 600, color: pct == null ? "var(--muted)" : pct > 0 ? "#16c784" : pct < 0 ? "#e05260" : "var(--muted)" }}>{pct == null ? "\u2014" : (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%"}</span>
                   </div>); })}
               </div>
@@ -1289,7 +1305,7 @@ export default function ClientTerminal() {
                     <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
-                    <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: spDir !== 0 ? 700 : 500, color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)", transition: "color 0.55s ease-out" }}>{sp > 0 ? Math.round(sp * 10) : "\u2014"}</span>
+                    <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: spDir !== 0 ? 700 : 500, color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)", transition: "color 0.55s ease-out" }}>{sp > 0 ? Math.round(sp * (dg(s.symbol) >= 3 ? 10 : 1)) : "\u2014"}</span>
                     <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: 600, color: pct == null ? "var(--muted)" : pct > 0 ? "#16c784" : pct < 0 ? "#e05260" : "var(--muted)" }}>{pct == null ? "\u2014" : (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%"}</span>
                   </div>); })}
               </div>
@@ -1649,7 +1665,7 @@ export default function ClientTerminal() {
               {/* R/R + P&L estimate — only when both SL and TP are set */}
               {(() => {
                 const ref = orderType === "MARKET" ? (price ?? 0) : (Number(pendingPrice) || (price ?? 0));
-                const pipSz = Math.pow(10, -(eDg(selSym) - 1));
+                const pipSz = pipOf(eDg(selSym));
                 const tpPips = tp && ref ? Math.abs(Number(tp) - ref) / pipSz : 0;
                 const slPips = sl && ref ? Math.abs(Number(sl) - ref) / pipSz : 0;
                 if (!tpPips && !slPips) return null;
@@ -1742,6 +1758,9 @@ export default function ClientTerminal() {
           <div className="border-y border-[var(--border)] bg-[var(--panel)]" style={{ color: "#facc15" }}>
             <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-1.5 text-[11px] font-bold">
               <span style={{ color: "var(--muted)" }}>Balance: <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(balance) : "--"}</span></span>
+              {account && Number(account.credit) > 0 && (
+                <span style={{ color: "var(--muted)" }}>Credit: <span className="font-mono font-bold" style={{ color: "#f59e0b" }}>{cSym + fmt(Number(account.credit))}</span></span>
+              )}
               <span style={{ color: "var(--muted)" }}>Equity: <span className="font-mono font-bold" style={{ color: !account ? "var(--text)" : equity >= balance ? BUY : SELL }}>{account ? cSym + fmt(equity) : "--"}</span></span>
               <span style={{ color: "var(--muted)" }}>Margin: <span className="font-mono font-bold text-[var(--text)]">{account ? cSym + fmt(used) : "--"}</span></span>
               <span style={{ color: "var(--muted)" }}>Free Margin: <span className="font-mono font-bold" style={{ color: account && free < 0 ? SELL : "#22c55e" }}>{account ? cSym + fmt(free) : "--"}</span></span>
@@ -1819,11 +1838,11 @@ export default function ClientTerminal() {
                       )}
                     </td>
                     {/* Trailing stop inline edit */}
-                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "trailingStop", val: p.trailingStop > 0 ? String(Math.round(p.trailingStop / Math.pow(10, -(dg(p.symbol) - 1)))) : "" }); }} title="Trailing stop (pips). Click to edit. 0 = off." style={{ cursor: "pointer" }}>
+                    <td className="px-2 py-1 text-right" onClick={() => { if (!tpSlEdit) setTpSlEdit({ id: p.id, field: "trailingStop", val: p.trailingStop > 0 ? String(Math.round(p.trailingStop / pipOf(dg(p.symbol)))) : "" }); }} title="Trailing stop (pips). Click to edit. 0 = off." style={{ cursor: "pointer" }}>
                       {tpSlEdit !== null && tpSlEdit.id === p.id && tpSlEdit.field === "trailingStop" ? (
                         <input type="number" inputMode="decimal" autoFocus value={tpSlEdit.val} onChange={(e) => setTpSlEdit({ id: p.id, field: "trailingStop", val: e.target.value })} onBlur={saveTpSl} onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setTpSlEdit(null); }} className="w-16 rounded border px-1 py-0.5 text-right text-[10px]" style={{ background: "var(--soft)", borderColor: "#f59e0b", color: "#f59e0b" }} onClick={(e) => e.stopPropagation()} />
                       ) : (
-                        <span style={{ color: p.trailingStop > 0 ? "#f59e0b" : "var(--muted)" }}>{p.trailingStop > 0 ? Math.round(p.trailingStop / Math.pow(10, -(dg(p.symbol) - 1))) + "p" : "—"}</span>
+                        <span style={{ color: p.trailingStop > 0 ? "#f59e0b" : "var(--muted)" }}>{p.trailingStop > 0 ? Math.round(p.trailingStop / pipOf(dg(p.symbol))) + "p" : "—"}</span>
                       )}
                     </td>
                     {/* Commission, Swap and Gross P/L — shown only when swap enabled */}

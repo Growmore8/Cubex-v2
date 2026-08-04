@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 
-// 1 pip = 10^-(digits-1). e.g. EURUSD digits=5 → pip=0.0001; XAUUSD digits=2 → pip=0.1
+// Forex (digits ≥ 3): pip is one above the last decimal — EURUSD 5D → 0.0001; USDJPY 3D → 0.01
+// Metals/crypto (digits ≤ 2): last decimal IS the pip — XAUUSD 2D → 0.01, NOT 0.1
 export function pipForDigits(digits: number): number {
-  return Math.pow(10, -(digits - 1));
+  return digits >= 3 ? Math.pow(10, -(digits - 1)) : Math.pow(10, -digits);
 }
 
 // Total spread in pips for execution:
