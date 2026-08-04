@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen, assertCan } from "@/lib/perms";
-import { getPrice } from "@/lib/prices";
+import { getPrice, getAsk } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
 import { pnlFor } from "@/lib/trademath";
@@ -99,8 +99,12 @@ export async function manualTrade(s: any, input: any) {
   if (acc.locked) throw new Error("Account is locked");
   await assertTradingOpen();
   await assertCan(s, "manualTrade");
-  const live = await getPrice(input.symbol);
-  const openPrice = (input.openPrice != null && Number(input.openPrice) > 0) ? Number(input.openPrice) : live;
+  const liveBid = await getPrice(input.symbol);
+  const liveAsk = await getAsk(input.symbol);
+  // BUY opens at ask, SELL opens at bid — same as client trade placement
+  const defaultPx = input.type === "BUY" ? (liveAsk ?? liveBid) : (liveBid ?? liveAsk);
+  const openPrice = (input.openPrice != null && Number(input.openPrice) > 0) ? Number(input.openPrice) : defaultPx;
+  const live = liveAsk ?? liveBid;
   if (openPrice == null) throw new Error("No price for " + input.symbol);
   // Same margin rule as the client: free margin must cover this trade.
   await assertMargin(acc, { symbol: input.symbol, type: input.type, lots: Number(input.lots) }, live ?? openPrice);
@@ -136,8 +140,12 @@ export async function deleteOpen(s: any, tradeId: string) {
 export async function forceClose(s: any, tradeId: string, opts?: { price?: number; closedAt?: Date }) {
   const trade = await prisma.trade.findFirst({ where: { id: BigInt(tradeId), account: accountWhere(s) }, include: { account: true } });
   if (!trade) throw new Error("Position not found");
-  // Manual close: use the supplied price (else live market price).
-  const price = (opts?.price != null && opts.price > 0) ? opts.price : await getPrice(trade.symbol);
+  // Manual close: use the supplied price, else correct side price (BUY closes at bid, SELL closes at ask)
+  const fcBid = await getPrice(trade.symbol);
+  const fcAsk = await getAsk(trade.symbol);
+  const price = (opts?.price != null && opts.price > 0)
+    ? opts.price
+    : (trade.type === "BUY" ? (fcBid ?? fcAsk) : (fcAsk ?? fcBid));
   if (price == null) throw new Error("No price");
   const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
   await prisma.$transaction(async (tx) => {

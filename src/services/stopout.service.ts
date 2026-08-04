@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { pnlFor, usedMargin } from "@/lib/trademath";
-import { getPrice, getBid } from "@/lib/prices";
+import { getPrice, getBid, getAsk } from "@/lib/prices";
 import { audit } from "@/lib/audit";
 import { notifyStaff } from "@/services/notification.service";
 import { gnum, gprice } from "@/lib/format";
@@ -88,7 +88,8 @@ async function processAccount(tenantId: string, account: any): Promise<number> {
     // Fetch all prices in parallel — ask for SELL close, bid for BUY close
     const symbols = [...new Set(trades.map((t) => t.symbol))];
     const [asks, bids] = await Promise.all([
-      Promise.all(symbols.map((s) => getPrice(s))),
+      // getAsk() reads the real exchange ask (ask:SYMBOL); fall back to display BID when no real feed
+      Promise.all(symbols.map(async (s) => { const a = await getAsk(s); return (a != null && a > 0) ? a : getPrice(s); })),
       Promise.all(symbols.map((s) => getBid(s))),
     ]);
     const askMap: Record<string, number> = {};

@@ -1046,7 +1046,9 @@ async function liquidate(acc, list, io) {
     const liqCs = acc.currency === 'EUR' ? '€' : acc.currency === 'GBP' ? '£' : '$';
     let total = 0; // accumulated in account currency
     for (const t of list) {
-      const ask = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
+      const _lst = state[t.symbol];
+      const _lra = (_lst && _lst.ask > 0) ? _lst.ask : null;
+      const ask = _lra ?? ((_lst?.price || Number(t.openPrice)) + getSpreadPrice(acc.tenantId, t.symbol, acc.groupId, acc.id));
       const price = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, acc.id, ask) : ask;
       const pnl = calcPnl(t.symbol, t.type, Number(t.openPrice), price, Number(t.lots));
       const swapAmt = Number(t.swap ?? 0);
@@ -1091,7 +1093,9 @@ async function monitor(io) {
       const symOpen = new Map(list.map((t) => [t.symbol, Number(t.openPrice)]));
       for (const t of list) {
         const m = meta[t.symbol]; if (!m) continue;
-        const ask = state[t.symbol] && state[t.symbol].price ? state[t.symbol].price : Number(t.openPrice);
+        const _mst = state[t.symbol];
+        const _mra = (_mst && _mst.ask > 0) ? _mst.ask : null;
+        const ask = _mra ?? ((_mst?.price || Number(t.openPrice)) + getSpreadPrice(acc.tenantId, t.symbol, acc.groupId, acc.id));
         const closePrice = t.type === "BUY" ? getBid(acc.tenantId, t.symbol, acc.groupId, acc.id, ask) : ask;
         floating += calcPnl(t.symbol, t.type, Number(t.openPrice), closePrice, Number(t.lots));
         net[t.symbol] = (net[t.symbol] || 0) + (t.type === "BUY" ? 1 : -1) * Number(t.lots);
@@ -1150,7 +1154,9 @@ async function monitor(io) {
       if (!isMarketOpen(t.symbol, meta[t.symbol] && meta[t.symbol].cat)) continue;
       const st = state[t.symbol];
       if (!st || st.price == null) continue;
-      const ask = st.price;
+      // Use real exchange ask when available; otherwise construct from display BID + configured spread
+      const realAsk = (st.ask != null && st.ask > 0) ? st.ask : null;
+      const ask = realAsk ?? (st.price + getSpreadPrice(t.account.tenantId, t.symbol, t.account.groupId, t.account.id));
       const bid = getBid(t.account.tenantId, t.symbol, t.account.groupId, t.account.id, ask);
       const sl = Number(t.sl), tp = Number(t.tp);
       let reason = null;
@@ -1200,7 +1206,8 @@ async function checkPending(io) {
       }
       const st = state[o.symbol];
       if (!st || st.price == null) continue;
-      const ask = st.price;
+      const _pra = (st.ask != null && st.ask > 0) ? st.ask : null;
+      const ask = _pra ?? (st.price + getSpreadPrice(o.account.tenantId, o.symbol, o.account.groupId, o.account.id));
       const bid = getBid(o.account.tenantId, o.symbol, o.account.groupId, o.account.id, ask);
       const trig = Number(o.price);
       if (!trig) continue;
