@@ -753,14 +753,7 @@ export default function ClientTerminal() {
   function csz(sym: string) { return contractFor(catMap[sym] || "forex", sym); }
   // Account-currency P&L wrapper: divides USD result by fxRate so all live P&L is in account currency.
   const pnlOfAcc = (p: any, price: number, cs: number) => pnlOf(p, price, cs) / fxRate;
-  const floating = positions.reduce((s, p) => {
-    const bid = prices[p.symbol] ?? p.openPrice;
-    // SELL closes at ask (bid + spread); BUY closes at bid — matches actual execution
-    const closePx = p.type === "SELL"
-      ? bid + _spreadPips(p.symbol) * Math.pow(10, -(eDg(p.symbol) - 1))
-      : bid;
-    return s + pnlOfAcc(p, closePx, csz(p.symbol));
-  }, 0);
+  const floating = positions.reduce((s, p) => s + pnlOfAcc(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
   const balance = account ? account.deposit + account.pnl - account.withdrawal : 0;
   const equity = balance + floating + (account ? account.credit + account.bonus + (account.insurance || 0) : 0);
   const used = account ? (() => {
