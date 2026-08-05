@@ -11,18 +11,24 @@ function json(data: unknown, status = 200) {
 
 const PAGE = 50;
 
+function toCsv(headers: string[], rows: string[][]): string {
+  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  return [headers, ...rows].map((r) => r.map(esc).join(",")).join("\r\n");
+}
+
 export async function GET(req: Request) {
   const s = await requireSuperAdmin();
   if (!s) return json({ ok: false, error: "Forbidden" }, 403);
 
   const u = new URL(req.url);
-  const tab      = u.searchParams.get("tab") || "requests";          // "requests" | "ledger"
+  const tab      = u.searchParams.get("tab") || "requests";
   const tenantId = u.searchParams.get("tenantId") || "";
   const search   = u.searchParams.get("search")?.trim() || "";
-  const status   = u.searchParams.get("status") || "";               // PENDING | APPROVED | REJECTED | CANCELLED
-  const kind     = u.searchParams.get("kind") || "";                 // DEPOSIT | WITHDRAWAL | CREDIT_REQUEST | CREDIT_CLEAR
-  const type     = u.searchParams.get("type") || "";                 // FinType (ledger only)
+  const status   = u.searchParams.get("status") || "";
+  const kind     = u.searchParams.get("kind") || "";
+  const type     = u.searchParams.get("type") || "";
   const page     = Math.max(0, parseInt(u.searchParams.get("page") || "0", 10));
+  const doExport = u.searchParams.get("export") === "1";
 
   // Tenant list for filter dropdown
   const tenants = await prisma.tenant.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
@@ -46,8 +52,7 @@ export async function GET(req: Request) {
       prisma.financialHistory.findMany({
         where,
         orderBy: { appliedAt: "desc" },
-        skip: page * PAGE,
-        take: PAGE,
+        ...(doExport ? {} : { skip: page * PAGE, take: PAGE }),
         include: {
           account: {
             select: { login: true, name: true, tenantId: true, tenant: { select: { name: true } } },
@@ -57,7 +62,24 @@ export async function GET(req: Request) {
       prisma.financialHistory.count({ where }),
     ]);
 
-    // Aggregate totals for summary (unfiltered by page, filtered by tenant/search/type)
+    if (doExport) {
+      const csv = toCsv(
+        ["Date", "Tenant", "Login", "Client", "Type", "Description", "Amount", "Mode", "Applied By"],
+        rows.map((r) => [
+          new Date(r.appliedAt).toISOString(),
+          r.account.tenant.name,
+          String(r.account.login),
+          r.account.name || "",
+          r.type,
+          r.description || "",
+          r.amount.toString(),
+          r.mode,
+          r.createdBy || "system",
+        ])
+      );
+      return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=\"ledger-export.csv\"" } });
+    }
+
     const agg = await prisma.financialHistory.groupBy({
       by: ["type"],
       where,
@@ -87,8 +109,7 @@ export async function GET(req: Request) {
     prisma.paymentRequest.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      skip: page * PAGE,
-      take: PAGE,
+      ...(doExport ? {} : { skip: page * PAGE, take: PAGE }),
       include: {
         account: {
           select: {
@@ -102,7 +123,25 @@ export async function GET(req: Request) {
     prisma.paymentRequest.count({ where: { ...where, status: "PENDING" } }),
   ]);
 
-  // Kind totals (approved only) for summary
+  if (doExport) {
+    const csv = toCsv(
+      ["Date", "Tenant", "Login", "Client", "Email", "Type", "Method", "Amount", "Status", "Note"],
+      rows.map((r) => [
+        new Date(r.createdAt).toISOString(),
+        r.account.tenant.name,
+        String(r.account.login),
+        r.account.name || "",
+        r.account.email || "",
+        r.kind,
+        r.method || "",
+        r.amount.toString(),
+        r.status,
+        r.note || "",
+      ])
+    );
+    return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=\"payment-requests-export.csv\"" } });
+  }
+
   const kindAgg = await prisma.paymentRequest.groupBy({
     by: ["kind", "status"],
     where: { ...where, status: { in: ["APPROVED", "PENDING"] } },
