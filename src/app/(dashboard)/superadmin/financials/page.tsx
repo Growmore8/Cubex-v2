@@ -78,6 +78,19 @@ const CSS = `
 .fin-btn.export{background:var(--accent);color:#04221c;border-color:transparent;}
 .fin-btn.export:hover{opacity:.9;}
 .fin-btn.danger{background:#fee2e2;color:#b91c1c;border-color:#fca5a5;}
+.fin-export-wrap{position:relative;}
+.fin-export-main{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;font-size:12px;font-weight:700;border-radius:8px 0 0 8px;border:1px solid transparent;background:var(--accent);color:#04221c;cursor:pointer;transition:opacity .15s;}
+.fin-export-main:hover{opacity:.88;}
+.fin-export-caret{display:inline-flex;align-items:center;justify-content:center;width:30px;padding:7px 0;font-size:11px;border-radius:0 8px 8px 0;border:1px solid transparent;border-left:1px solid rgba(4,34,28,.25);background:var(--accent);color:#04221c;cursor:pointer;transition:opacity .15s;}
+.fin-export-caret:hover{opacity:.88;}
+.fin-export-main:disabled,.fin-export-caret:disabled{opacity:.5;cursor:not-allowed;}
+.fin-export-drop{position:absolute;top:calc(100% + 4px);right:0;min-width:160px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:999;overflow:hidden;}
+.fin-export-opt{display:flex;align-items:center;gap:9px;padding:10px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text);transition:background .12s;}
+.fin-export-opt:hover{background:var(--bg2);}
+.fin-export-opt i{font-size:13px;width:16px;text-align:center;}
+.fin-active-filters{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
+.fin-filter-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;background:color-mix(in srgb,var(--accent) 15%,transparent);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);color:var(--text);font-size:10.5px;font-weight:600;}
+.fin-filter-chip i{font-size:9px;color:var(--text2);}
 .fin-tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
 .fin-tbl{width:100%;border-collapse:collapse;}
 .fin-tbl thead{position:sticky;top:0;z-index:2;}
@@ -122,7 +135,9 @@ export default function SAFinancials() {
   const [status, setStatus] = useState("");
   const [kind, setKind]     = useState("");
   const [type, setType]     = useState("");
-  const [slip, setSlip]     = useState<string|null>(null);
+  const [slip, setSlip]         = useState<string|null>(null);
+  const [exportMenu, setExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const buildParams = useCallback((pg: number, exp = false) => {
@@ -161,15 +176,34 @@ export default function SAFinancials() {
     setStatus(""); setKind(""); setType(""); setSearch("");
   }
 
-  async function exportCsv() {
+  // close export menu when clicking outside
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) setExportMenu(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  async function doExport(fmt: "csv"|"pdf") {
+    setExportMenu(false);
     setExporting(true);
     try {
-      const res = await fetch("/api/superadmin/financials?" + buildParams(0, true));
+      const p = new URLSearchParams({ tab });
+      if (tenantId) p.set("tenantId", tenantId);
+      if (search)   p.set("search", search);
+      if (status)   p.set("status", status);
+      if (kind)     p.set("kind", kind);
+      if (type)     p.set("type", type);
+      p.set("export", fmt);
+      const res  = await fetch("/api/superadmin/financials?" + p);
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
       a.href = url;
-      a.download = tab === "ledger" ? "ledger-export.csv" : "payment-requests-export.csv";
+      a.download = fmt === "pdf"
+        ? (tab === "ledger" ? "financial-ledger.pdf" : "payment-requests.pdf")
+        : (tab === "ledger" ? "ledger-export.csv"    : "payment-requests-export.csv");
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) { setErr(e.message||"Export failed"); }
@@ -203,11 +237,26 @@ export default function SAFinancials() {
           </div>
           <div className="page-sub">Cross-tenant view of all deposits, withdrawals &amp; ledger entries</div>
         </div>
-        <button className="fin-btn export" onClick={exportCsv} disabled={exporting}>
-          {exporting
-            ? <><i className="fa-solid fa-circle-notch fa-spin"></i>Exporting…</>
-            : <><i className="fa-solid fa-file-csv"></i>Export CSV</>}
-        </button>
+        <div className="fin-export-wrap" ref={exportMenuRef}>
+          <div style={{ display:"flex" }}>
+            <button className="fin-export-main" onClick={()=>doExport("csv")} disabled={exporting}>
+              {exporting ? <><i className="fa-solid fa-circle-notch fa-spin"></i>Exporting…</> : <><i className="fa-solid fa-file-export"></i>Export</>}
+            </button>
+            <button className="fin-export-caret" onClick={()=>setExportMenu(m=>!m)} disabled={exporting}>
+              <i className="fa-solid fa-chevron-down"></i>
+            </button>
+          </div>
+          {exportMenu && (
+            <div className="fin-export-drop">
+              <div className="fin-export-opt" onClick={()=>doExport("csv")}>
+                <i className="fa-solid fa-file-csv" style={{ color:"#15803d" }}></i>Download CSV
+              </div>
+              <div className="fin-export-opt" onClick={()=>doExport("pdf")}>
+                <i className="fa-solid fa-file-pdf" style={{ color:"#dc2626" }}></i>Download PDF
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -366,6 +415,19 @@ export default function SAFinancials() {
           </button>
         }
       </div>
+
+      {/* Active filter chips */}
+      {hasFilter && (
+        <div className="fin-active-filters">
+          <span style={{ fontSize:10.5, color:"var(--text2)", fontWeight:600, alignSelf:"center" }}>Active filters:</span>
+          {search    && <span className="fin-filter-chip"><i className="fa-solid fa-magnifying-glass"></i>Search: {search}</span>}
+          {tenantId  && <span className="fin-filter-chip"><i className="fa-solid fa-building"></i>Tenant: {tenants.find(t=>t.id===tenantId)?.name||tenantId}</span>}
+          {kind      && <span className="fin-filter-chip"><i className="fa-solid fa-tag"></i>{kind.replace(/_/g," ")}</span>}
+          {status    && <span className="fin-filter-chip"><i className="fa-solid fa-circle-half-stroke"></i>{status}</span>}
+          {type      && <span className="fin-filter-chip"><i className="fa-solid fa-tag"></i>{type.replace(/_/g," ")}</span>}
+          <span style={{ fontSize:10, color:"var(--text3)", alignSelf:"center" }}>— exports will reflect these filters</span>
+        </div>
+      )}
 
       {err && <div className="fin-err"><i className="fa-solid fa-triangle-exclamation"></i>{err}</div>}
 
