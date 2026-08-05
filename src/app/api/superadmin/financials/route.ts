@@ -9,17 +9,17 @@ function json(data: unknown, status = 200) {
   });
 }
 
-const PAGE = 50;
-const NAVY   = "#0b0f17";
-const ACCENT = "#16c79a";
-const GRAY1  = "#f8fafc";
-const GRAY2  = "#eef2f7";
-const TEXT   = "#0f172a";
-const TEXT2  = "#64748b";
-const GREEN  = "#15803d";
-const RED    = "#b91c1c";
-const AMBER  = "#b45309";
-const BLUE   = "#1d4ed8";
+const PAGE  = 50;
+const NAVY  = "#0b0f17";
+const ACCENT= "#16c79a";
+const GRAY1 = "#f8fafc";
+const GRAY2 = "#eef2f7";
+const TEXT  = "#0f172a";
+const TEXT2 = "#64748b";
+const GREEN = "#15803d";
+const RED   = "#b91c1c";
+const AMBER = "#b45309";
+const BLUE  = "#1d4ed8";
 
 function money(n: number) {
   return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,7 +27,6 @@ function money(n: number) {
 function fmtDt(d: Date | string) {
   return new Date(d).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
-
 function toCsv(headers: string[], rows: string[][]): string {
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
   return [headers, ...rows].map((r) => r.map(esc).join(",")).join("\r\n");
@@ -54,65 +53,64 @@ function buildPdf(
     const PH  = doc.page.height;
     const L   = 36;
     const W   = PW - 72;
-    const BOT = PH - 44;   // safe bottom
+    const BOT = PH - 30; // rows must stay above footer strip
 
-    // ── HEADER ──────────────────────────────────────────────────────────────
-    doc.save().rect(0, 0, PW, 54).fill(NAVY).restore();
-    doc.fillColor(ACCENT).font("Helvetica-Bold").fontSize(15)
-       .text(brandName, L, 12, { lineBreak: false });
-    const titleLabel = tab === "requests" ? "  Payment Requests Report" : "  Financial Ledger Report";
-    const titleX = L + doc.widthOfString(brandName) + 2;
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(13)
-       .text(titleLabel, titleX, 14, { lineBreak: false });
-    doc.fillColor("#7fa8d4").font("Helvetica").fontSize(8)
-       .text(subtitle, L, 38, { lineBreak: false })
-       .text("Generated: " + generated, L, 38, { width: W, align: "right", lineBreak: false });
+    // ── HEADER (44pt) ──────────────────────────────────────────────────────
+    doc.save().rect(0, 0, PW, 44).fill(NAVY).restore();
+    doc.fillColor(ACCENT).font("Helvetica-Bold").fontSize(14)
+       .text(brandName, L, 10, { lineBreak: false });
+    const bw = doc.widthOfString(brandName);
+    const titleLabel = tab === "requests" ? "  Payment Requests" : "  Financial Ledger";
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(12)
+       .text(titleLabel, L + bw + 2, 11, { lineBreak: false });
+    doc.fillColor("#7fa8d4").font("Helvetica").fontSize(7.5)
+       .text(subtitle, L, 30, { lineBreak: false })
+       .text("Generated: " + generated, L, 30, { width: W, align: "right", lineBreak: false });
 
-    let y = 66;
+    let y = 54; // header 44pt + 10pt gap
 
-    // ── KPI CARDS ────────────────────────────────────────────────────────────
+    // ── KPI CARDS (34pt tall, 42pt total) ──────────────────────────────────
     const cardW = W / kpis.length;
     kpis.forEach((k, i) => {
       const cx = L + i * cardW;
-      doc.save().roundedRect(cx + 2, y, cardW - 8, 44, 4).fill(GRAY1).restore();
-      doc.roundedRect(cx + 2, y, cardW - 8, 44, 4).lineWidth(0.5).stroke("#e5e7eb");
-      doc.save().rect(cx + 2, y, 4, 44).fill(k.color).restore();
-      doc.fillColor(TEXT2).font("Helvetica").fontSize(6.5)
-         .text(k.label.toUpperCase(), cx + 14, y + 8, { width: cardW - 26, lineBreak: false });
-      doc.fillColor(k.color).font("Helvetica-Bold").fontSize(12)
-         .text(k.value, cx + 14, y + 19, { width: cardW - 26, lineBreak: false });
+      doc.save().roundedRect(cx + 2, y, cardW - 8, 34, 3).fill(GRAY1).restore();
+      doc.roundedRect(cx + 2, y, cardW - 8, 34, 3).lineWidth(0.4).stroke("#e5e7eb");
+      doc.save().rect(cx + 2, y, 4, 34).fill(k.color).restore();
+      doc.fillColor(TEXT2).font("Helvetica").fontSize(6)
+         .text(k.label.toUpperCase(), cx + 12, y + 5, { width: cardW - 24, lineBreak: false });
+      doc.fillColor(k.color).font("Helvetica-Bold").fontSize(11)
+         .text(k.value, cx + 12, y + 15, { width: cardW - 24, lineBreak: false });
     });
-    y += 56;
+    y += 42;
 
-    // ── TABLE ────────────────────────────────────────────────────────────────
-    const headH = 18;
-    const rowH  = 15;
-    const pad   = 5;
-    const fontSz = 7;
+    // ── TABLE ───────────────────────────────────────────────────────────────
+    const headH = 15;
+    const rowH  = 12;
+    const pad   = 4;
+    const fontSz = 6.5;
 
-    // Landscape A4 usable ~769px
     const cols: ColDef[] = tab === "requests"
       ? [
-          { label: "Date / Time",  w: 90,  align: "left"  },
-          { label: "Tenant",       w: 82,  align: "left"  },
-          { label: "Login",        w: 78,  align: "left"  },
-          { label: "Client",       w: 88,  align: "left"  },
-          { label: "Type",         w: 80,  align: "left"  },
-          { label: "Method",       w: 68,  align: "left"  },
-          { label: "Amount",       w: 68,  align: "right" },
-          { label: "Status",       w: 58,  align: "left"  },
-          { label: "Note",         w: 0,   align: "left"  },  // fills remainder
+          { label: "Date / Time", w: 85,  align: "left"  },
+          { label: "Tenant",      w: 80,  align: "left"  },
+          { label: "Login",       w: 68,  align: "left"  },
+          { label: "Client",      w: 88,  align: "left"  },
+          { label: "Type",        w: 75,  align: "left"  },
+          { label: "Method",      w: 62,  align: "left"  },
+          { label: "Amount",      w: 62,  align: "right" },
+          { label: "Status",      w: 54,  align: "left"  },
+          { label: "Note",        w: 0,   align: "left"  },
         ]
       : [
-          { label: "Date / Time",  w: 90,  align: "left"  },
-          { label: "Tenant",       w: 88,  align: "left"  },
-          { label: "Login",        w: 78,  align: "left"  },
-          { label: "Client",       w: 95,  align: "left"  },
-          { label: "Type",         w: 78,  align: "left"  },
-          { label: "Description",  w: 0,   align: "left"  },
-          { label: "Amount",       w: 72,  align: "right" },
-          { label: "Mode",         w: 52,  align: "left"  },
-          { label: "Applied By",   w: 108, align: "left"  },
+          { label: "Date / Time", w: 85,  align: "left"  },
+          { label: "Tenant",      w: 85,  align: "left"  },
+          { label: "Login",       w: 68,  align: "left"  },
+          { label: "Client",      w: 90,  align: "left"  },
+          { label: "Type",        w: 70,  align: "left"  },
+          { label: "Description", w: 0,   align: "left"  },
+          { label: "Amount",      w: 68,  align: "right" },
+          { label: "Mode",        w: 52,  align: "left"  },
+          { label: "Applied By",  w: 108, align: "left"  },
         ];
 
     const fixedW = cols.filter((c) => c.w > 0).reduce((s, c) => s + c.w, 0);
@@ -121,9 +119,9 @@ function buildPdf(
     function drawHeader(yy: number) {
       doc.save().rect(L, yy, W, headH).fill(GRAY2).restore();
       let x = L;
-      doc.fillColor(TEXT2).font("Helvetica-Bold").fontSize(6.5);
+      doc.fillColor(TEXT2).font("Helvetica-Bold").fontSize(6);
       cols.forEach((c) => {
-        doc.text(c.label.toUpperCase(), x + pad, yy + 5, { width: c.w - 2 * pad, align: c.align, lineBreak: false });
+        doc.text(c.label.toUpperCase(), x + pad, yy + 4, { width: c.w - 2 * pad, align: c.align, lineBreak: false });
         x += c.w;
       });
       return yy + headH;
@@ -131,9 +129,10 @@ function buildPdf(
 
     y = drawHeader(y);
 
-    const inFlowTypes = new Set(["DEPOSIT","CREDIT_IN","BONUS","REFERRAL","INSURANCE","TRANSFER_IN"]);
+    const inFlowSet   = new Set(["DEPOSIT","CREDIT_IN","BONUS","REFERRAL","INSURANCE","TRANSFER_IN"]);
     const statusColor = (st: string) => st === "APPROVED" ? GREEN : st === "PENDING" ? AMBER : st === "REJECTED" ? RED : TEXT2;
-    const typeColor   = (t: string) => (inFlowTypes.has(t) || t === "CREDIT_REQUEST") ? GREEN :
+    const typeColor   = (t: string) =>
+      inFlowSet.has(t) || t === "CREDIT_REQUEST" ? GREEN :
       ["WITHDRAWAL","CREDIT_OUT","CREDIT_CLEAR"].includes(t) ? RED :
       ["BONUS","REFERRAL"].includes(t) ? "#7c3aed" : TEXT2;
 
@@ -152,31 +151,31 @@ function buildPdf(
       let x = L;
       const cells: { v: string; c: string }[] = tab === "requests"
         ? [
-            { v: fmtDt(r.createdAt),                          c: TEXT2 },
-            { v: r.account.tenant.name,                       c: TEXT  },
-            { v: r.account.login,                             c: TEXT  },
-            { v: r.account.name || r.account.email || "—",   c: TEXT  },
-            { v: r.kind.replace(/_/g, " "),                   c: typeColor(r.kind) },
-            { v: r.method || "—",                             c: TEXT2 },
-            { v: money(parseFloat(r.amount)),                 c: typeColor(r.kind) },
-            { v: r.status,                                    c: statusColor(r.status) },
-            { v: r.note || "—",                               c: TEXT2 },
+            { v: fmtDt(r.createdAt),                        c: TEXT2 },
+            { v: r.account.tenant.name,                     c: TEXT  },
+            { v: r.account.login,                           c: TEXT  },
+            { v: r.account.name || r.account.email || "—", c: TEXT  },
+            { v: r.kind.replace(/_/g, " "),                 c: typeColor(r.kind)    },
+            { v: r.method || "—",                           c: TEXT2 },
+            { v: money(parseFloat(r.amount)),               c: typeColor(r.kind)    },
+            { v: r.status,                                  c: statusColor(r.status)},
+            { v: r.note || "—",                             c: TEXT2 },
           ]
         : [
-            { v: fmtDt(r.appliedAt),                          c: TEXT2 },
-            { v: r.account.tenant.name,                       c: TEXT  },
-            { v: r.account.login,                             c: TEXT  },
-            { v: r.account.name || "—",                       c: TEXT  },
-            { v: r.type.replace(/_/g, " "),                   c: typeColor(r.type) },
-            { v: r.description || "—",                        c: TEXT2 },
-            { v: money(parseFloat(r.amount)),                 c: typeColor(r.type) },
-            { v: r.mode,                                      c: r.mode === "REALTIME" ? BLUE : TEXT2 },
-            { v: r.createdBy || "system",                     c: TEXT2 },
+            { v: fmtDt(r.appliedAt),                        c: TEXT2 },
+            { v: r.account.tenant.name,                     c: TEXT  },
+            { v: r.account.login,                           c: TEXT  },
+            { v: r.account.name || "—",                     c: TEXT  },
+            { v: r.type.replace(/_/g, " "),                 c: typeColor(r.type) },
+            { v: r.description || "—",                      c: TEXT2 },
+            { v: money(parseFloat(r.amount)),               c: typeColor(r.type) },
+            { v: r.mode,                                    c: r.mode === "REALTIME" ? BLUE : TEXT2 },
+            { v: r.createdBy || "system",                   c: TEXT2 },
           ];
 
       cells.forEach((cell, i) => {
         doc.fillColor(cell.c)
-           .text(cell.v, x + pad, y + 4, {
+           .text(cell.v, x + pad, y + 3, {
              width: cols[i].w - 2 * pad,
              align: cols[i].align,
              lineBreak: false,
@@ -185,23 +184,27 @@ function buildPdf(
         x += cols[i].w;
       });
 
-      doc.moveTo(L, y + rowH).lineTo(L + W, y + rowH).lineWidth(0.25).stroke("#f0f1f3");
+      doc.moveTo(L, y + rowH).lineTo(L + W, y + rowH).lineWidth(0.2).stroke("#f0f1f3");
       y += rowH;
     });
 
-    // ── FOOTER on every page ──────────────────────────────────────────────────
-    const range = doc.bufferedPageRange();
+    // ── FOOTER — must set margins.bottom = 0 to prevent PDFKit auto-adding a page ──
+    const range      = doc.bufferedPageRange();
+    const totalPages = range.count;
     for (let pg = range.start; pg < range.start + range.count; pg++) {
       doc.switchToPage(pg);
-      doc.save().rect(0, PH - 24, PW, 24).fill("#f8fafc").restore();
-      doc.moveTo(0, PH - 24).lineTo(PW, PH - 24).lineWidth(0.5).stroke("#e5e7eb");
-      doc.fillColor(TEXT2).font("Helvetica").fontSize(7)
-         .text(
-           `${brandName} — Client Financials  ·  ${rows.length} records  ·  ${subtitle}  ·  Generated ${generated}`,
-           L, PH - 16,
-           { width: W - 40, lineBreak: false, ellipsis: true }
-         )
-         .text(`${pg - range.start + 1} / ${range.count}`, L, PH - 16, { width: W, align: "right", lineBreak: false });
+      doc.page.margins.bottom = 0; // KEY: without this, writing at PH-18 triggers an extra blank page
+      const FY = PH - 18;
+      doc.save().rect(0, FY - 3, PW, 21).fill(GRAY1).restore();
+      doc.moveTo(0, FY - 3).lineTo(PW, FY - 3).lineWidth(0.4).stroke("#e2e8f0");
+      doc.fillColor(TEXT2).font("Helvetica").fontSize(6.5)
+         .text(`${brandName}  ·  ${rows.length} records  ·  ${subtitle}`, L, FY, {
+           width: W - 50, lineBreak: false, ellipsis: true,
+         });
+      doc.fillColor(TEXT2).font("Helvetica").fontSize(6.5)
+         .text(`${pg - range.start + 1} / ${totalPages}`, L, FY, {
+           width: W, align: "right", lineBreak: false,
+         });
     }
 
     doc.end();
@@ -219,11 +222,13 @@ export async function GET(req: Request) {
   const status      = u.searchParams.get("status") || "";
   const kind        = u.searchParams.get("kind") || "";
   const type        = u.searchParams.get("type") || "";
-  const accountType = u.searchParams.get("accountType") || "";   // "DEMO" | "LIVE" | ""
+  const accountType = u.searchParams.get("accountType") || "";
+  const dateFrom    = u.searchParams.get("dateFrom") || "";
+  const dateTo      = u.searchParams.get("dateTo") || "";
   const page        = Math.max(0, parseInt(u.searchParams.get("page") || "0", 10));
-  const doExport    = u.searchParams.get("export");              // "csv" | "pdf" | null
+  const doExport    = u.searchParams.get("export");
 
-  const tenants = await prisma.tenant.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
+  const tenants    = await prisma.tenant.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
   const tenantName = tenantId ? (tenants.find((t) => t.id === tenantId)?.name || tenantId) : "All Tenants";
   const generated  = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
@@ -240,9 +245,17 @@ export async function GET(req: Request) {
 
   const isExport = !!doExport;
 
-  // ── LEDGER ─────────────────────────────────────────────────────────────────
+  function dateRange(field: string) {
+    if (!dateFrom && !dateTo) return {};
+    const range: any = {};
+    if (dateFrom) range.gte = new Date(dateFrom);
+    if (dateTo)   range.lte = new Date(dateTo + "T23:59:59.999Z");
+    return { [field]: range };
+  }
+
+  // ── LEDGER ──────────────────────────────────────────────────────────────────
   if (tab === "ledger") {
-    const where: any = { account: accountWhere };
+    const where: any = { account: accountWhere, ...dateRange("appliedAt") };
     if (type) where.type = type;
 
     const [rows, total] = await Promise.all([
@@ -250,7 +263,11 @@ export async function GET(req: Request) {
         where,
         orderBy: { appliedAt: "desc" },
         ...(isExport ? {} : { skip: page * PAGE, take: PAGE }),
-        include: { account: { select: { login: true, name: true, type: true, tenantId: true, tenant: { select: { name: true } } } } },
+        include: {
+          account: {
+            select: { login: true, name: true, type: true, tenantId: true, tenant: { select: { name: true } } },
+          },
+        },
       }),
       prisma.financialHistory.count({ where }),
     ]);
@@ -264,10 +281,9 @@ export async function GET(req: Request) {
     }
 
     if (doExport === "pdf") {
-      const inFlowTypes = new Set(["DEPOSIT","CREDIT_IN","BONUS","REFERRAL","INSURANCE","TRANSFER_IN"]);
-      const inflows  = rows.filter(r => inFlowTypes.has(r.type)).reduce((s, r) => s + parseFloat(r.amount.toString()), 0);
-      const outflows = rows.filter(r => ["WITHDRAWAL","CREDIT_OUT"].includes(r.type)).reduce((s, r) => s + parseFloat(r.amount.toString()), 0);
-      const net = inflows - outflows;
+      const inflows  = rows.filter((r) => new Set(["DEPOSIT","CREDIT_IN","BONUS","REFERRAL","INSURANCE","TRANSFER_IN"]).has(r.type)).reduce((s, r) => s + parseFloat(r.amount.toString()), 0);
+      const outflows = rows.filter((r) => ["WITHDRAWAL","CREDIT_OUT"].includes(r.type)).reduce((s, r) => s + parseFloat(r.amount.toString()), 0);
+      const net      = inflows - outflows;
       const kpis = [
         { label: "Total Inflows",  value: money(inflows),      color: GREEN },
         { label: "Total Outflows", value: money(outflows),     color: RED   },
@@ -278,11 +294,13 @@ export async function GET(req: Request) {
         `Tenant: ${tenantName}`,
         type        ? `Type: ${type}`                 : "",
         accountType ? `Accounts: ${accountType} only` : "",
+        dateFrom    ? `From: ${dateFrom}`             : "",
+        dateTo      ? `To: ${dateTo}`                 : "",
         search      ? `Search: "${search}"`           : "",
       ].filter(Boolean).join("  ·  ");
       const pdf = await buildPdf("ledger", rows, kpis, tenantName, subtitle, generated);
       return new Response(new Uint8Array(pdf), {
-        headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${tenantName.replace(/\s/g,"-")}-ledger.pdf"` },
+        headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${tenantName.replace(/\s/g, "-")}-ledger.pdf"` },
       });
     }
 
@@ -290,16 +308,14 @@ export async function GET(req: Request) {
     return json({ ok: true, tab: "ledger", rows, total, page, pages: Math.ceil(total / PAGE), agg, tenants });
   }
 
-  // ── PAYMENT REQUESTS ───────────────────────────────────────────────────────
-  const where: any = {};
-  if (status)       where.status   = status;
-  if (kind)         where.kind     = kind;
-  if (tenantId)     where.tenantId = tenantId;
+  // ── PAYMENT REQUESTS ────────────────────────────────────────────────────────
+  const where: any = { ...dateRange("createdAt") };
+  if (status)   where.status   = status;
+  if (kind)     where.kind     = kind;
+  if (tenantId) where.tenantId = tenantId;
 
-  // Attach account filters (type + search)
-  const hasAccFilter = Object.keys(accountWhere).some(k => k !== "tenantId");
   const accFilter: any = { ...accountWhere };
-  delete accFilter.tenantId; // tenantId already on PaymentRequest directly
+  delete accFilter.tenantId;
   if (Object.keys(accFilter).length > 0) where.account = accFilter;
 
   const [rows, total, pending] = await Promise.all([
@@ -307,7 +323,11 @@ export async function GET(req: Request) {
       where,
       orderBy: { createdAt: "desc" },
       ...(isExport ? {} : { skip: page * PAGE, take: PAGE }),
-      include: { account: { select: { login: true, name: true, email: true, type: true, tenant: { select: { name: true } } } } },
+      include: {
+        account: {
+          select: { login: true, name: true, email: true, type: true, tenant: { select: { name: true } } },
+        },
+      },
     }),
     prisma.paymentRequest.count({ where }),
     prisma.paymentRequest.count({ where: { ...where, status: "PENDING" } }),
@@ -322,8 +342,8 @@ export async function GET(req: Request) {
   }
 
   if (doExport === "pdf") {
-    const approvedDep = rows.filter(r => r.kind === "DEPOSIT" && r.status === "APPROVED").reduce((s, r) => s + parseFloat(r.amount.toString()), 0);
-    const approvedWd  = rows.filter(r => r.kind === "WITHDRAWAL" && r.status === "APPROVED").reduce((s, r) => s + parseFloat(r.amount.toString()), 0);
+    const approvedDep = rows.filter((r) => r.kind === "DEPOSIT"    && r.status === "APPROVED").reduce((s, r) => s + parseFloat(r.amount.toString()), 0);
+    const approvedWd  = rows.filter((r) => r.kind === "WITHDRAWAL" && r.status === "APPROVED").reduce((s, r) => s + parseFloat(r.amount.toString()), 0);
     const kpis = [
       { label: "Approved Deposits",    value: money(approvedDep),  color: GREEN },
       { label: "Approved Withdrawals", value: money(approvedWd),   color: RED   },
@@ -332,14 +352,16 @@ export async function GET(req: Request) {
     ];
     const subtitle = [
       `Tenant: ${tenantName}`,
-      kind        ? kind.replace(/_/g," ")         : "",
-      status      ? `Status: ${status}`            : "",
-      accountType ? `Accounts: ${accountType} only`: "",
-      search      ? `Search: "${search}"`          : "",
+      kind        ? kind.replace(/_/g, " ")         : "",
+      status      ? `Status: ${status}`             : "",
+      accountType ? `Accounts: ${accountType} only` : "",
+      dateFrom    ? `From: ${dateFrom}`             : "",
+      dateTo      ? `To: ${dateTo}`                 : "",
+      search      ? `Search: "${search}"`           : "",
     ].filter(Boolean).join("  ·  ");
     const pdf = await buildPdf("requests", rows, kpis, tenantName, subtitle, generated);
     return new Response(new Uint8Array(pdf), {
-      headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${tenantName.replace(/\s/g,"-")}-payment-requests.pdf"` },
+      headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${tenantName.replace(/\s/g, "-")}-payment-requests.pdf"` },
     });
   }
 

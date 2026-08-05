@@ -136,6 +136,8 @@ export default function SAFinancials() {
   const [kind, setKind]               = useState("");
   const [type, setType]               = useState("");
   const [accountType, setAccountType] = useState("");
+  const [dateFrom, setDateFrom]       = useState("");
+  const [dateTo, setDateTo]           = useState("");
   const [slip, setSlip]         = useState<string|null>(null);
   const [exportMenu, setExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -149,9 +151,11 @@ export default function SAFinancials() {
     if (kind)        p.set("kind", kind);
     if (type)        p.set("type", type);
     if (accountType) p.set("accountType", accountType);
+    if (dateFrom)    p.set("dateFrom", dateFrom);
+    if (dateTo)      p.set("dateTo", dateTo);
     if (exp)         p.set("export", "1");
     return p;
-  }, [tab, tenantId, search, status, kind, type, accountType]);
+  }, [tab, tenantId, search, status, kind, type, accountType, dateFrom, dateTo]);
 
   const load = useCallback(async (pg = 0) => {
     setLoading(true); setErr("");
@@ -165,7 +169,7 @@ export default function SAFinancials() {
     finally { setLoading(false); }
   }, [buildParams]);
 
-  useEffect(() => { load(0); }, [tab, tenantId, status, kind, type, accountType]);
+  useEffect(() => { load(0); }, [tab, tenantId, status, kind, type, accountType, dateFrom, dateTo]);
   useEffect(() => {
     if (searchRef.current) clearTimeout(searchRef.current);
     searchRef.current = setTimeout(() => load(0), 380);
@@ -175,7 +179,7 @@ export default function SAFinancials() {
 
   function switchTab(t: "requests"|"ledger") {
     setTab(t); setPage(0); setRows([]);
-    setStatus(""); setKind(""); setType(""); setSearch(""); setAccountType("");
+    setStatus(""); setKind(""); setType(""); setSearch(""); setAccountType(""); setDateFrom(""); setDateTo("");
   }
 
   // close export menu when clicking outside
@@ -198,6 +202,8 @@ export default function SAFinancials() {
       if (kind)        p.set("kind", kind);
       if (type)        p.set("type", type);
       if (accountType) p.set("accountType", accountType);
+      if (dateFrom)    p.set("dateFrom", dateFrom);
+      if (dateTo)      p.set("dateTo", dateTo);
       p.set("export", fmt);
       const res  = await fetch("/api/superadmin/financials?" + p);
       const blob = await res.blob();
@@ -225,7 +231,7 @@ export default function SAFinancials() {
   const ledNet  = ledIn - ledOut;
   const ledCnt  = agg.reduce((s,r)=>s+r._count?.id,0);
 
-  const hasFilter = !!(search||tenantId||status||kind||type||accountType);
+  const hasFilter = !!(search||tenantId||status||kind||type||accountType||dateFrom||dateTo);
 
   return (
     <div>
@@ -398,6 +404,8 @@ export default function SAFinancials() {
           <option value="LIVE">Live only</option>
           <option value="DEMO">Demo only</option>
         </select>
+        <input type="date" value={dateFrom} onChange={e=>{setDateFrom(e.target.value);setPage(0);}} title="From date" style={{ flex:"0 0 auto", width:130 }} />
+        <input type="date" value={dateTo}   onChange={e=>{setDateTo(e.target.value);setPage(0);}}   title="To date"   style={{ flex:"0 0 auto", width:130 }} />
         {tab==="requests" && <>
           <select value={kind} onChange={e=>{setKind(e.target.value);setPage(0);}}>
             <option value="">All Types</option>
@@ -418,7 +426,7 @@ export default function SAFinancials() {
           <i className="fa-solid fa-rotate-right"></i>Refresh
         </button>
         {hasFilter &&
-          <button className="fin-btn danger" onClick={()=>{setSearch("");setTenantId("");setStatus("");setKind("");setType("");setAccountType("");setPage(0);}}>
+          <button className="fin-btn danger" onClick={()=>{setSearch("");setTenantId("");setStatus("");setKind("");setType("");setAccountType("");setDateFrom("");setDateTo("");setPage(0);}}>
             <i className="fa-solid fa-xmark"></i>Clear
           </button>
         }
@@ -434,6 +442,8 @@ export default function SAFinancials() {
           {kind        && <span className="fin-filter-chip"><i className="fa-solid fa-tag"></i>{kind.replace(/_/g," ")}</span>}
           {status      && <span className="fin-filter-chip"><i className="fa-solid fa-circle-half-stroke"></i>{status}</span>}
           {type        && <span className="fin-filter-chip"><i className="fa-solid fa-tag"></i>{type.replace(/_/g," ")}</span>}
+          {dateFrom    && <span className="fin-filter-chip"><i className="fa-solid fa-calendar-days"></i>From: {dateFrom}</span>}
+          {dateTo      && <span className="fin-filter-chip"><i className="fa-solid fa-calendar-days"></i>To: {dateTo}</span>}
           <span style={{ fontSize:10, color:"var(--text3)", alignSelf:"center" }}>— exports will reflect these filters</span>
         </div>
       )}
