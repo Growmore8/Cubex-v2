@@ -5,12 +5,12 @@ type Tenant = { id: string; name: string };
 type PayRow = {
   id: string; kind: string; amount: string; method: string | null;
   slipUrl: string | null; note: string | null; status: string; createdAt: string;
-  account: { login: number; name: string | null; email: string | null; tenant: { name: string } };
+  account: { login: string; name: string | null; email: string | null; type: string; tenant: { name: string } };
 };
 type LedRow = {
   id: string; type: string; amount: string; description: string | null;
   mode: string; appliedAt: string; createdBy: string | null;
-  account: { login: number; name: string | null; tenantId: string; tenant: { name: string } };
+  account: { login: string; name: string | null; type: string; tenantId: string; tenant: { name: string } };
 };
 
 const KINDS    = ["DEPOSIT","WITHDRAWAL","CREDIT_REQUEST","CREDIT_CLEAR"];
@@ -130,11 +130,12 @@ export default function SAFinancials() {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [err, setErr]       = useState("");
-  const [tenantId, setTenantId] = useState("");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [kind, setKind]     = useState("");
-  const [type, setType]     = useState("");
+  const [tenantId, setTenantId]       = useState("");
+  const [search, setSearch]           = useState("");
+  const [status, setStatus]           = useState("");
+  const [kind, setKind]               = useState("");
+  const [type, setType]               = useState("");
+  const [accountType, setAccountType] = useState("");
   const [slip, setSlip]         = useState<string|null>(null);
   const [exportMenu, setExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -142,14 +143,15 @@ export default function SAFinancials() {
 
   const buildParams = useCallback((pg: number, exp = false) => {
     const p = new URLSearchParams({ tab, page: String(pg) });
-    if (tenantId) p.set("tenantId", tenantId);
-    if (search)   p.set("search", search);
-    if (status)   p.set("status", status);
-    if (kind)     p.set("kind", kind);
-    if (type)     p.set("type", type);
-    if (exp)      p.set("export", "1");
+    if (tenantId)    p.set("tenantId", tenantId);
+    if (search)      p.set("search", search);
+    if (status)      p.set("status", status);
+    if (kind)        p.set("kind", kind);
+    if (type)        p.set("type", type);
+    if (accountType) p.set("accountType", accountType);
+    if (exp)         p.set("export", "1");
     return p;
-  }, [tab, tenantId, search, status, kind, type]);
+  }, [tab, tenantId, search, status, kind, type, accountType]);
 
   const load = useCallback(async (pg = 0) => {
     setLoading(true); setErr("");
@@ -163,7 +165,7 @@ export default function SAFinancials() {
     finally { setLoading(false); }
   }, [buildParams]);
 
-  useEffect(() => { load(0); }, [tab, tenantId, status, kind, type]);
+  useEffect(() => { load(0); }, [tab, tenantId, status, kind, type, accountType]);
   useEffect(() => {
     if (searchRef.current) clearTimeout(searchRef.current);
     searchRef.current = setTimeout(() => load(0), 380);
@@ -173,7 +175,7 @@ export default function SAFinancials() {
 
   function switchTab(t: "requests"|"ledger") {
     setTab(t); setPage(0); setRows([]);
-    setStatus(""); setKind(""); setType(""); setSearch("");
+    setStatus(""); setKind(""); setType(""); setSearch(""); setAccountType("");
   }
 
   // close export menu when clicking outside
@@ -190,11 +192,12 @@ export default function SAFinancials() {
     setExporting(true);
     try {
       const p = new URLSearchParams({ tab });
-      if (tenantId) p.set("tenantId", tenantId);
-      if (search)   p.set("search", search);
-      if (status)   p.set("status", status);
-      if (kind)     p.set("kind", kind);
-      if (type)     p.set("type", type);
+      if (tenantId)    p.set("tenantId", tenantId);
+      if (search)      p.set("search", search);
+      if (status)      p.set("status", status);
+      if (kind)        p.set("kind", kind);
+      if (type)        p.set("type", type);
+      if (accountType) p.set("accountType", accountType);
       p.set("export", fmt);
       const res  = await fetch("/api/superadmin/financials?" + p);
       const blob = await res.blob();
@@ -222,7 +225,7 @@ export default function SAFinancials() {
   const ledNet  = ledIn - ledOut;
   const ledCnt  = agg.reduce((s,r)=>s+r._count?.id,0);
 
-  const hasFilter = !!(search||tenantId||status||kind||type);
+  const hasFilter = !!(search||tenantId||status||kind||type||accountType);
 
   return (
     <div>
@@ -390,6 +393,11 @@ export default function SAFinancials() {
           <option value="">All Tenants</option>
           {tenants.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
+        <select value={accountType} onChange={e=>{setAccountType(e.target.value);setPage(0);}}>
+          <option value="">Live &amp; Demo</option>
+          <option value="LIVE">Live only</option>
+          <option value="DEMO">Demo only</option>
+        </select>
         {tab==="requests" && <>
           <select value={kind} onChange={e=>{setKind(e.target.value);setPage(0);}}>
             <option value="">All Types</option>
@@ -410,7 +418,7 @@ export default function SAFinancials() {
           <i className="fa-solid fa-rotate-right"></i>Refresh
         </button>
         {hasFilter &&
-          <button className="fin-btn danger" onClick={()=>{setSearch("");setTenantId("");setStatus("");setKind("");setType("");setPage(0);}}>
+          <button className="fin-btn danger" onClick={()=>{setSearch("");setTenantId("");setStatus("");setKind("");setType("");setAccountType("");setPage(0);}}>
             <i className="fa-solid fa-xmark"></i>Clear
           </button>
         }
@@ -420,11 +428,12 @@ export default function SAFinancials() {
       {hasFilter && (
         <div className="fin-active-filters">
           <span style={{ fontSize:10.5, color:"var(--text2)", fontWeight:600, alignSelf:"center" }}>Active filters:</span>
-          {search    && <span className="fin-filter-chip"><i className="fa-solid fa-magnifying-glass"></i>Search: {search}</span>}
-          {tenantId  && <span className="fin-filter-chip"><i className="fa-solid fa-building"></i>Tenant: {tenants.find(t=>t.id===tenantId)?.name||tenantId}</span>}
-          {kind      && <span className="fin-filter-chip"><i className="fa-solid fa-tag"></i>{kind.replace(/_/g," ")}</span>}
-          {status    && <span className="fin-filter-chip"><i className="fa-solid fa-circle-half-stroke"></i>{status}</span>}
-          {type      && <span className="fin-filter-chip"><i className="fa-solid fa-tag"></i>{type.replace(/_/g," ")}</span>}
+          {search      && <span className="fin-filter-chip"><i className="fa-solid fa-magnifying-glass"></i>Search: {search}</span>}
+          {tenantId    && <span className="fin-filter-chip"><i className="fa-solid fa-building"></i>Tenant: {tenants.find(t=>t.id===tenantId)?.name||tenantId}</span>}
+          {accountType && <span className="fin-filter-chip"><i className="fa-solid fa-layer-group"></i>{accountType === "LIVE" ? "Live accounts" : "Demo accounts"}</span>}
+          {kind        && <span className="fin-filter-chip"><i className="fa-solid fa-tag"></i>{kind.replace(/_/g," ")}</span>}
+          {status      && <span className="fin-filter-chip"><i className="fa-solid fa-circle-half-stroke"></i>{status}</span>}
+          {type        && <span className="fin-filter-chip"><i className="fa-solid fa-tag"></i>{type.replace(/_/g," ")}</span>}
           <span style={{ fontSize:10, color:"var(--text3)", alignSelf:"center" }}>— exports will reflect these filters</span>
         </div>
       )}
@@ -444,6 +453,7 @@ export default function SAFinancials() {
                     <th>Tenant</th>
                     <th>Login</th>
                     <th>Client</th>
+                    <th>Acct</th>
                     <th>Type</th>
                     <th>Method</th>
                     <th className="r">Amount</th>
@@ -453,7 +463,7 @@ export default function SAFinancials() {
                   </tr></thead>
                   <tbody>
                     {rows.length===0
-                      ? <tr><td colSpan={10}><div className="fin-empty"><i className="fa-regular fa-folder-open"></i>No records match your filters</div></td></tr>
+                      ? <tr><td colSpan={11}><div className="fin-empty"><i className="fa-regular fa-folder-open"></i>No records match your filters</div></td></tr>
                       : (rows as PayRow[]).map(r=>{
                           const tc=typeClr(r.kind), sc=statusClr(r.status);
                           const isIn=r.kind==="DEPOSIT"||r.kind==="CREDIT_REQUEST";
@@ -463,6 +473,11 @@ export default function SAFinancials() {
                               <td><span className="fin-tenant-chip">{r.account.tenant.name}</span></td>
                               <td><span className="fin-mono">{r.account.login}</span></td>
                               <td style={{ fontSize:11 }}>{r.account.name||r.account.email||"—"}</td>
+                              <td>
+                                <span className="fin-badge" style={{ background: r.account.type==="DEMO"?"#f3e8ff":"#dbeafe", color: r.account.type==="DEMO"?"#7c3aed":"#1d4ed8", fontSize:10 }}>
+                                  {r.account.type}
+                                </span>
+                              </td>
                               <td>
                                 <span className="fin-badge" style={{ background:tc.bg, color:tc.c }}>
                                   <i className={"fa-solid "+typeIcon(r.kind)}></i>
@@ -499,6 +514,7 @@ export default function SAFinancials() {
                     <th>Tenant</th>
                     <th>Login</th>
                     <th>Client</th>
+                    <th>Acct</th>
                     <th>Type</th>
                     <th>Description</th>
                     <th className="r">Amount</th>
@@ -507,7 +523,7 @@ export default function SAFinancials() {
                   </tr></thead>
                   <tbody>
                     {rows.length===0
-                      ? <tr><td colSpan={9}><div className="fin-empty"><i className="fa-regular fa-folder-open"></i>No records match your filters</div></td></tr>
+                      ? <tr><td colSpan={10}><div className="fin-empty"><i className="fa-regular fa-folder-open"></i>No records match your filters</div></td></tr>
                       : (rows as LedRow[]).map(r=>{
                           const tc=typeClr(r.type);
                           const isIn=INFLOW_TYPES.has(r.type);
@@ -517,6 +533,11 @@ export default function SAFinancials() {
                               <td><span className="fin-tenant-chip">{r.account.tenant.name}</span></td>
                               <td><span className="fin-mono">{r.account.login}</span></td>
                               <td style={{ fontSize:11 }}>{r.account.name||"—"}</td>
+                              <td>
+                                <span className="fin-badge" style={{ background: r.account.type==="DEMO"?"#f3e8ff":"#dbeafe", color: r.account.type==="DEMO"?"#7c3aed":"#1d4ed8", fontSize:10 }}>
+                                  {r.account.type}
+                                </span>
+                              </td>
                               <td>
                                 <span className="fin-badge" style={{ background:tc.bg, color:tc.c }}>
                                   <i className={"fa-solid "+typeIcon(r.type)}></i>
