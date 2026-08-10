@@ -10,6 +10,7 @@ const FEATURE_FLAGS: { key: string; label: string; desc: string }[] = [
   { key: "advancedAnalytics", label: "Advanced Analytics", desc: "Show detailed trading analytics and performance reports to clients" },
   { key: "marketNewsFeed",    label: "Market News Feed",   desc: "Show live market news in the client trading panel" },
   { key: "economicCalendar",  label: "Economic Calendar",  desc: "Show the economic events calendar in the client panel" },
+  { key: "cipherbcPayment",   label: "CipherBC Gateway",   desc: "Enable CipherBC crypto payment gateway for client deposits (auto-credited on confirmation)" },
 ];
 
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [
@@ -239,7 +240,7 @@ export default function SATenantsPage() {
           </thead>
           <tbody>
             {filteredRows.map((t: any) => (
-              <tr key={t.id} className="ui-row">
+              <tr key={t.id} className="ui-row" style={t.status !== "ACTIVE" ? { background: "rgba(220,38,38,0.04)" } : {}}>
                 <td className="px-2 py-2 font-medium">
                   <span className="inline-flex items-center gap-1.5">
                     {t.brandName || t.name}
@@ -253,7 +254,29 @@ export default function SATenantsPage() {
                 </td>
                 <td className="px-2 py-2 text-blue-600">{t.subdomain}</td>
                 <td className="px-2 py-2">
-                  <span className={"sab " + (t.status === "ACTIVE" ? "sab-green" : "sab-red")}>{t.status}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        if (t.status === "ACTIVE") {
+                          if (await confirm({ title: "Disable Tenant?", message: `All active sessions for "${t.brandName || t.name}" will be terminated within seconds. Users will be logged out immediately. Continue?`, danger: true, confirmLabel: "Disable" }))
+                            act(t.id, "lock", {});
+                        } else {
+                          act(t.id, "open", {});
+                        }
+                      }}
+                      title={t.status === "ACTIVE" ? "Click to disable this tenant" : "Click to enable this tenant"}
+                      className="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none"
+                      style={{ background: t.status === "ACTIVE" ? "#16a34a" : "#d1d5db" }}
+                    >
+                      <span
+                        className="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                        style={{ transform: t.status === "ACTIVE" ? "translateX(16px)" : "translateX(0px)" }}
+                      />
+                    </button>
+                    <span className="text-xs font-medium" style={{ color: t.status === "ACTIVE" ? "#16a34a" : t.status === "SUSPENDED" ? "#dc2626" : "#6b7280" }}>
+                      {t.status === "ACTIVE" ? "Enabled" : t.status === "SUSPENDED" ? "Disabled" : t.status}
+                    </span>
+                  </div>
                 </td>
                 <td className="px-2 py-2">
                   <span className="font-medium">{t.subscription ? (PLAN_LABELS[t.subscription.plan] || t.subscription.plan) : "—"}</span>
@@ -299,14 +322,6 @@ export default function SATenantsPage() {
                     onClick={() => openSub(t)}
                   >
                     <i className="fa-solid fa-credit-card"></i>
-                  </button>
-                  <button
-                    title={t.status === "ACTIVE" ? "Suspend tenant" : "Activate tenant"}
-                    className="mx-0.5 rounded px-2 py-1"
-                    style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent2)" }}
-                    onClick={() => act(t.id, t.status === "ACTIVE" ? "lock" : "open", {})}
-                  >
-                    <i className={"fa-solid " + (t.status === "ACTIVE" ? "fa-pause" : "fa-play")}></i>
                   </button>
                   <button
                     title="Reset admin password"
