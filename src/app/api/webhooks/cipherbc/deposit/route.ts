@@ -1,54 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyCipherbcSignature } from "@/lib/cipherbc";
+import { getCipherbcBusinessPublicKey } from "@/lib/cipherbc";
+import crypto from "crypto";
 
-// CipherBC POSTs here when a client's deposit is confirmed.
-// Expected payload: { merchantOrderId, orderId, amount, currency, status, ... }
-// merchantOrderId = our PaymentRequest.id (we pass this when creating the CipherBC payment order)
-// status = "SUCCESS" | "FAILED" | "PENDING"
+// HyperBC callback signature verification:
+// - Parse body JSON, remove the "sign" field
+// - Sort remaining keys alphabetically, join as "key=value&key=value"
+// - RSA-SHA256 verify against their business public key
+function verifyCallback(payload: Record<string, unknown>, sign: string): boolean {
+  const pubKey = getCipherbcBusinessPublicKey();
+  if (!pubKey) return false;
+  const str = Object.keys(payload)
+    .filter((k) => k !== "sign" && payload[k] !== undefined && payload[k] !== null && payload[k] !== "")
+    .sort()
+    .map((k) => `${k}=${payload[k]}`)
+    .join("&");
+  try {
+    return crypto.createVerify("RSA-SHA256").update(str, "utf-8").verify(pubKey, sign, "base64");
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
-  const raw = await req.text();
-
-  // Verify CipherBC's signature using their platform public key
-  const sig = req.headers.get("x-signature") || req.headers.get("x-cipherbc-signature") || "";
-  const keyConfigured = !!process.env.CIPHERBC_BUSINESS_PUBLIC_KEY_B64;
-  if (keyConfigured && !verifyCipherbcSignature(raw, sig)) {
-    console.error("[CipherBC/deposit] Invalid signature");
-    return NextResponse.json({ code: "INVALID_SIGNATURE" }, { status: 401 });
-  }
-
   let payload: any;
   try {
-    payload = JSON.parse(raw);
+    payload = await req.json();
   } catch {
     return NextResponse.json({ code: "INVALID_PAYLOAD" }, { status: 400 });
   }
 
-  const { merchantOrderId, orderId, status } = payload;
+  // Verify HyperBC's signature
+  const keyConfigured = !!process.env.CIPHERBC_BUSINESS_PUBLIC_KEY_B64;
+  if (keyConfigured && !verifyCallback(payload, payload.sign || "")) {
+    console.error("[CipherBC/deposit] Invalid signature");
+    return NextResponse.json({ code: "INVALID_SIGNATURE" }, { status: 401 });
+  }
 
-  // Only process successful payments
-  if (status !== "SUCCESS") {
-    return NextResponse.json({ code: "OK", note: "non-success status acknowledged" });
+  // HyperBC uses out_trade_no for our merchant order ID, order_id for their internal ID
+  const merchantOrderId = payload.out_trade_no || payload.merchantOrderId;
+  const orderId = payload.order_id || payload.orderId;
+  const status = String(payload.status || "").toUpperCase();
+
+  // Only process successful payments (status 1, "1", "SUCCESS", "success")
+  const isSuccess = status === "1" || status === "SUCCESS" || status === "PAID";
+  if (!isSuccess) {
+    return NextResponse.json({ code: "SUCCESS" });
   }
 
   if (!merchantOrderId) {
-    return NextResponse.json({ code: "MISSING_MERCHANT_ORDER_ID" }, { status: 400 });
+    return NextResponse.json({ code: "MISSING_ORDER_ID" }, { status: 400 });
   }
 
-  // Find the pending PaymentRequest
   const request = await prisma.paymentRequest.findFirst({
     where: { id: merchantOrderId, kind: "DEPOSIT", status: "PENDING" },
     include: { account: true },
   });
 
   if (!request) {
-    // Already processed or not found — return OK to stop CipherBC from retrying
     console.warn("[CipherBC/deposit] PaymentRequest not found or already processed:", merchantOrderId);
-    return NextResponse.json({ code: "OK" });
+    return NextResponse.json({ code: "SUCCESS" });
   }
 
-  // Approve the deposit in a single transaction
   await prisma.$transaction([
     prisma.paymentRequest.update({
       where: { id: request.id },

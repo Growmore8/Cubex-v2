@@ -3,9 +3,21 @@ import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { signWithBusinessKey } from "@/lib/cipherbc";
 
-// Client calls this to initiate a CipherBC (HyperBC) deposit.
-// We create a PaymentRequest, call HyperBC to create a payment order,
-// and return the paymentUrl for the client to be redirected to.
+// HyperBC signature: sort all params (except sign) alphabetically as
+// "key=value&key=value", then RSA-SHA256 sign that string with our business private key.
+function buildSign(params: Record<string, string>): string {
+  const str = Object.keys(params)
+    .sort()
+    .map((k) => `${k}=${params[k]}`)
+    .join("&");
+  return signWithBusinessKey(str);
+}
+
+function randomNonce(): string {
+  return Math.random().toString(36).substring(2, 18) +
+    Math.random().toString(36).substring(2, 18);
+}
+
 export async function POST(req: NextRequest) {
   const s = await requireClient();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
@@ -22,14 +34,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Minimum deposit is $1" }, { status: 400 });
   }
 
-  // Resolve the client's live account — prefer explicit accountId, fall back to oldest LIVE account
+  // Resolve the client's live account
   const reqAccId = body?.accountId ? String(body.accountId) : "";
   const account = reqAccId
     ? await prisma.account.findFirst({ where: { id: reqAccId, tenantId: s.tenantId!, userId: s.sub, type: "LIVE" }, select: { id: true } })
     : await prisma.account.findFirst({ where: { tenantId: s.tenantId!, userId: s.sub, type: "LIVE" }, orderBy: { createdAt: "asc" }, select: { id: true } });
   if (!account) return NextResponse.json({ ok: false, error: "Live account not found" }, { status: 404 });
 
-  // Create a PENDING PaymentRequest — its UUID becomes the merchantOrderId sent to HyperBC
+  // Create a PENDING PaymentRequest — its UUID becomes the merchant order ID
   const paymentRequest = await prisma.paymentRequest.create({
     data: {
       tenantId: s.tenantId!,
@@ -43,37 +55,42 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Build the HyperBC order creation request
-  // Notify URL: where HyperBC will POST when payment is confirmed
   const notifyUrl = "https://api.orbitfxsolution.com/api/webhooks/cipherbc/deposit";
   const origin = req.headers.get("origin") || "https://api.orbitfxsolution.com";
   const returnUrl = `${origin.replace(/\/$/, "")}/client/wallet?status=paid`;
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const nonceStr = randomNonce();
 
-  const orderPayload = {
-    appId,
-    merchantOrderId: paymentRequest.id,
+  // Build params WITHOUT sign first
+  const params: Record<string, string> = {
+    appid: appId,
+    timestamp,
+    nonce_str: nonceStr,
+    out_trade_no: paymentRequest.id,
     amount: amount.toFixed(2),
     currency: "USDT",
-    notifyUrl,
-    returnUrl,
+    notify_url: notifyUrl,
+    return_url: returnUrl,
   };
-  const payloadStr = JSON.stringify(orderPayload);
 
-  // Sign the request body with our business private key
-  let signature = "";
-  try { signature = signWithBusinessKey(payloadStr); } catch {}
+  // Sign the sorted key=value string with our business RSA private key
+  let sign = "";
+  try {
+    sign = buildSign(params);
+  } catch (e) {
+    console.error("[CipherBC] Signing failed:", e);
+    await prisma.paymentRequest.delete({ where: { id: paymentRequest.id } }).catch(() => {});
+    return NextResponse.json({ ok: false, error: "Signature error" }, { status: 500 });
+  }
 
-  // Call HyperBC API — endpoint: POST {apiBase}/order/create
+  const orderPayload = { ...params, sign };
+
   let cipherResp: Response | null = null;
   try {
     cipherResp = await fetch(`${apiBase}/order/create`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-App-Id": appId,
-        "X-Signature": signature,
-      },
-      body: payloadStr,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(orderPayload),
     });
   } catch {
     await prisma.paymentRequest.delete({ where: { id: paymentRequest.id } }).catch(() => {});
@@ -81,17 +98,18 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await cipherResp.json().catch(() => null);
-  if (!cipherResp.ok || !data || data.code !== "SUCCESS" || !data.data?.paymentUrl) {
-    console.error("[CipherBC] Order creation failed:", JSON.stringify(data));
+  console.log("[CipherBC] Order response:", JSON.stringify(data));
+
+  if (!data || data.status !== 200 || !data.data?.pay_url) {
     await prisma.paymentRequest.delete({ where: { id: paymentRequest.id } }).catch(() => {});
-    return NextResponse.json({ ok: false, error: data?.message || "Gateway order creation failed. Try again." }, { status: 502 });
+    return NextResponse.json({ ok: false, error: data?.msg || "Gateway order creation failed. Try again." }, { status: 502 });
   }
 
-  // Persist the HyperBC orderId for reconciliation
+  // Persist the HyperBC order ID for reconciliation
   await prisma.paymentRequest.update({
     where: { id: paymentRequest.id },
-    data: { details: { gateway: "cipherbc", cipherbcOrderId: data.data.orderId } },
+    data: { details: { gateway: "cipherbc", cipherbcOrderId: data.data.order_id } },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, paymentUrl: data.data.paymentUrl });
+  return NextResponse.json({ ok: true, paymentUrl: data.data.pay_url });
 }
