@@ -32,7 +32,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ code: "INVALID_SIGNATURE" }, { status: 401 });
   }
 
-  const merchantOrderId = payload.merchant_order_id || payload.out_trade_no;
+  const rawMerchantId = String(payload.merchant_order_id || payload.out_trade_no || "");
+  const merchantOrderId = rawMerchantId.length === 32
+    ? `${rawMerchantId.slice(0,8)}-${rawMerchantId.slice(8,12)}-${rawMerchantId.slice(12,16)}-${rawMerchantId.slice(16,20)}-${rawMerchantId.slice(20)}`
+    : rawMerchantId;
   const orderId = payload.order_no || payload.order_id;
   const rawStatus = String(payload.status ?? "");
   const failReason = payload.fail_reason || payload.failReason || "";

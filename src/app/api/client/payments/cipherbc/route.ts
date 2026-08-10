@@ -57,12 +57,15 @@ export async function POST(req: NextRequest) {
   const successUrl = `${origin.replace(/\/$/, "")}/client/wallet?status=paid`;
   const failUrl = `${origin.replace(/\/$/, "")}/client/wallet?status=failed`;
 
+  // UUID without hyphens = 32 hex chars, which satisfies CipherBC's merchant_order_id constraint
+  const merchantOrderId = paymentRequest.id.replace(/-/g, "");
+
   // Build params WITHOUT sign — field names exactly as per CipherBC docs
   const params: Record<string, string> = {
     app_id: appId,
     version: "1.0",
     time: String(Math.floor(Date.now() / 1000)),
-    merchant_order_id: paymentRequest.id,
+    merchant_order_id: merchantOrderId,
     amount: formatAmount(amount),
     currency: "usd",
     success_url: successUrl,
