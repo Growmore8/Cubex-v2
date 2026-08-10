@@ -37,13 +37,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ code: "INVALID_SIGNATURE" }, { status: 401 });
   }
 
-  // HyperBC uses out_trade_no for our merchant order ID, order_id for their internal ID
-  const merchantOrderId = payload.out_trade_no || payload.merchantOrderId;
-  const orderId = payload.order_id || payload.orderId;
-  const status = String(payload.status || "").toUpperCase();
+  const merchantOrderId = payload.merchant_order_id || payload.out_trade_no;
+  const orderId = payload.order_no || payload.order_id;
+  const status = String(payload.status ?? "");
 
-  // Only process successful payments (status 1, "1", "SUCCESS", "success")
-  const isSuccess = status === "1" || status === "SUCCESS" || status === "PAID";
+  // CipherBC status: 0=pending, 1=complete, 2=abnormal, 5=overpayment, 10=cancelled
+  const isSuccess = status === "1" || status === "5";
   if (!isSuccess) {
     return NextResponse.json({ code: "SUCCESS" });
   }

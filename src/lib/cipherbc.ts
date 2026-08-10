@@ -32,7 +32,8 @@ export function getRiskPrivateKey() {
 
 function rsaVerify(pubKey: string, data: string, signature: string): boolean {
   try {
-    return crypto.createVerify("RSA-SHA256").update(data, "utf-8").verify(pubKey, signature, "base64");
+    // CipherBC uses MD5withRSA (RSA-MD5) for all signing
+    return crypto.createVerify("MD5").update(data, "utf-8").verify(pubKey, signature, "base64");
   } catch {
     return false;
   }
@@ -54,12 +55,13 @@ export function verifyCipherbcRiskSignature(body: string, signature: string): bo
 export function signWithBusinessKey(data: string): string {
   const privKey = getBusinessPrivateKey();
   if (!privKey) throw new Error("CIPHERBC_BUSINESS_PRIVATE_KEY_B64 not set");
-  return crypto.createSign("RSA-SHA256").update(data, "utf-8").sign(privKey, "base64");
+  // CipherBC uses MD5withRSA
+  return crypto.createSign("MD5").update(data, "utf-8").sign(privKey, "base64");
 }
 
 /** Sign data with our risk private key (for risk-control responses) */
 export function signWithRiskKey(data: string): string {
   const privKey = getRiskPrivateKey();
   if (!privKey) throw new Error("CIPHERBC_RISK_PRIVATE_KEY_B64 not set");
-  return crypto.createSign("RSA-SHA256").update(data, "utf-8").sign(privKey, "base64");
+  return crypto.createSign("MD5").update(data, "utf-8").sign(privKey, "base64");
 }

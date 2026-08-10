@@ -32,13 +32,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ code: "INVALID_SIGNATURE" }, { status: 401 });
   }
 
-  const merchantOrderId = payload.out_trade_no || payload.merchantOrderId;
-  const orderId = payload.order_id || payload.orderId;
-  const rawStatus = String(payload.status || "").toUpperCase();
+  const merchantOrderId = payload.merchant_order_id || payload.out_trade_no;
+  const orderId = payload.order_no || payload.order_id;
+  const rawStatus = String(payload.status ?? "");
   const failReason = payload.fail_reason || payload.failReason || "";
 
-  const isSuccess = rawStatus === "1" || rawStatus === "SUCCESS";
-  const isFailed = rawStatus === "2" || rawStatus === "0" || rawStatus === "FAILED";
+  const isSuccess = rawStatus === "1";
+  const isFailed = rawStatus === "10" || rawStatus === "2";
 
   if (!merchantOrderId) {
     return NextResponse.json({ code: "MISSING_ORDER_ID" }, { status: 400 });
