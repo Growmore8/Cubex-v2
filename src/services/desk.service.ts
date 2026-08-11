@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen, assertCan } from "@/lib/perms";
-import { getPrice, getAsk } from "@/lib/prices";
+import { getPrice, getAsk, getAccountFxRate } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
 import { pnlFor } from "@/lib/trademath";
@@ -148,11 +148,14 @@ export async function forceClose(s: any, tradeId: string, opts?: { price?: numbe
     : (trade.type === "BUY" ? (fcBid ?? fcAsk) : (fcAsk ?? fcBid));
   if (price == null) throw new Error("No price");
   const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
+  // Convert USD P&L to the account's currency before crediting (mirrors closeOrder behaviour)
+  const closeFxRate = await getAccountFxRate(trade.account.currency as string);
+  const pnlAcc = pnl / closeFxRate;
   await prisma.$transaction(async (tx) => {
     await tx.tradeHistory.create({
-      data: { ticket: trade.ticket, accountId: trade.accountId, symbol: trade.symbol, side: trade.type, lots: trade.lots, openPrice: trade.openPrice, closePrice: new Prisma.Decimal(price), sl: trade.sl, tp: trade.tp, pnl: new Prisma.Decimal(pnl), openedAt: trade.openedAt, ...(opts?.closedAt ? { closedAt: opts.closedAt } : {}) },
+      data: { ticket: trade.ticket, accountId: trade.accountId, symbol: trade.symbol, side: trade.type, lots: trade.lots, openPrice: trade.openPrice, closePrice: new Prisma.Decimal(price), sl: trade.sl, tp: trade.tp, pnl: new Prisma.Decimal(pnlAcc), openedAt: trade.openedAt, ...(opts?.closedAt ? { closedAt: opts.closedAt } : {}) },
     });
-    await tx.account.update({ where: { id: trade.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnl) } } });
+    await tx.account.update({ where: { id: trade.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnlAcc) } } });
     await tx.trade.delete({ where: { id: trade.id } });
   });
   const label = `${trade.account.login} ${trade.symbol} closed @ ${gprice(price)} | PnL ${gnum(pnl, 2)} (by staff)`;
