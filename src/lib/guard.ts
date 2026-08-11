@@ -5,15 +5,11 @@ import type { SessionPayload } from "@/types";
 // Throws if the staff member is in read-only mode (User LOCKED or tenant SUSPENDED).
 // Call at the top of mutating staff routes so locked accounts can view but not act.
 export async function assertWritable(s: SessionPayload) {
-  try {
-    const u = await prisma.user.findUnique({ where: { id: s.sub }, select: { status: true } });
-    if (u && u.status === "LOCKED") throw new Error("Your account is read-only (locked). Action not allowed.");
-    if (s.tenantId) {
-      const t = await prisma.tenant.findUnique({ where: { id: s.tenantId }, select: { status: true } });
-      if (t && t.status === "SUSPENDED") throw new Error("This workspace is locked (read-only). Action not allowed.");
-    }
-  } catch (e: any) {
-    if (e?.message?.includes("read-only")) throw e;
+  const u = await prisma.user.findUnique({ where: { id: s.sub }, select: { status: true } });
+  if (u?.status === "LOCKED") throw new Error("Your account is read-only (locked). Action not allowed.");
+  if (s.tenantId) {
+    const t = await prisma.tenant.findUnique({ where: { id: s.tenantId }, select: { status: true } });
+    if (t?.status === "SUSPENDED") throw new Error("This workspace is locked (read-only). Action not allowed.");
   }
 }
 

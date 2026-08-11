@@ -165,7 +165,8 @@ async function processAccount(tenantId: string, account: any): Promise<number> {
       });
       await tx.account.update({
         where: { id: account.id },
-        data: { pnl: { increment: new Prisma.Decimal(pnl + swap) } },
+        // Only price-based P&L — swap is already in account.pnl from nightly rollovers
+        data: { pnl: { increment: new Prisma.Decimal(pnl) } },
       });
       await tx.trade.delete({ where: { id: worstTrade.id } });
     });

@@ -8,7 +8,8 @@ export async function POST() {
   const h = await headers();
   const secret = process.env.CRON_SECRET;
   const provided = h.get("x-cron-secret");
-  let authorized = secret ? provided === secret : true;
+  // Deny if no secret configured — never allow unauthenticated access to billing cron
+  let authorized = !!secret && provided === secret;
   if (!authorized) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   const now = new Date();

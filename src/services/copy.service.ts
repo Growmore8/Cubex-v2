@@ -92,7 +92,8 @@ export async function closeCopiedTrades(masterTradeId: bigint, tenantId: string)
             openedAt: ft.openedAt,
           },
         });
-        await tx.account.update({ where: { id: ft.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnl + swap) } } });
+        // Only price-based P&L — swap already applied to account.pnl during nightly rollover
+        await tx.account.update({ where: { id: ft.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnl) } } });
         await tx.trade.delete({ where: { id: ft.id } });
       });
       audit(tenantId, "copy.close", `${(ft.account as any).login} copy #${ft.ticket} closed (master closed) @ ${closePrice} PnL ${pnl.toFixed(2)}`, (ft.account as any).login, "CLIENT");

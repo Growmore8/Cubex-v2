@@ -28,14 +28,24 @@ export async function reviewPayment(tenantId: string, id: string, status: "APPRO
     const amt = row.amount;
     const data = row.kind === "DEPOSIT" ? { deposit: { increment: amt } } : { withdrawal: { increment: amt } };
     await prisma.$transaction(async (tx) => {
+      // Atomic check-and-update: only update if still PENDING — prevents double-approval race
+      const updated = await tx.paymentRequest.updateMany({
+        where: { id, status: "PENDING" },
+        data: { status: "APPROVED", reviewedBy: by },
+      });
+      if (updated.count === 0) throw new Error("Already reviewed");
       await tx.account.update({ where: { id: row.accountId }, data });
       await tx.financialHistory.create({
         data: { accountId: row.accountId, type: row.kind as any, amount: amt, description: row.method || row.kind, mode: "REALTIME", createdBy: by },
       });
-      await tx.paymentRequest.update({ where: { id }, data: { status: "APPROVED", reviewedBy: by } });
     });
   } else {
-    await prisma.paymentRequest.update({ where: { id }, data: { status: "REJECTED", reviewedBy: by } });
+    // Atomic reject: only moves from PENDING → REJECTED
+    const updated = await prisma.paymentRequest.updateMany({
+      where: { id, status: "PENDING" },
+      data: { status: "REJECTED", reviewedBy: by },
+    });
+    if (updated.count === 0) throw new Error("Already reviewed");
   }
   return row;
 }

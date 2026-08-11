@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminOrManager, assertWritable } from "@/lib/guard";
+import { assertCan } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
@@ -12,6 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     await assertWritable(s);
+    await assertCan(s, "editTrades");
     const b = await req.json();
     const t: any = await prisma.trade.findUnique({ where: { id: Number(id) }, include: { account: true } });
     if (!t) throw new Error("Position not found");

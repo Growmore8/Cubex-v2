@@ -210,7 +210,9 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
         openedAt: trade.openedAt,
       },
     });
-    await tx.account.update({ where: { id: trade.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnlAcc + swapAcc) } } });
+    // Only credit the price-based P&L — swap was already applied to account.pnl
+    // every night during the swap rollover, so adding it again here would double-charge.
+    await tx.account.update({ where: { id: trade.accountId }, data: { pnl: { increment: new Prisma.Decimal(pnlAcc) } } });
     if (isPartial) {
       // Reduce lots on open trade; keep remaining swap proportional
       const remainLots = totalLots - lots;
