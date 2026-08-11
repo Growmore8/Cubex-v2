@@ -62,6 +62,13 @@ export async function POST() {
       // Hard-delete — cascades to trades, history, financials, KYC, etc.
       await prisma.account.delete({ where: { id: acc.id } });
       deleted++;
+      // Free the email: delete the user if they have no remaining accounts
+      if (acc.userId) {
+        const remaining = await prisma.account.count({ where: { userId: acc.userId } });
+        if (remaining === 0) {
+          await prisma.user.deleteMany({ where: { id: acc.userId, role: "CLIENT" } });
+        }
+      }
     } catch (e) {
       console.error("[demo-cleanup] failed to delete", acc.login, e);
     }

@@ -389,8 +389,15 @@ export async function runStatementCron(): Promise<{ weekly: number; monthly: num
 
   for (const t of tenants as any[]) {
     if (!t.smtpEmail || !t.smtpPassword) continue;
+    const now = new Date();
     const accounts = await prisma.account.findMany({
-      where: { tenantId: t.id, deactivated: false, user: { role: "CLIENT", status: "ACTIVE" } },
+      where: {
+        tenantId: t.id,
+        deactivated: false,
+        user: { role: "CLIENT", status: "ACTIVE" },
+        // Exclude expired demo accounts — expiresAt null means live (no expiry), gt:now means still active demo
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
       include: { user: { select: { id: true, email: true } } },
     });
 
