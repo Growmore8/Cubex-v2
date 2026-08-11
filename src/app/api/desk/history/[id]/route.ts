@@ -3,6 +3,8 @@ import { requireAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { assertCan } from "@/lib/perms";
+import { emitRefresh } from "@/lib/realtime";
+import { pnlFor } from "@/lib/trademath";
 
 const FIN: Record<string, { col: string; sign: number }> = {
   DEPOSIT: { col: "deposit", sign: 1 },
@@ -63,6 +65,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       await prisma.$transaction(ops);
       await audit(s.tenantId!, "history.deleteFin", row.type + " " + Number(row.amount), s.email);
     }
+    emitRefresh();
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
@@ -82,12 +85,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       const row = await prisma.tradeHistory.findFirst({ where: { id: p.id, account: { tenantId: s.tenantId! } } });
       if (!row) throw new Error("Not found");
       const data: any = {};
-      if (b.closePrice != null) data.closePrice = Number(b.closePrice);
       if (b.openPrice != null) data.openPrice = Number(b.openPrice);
       if (b.lots != null) data.lots = Number(b.lots);
       if (b.sl != null) data.sl = Number(b.sl);
       if (b.tp != null) data.tp = Number(b.tp);
       let pnlDelta = 0;
+      if (b.closePrice != null) {
+        data.closePrice = Number(b.closePrice);
+        // Auto-recalculate P&L from the new close price
+        const recalcPnl = pnlFor(
+          row.symbol,
+          row.side as "BUY" | "SELL",
+          Number(b.openPrice ?? row.openPrice),
+          Number(b.closePrice),
+          Number(b.lots ?? row.lots),
+        );
+        pnlDelta = recalcPnl - Number(row.pnl);
+        data.pnl = recalcPnl;
+      }
+      // Explicit pnl in body overrides the auto-calculated value (admin adjustment)
       if (b.pnl != null) { const np = Number(b.pnl); pnlDelta = np - Number(row.pnl); data.pnl = np; }
       const ops: any[] = [prisma.tradeHistory.update({ where: { id: p.id }, data })];
       if (pnlDelta !== 0) ops.push(prisma.account.update({ where: { id: row.accountId }, data: { pnl: { increment: pnlDelta } } }));
@@ -106,6 +122,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       await prisma.$transaction(ops);
     }
     await audit(s.tenantId!, "history.edit", p.kind + " " + p.id.toString(), s.email);
+    emitRefresh();
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

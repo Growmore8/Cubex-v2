@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, startTransition } from "react";
+import { pnlFor } from "@/lib/trademath";
 import { io, Socket } from "socket.io-client";
 import PriceCell from "@/components/PriceCell";
 import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds";
@@ -660,7 +661,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
     const isFin = String(hEdit.id).startsWith("F");
     const body: any = isFin
       ? { amount: Number(hEdit.amt), description: hEdit.desc }
-      : { closePrice: Number(hEdit.closePrice), pnl: Number(hEdit.pnl), sl: Number(hEdit.sl), tp: Number(hEdit.tp) };
+      // Only send explicit pnl when admin manually edited it — otherwise backend auto-recalculates from closePrice
+      : { closePrice: Number(hEdit.closePrice), ...(!hEdit._pnlAuto ? { pnl: Number(hEdit.pnl) } : {}), sl: Number(hEdit.sl), tp: Number(hEdit.tp) };
     const r = await fetch("/api/desk/history/" + hEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((x) => x.json()).catch(() => ({ ok: false }));
     if (!r.ok) { setErr(r.error || "Save failed"); return; }
     setHEdit(null); loadAll(); loadAccHistory();
@@ -3541,8 +3543,12 @@ const [selAcc, setSelAcc] = useState<any>(null);
               <div className={lab}>Amount</div><input type="number" className={inp} value={hEdit.amt} onChange={(e) => setHEdit({ ...hEdit, amt: e.target.value })} />
               <div className={lab}>Description</div><input className={inp} value={hEdit.desc || ""} onChange={(e) => setHEdit({ ...hEdit, desc: e.target.value })} />
             </>) : (<>
-              <div className={lab}>Close Price</div><input type="number" className={inp} value={hEdit.closePrice} onChange={(e) => setHEdit({ ...hEdit, closePrice: e.target.value })} />
-              <div className={lab}>P&amp;L</div><input type="number" className={inp} value={hEdit.pnl} onChange={(e) => setHEdit({ ...hEdit, pnl: e.target.value })} />
+              <div className={lab}>Close Price</div><input type="number" className={inp} value={hEdit.closePrice} onChange={(e) => {
+                const cp = Number(e.target.value);
+                const auto = cp > 0 ? pnlFor(hEdit.symbol, hEdit.side, Number(hEdit.openPrice), cp, Number(hEdit.lots)) : Number(hEdit.pnl);
+                setHEdit({ ...hEdit, closePrice: e.target.value, pnl: Number(auto.toFixed(2)), _pnlAuto: true });
+              }} />
+              <div className={lab}>P&amp;L <span style={{fontSize:"10px",opacity:0.5}}>{hEdit._pnlAuto ? "(auto)" : ""}</span></div><input type="number" className={inp} value={hEdit.pnl} onChange={(e) => setHEdit({ ...hEdit, pnl: e.target.value, _pnlAuto: false })} />
               <div className="grid grid-cols-2 gap-2"><div><div className={lab}>S/L</div><input type="number" className={inp} value={hEdit.sl} onChange={(e) => setHEdit({ ...hEdit, sl: e.target.value })} /></div><div><div className={lab}>T/P</div><input type="number" className={inp} value={hEdit.tp} onChange={(e) => setHEdit({ ...hEdit, tp: e.target.value })} /></div></div>
             </>)}
             {err && <div className="mt-2 text-[11px]" style={{ color: SELL }}>{err}</div>}
