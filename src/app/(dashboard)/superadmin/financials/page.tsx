@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 
 type Tenant = { id: string; name: string };
 type PayRow = {
@@ -115,6 +115,15 @@ const CSS = `
 .fin-pager-info{font-size:11px;color:var(--text2);padding:0 6px;}
 .fin-loading{display:flex;align-items:center;justify-content:center;gap:8px;padding:36px;color:var(--text2);font-size:13px;}
 .fin-err{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fee2e2;color:#b91c1c;border-radius:8px;margin-bottom:12px;font-size:12px;}
+.fin-expand-btn{width:24px;height:24px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+.fin-expand-btn:hover{border-color:var(--accent);color:var(--text);}
+.fin-expand-btn.open{background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:var(--accent);color:var(--accent);}
+.fin-detail-row td{padding:0 !important;border-bottom:2px solid var(--accent) !important;}
+.fin-detail-inner{padding:10px 14px 12px 42px;background:color-mix(in srgb,var(--accent) 5%,var(--bg2));display:flex;flex-wrap:wrap;gap:18px;}
+.fin-detail-item{display:flex;flex-direction:column;gap:3px;min-width:120px;}
+.fin-detail-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);}
+.fin-detail-val{font-size:12px;color:var(--text);font-weight:500;word-break:break-word;}
+.fin-detail-note{flex:1 1 280px;}
 `;
 
 export default function SAFinancials() {
@@ -139,6 +148,7 @@ export default function SAFinancials() {
   const [dateFrom, setDateFrom]       = useState("");
   const [dateTo, setDateTo]           = useState("");
   const [slip, setSlip]         = useState<string|null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [exportMenu, setExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<ReturnType<typeof setTimeout>|null>(null);
@@ -180,6 +190,14 @@ export default function SAFinancials() {
   function switchTab(t: "requests"|"ledger") {
     setTab(t); setPage(0); setRows([]);
     setStatus(""); setKind(""); setType(""); setSearch(""); setAccountType(""); setDateFrom(""); setDateTo("");
+  }
+
+  function toggleRow(id: string) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }
 
   // close export menu when clicking outside
@@ -459,6 +477,7 @@ export default function SAFinancials() {
               <div style={{ overflowX:"auto" }}>
                 <table className="fin-tbl">
                   <thead><tr>
+                    <th style={{ width:32 }}></th>
                     <th>Date / Time</th>
                     <th>Tenant</th>
                     <th>Login</th>
@@ -469,7 +488,6 @@ export default function SAFinancials() {
                     <th className="r">Amount</th>
                     <th>Status</th>
                     <th>Proof</th>
-                    <th>Note</th>
                   </tr></thead>
                   <tbody>
                     {rows.length===0
@@ -477,38 +495,82 @@ export default function SAFinancials() {
                       : (rows as PayRow[]).map(r=>{
                           const tc=typeClr(r.kind), sc=statusClr(r.status);
                           const isIn=r.kind==="DEPOSIT"||r.kind==="CREDIT_REQUEST";
+                          const isOpen=expanded.has(r.id);
+                          const hasDetail=!!(r.note||r.account.email||r.account.name);
                           return (
-                            <tr key={r.id}>
-                              <td style={{ whiteSpace:"nowrap", color:"var(--text2)", fontSize:11 }}>{fmtDate(r.createdAt)}</td>
-                              <td><span className="fin-tenant-chip">{r.account.tenant.name}</span></td>
-                              <td><span className="fin-mono">{r.account.login}</span></td>
-                              <td style={{ fontSize:11 }}>{r.account.name||r.account.email||"—"}</td>
-                              <td>
-                                <span className="fin-badge" style={{ background: r.account.type==="DEMO"?"#f3e8ff":"#dbeafe", color: r.account.type==="DEMO"?"#7c3aed":"#1d4ed8", fontSize:10 }}>
-                                  {r.account.type}
-                                </span>
-                              </td>
-                              <td>
-                                <span className="fin-badge" style={{ background:tc.bg, color:tc.c }}>
-                                  <i className={"fa-solid "+typeIcon(r.kind)}></i>
-                                  {r.kind.replace(/_/g," ")}
-                                </span>
-                              </td>
-                              <td style={{ fontSize:11, color:"var(--text2)" }}>{r.method||"—"}</td>
-                              <td className={isIn?"fin-amount-pos":"fin-amount-neg"}>{fmtFull(r.amount)}</td>
-                              <td>
-                                <span className="fin-badge" style={{ background:sc.bg, color:sc.c }}>{r.status}</span>
-                              </td>
-                              <td>
-                                {r.slipUrl
-                                  ? <button onClick={()=>setSlip(r.slipUrl!)} style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontSize:11, color:"#1d4ed8", display:"inline-flex", alignItems:"center", gap:4 }}>
-                                      <i className="fa-solid fa-image"></i>View
-                                    </button>
-                                  : <span style={{ color:"var(--text3)", fontSize:11 }}>—</span>
-                                }
-                              </td>
-                              <td style={{ fontSize:11, color:"var(--text2)", maxWidth:130, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }} title={r.note||""}>{r.note||"—"}</td>
-                            </tr>
+                            <React.Fragment key={r.id}>
+                              <tr>
+                                <td style={{ width:32, paddingRight:4 }}>
+                                  <button
+                                    className={"fin-expand-btn"+(isOpen?" open":"")}
+                                    onClick={()=>toggleRow(r.id)}
+                                    title={isOpen?"Hide details":"Show details"}
+                                  >
+                                    <i className={"fa-solid fa-chevron-"+(isOpen?"up":"down")} style={{ fontSize:9 }}></i>
+                                  </button>
+                                </td>
+                                <td style={{ whiteSpace:"nowrap", color:"var(--text2)", fontSize:11 }}>{fmtDate(r.createdAt)}</td>
+                                <td><span className="fin-tenant-chip">{r.account.tenant.name}</span></td>
+                                <td><span className="fin-mono">{r.account.login}</span></td>
+                                <td style={{ fontSize:11 }}>{r.account.name||r.account.email||"—"}</td>
+                                <td>
+                                  <span className="fin-badge" style={{ background: r.account.type==="DEMO"?"#f3e8ff":"#dbeafe", color: r.account.type==="DEMO"?"#7c3aed":"#1d4ed8", fontSize:10 }}>
+                                    {r.account.type}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span className="fin-badge" style={{ background:tc.bg, color:tc.c }}>
+                                    <i className={"fa-solid "+typeIcon(r.kind)}></i>
+                                    {r.kind.replace(/_/g," ")}
+                                  </span>
+                                </td>
+                                <td style={{ fontSize:11, color:"var(--text2)" }}>{r.method||"—"}</td>
+                                <td className={isIn?"fin-amount-pos":"fin-amount-neg"}>{fmtFull(r.amount)}</td>
+                                <td>
+                                  <span className="fin-badge" style={{ background:sc.bg, color:sc.c }}>{r.status}</span>
+                                </td>
+                                <td>
+                                  {r.slipUrl
+                                    ? <button onClick={()=>setSlip(r.slipUrl!)} style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontSize:11, color:"#1d4ed8", display:"inline-flex", alignItems:"center", gap:4 }}>
+                                        <i className="fa-solid fa-image"></i>View
+                                      </button>
+                                    : <span style={{ color:"var(--text3)", fontSize:11 }}>—</span>
+                                  }
+                                </td>
+                              </tr>
+                              {isOpen && (
+                                <tr className="fin-detail-row">
+                                  <td colSpan={11}>
+                                    <div className="fin-detail-inner">
+                                      <div className="fin-detail-item">
+                                        <span className="fin-detail-label"><i className="fa-solid fa-hashtag" style={{ marginRight:3 }}></i>Account</span>
+                                        <span className="fin-detail-val fin-mono">{r.account.login} <span style={{ fontFamily:"inherit", fontWeight:400, color:"var(--text2)", fontSize:11 }}>({r.account.type})</span></span>
+                                      </div>
+                                      <div className="fin-detail-item">
+                                        <span className="fin-detail-label"><i className="fa-solid fa-user" style={{ marginRight:3 }}></i>Client</span>
+                                        <span className="fin-detail-val">{r.account.name||"—"}</span>
+                                      </div>
+                                      {r.account.email && (
+                                        <div className="fin-detail-item">
+                                          <span className="fin-detail-label"><i className="fa-solid fa-envelope" style={{ marginRight:3 }}></i>Email</span>
+                                          <span className="fin-detail-val">{r.account.email}</span>
+                                        </div>
+                                      )}
+                                      <div className="fin-detail-item">
+                                        <span className="fin-detail-label"><i className="fa-solid fa-wallet" style={{ marginRight:3 }}></i>Method / Way</span>
+                                        <span className="fin-detail-val">{r.method||"—"}</span>
+                                      </div>
+                                      {r.note && (
+                                        <div className="fin-detail-item fin-detail-note">
+                                          <span className="fin-detail-label"><i className="fa-solid fa-note-sticky" style={{ marginRight:3 }}></i>Note / Details</span>
+                                          <span className="fin-detail-val" style={{ whiteSpace:"pre-wrap" }}>{r.note}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
                           );
                         })
                     }

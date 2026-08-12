@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 export default function AdminPaymentsPage() {
   const [reqs, setReqs] = useState<any[]>([]);
@@ -10,6 +10,8 @@ export default function AdminPaymentsPage() {
   const [confirmDel, setConfirmDel] = useState<any>(null);
   const [err, setErr] = useState("");
   const [sort, setSort] = useState<{ k: string; d: 1 | -1 } | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  function toggleRow(id: string) { setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
   const sacc: Record<string, (p: any) => any> = { account: (p) => p.account?.login, type: (p) => p.kind, amount: (p) => Number(p.amount), method: (p) => p.method, status: (p) => p.status };
   const toggle = (k: string) => setSort((s) => (!s || s.k !== k ? { k, d: 1 } : s.d === 1 ? { k, d: -1 } : null));
   const sortedReqs = (() => { if (!sort || !sacc[sort.k]) return reqs; const g = sacc[sort.k]; return [...reqs].sort((a, b) => { const va = g(a), vb = g(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; if (typeof va === "number" && typeof vb === "number") return (va - vb) * sort.d; return String(va).localeCompare(String(vb), undefined, { numeric: true }) * sort.d; }); })();
@@ -90,25 +92,85 @@ export default function AdminPaymentsPage() {
       <div className="ui-card overflow-x-auto p-0">
         <table className="w-full text-sm">
           <thead className="border-b bg-gray-50 text-left text-gray-600">
-            <tr><Sth k="account" label="Account" /><Sth k="type" label="Type" /><Sth k="amount" label="Amount" /><Sth k="method" label="Method" /><th className="px-3 py-2">Slip</th><Sth k="status" label="Status" /><th className="px-3 py-2 text-right">Action</th></tr>
+            <tr>
+              <th className="px-2 py-2" style={{ width:32 }}></th>
+              <Sth k="account" label="Account" /><Sth k="type" label="Kind" /><Sth k="amount" label="Amount" /><Sth k="method" label="Method / Way" /><th className="px-3 py-2">Slip</th><Sth k="status" label="Status" /><th className="px-3 py-2 text-right">Action</th>
+            </tr>
           </thead>
           <tbody>
-            {reqs.length === 0 ? <tr><td className="px-3 py-4" colSpan={7}>No requests.</td></tr> : sortedReqs.map((p) => (
-              <tr key={p.id} className="ui-row border-b last:border-0">
-                <td className="px-3 py-2">{p.account.login} <span className="text-gray-500">{p.account.name}</span></td>
-                <td className="px-3 py-2">{p.kind}</td>
-                <td className="px-3 py-2">{Number(p.amount).toFixed(2)}</td>
-                <td className="px-3 py-2">{p.method || "-"}</td>
-                <td className="px-3 py-2">{p.slipUrl ? <a className="text-blue-600 underline transition-colors duration-200" href={"/api/files/slip/" + p.id} target="_blank" rel="noreferrer">View</a> : "-"}</td>
-                <td className="px-3 py-2"><span className={badge(p.status)}>{p.status}</span></td>
-                <td className="px-3 py-2 text-right space-x-2">
-                  {p.status === "PENDING" ? (<>
-                    <button className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-green-600" onClick={() => review(p.id, "approve")}>Approve</button>
-                    <button className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-red-600" onClick={() => review(p.id, "reject")}>Reject</button>
-                  </>) : <span className="text-gray-400">{p.reviewedBy}</span>}
-                </td>
-              </tr>
-            ))}
+            {reqs.length === 0
+              ? <tr><td className="px-3 py-4" colSpan={8}>No requests.</td></tr>
+              : sortedReqs.map((p) => {
+                  const isOpen = expanded.has(p.id);
+                  return (
+                    <React.Fragment key={p.id}>
+                      <tr className="ui-row border-b last:border-0">
+                        <td className="px-2 py-2" style={{ width:32 }}>
+                          <button
+                            onClick={() => toggleRow(p.id)}
+                            title={isOpen ? "Hide details" : "Show details"}
+                            style={{ width:22, height:22, border:"1px solid var(--border)", borderRadius:5, background: isOpen ? "color-mix(in srgb,var(--accent) 12%,transparent)" : "var(--bg2)", color: isOpen ? "var(--accent)" : "var(--text2)", cursor:"pointer", display:"inline-flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}
+                          >
+                            <i className={"fa-solid " + (isOpen ? "fa-chevron-up" : "fa-chevron-down")} style={{ fontSize:8 }}></i>
+                          </button>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="font-mono font-semibold">{p.account.login}</span>
+                          {" "}<span className="text-gray-500 text-xs">{p.account.name}</span>
+                          {" "}<span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: p.account.type==="DEMO"?"#f3e8ff":"#dbeafe", color: p.account.type==="DEMO"?"#7c3aed":"#1d4ed8" }}>{p.account.type}</span>
+                        </td>
+                        <td className="px-3 py-2">{p.kind.replace(/_/g," ")}</td>
+                        <td className="px-3 py-2 font-semibold" style={{ color: (p.kind==="DEPOSIT"||p.kind==="CREDIT_REQUEST") ? "#15803d" : "#b91c1c" }}>{Number(p.amount).toFixed(2)}</td>
+                        <td className="px-3 py-2 text-gray-600">{p.method || "—"}</td>
+                        <td className="px-3 py-2">{p.slipUrl ? <a className="text-blue-600 underline transition-colors duration-200" href={"/api/files/slip/" + p.id} target="_blank" rel="noreferrer">View</a> : "—"}</td>
+                        <td className="px-3 py-2"><span className={badge(p.status)}>{p.status}</span></td>
+                        <td className="px-3 py-2 text-right space-x-2">
+                          {p.status === "PENDING" ? (<>
+                            <button className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-green-600" onClick={() => review(p.id, "approve")}>Approve</button>
+                            <button className="ui-btn ui-btn-ghost px-2 py-1 text-xs text-red-600" onClick={() => review(p.id, "reject")}>Reject</button>
+                          </>) : <span className="text-gray-400 text-xs">{p.reviewedBy}</span>}
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr style={{ borderBottom:"2px solid var(--accent)" }}>
+                          <td colSpan={8} style={{ padding:0 }}>
+                            <div style={{ padding:"10px 14px 12px 44px", background:"color-mix(in srgb,var(--accent) 5%,var(--bg2))", display:"flex", flexWrap:"wrap", gap:18 }}>
+                              <div style={{ display:"flex", flexDirection:"column", gap:3, minWidth:120 }}>
+                                <span style={{ fontSize:"9.5px", fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--text3)" }}>Account</span>
+                                <span style={{ fontSize:12, fontWeight:600, fontFamily:"monospace" }}>{p.account.login} <span style={{ fontFamily:"inherit", fontWeight:400, color:"var(--text2)", fontSize:11 }}>({p.account.type})</span></span>
+                              </div>
+                              <div style={{ display:"flex", flexDirection:"column", gap:3, minWidth:120 }}>
+                                <span style={{ fontSize:"9.5px", fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--text3)" }}>Client Name</span>
+                                <span style={{ fontSize:12 }}>{p.account.name || "—"}</span>
+                              </div>
+                              {p.account.email && (
+                                <div style={{ display:"flex", flexDirection:"column", gap:3, minWidth:160 }}>
+                                  <span style={{ fontSize:"9.5px", fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--text3)" }}>Email</span>
+                                  <span style={{ fontSize:12 }}>{p.account.email}</span>
+                                </div>
+                              )}
+                              <div style={{ display:"flex", flexDirection:"column", gap:3, minWidth:140 }}>
+                                <span style={{ fontSize:"9.5px", fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--text3)" }}>Method / Way</span>
+                                <span style={{ fontSize:12 }}>{p.method || "—"}</span>
+                              </div>
+                              <div style={{ display:"flex", flexDirection:"column", gap:3, minWidth:100 }}>
+                                <span style={{ fontSize:"9.5px", fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--text3)" }}>Date</span>
+                                <span style={{ fontSize:12 }}>{p.createdAt ? new Date(p.createdAt).toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}</span>
+                              </div>
+                              {p.note && (
+                                <div style={{ display:"flex", flexDirection:"column", gap:3, flex:"1 1 260px" }}>
+                                  <span style={{ fontSize:"9.5px", fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--text3)" }}>Note / Details</span>
+                                  <span style={{ fontSize:12, whiteSpace:"pre-wrap", wordBreak:"break-word" }}>{p.note}</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+            }
           </tbody>
         </table>
       </div>
