@@ -767,9 +767,24 @@ export default function ClientTerminal() {
   }
   const catMap: Record<string, string> = Object.fromEntries(symbols.map((s) => [s.symbol, s.category || "forex"]));
   function csz(sym: string) { return contractFor(catMap[sym] || "forex", sym); }
+  // Returns the exact price a position would close at — BUY exits at bid, SELL exits at ask.
+  // Must not use _spreadPx (defined later) so the spread formula is inlined here.
+  function closePxFor(p: any): number {
+    const raw = prices[p.symbol];
+    if (raw == null) return Number(p.openPrice);
+    if (p.type !== "SELL") return raw; // BUY closes at bid = prices[]
+    // SELL closes at ask = bid + spread (mirrors _spreadPips/_spreadPx logic)
+    const s = symbolSpreads[p.symbol];
+    const grpAcc = groupSpread + accountSpreadMarkup;
+    const liveSp = liveSpreadPips[p.symbol];
+    const pips = (liveSp != null && liveSp > 0) ? liveSp + grpAcc : ((s?.min || 0) + grpAcc);
+    const digits = effectiveDg(dg(p.symbol), raw);
+    return raw + pips * pipOf(digits);
+  }
   // Account-currency P&L wrapper: divides USD result by fxRate so all live P&L is in account currency.
   const pnlOfAcc = (p: any, price: number, cs: number) => pnlOf(p, price, cs) / fxRate;
-  const floating = positions.reduce((s, p) => s + pnlOfAcc(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
+  // floating uses the correct bid/ask per trade type so displayed equity matches actual close value
+  const floating = positions.reduce((s, p) => s + pnlOfAcc(p, closePxFor(p), csz(p.symbol)), 0);
   const balance = account ? account.deposit + account.pnl - account.withdrawal : 0;
   const equity = balance + floating + (account ? account.credit + account.bonus + (account.insurance || 0) : 0);
   const used = account ? (() => {
@@ -1813,7 +1828,7 @@ export default function ClientTerminal() {
             <table className="w-full text-[10px]">
               <thead><tr className="text-left text-[var(--muted)]"><th className="px-2 py-1 font-normal">#Ticket</th><Sth tbl="pos" k="name" label="Name" /><Sth tbl="pos" k="date" label="Date" /><Sth tbl="pos" k="qty" label="Qty" align="right" /><Sth tbl="pos" k="open" label="Open" align="right" /><Sth tbl="pos" k="current" label="Current" align="right" /><Sth tbl="pos" k="tp" label="TP" align="right" /><Sth tbl="pos" k="sl" label="SL" align="right" /><th className="px-2 py-1 font-normal text-right" title="Trailing Stop (pips)">Trail</th>{swapEnabled && <><th className="px-2 py-1 font-normal text-right">Commission</th><th className="px-2 py-1 font-normal text-right">Swap</th><Sth tbl="pos" k="pnl" label="Gross P/L" align="right" /></>}<Sth tbl="pos" k="pnl" label={swapEnabled ? "Net P/L" : "P/L"} align="right" /><th className="px-2 py-1 font-normal text-right"></th></tr></thead>
               <tbody>
-                {!dataReady ? <tr><td colSpan={14} className="px-2 py-3 text-center text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-2" />Loading…</td></tr> : positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={14}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => Number(prices[p.symbol] ?? p.openPrice), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)) }).map((p) => { const cur = prices[p.symbol] ?? p.openPrice; const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
+                {!dataReady ? <tr><td colSpan={14} className="px-2 py-3 text-center text-[var(--muted)]"><i className="fa-solid fa-circle-notch fa-spin mr-2" />Loading…</td></tr> : positions.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={14}>No open positions.</td></tr> : sortRows("pos", positions, { name: (p) => p.symbol, date: (p) => new Date(p.openedAt).getTime(), qty: (p) => Number(p.lots), open: (p) => Number(p.openPrice), current: (p) => closePxFor(p), tp: (p) => Number(p.tp) || null, sl: (p) => Number(p.sl) || null, pnl: (p) => pnlOf(p, closePxFor(p), csz(p.symbol)) }).map((p) => { const cur = closePxFor(p); const pl = pnlOf(p, cur, csz(p.symbol)); const cdir = dirs[p.symbol] || 0; return (
                   <tr key={p.id} className="border-t border-[var(--border)] cursor-context-menu" title={p.comment || undefined} onContextMenu={(e) => { e.preventDefault(); setPosCtx({ x: e.clientX, y: e.clientY, pos: p }); }}>
                     <td className="px-2 py-1 text-[var(--muted)] tabular-nums">{p.ticket ? String(p.ticket) : "—"}</td>
                     <td className="px-2 py-1">{p.symbol} <span style={{ color: p.type === "BUY" ? BUY : SELL }}>{p.type === "BUY" ? "Buy" : "Sell"}</span>{p.masterTradeId && <span className="ml-1 rounded px-0.5 text-[8px] font-bold" style={{ background: "#7c3aed22", color: "#7c3aed" }}>COPY</span>}</td>

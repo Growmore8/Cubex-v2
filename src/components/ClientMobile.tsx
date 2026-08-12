@@ -262,6 +262,15 @@ export default function ClientMobile({ t }: { t: any }) {
     return Math.max(base, Math.min(minD, 8));
   };
 
+  // SELL trades close at ASK (bid + spread); BUY trades close at BID
+  const closeMobPx = (p: any): number => {
+    const raw = prices[p.symbol];
+    if (raw == null) return Number(p.openPrice);
+    if (p.type !== "SELL") return raw;
+    const pips = _mobSpreadPips(p.symbol);
+    return raw + pips * pipOf(eDg(p.symbol));
+  };
+
   const [tab, setTab] = useState<"dashboard" | "quotes" | "chart" | "trades" | "account">("dashboard");
   const [tradeView, setTradeView] = useState<"positions" | "history">("positions");
   const [mobNews, setMobNews] = useState<any[]>([]);
@@ -608,7 +617,7 @@ export default function ClientMobile({ t }: { t: any }) {
   const buyPos = (positions || []).filter((p: any) => p.type === "BUY");
   const sellPos = (positions || []).filter((p: any) => p.type === "SELL");
   const sumLots = (arr: any[]) => arr.reduce((s, p) => s + Number(p.lots || 0), 0);
-  const sumPL = (arr: any[]) => arr.reduce((s, p) => s + pnlOf(p, prices[p.symbol] ?? p.openPrice, csz(p.symbol)), 0);
+  const sumPL = (arr: any[]) => arr.reduce((s, p) => s + pnlOf(p, closeMobPx(p), csz(p.symbol)), 0);
 
   // group by symbol
   const bySym: Record<string, any[]> = {};
@@ -1720,7 +1729,7 @@ export default function ClientMobile({ t }: { t: any }) {
           {tradeView === "positions" && (
           <div className="space-y-3 p-3 pb-16">
             {(positions || []).length === 0 ? <div className="py-4 text-center text-[12px] text-[var(--muted)]">No open positions.</div> : (positions || []).map((p: any) => {
-              const cur = prices[p.symbol] ?? p.openPrice; const plv = pnlOf(p, cur, csz(p.symbol)); const dd = dg(p.symbol);
+              const cur = closeMobPx(p); const plv = pnlOf(p, cur, csz(p.symbol)); const dd = dg(p.symbol);
               const open = expanded === p.id;
               return (
                 <div key={p.id} className="relative overflow-hidden rounded-xl">
