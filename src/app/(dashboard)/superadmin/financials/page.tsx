@@ -560,12 +560,43 @@ export default function SAFinancials() {
                                         <span className="fin-detail-label"><i className="fa-solid fa-wallet" style={{ marginRight:3 }}></i>Method / Way</span>
                                         <span className="fin-detail-val">{r.method||"—"}</span>
                                       </div>
-                                      {r.note && (
-                                        <div className="fin-detail-item fin-detail-note">
-                                          <span className="fin-detail-label"><i className="fa-solid fa-note-sticky" style={{ marginRight:3 }}></i>Note / Details</span>
-                                          <span className="fin-detail-val" style={{ whiteSpace:"pre-wrap" }}>{r.note}</span>
-                                        </div>
-                                      )}
+                                      {r.note && (() => {
+                                        const isBankNote = /bank.?transfer/i.test(r.note);
+                                        const parts = isBankNote ? r.note.replace(/^Bank Transfer\s*[—–-]\s*/i,"").split("·").map((s:string)=>s.trim()).filter(Boolean) : [];
+                                        const acNum = parts.find((s:string)=>/^A\/C\s+/i.test(s))?.replace(/^A\/C\s+/i,"");
+                                        const ifsc  = parts.find((s:string)=>/^IFSC\s+/i.test(s))?.replace(/^IFSC\s+/i,"");
+                                        const bank  = parts.find((s:string)=>!/^A\/C/i.test(s)&&!/^IFSC/i.test(s)&&s!==parts[0]&&/^[A-Z]/i.test(s));
+                                        function CopyInline({v}:{v:string}) {
+                                          const [c,setC]=React.useState(false);
+                                          return <button onClick={()=>{navigator.clipboard.writeText(v);setC(true);setTimeout(()=>setC(false),1500);}} style={{marginLeft:5,padding:"1px 6px",fontSize:9,borderRadius:4,border:"1px solid var(--border)",background:"var(--bg2)",color:c?"#15803d":"var(--text3)",cursor:"pointer"}}><i className={"fa-solid "+(c?"fa-check":"fa-copy")} style={{fontSize:8}}/></button>;
+                                        }
+                                        return (
+                                          <>
+                                            {isBankNote && acNum && (
+                                              <div className="fin-detail-item">
+                                                <span className="fin-detail-label"><i className="fa-solid fa-credit-card" style={{marginRight:3}}></i>A/C Number</span>
+                                                <span className="fin-detail-val fin-mono">{acNum}<CopyInline v={acNum}/></span>
+                                              </div>
+                                            )}
+                                            {isBankNote && bank && (
+                                              <div className="fin-detail-item">
+                                                <span className="fin-detail-label"><i className="fa-solid fa-building-columns" style={{marginRight:3}}></i>Bank</span>
+                                                <span className="fin-detail-val">{bank}</span>
+                                              </div>
+                                            )}
+                                            {isBankNote && ifsc && (
+                                              <div className="fin-detail-item">
+                                                <span className="fin-detail-label"><i className="fa-solid fa-barcode" style={{marginRight:3}}></i>IFSC</span>
+                                                <span className="fin-detail-val fin-mono">{ifsc}<CopyInline v={ifsc}/></span>
+                                              </div>
+                                            )}
+                                            <div className="fin-detail-item fin-detail-note">
+                                              <span className="fin-detail-label"><i className="fa-solid fa-note-sticky" style={{marginRight:3}}></i>Full Note</span>
+                                              <span className="fin-detail-val" style={{whiteSpace:"pre-wrap"}}>{r.note}<CopyInline v={r.note}/></span>
+                                            </div>
+                                          </>
+                                        );
+                                      })()}
                                     </div>
                                   </td>
                                 </tr>

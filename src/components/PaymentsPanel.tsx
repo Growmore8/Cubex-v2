@@ -1,7 +1,42 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { BUY, SELL, GOLD } from "@/config/theme";
 import { useDialog } from "@/components/ui/ConfirmDialog";
+
+// Parse bank-transfer notes: "Bank Transfer — NAME · A/C 12345 · ICICI · IFSC ICIC0002043"
+// Also handles plain note strings gracefully.
+function parseBankNote(note: string): Record<string, string> | null {
+  if (!note) return null;
+  const out: Record<string, string> = {};
+  // try "KEY value" style from note if it contains ·
+  const parts = note.replace(/^Bank Transfer\s*[—–-]\s*/i, "").split("·").map(s => s.trim()).filter(Boolean);
+  parts.forEach(part => {
+    const acMatch = part.match(/^A\/C\s+(.+)/i);
+    const ifscMatch = part.match(/^IFSC\s+(.+)/i);
+    if (acMatch) { out["A/C Number"] = acMatch[1].trim(); }
+    else if (ifscMatch) { out["IFSC"] = ifscMatch[1].trim(); }
+    else if (!out["Account Name"] && !/^\d/.test(part)) { out["Account Name"] = part; }
+    else if (!out["Bank Name"]) { out["Bank Name"] = part; }
+    else { out["Info"] = (out["Info"] ? out["Info"] + " " : "") + part; }
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+function CopyBtn({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  }
+  return (
+    <button
+      onClick={copy}
+      title="Copy"
+      style={{ marginLeft:4, padding:"1px 5px", fontSize:9, borderRadius:4, border:"1px solid var(--border)", background:"var(--bg2,var(--bg))", color: copied ? BUY : "var(--muted)", cursor:"pointer", transition:"color .2s" }}
+    >
+      <i className={"fa-solid " + (copied ? "fa-check" : "fa-copy")} style={{ fontSize:8 }} />
+    </button>
+  );
+}
 
 export default function PaymentsPanel() {
   const { confirm, node } = useDialog();
@@ -13,9 +48,12 @@ export default function PaymentsPanel() {
   const [err, setErr] = useState("");
   const [view, setView] = useState("");
   const [sel, setSel] = useState<Record<string, boolean>>({});
-  const [expand, setExpand] = useState("");
-  // Settlement date modal for approving CREDIT_REQUEST
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [settleModal, setSettleModal] = useState<{ p: any; settleTo: string } | null>(null);
+
+  function toggleExpand(id: string) {
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
 
   async function load() {
     const r = await fetch("/api/admin/payments").then((x) => x.json()).catch(() => ({ ok: false }));
@@ -27,8 +65,10 @@ export default function PaymentsPanel() {
   function name(p: any) { return g(p, ["clientName", "client", "accountName", "name"], (p.account && p.account.name) || "-"); }
   function login(p: any) { return (p.account && p.account.login) || g(p, ["accountLogin", "login"], ""); }
   function acctType(p: any) { return String((p.account && p.account.type) || g(p, ["accountType"], "")).toUpperCase(); }
+  function acctEmail(p: any) { return (p.account && p.account.email) || ""; }
   function kind(p: any) { return String(g(p, ["kind", "type", "direction"], "")).toUpperCase(); }
   function method(p: any) { return g(p, ["method", "channel", "gateway", "network"], ""); }
+  function note(p: any) { return g(p, ["note"], ""); }
   function slip(p: any) { return g(p, ["slipUrl", "proofUrl", "slip", "receiptUrl"], ""); }
   function st(p: any) { return String(g(p, ["status", "state"], "PENDING")).toUpperCase(); }
   function when(p: any) { const v = g(p, ["createdAt", "date", "requestedAt", "created"], null); return v ? new Date(v).toLocaleString() : ""; }
@@ -41,7 +81,6 @@ export default function PaymentsPanel() {
     if (k === "WITHDRAWAL") return "Withdrawal";
     return k;
   }
-  function details(p: any) { const d = g(p, ["details", "destination", "meta"], null); if (!d) return null; if (typeof d === "string") { try { return JSON.parse(d); } catch { return { Info: d }; } } return d; }
 
   async function act(p: any, action: string, extra?: Record<string, string>) {
     setBusy(p.id + action); setErr("");
@@ -52,18 +91,13 @@ export default function PaymentsPanel() {
   }
 
   function tryApprove(p: any) {
-    if (kind(p) === "CREDIT_REQUEST") {
-      setSettleModal({ p, settleTo: "" });
-    } else {
-      act(p, "approve");
-    }
+    if (kind(p) === "CREDIT_REQUEST") { setSettleModal({ p, settleTo: "" }); }
+    else { act(p, "approve"); }
   }
 
   async function confirmSettle() {
     if (!settleModal) return;
-    await act(settleModal.p, "approve", {
-      settleTo: settleModal.settleTo || "",
-    });
+    await act(settleModal.p, "approve", { settleTo: settleModal.settleTo || "" });
     setSettleModal(null);
   }
 
@@ -124,58 +158,121 @@ export default function PaymentsPanel() {
         <table className="w-full">
           <thead><tr className="border-b border-[var(--border)]">
             <th className={th}><input type="checkbox" checked={allOn} onChange={toggleAll} /></th>
-            <th className={th}></th>
+            <th className={th} style={{ width:28 }}></th>
             <th className={th}>Client</th><th className={th}>Account ID</th><th className={th}>Kind</th>
             <th className={th + " text-right"}>Amount</th><th className={th}>Method / Note</th><th className={th}>Date / Time</th>
             <th className={th}>Status</th><th className={th + " text-right"}>Actions</th>
           </tr></thead>
           <tbody>
-            {rows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={10}>No payment requests.</td></tr> : rows.map((p) => {
-              const d = details(p); const open = expand === p.id;
-              const isCredit = kind(p) === "CREDIT_REQUEST" || kind(p) === "CREDIT_CLEAR";
-              return [
-                <tr key={p.id} className="ui-row border-b border-[var(--border)]">
-                  <td className={td}><input type="checkbox" checked={!!sel[p.id]} onChange={(e) => setSel((s) => ({ ...s, [p.id]: e.target.checked }))} /></td>
-                  <td className={td}>{d ? <button onClick={() => setExpand(open ? "" : p.id)} className="text-[var(--muted)]">{open ? "▾" : "▸"}</button> : null}</td>
-                  <td className={td + " font-medium"}>{name(p)}</td>
-                  <td className={td + " text-[var(--muted)]"}>
-                    <span className="font-medium text-[var(--text)]">{login(p) || "-"}</span>
-                    {acctType(p) ? <span className="ml-1.5 rounded px-1 py-0.5 text-[8px] font-semibold" style={acctType(p) === "DEMO" ? { background: "rgba(155,89,182,0.18)", color: "#b07cd6" } : { background: "rgba(38,166,154,0.18)", color: BUY }}>{acctType(p)}</span> : null}
-                  </td>
-                  <td className={td} style={{ color: isCredit ? creditColor : isOut(p) ? SELL : BUY }}>
-                    <span>{kindLabel(p)}</span>
-                  </td>
-                  <td className={td + " text-right"} style={{ color: isOut(p) ? SELL : BUY }}>
-                    {(isOut(p) ? "-" : "+") + "$" + Number(g(p, ["amount"], 0)).toFixed(2)}
-                  </td>
-                  <td className={td + " max-w-[140px] truncate text-[var(--muted)]"}>{method(p) || g(p, ["note"], "")}</td>
-                  <td className={td + " text-[var(--muted)]"}>{when(p)}</td>
-                  <td className={td}><span className="rounded-full px-1.5 py-0.5 text-[9px]" style={badge(st(p))}>{st(p)}</span></td>
-                  <td className={td}>
-                    <div className="flex items-center justify-end gap-1">
-                      {slip(p) ? <button onClick={() => setView("/api/files/slip/" + g(p, ["id"], ""))} className="ui-btn px-2 py-0.5 text-[9px]">Slip</button> : null}
-                      {st(p) === "PENDING" && (<>
-                        <button disabled={!!busy} onClick={() => tryApprove(p)} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
-                        <button disabled={!!busy} onClick={() => act(p, "reject")} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
-                      </>)}
-                      <button disabled={!!busy} onClick={() => delOne(p.id)} className="ui-btn px-1.5 py-0.5 text-[9px]" style={{ color: SELL }}>Del</button>
-                    </div>
-                  </td>
-                </tr>,
-                open && d ? (
-                  <tr key={p.id + "x"} style={{ background: "var(--bg)" }}>
-                    <td colSpan={10} className="px-6 py-2 text-[var(--muted)]">
-                      <div className="flex flex-wrap gap-x-6 gap-y-1">{Object.entries(d as Record<string, any>).map(([k, v]) => <span key={k}><b className="text-[var(--text)]">{k}:</b> {String(v)}</span>)}</div>
-                    </td>
-                  </tr>
-                ) : null,
-              ];
-            })}
+            {rows.length === 0
+              ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={10}>No payment requests.</td></tr>
+              : rows.map((p) => {
+                  const open = expanded.has(p.id);
+                  const isCredit = kind(p) === "CREDIT_REQUEST" || kind(p) === "CREDIT_CLEAR";
+                  const noteText = note(p);
+                  const methodText = method(p);
+                  const isBankTransfer = /bank.?transfer/i.test(methodText) || /bank.?transfer/i.test(noteText);
+                  const parsed = isBankTransfer ? parseBankNote(noteText) : null;
+
+                  return (
+                    <React.Fragment key={p.id}>
+                      <tr className="ui-row border-b border-[var(--border)]">
+                        <td className={td}><input type="checkbox" checked={!!sel[p.id]} onChange={(e) => setSel((s) => ({ ...s, [p.id]: e.target.checked }))} /></td>
+                        <td className={td} style={{ width:28 }}>
+                          <button
+                            onClick={() => toggleExpand(p.id)}
+                            title={open ? "Hide details" : "Show details"}
+                            style={{ width:18, height:18, border:"1px solid var(--border)", borderRadius:3, background: open ? "color-mix(in srgb,var(--accent) 15%,transparent)" : "transparent", color: open ? "var(--accent)" : "var(--muted)", cursor:"pointer", display:"inline-flex", alignItems:"center", justifyContent:"center" }}
+                          >
+                            {open ? "▾" : "▸"}
+                          </button>
+                        </td>
+                        <td className={td + " font-medium"}>{name(p)}</td>
+                        <td className={td + " text-[var(--muted)]"}>
+                          <span className="font-medium text-[var(--text)]">{login(p) || "-"}</span>
+                          {acctType(p) ? <span className="ml-1.5 rounded px-1 py-0.5 text-[8px] font-semibold" style={acctType(p) === "DEMO" ? { background: "rgba(155,89,182,0.18)", color: "#b07cd6" } : { background: "rgba(38,166,154,0.18)", color: BUY }}>{acctType(p)}</span> : null}
+                        </td>
+                        <td className={td} style={{ color: isCredit ? creditColor : isOut(p) ? SELL : BUY }}>
+                          <span>{kindLabel(p)}</span>
+                        </td>
+                        <td className={td + " text-right"} style={{ color: isOut(p) ? SELL : BUY }}>
+                          {(isOut(p) ? "-" : "+") + "$" + Number(g(p, ["amount"], 0)).toFixed(2)}
+                        </td>
+                        <td className={td + " max-w-[140px] truncate text-[var(--muted)]"}>{methodText || noteText || "—"}</td>
+                        <td className={td + " text-[var(--muted)]"}>{when(p)}</td>
+                        <td className={td}><span className="rounded-full px-1.5 py-0.5 text-[9px]" style={badge(st(p))}>{st(p)}</span></td>
+                        <td className={td}>
+                          <div className="flex items-center justify-end gap-1">
+                            {slip(p) ? <button onClick={() => setView("/api/files/slip/" + g(p, ["id"], ""))} className="ui-btn px-2 py-0.5 text-[9px]">Slip</button> : null}
+                            {st(p) === "PENDING" && (<>
+                              <button disabled={!!busy} onClick={() => tryApprove(p)} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: BUY, color: "#04140e" }}>Approve</button>
+                              <button disabled={!!busy} onClick={() => act(p, "reject")} className="ui-btn px-2 py-0.5 text-[9px]" style={{ background: SELL, color: "#1a0606" }}>Reject</button>
+                            </>)}
+                            <button disabled={!!busy} onClick={() => delOne(p.id)} className="ui-btn px-1.5 py-0.5 text-[9px]" style={{ color: SELL }}>Del</button>
+                          </div>
+                        </td>
+                      </tr>
+                      {open && (
+                        <tr key={p.id + "x"} style={{ background: "color-mix(in srgb,var(--accent) 4%,var(--bg))", borderBottom:"2px solid var(--accent)" }}>
+                          <td colSpan={10} style={{ padding:"8px 8px 10px 36px" }}>
+                            <div style={{ display:"flex", flexWrap:"wrap", gap:"14px 24px", alignItems:"flex-start" }}>
+                              {/* Account */}
+                              <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                                <span style={{ fontSize:8.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--muted)", opacity:.7 }}>Account</span>
+                                <span style={{ fontSize:11, fontWeight:600, fontFamily:"monospace" }}>{login(p)} <span style={{ fontWeight:400, fontSize:10, color:"var(--muted)" }}>({acctType(p)})</span></span>
+                              </div>
+                              {/* Client name */}
+                              <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                                <span style={{ fontSize:8.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--muted)", opacity:.7 }}>Client</span>
+                                <span style={{ fontSize:11 }}>{name(p)}</span>
+                              </div>
+                              {/* Email */}
+                              {acctEmail(p) && (
+                                <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                                  <span style={{ fontSize:8.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--muted)", opacity:.7 }}>Email</span>
+                                  <span style={{ fontSize:11 }}>{acctEmail(p)}<CopyBtn value={acctEmail(p)} /></span>
+                                </div>
+                              )}
+                              {/* Method */}
+                              <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                                <span style={{ fontSize:8.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--muted)", opacity:.7 }}>Method / Way</span>
+                                <span style={{ fontSize:11 }}>{methodText || "—"}</span>
+                              </div>
+                              {/* Parsed bank fields with copy */}
+                              {parsed && Object.entries(parsed).map(([k, v]) => (
+                                <div key={k} style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                                  <span style={{ fontSize:8.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--muted)", opacity:.7 }}>{k}</span>
+                                  <span style={{ fontSize:11, fontFamily: k === "A/C Number" || k === "IFSC" ? "monospace" : "inherit", fontWeight: k === "A/C Number" || k === "IFSC" ? 600 : 400 }}>
+                                    {v}<CopyBtn value={v} />
+                                  </span>
+                                </div>
+                              ))}
+                              {/* Full note if not bank or if there's extra info */}
+                              {noteText && !isBankTransfer && (
+                                <div style={{ display:"flex", flexDirection:"column", gap:2, flex:"1 1 220px" }}>
+                                  <span style={{ fontSize:8.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--muted)", opacity:.7 }}>Note / Details</span>
+                                  <span style={{ fontSize:11, whiteSpace:"pre-wrap", wordBreak:"break-word" }}>{noteText}<CopyBtn value={noteText} /></span>
+                                </div>
+                              )}
+                              {/* For bank transfer: show raw note too for reference */}
+                              {isBankTransfer && noteText && (
+                                <div style={{ display:"flex", flexDirection:"column", gap:2, flex:"1 1 220px" }}>
+                                  <span style={{ fontSize:8.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"var(--muted)", opacity:.7 }}>Full Note</span>
+                                  <span style={{ fontSize:10, color:"var(--muted)", wordBreak:"break-all" }}>{noteText}<CopyBtn value={noteText} /></span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+            }
           </tbody>
         </table>
       </div>
 
-      {/* Settlement dates modal for CREDIT_REQUEST approval */}
       {settleModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}>
           <div className="ui-pop w-80 rounded-xl border p-4 shadow-2xl" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)" }}>
@@ -201,7 +298,7 @@ export default function PaymentsPanel() {
 
       {view && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.8)" }}>
-          <button onClick={() => setView("")} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-lg text-white transition-colors duration-200 hover:bg-white/30"><i className="fa-solid fa-xmark" /></button>
+          <button onClick={() => setView("")} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-content-center rounded-full bg-white/15 text-lg text-white transition-colors duration-200 hover:bg-white/30"><i className="fa-solid fa-xmark" /></button>
           <img src={view} alt="slip" className="ui-pop max-h-full max-w-full rounded-xl" />
         </div>
       )}
