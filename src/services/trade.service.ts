@@ -77,11 +77,14 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
   let ask: number;
 
   if (rawAsk != null && rawAsk > rawBid) {
-    // Real exchange bid/ask from Massive/Binance/Kraken — use market spread as base.
-    // Tenant admin markup (adminPips) is added on top of the real exchange ask.
+    // Real exchange bid/ask from Massive/Binance/Kraken.
+    // Anchor to the smoothed display price (rawBid = getPrice) so the execution price
+    // matches what the client sees on screen, preventing slippage surprises from the
+    // display-smoothing lag. Real market spread is preserved on top.
     const realBid = (realBidRaw != null && realBidRaw > 0) ? realBidRaw : rawBid;
-    bid = realBid;
-    ask = rawAsk + adminPips * pip;
+    const liveSpread = rawAsk - realBid; // actual exchange spread in price units
+    bid = rawBid;                        // display price = what client sees
+    ask = rawBid + liveSpread + adminPips * pip;
   } else {
     // Single-price feed (TD/FH): construct spread from tenant config.
     // If tenant has no spread configured, fall back to SA-level default per category.
