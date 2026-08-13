@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { io } from "socket.io-client";
 import { useDialog } from "@/components/ui/ConfirmDialog";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { PresenceDot, DeviceIcon, isOnline, ago } from "@/components/ui/Presence";
@@ -35,7 +36,12 @@ export default function AdminClientsPage() {
     if (c.ok) setClients(c.clients); else setErr(c.error || "Failed");
     if (m.ok) setManagers(m.managers);
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const socket = io({ path: "/socket.io" });
+    socket.on("refresh", () => load());
+    return () => { socket.disconnect(); };
+  }, []);
 
   async function create(e: React.FormEvent) {
     e.preventDefault(); setErr("");

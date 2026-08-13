@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { io } from "socket.io-client";
 
 export default function AdminPaymentsPage() {
   const [reqs, setReqs] = useState<any[]>([]);
@@ -27,7 +28,12 @@ export default function AdminPaymentsPage() {
     if (d.ok) setReqs(d.requests);
     if (m.ok) { setAllowed(!!m.allowed); setOwn(m.own || []); setGlobals(m.globals || []); }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const socket = io({ path: "/socket.io" });
+    socket.on("refresh", () => load());
+    return () => { socket.disconnect(); };
+  }, []);
 
   async function review(id: string, action: "approve" | "reject") {
     setErr("");

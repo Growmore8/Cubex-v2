@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { io } from "socket.io-client";
 import Link from "next/link";
 
 export default function AdminKycPage() {
@@ -17,7 +18,12 @@ export default function AdminKycPage() {
     const d = await fetch("/api/admin/kyc").then((r) => r.json());
     if (d.ok) setDocs(d.docs);
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const socket = io({ path: "/socket.io" });
+    socket.on("refresh", () => load());
+    return () => { socket.disconnect(); };
+  }, []);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [flashErr, setFlashErr] = useState("");
