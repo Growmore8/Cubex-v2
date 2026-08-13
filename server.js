@@ -1184,8 +1184,11 @@ async function monitor(io) {
           }
         }
       }
-      // Close at bid (BUY) or ask (SELL)
-      if (reason) closeTpSl(t, reason, t.type === "BUY" ? bid : ask, io);
+      // Close at exact TP/SL price level, not the current market price (which may have moved past it)
+      if (reason) {
+        const closePrice = reason === "TP" ? tp : reason === "SL" ? sl : (t.type === "BUY" ? bid : ask);
+        closeTpSl(t, reason, closePrice, io);
+      }
     }
   } catch (e) { console.error("[monitor]", e); } finally { _monitorRunning = false; }
 }
