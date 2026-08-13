@@ -71,15 +71,29 @@ export default function ManagerDashboard() {
     fetch("/api/auth/ping").then((r) => r.json()).then((d) => { if (d.ok && d.session) setMe({ name: d.session.name || d.session.email, email: d.session.email }); setLoading(false); }).catch(() => { setLoading(false); });
   }, []);
 
-  // Socket for live prices
+  // Socket for live prices + refresh events
   useEffect(() => {
-    const sock = io({ path: "/api/socketio", transports: ["websocket"] });
+    const sock = io({ path: "/socket.io" });
     socketRef.current = sock;
     sock.on("prices", (data: any) => {
       startTransition(() => {
         if (data.prices) setPrices((p) => ({ ...p, ...data.prices }));
         if (data.spreads) setLiveSpread((s) => ({ ...s, ...data.spreads }));
       });
+    });
+    sock.on("tick", ({ symbol, price }: any) => {
+      startTransition(() => setPrices((p) => ({ ...p, [symbol]: price })));
+    });
+    sock.on("refresh", () => {
+      // Re-fetch live data; reset loaded flags so tabs reload fresh data
+      fetch("/api/desk/trades").then((r) => r.json()).then((d) => { if (d.ok) setPositions(d.trades || []); }).catch(() => {});
+      fetch("/api/desk/history").then((r) => r.json()).then((d) => { if (d.ok) { setHistory((d.history || []).filter((h: any) => h.kind === "TRADE" || h.pnl !== undefined)); setHistLoaded(true); } }).catch(() => {});
+      fetch("/api/manager/clients").then((r) => r.json()).then((d) => { if (d.ok) { setClients(d.clients || []); setClientsLoaded(true); } }).catch(() => {});
+      fetch("/api/manager/payments").then((r) => r.json()).then((d) => { if (d.ok) { setRequests(d.requests || []); setReqLoaded(true); } }).catch(() => {});
+    });
+    sock.on("liquidation", () => {
+      fetch("/api/desk/trades").then((r) => r.json()).then((d) => { if (d.ok) setPositions(d.trades || []); }).catch(() => {});
+      fetch("/api/desk/history").then((r) => r.json()).then((d) => { if (d.ok) { setHistory((d.history || []).filter((h: any) => h.kind === "TRADE" || h.pnl !== undefined)); setHistLoaded(true); } }).catch(() => {});
     });
     return () => { sock.disconnect(); };
   }, []);

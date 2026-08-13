@@ -135,6 +135,8 @@ export default function AdminDeskPage() {
   const [selSym, setSelSym] = useState("");
   const [tf, setTf] = useState("1M");
 const [selAcc, setSelAcc] = useState<any>(null);
+  const selAccRef = useRef<any>(null);
+  useEffect(() => { selAccRef.current = selAcc; }, [selAcc]);
   const [lot, setLot] = useState(0.01);
   // Instant reflection: whenever the client list reloads (after a trade close,
   // fund add, etc.) re-point selAcc at the fresh record so the summary ticker
@@ -480,8 +482,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
     const flushIv = setInterval(flush, 150);
     // Single timer clears the up/down flash for all symbols (cheap vs per-symbol timers)
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
-    socket.on("liquidation", () => { loadAll(); loadNotifs(); });
-    socket.on("refresh", () => { loadAll(); loadNotifs(); });
+    socket.on("liquidation", () => { loadAll(); loadNotifs(); loadAccHistory(selAccRef.current?.id); });
+    socket.on("refresh", () => { loadAll(); loadNotifs(); loadAccHistory(selAccRef.current?.id); });
     const t = setInterval(() => fetch("/api/desk/trades").then((r) => r.json()).then((d) => d.ok && setOpen(d.trades)).catch(() => {}), 7000);
     return () => { socket.disconnect(); clearInterval(t); clearInterval(clr); clearInterval(flushIv); };
   }, []);
