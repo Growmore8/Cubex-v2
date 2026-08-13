@@ -61,17 +61,36 @@ export async function assertMargin(account: any, newTrade: { symbol: string; typ
 }
 
 async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SELL", account: any) {
-  const [rawBid, rawAsk, realBidRaw, symRow, globalSym] = await Promise.all([
+  const groupId = (account as any).groupId as string | null | undefined;
+  const accountId = account.id as string | null | undefined;
+
+  // All DB + Redis reads in a single parallel batch — no sequential round-trips
+  const [rawBid, rawAsk, realBidRaw, symRow, globalSym, grpRow, accMarkup] = await Promise.all([
     getPrice(symbol),
     getAsk(symbol),
     getBid(symbol),
-    prisma.symbol.findFirst({ where: { tenantId, symbol }, select: { digits: true, spreadType: true, commissionPerLot: true, swapLong: true, swapShort: true } }).catch(() => null),
+    prisma.symbol.findFirst({
+      where: { tenantId, symbol },
+      select: { digits: true, spreadType: true, commissionPerLot: true, swapLong: true, swapShort: true, spread: true },
+    }).catch(() => null),
     prisma.globalSymbol.findUnique({ where: { symbol }, select: { category: true } }).catch(() => null),
+    groupId ? (prisma.tradeGroup as any).findUnique({
+      where: { id: groupId },
+      select: { spread: true, spreadType: true, commissionPerLot: true },
+    }).catch(() => null) : null,
+    accountId ? prisma.account.findUnique({
+      where: { id: accountId },
+      select: { spreadMarkup: true },
+    }).catch(() => null) : null,
   ]);
+
   if (rawBid == null) throw new Error("No price for " + symbol);
   const digits = symRow?.digits ?? 5;
   const pip = pipForDigits(digits);
-  const adminPips = await getSpreadPips(tenantId, symbol, (account as any).groupId, account.id);
+
+  // Compute adminPips from already-fetched data (no sequential DB call)
+  const grpSpreadMarkup = ((grpRow?.spreadType ?? "FIXED") === "FIXED") ? Number(grpRow?.spread ?? 0) : 0;
+  const adminPips = Number(symRow?.spread ?? 0) + grpSpreadMarkup + Number(accMarkup?.spreadMarkup ?? 0);
 
   let bid: number;
   let ask: number;
@@ -96,7 +115,7 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
     ask = rawBid + effectivePips * pip;
   }
 
-  return { ask, bid, symRow };
+  return { ask, bid, symRow, grpRow };
 }
 
 export async function placeOrder(tenantId: string, userId: string, input: any) {
@@ -106,10 +125,14 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   if (!account) throw new Error("No trading account");
   if (account.deactivated) throw new Error("Account is deactivated");
   if (account.locked) throw new Error("Account is locked (read-only)");
-  await assertTradingOpen();
-  await assertMarketOpen(input.symbol);
 
-  const { ask, bid, symRow } = await resolvePrice(tenantId, input.symbol, input.side, account);
+  // Run all pre-trade checks and price resolution in parallel
+  const [, , priceResult] = await Promise.all([
+    assertTradingOpen(),
+    assertMarketOpen(input.symbol),
+    resolvePrice(tenantId, input.symbol, input.side, account),
+  ]);
+  const { ask, bid, symRow, grpRow } = priceResult;
   const openPrice = input.side === "BUY" ? ask : bid;
 
   const slErr = validateSlTp(input.side, openPrice, input.sl, input.tp);
@@ -117,15 +140,9 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
 
   await assertMargin(account, { symbol: input.symbol, type: input.side, lots: Number(input.lots) }, ask);
 
-  // Commission: group override takes priority over symbol default (-1 = use symbol)
+  // Commission: group override takes priority over symbol default (grpRow already fetched in resolvePrice)
   let commRate = Number(symRow?.commissionPerLot ?? 0);
-  if (account.groupId) {
-    const grp = await (prisma.tradeGroup as any).findFirst({
-      where: { id: account.groupId },
-      select: { commissionPerLot: true },
-    }).catch(() => null);
-    if (grp && Number(grp.commissionPerLot) >= 0) commRate = Number(grp.commissionPerLot);
-  }
+  if (grpRow && Number((grpRow as any).commissionPerLot) >= 0) commRate = Number((grpRow as any).commissionPerLot);
   const commission = Number(input.lots) * commRate;
 
   // Trailing stop: convert pips to price distance
@@ -133,6 +150,9 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   const digits = symRow?.digits ?? 5;
   const pip = pipForDigits(digits);
   const trailingStop = trailingStopPips > 0 ? trailingStopPips * pip : 0;
+
+  // Start FX rate fetch early — runs in parallel with ticket creation below
+  const commFxRateP = commission > 0 ? getAccountFxRate(account.currency as string) : Promise.resolve(1);
 
   let trade: any;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -157,7 +177,7 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
 
   // Deduct commission immediately from account pnl (in account currency).
   if (commission > 0) {
-    const commFxRate = await getAccountFxRate(account.currency as string);
+    const commFxRate = await commFxRateP;
     await prisma.account.update({ where: { id: account.id }, data: { pnl: { decrement: new Prisma.Decimal(commission / commFxRate) } } });
   }
 
@@ -184,9 +204,13 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
   if (!trade) throw new Error("Position not found");
   if (trade.account.deactivated) throw new Error("Account is deactivated");
   if (trade.account.locked) throw new Error("Account is locked (read-only)");
-  await assertMarketOpen(trade.symbol);
 
-  const { ask, bid } = await resolvePrice(tenantId, trade.symbol, trade.type as "BUY" | "SELL", trade.account);
+  // All pre-close operations run in parallel
+  const [, { ask, bid }, closeFxRate] = await Promise.all([
+    assertMarketOpen(trade.symbol),
+    resolvePrice(tenantId, trade.symbol, trade.type as "BUY" | "SELL", trade.account),
+    getAccountFxRate(trade.account.currency as string),
+  ]);
   const price = trade.type === "BUY" ? bid : ask;
 
   const totalLots = Number(trade.lots);
@@ -197,7 +221,6 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
   const swap = Number(trade.swap) * (lots / totalLots); // proportional swap for partial close
   const commission = isPartial ? 0 : Number(trade.commission); // commission already deducted on open
   // Convert USD P&L and swap to account currency before crediting.
-  const closeFxRate = await getAccountFxRate(trade.account.currency as string);
   const pnlAcc = pnl / closeFxRate;
   const swapAcc = swap / closeFxRate;
 
