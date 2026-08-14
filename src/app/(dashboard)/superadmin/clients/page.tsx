@@ -12,8 +12,8 @@ const AMB = "#b45309";
 // ── Account card rendered inside the detail panel ──────────────────────────
 function AccountCard({ a, tenants, m, act, openEdit, openMgr, setPwRow, setIdRow, setDelRow, setRepRow, setMoneyRow, setErr }: any) {
   const bs = (bg: string) => ({ background: bg, padding: "3px 8px", borderRadius: 4, border: "1px solid transparent", cursor: "pointer" });
-  function kycChip(kyc: string | null) {
-    if (!kyc) return null;
+  function kycChip(kyc: string | null, type: string) {
+    if (!kyc || type !== "LIVE") return null;
     const cls = kyc === "APPROVED" ? "sab-green" : kyc === "PENDING" ? "sab-amber" : "sab-red";
     return <span className={"sab " + cls} style={{ fontSize: 9 }}>KYC</span>;
   }
@@ -28,7 +28,7 @@ function AccountCard({ a, tenants, m, act, openEdit, openMgr, setPwRow, setIdRow
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-mono font-semibold text-sm" style={{ color: a.type === "LIVE" ? GRN : BLU }}>{a.login}</span>
           {a.isPool && <span className="text-[9px] font-semibold" style={{ color: AMB }}>POOL</span>}
-          {kycChip(a.kyc)}
+          {kycChip(a.kyc, a.type)}
           {statusChip(a)}
         </div>
         <div className="text-right">
@@ -182,7 +182,7 @@ export default function SAClientsPage() {
       const has = client.accounts.some((a: any) => statusF === "Active" ? (!a.locked && !a.deactivated) : statusF === "Locked" ? a.locked : a.deactivated);
       if (!has) return false;
     }
-    if (kycF !== "All" && !client.accounts.some((a: any) => (a.kyc || "NONE") === kycF)) return false;
+    if (kycF !== "All" && !client.accounts.some((a: any) => a.type === "LIVE" && (a.kyc || "NONE") === kycF)) return false;
     if (poolF !== "All" && !client.accounts.some((a: any) => poolF === "Pool" ? a.isPool : !a.isPool)) return false;
     if (onlineF === "Online" && !client.isOnline) return false;
     if (onlineF === "Offline" && client.isOnline) return false;
@@ -202,9 +202,10 @@ export default function SAClientsPage() {
   const sel = "ui-input rounded border px-2 py-1.5 text-sm";
 
   function clientKyc(client: any): string | null {
-    if (client.accounts.some((a: any) => a.kyc === "APPROVED")) return "APPROVED";
-    if (client.accounts.some((a: any) => a.kyc === "PENDING")) return "PENDING";
-    if (client.accounts.some((a: any) => a.kyc === "REJECTED")) return "REJECTED";
+    const live = client.accounts.filter((a: any) => a.type === "LIVE");
+    if (live.some((a: any) => a.kyc === "APPROVED")) return "APPROVED";
+    if (live.some((a: any) => a.kyc === "PENDING")) return "PENDING";
+    if (live.some((a: any) => a.kyc === "REJECTED")) return "REJECTED";
     return null;
   }
   function kycText(client: any) {

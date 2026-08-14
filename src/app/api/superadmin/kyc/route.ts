@@ -6,6 +6,7 @@ export async function GET() {
   const s = await requireSuperAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   const docs = await prisma.kycDocument.findMany({
+    where: { account: { type: "LIVE" } },
     orderBy: { createdAt: "desc" }, take: 300,
     include: { account: { select: { login: true, name: true, user: { select: { email: true, name: true } } } } },
   });

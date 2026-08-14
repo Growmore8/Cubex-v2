@@ -11,7 +11,8 @@ export function listClientKyc(accountId: string) {
 export function listTenantKyc(tenantId: string, managerId?: string | null) {
   return prisma.kycDocument.findMany({
     // Managers see only their own clients' KYC; admins see the whole tenant.
-    where: { account: { tenantId, ...(managerId ? { managerId } : {}) } },
+    // Only LIVE accounts require KYC — demo accounts are excluded.
+    where: { account: { tenantId, type: "LIVE", ...(managerId ? { managerId } : {}) } },
     orderBy: { createdAt: "desc" },
     include: { account: { select: { login: true, name: true } } },
   });
