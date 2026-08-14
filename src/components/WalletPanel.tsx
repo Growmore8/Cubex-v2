@@ -5,10 +5,6 @@ import { useEffect, useState } from "react";
 // desktop terminal modal, and the mobile app. Premium method-list -> QR-detail
 // deposit flow and tabbed withdraw. My Requests is shown in the Profile section.
 export default function WalletPanel({ initialTab = "deposit", onClose, tabs, accountId }: { initialTab?: "deposit" | "withdraw" | "kyc"; onClose?: () => void; tabs?: ("deposit" | "withdraw" | "kyc")[]; accountId?: string }) {
-  const shown: ("deposit" | "withdraw" | "kyc")[] = tabs && tabs.length ? tabs : ["deposit", "withdraw", "kyc"];
-  const panelTitle = shown.length === 1
-    ? (shown[0] === "kyc" ? "KYC Verification" : shown[0] === "deposit" ? "Deposit Funds" : "Withdraw Funds")
-    : "Wallet";
   const [tab, setTab] = useState<"deposit" | "withdraw" | "kyc">(initialTab);
   const [crypto, setCrypto] = useState<any[]>([]);
   const [upi, setUpi] = useState<any[]>([]);
@@ -20,6 +16,12 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const [pnlOnly, setPnlOnly] = useState(false);
   const [acctName, setAcctName] = useState("");
   const [acctType, setAcctType] = useState(""); // DEMO accounts can't deposit/withdraw/transfer
+  const allTabs: ("deposit" | "withdraw" | "kyc")[] = tabs && tabs.length ? tabs : ["deposit", "withdraw", "kyc"];
+  // KYC is only for live accounts; hide it entirely for demo accounts once acctType loads
+  const shown = acctType === "DEMO" ? allTabs.filter(t => t !== "kyc") : allTabs;
+  const panelTitle = shown.length === 1
+    ? (shown[0] === "kyc" ? "KYC Verification" : shown[0] === "deposit" ? "Deposit Funds" : "Withdraw Funds")
+    : "Wallet";
   const [acctCredit, setAcctCredit] = useState(0); // outstanding credit balance
   // Bank Transfer fields
   const [bankAcctNo, setBankAcctNo] = useState("");

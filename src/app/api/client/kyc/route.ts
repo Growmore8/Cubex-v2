@@ -21,6 +21,7 @@ export async function POST(req: Request) {
   try {
     const account = await clientAccount(s.tenantId!, s.sub);
     if (!account) throw new Error("No account");
+    if ((account as any).type === "DEMO") throw new Error("KYC verification is only required for live accounts.");
     if ((account as any).kycStatus === "APPROVED") throw new Error("Your identity is already verified. No further documents are required.");
     const form = await req.formData();
     const docType = String(form.get("docType") || "document");
