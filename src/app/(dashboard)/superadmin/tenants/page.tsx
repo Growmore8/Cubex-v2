@@ -10,6 +10,7 @@ const FEATURE_FLAGS: { key: string; label: string; desc: string }[] = [
   { key: "advancedAnalytics", label: "Advanced Analytics", desc: "Show detailed trading analytics and performance reports to clients" },
   { key: "marketNewsFeed",    label: "Market News Feed",   desc: "Show live market news in the client trading panel" },
   { key: "economicCalendar",  label: "Economic Calendar",  desc: "Show the economic events calendar in the client panel" },
+  { key: "moonpayPayment",    label: "MoonPay Card Deposit", desc: "Enable MoonPay card payment (debit/credit cards in INR, LKR, USD, 150+ currencies) — requires MOONPAY_PK and MOONPAY_SK env vars" },
 ];
 
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [

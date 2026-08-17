@@ -11,6 +11,8 @@ export async function GET() {
   // Otherwise, the tenant falls back to the global defaults.
   const tenant = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { permissions: true, features: true } });
   const selfService = !!((tenant?.permissions as any) || {}).ownPaymentMethods;
+  // MoonPay: requires server env vars AND tenant feature flag so SA can enable per-tenant
+  const moonpayEnabled = !!(process.env.MOONPAY_PK && process.env.MOONPAY_SK && ((tenant?.features as any) || {}).moonpayPayment);
   const own = await prisma.cryptoWallet.findMany({
     where: { active: true, tenantId: s.tenantId! },
     orderBy: { createdAt: "asc" },
@@ -41,6 +43,7 @@ export async function GET() {
     upi,
     bank,
     links,
+    moonpay: moonpayEnabled,
     xynder: { url: links[0]?.url || "", active: links.length > 0 }, // back-compat
   });
 }
