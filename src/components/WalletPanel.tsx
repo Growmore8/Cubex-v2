@@ -10,7 +10,6 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const [upi, setUpi] = useState<any[]>([]);
   const [bank, setBank] = useState<any[]>([]);
   const [links, setLinks] = useState<any[]>([]);
-  const [cipherbcEnabled, setCipherbcEnabled] = useState(false);
   const [docs, setDocs] = useState<any[]>([]);
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
   const [pnlOnly, setPnlOnly] = useState(false);
@@ -31,7 +30,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   const [sending, setSending] = useState(false);
 
   // Deposit: which method is open (null = list view)
-  const [depSel, setDepSel] = useState<{ kind: "crypto" | "upi" | "bank" | "credit_clear" | "cipherbc"; id: string } | null>(null);
+  const [depSel, setDepSel] = useState<{ kind: "crypto" | "upi" | "bank" | "credit_clear"; id: string } | null>(null);
   const [dAmount, setDAmount] = useState("");
 
   // Withdraw: inline destination
@@ -47,7 +46,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
       fetch("/api/client/kyc").then((r) => r.json()).catch(() => ({})),
       fetch("/api/client/account" + (accountId ? "?accountId=" + encodeURIComponent(accountId) : "")).then((r) => r.json()).catch(() => ({})),
     ]);
-    if (pm.ok) { setCrypto(pm.crypto || pm.wallets || []); setUpi(pm.upi || []); setBank(pm.bank || []); setLinks(pm.links || []); setCipherbcEnabled(!!pm.cipherbc); }
+    if (pm.ok) { setCrypto(pm.crypto || pm.wallets || []); setUpi(pm.upi || []); setBank(pm.bank || []); setLinks(pm.links || []); }
     if (k.ok) setDocs(k.docs || []);
     if (ac.ok && ac.account) {
       setWithdrawable(typeof ac.withdrawable === "number" ? ac.withdrawable : Math.max(0, Number(ac.account.pnl || 0)));
@@ -79,24 +78,6 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     if (!d.ok) { setErr(d.error || "Failed"); return; }
     (e.target as HTMLFormElement).reset(); setDAmount(""); setDepSel(null);
     setMsg("Credit clearance request submitted — admin will review and clear your credit."); load();
-  }
-
-  async function submitCipherbc(e: React.FormEvent) {
-    e.preventDefault(); setErr(""); setMsg("");
-    const amt = Number(dAmount); if (!(amt >= 1)) { setErr("Minimum deposit is $1"); return; }
-    setSending(true);
-    let d: any;
-    try {
-      d = await fetch("/api/client/payments/cipherbc", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amt, accountId }),
-      }).then((r) => r.json());
-    } catch { setSending(false); setErr("Network error — please try again"); return; }
-    setSending(false);
-    if (!d.ok) { setErr(d.error || "Failed to create payment. Try again."); return; }
-    // Open CipherBC payment page
-    window.location.href = d.paymentUrl;
   }
 
   async function submitDeposit(e: React.FormEvent) {
@@ -201,28 +182,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
 
     {/* ── DEPOSIT ── */}
     {tab === "deposit" && isDemo && demoNotice}
-    {tab === "deposit" && !isDemo && (depSel?.kind === "cipherbc" ? (
-      <form onSubmit={submitCipherbc} className="ui-card ui-fade-up space-y-4 p-4">
-        <button type="button" onClick={() => setDepSel(null)} className="text-sm font-medium text-blue-600 hover:text-blue-700"><i className="fa-solid fa-chevron-left mr-1" />Back</button>
-        <div className="flex items-center gap-3">
-          <span className="rounded-lg px-3 py-1 text-sm font-bold text-white" style={{ background: "#1a1a2e" }}>CipherBC</span>
-          <span className="text-sm font-semibold">Pay via CipherBC Gateway</span>
-        </div>
-        <div className="rounded-xl border p-3 text-[11px] leading-relaxed" style={{ borderColor: "rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.06)", color: "var(--muted)" }}>
-          <i className="fa-solid fa-circle-info mr-1 text-blue-500" />
-          Enter your deposit amount below. You will be redirected to the CipherBC payment page to complete the transaction. Your account will be credited automatically once the payment is confirmed.
-        </div>
-        <div><div className={lbl}>Amount (USD / USDT)</div>
-          <input className={input} type="number" step="0.01" min="1" value={dAmount} onChange={(e) => setDAmount(e.target.value)} placeholder="0.00" required />
-        </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setDepSel(null)} className="flex-1 rounded-lg border py-2 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button>
-          <button disabled={sending} className="flex-1 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-60" style={{ background: "#1a1a2e" }}>
-            {sending ? <><i className="fa-solid fa-spinner fa-spin mr-1" />Connecting…</> : <><i className="fa-solid fa-arrow-up-right-from-square mr-1" />Pay via CipherBC</>}
-          </button>
-        </div>
-      </form>
-    ) : depSel?.kind === "credit_clear" ? (
+    {tab === "deposit" && !isDemo && (depSel?.kind === "credit_clear" ? (
       <form onSubmit={submitCreditClear} className="ui-card ui-fade-up space-y-3 p-4">
         <button type="button" onClick={() => setDepSel(null)} className="text-sm font-medium text-blue-600 hover:text-blue-700"><i className="fa-solid fa-chevron-left mr-1" />Back</button>
         <div className="rounded-xl border p-3" style={{ borderColor: "rgba(239,83,80,0.4)", background: "rgba(239,83,80,0.07)" }}>
@@ -272,12 +232,11 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
       </form>
     ) : (
       <div className="ui-card ui-fade-up space-y-3 p-4">
-        {crypto.length === 0 && upi.length === 0 && bank.length === 0 && links.length === 0 && !cipherbcEnabled ? <p className="text-sm text-[var(--muted)]">No payment methods configured yet. Please contact support.</p> : (<>
+        {crypto.length === 0 && upi.length === 0 && bank.length === 0 && links.length === 0 ?<p className="text-sm text-[var(--muted)]">No payment methods configured yet. Please contact support.</p> : (<>
           {crypto.length > 0 && (<><div className={lbl}>Crypto (USDT)</div><div className="space-y-2">{crypto.map((w) => methodRow(w.id, netBadge(w.network), w.asset, w.address, () => { setDepSel({ kind: "crypto", id: w.id }); setMsg(""); setErr(""); }))}</div></>)}
           {upi.length > 0 && (<><div className={lbl}>UPI</div><div className="space-y-2">{upi.map((u) => methodRow(u.id, <span className="rounded bg-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white">UPI</span>, u.label || "UPI", u.address, () => { setDepSel({ kind: "upi", id: u.id }); setMsg(""); setErr(""); }))}</div></>)}
           {bank.length > 0 && (<><div className={lbl}>Bank Transfer</div><div className="space-y-2">{bank.map((b) => methodRow(b.id, <span className="rounded bg-indigo-500 px-2 py-0.5 text-[10px] font-bold text-white">BANK</span>, b.bankName || "Bank Transfer", "A/C " + b.accountNumber, () => { setDepSel({ kind: "bank", id: b.id }); setMsg(""); setErr(""); }))}</div></>)}
           {links.length > 0 && (<><div className={lbl}>Local Payment</div><div className="space-y-2">{links.map((l) => (<a key={l.id} href={l.url} target="_blank" rel="noreferrer" className="ui-transition flex w-full items-center gap-3 rounded-xl border p-3 hover:bg-[var(--soft)]" style={{ borderColor: "var(--border)", background: "var(--card)" }}><span className="rounded bg-blue-500 px-2 py-0.5 text-[10px] font-bold text-white">{(l.label || "Pay").split(" ")[0]}</span><div className="flex-1 text-sm font-semibold">{l.label}</div><i className="fa-solid fa-chevron-right text-[var(--muted)]" /></a>))}</div></>)}
-          {cipherbcEnabled && (<><div className={lbl}>Gateway</div><div className="space-y-2">{methodRow("cipherbc", <span className="rounded px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: "#1a1a2e" }}>CBC</span>, "CipherBC", "Instant crypto deposit — auto-credited", () => { setDepSel({ kind: "cipherbc", id: "cipherbc" }); setDAmount(""); setMsg(""); setErr(""); })}</div></>)}
           {acctCredit > 0 && (<><div className={lbl} style={{ color: "#ef5350" }}>Clear Outstanding Credit</div><div className="space-y-2">{methodRow("credit_clear", <span className="rounded px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: "#ef5350" }}>CREDIT</span>, "Clear Credit", "$" + acctCredit.toFixed(2) + " outstanding — upload payment slip", () => { setDepSel({ kind: "credit_clear", id: "credit_clear" }); setDAmount(acctCredit.toFixed(2)); setMsg(""); setErr(""); })}</div></>)}
         </>)}
       </div>

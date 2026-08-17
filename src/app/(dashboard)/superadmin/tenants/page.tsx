@@ -10,7 +10,6 @@ const FEATURE_FLAGS: { key: string; label: string; desc: string }[] = [
   { key: "advancedAnalytics", label: "Advanced Analytics", desc: "Show detailed trading analytics and performance reports to clients" },
   { key: "marketNewsFeed",    label: "Market News Feed",   desc: "Show live market news in the client trading panel" },
   { key: "economicCalendar",  label: "Economic Calendar",  desc: "Show the economic events calendar in the client panel" },
-  { key: "cipherbcPayment",   label: "CipherBC Gateway",   desc: "Enable CipherBC crypto payment gateway for client deposits (auto-credited on confirmation)" },
 ];
 
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [

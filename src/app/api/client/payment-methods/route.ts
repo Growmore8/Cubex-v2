@@ -11,7 +11,6 @@ export async function GET() {
   // Otherwise, the tenant falls back to the global defaults.
   const tenant = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { permissions: true, features: true } });
   const selfService = !!((tenant?.permissions as any) || {}).ownPaymentMethods;
-  const cipherbcEnabled = !!(process.env.CIPHERBC_APP_ID && process.env.CIPHERBC_API_BASE_URL && ((tenant?.features as any) || {}).cipherbcPayment);
   const own = await prisma.cryptoWallet.findMany({
     where: { active: true, tenantId: s.tenantId! },
     orderBy: { createdAt: "asc" },
@@ -42,7 +41,6 @@ export async function GET() {
     upi,
     bank,
     links,
-    cipherbc: cipherbcEnabled,
     xynder: { url: links[0]?.url || "", active: links.length > 0 }, // back-compat
   });
 }
