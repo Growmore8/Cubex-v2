@@ -41,8 +41,9 @@ export function getMoonPayUrl(params: {
 }
 
 // MoonPay webhook signature: header is "t=<timestamp>,s=<hex-hmac>"
+// Uses MOONPAY_WK (webhook key from dashboard Developers > API Keys), NOT the secret key
 export function verifyMoonPayWebhook(rawBody: string, signatureHeader: string): boolean {
-  const sk = process.env.MOONPAY_SK ?? "";
+  const sk = process.env.MOONPAY_WK ?? process.env.MOONPAY_SK ?? "";
   if (!sk) return false;
   try {
     const parts = Object.fromEntries(signatureHeader.split(",").map((p) => p.split("=")));
