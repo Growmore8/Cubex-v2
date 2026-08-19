@@ -26,6 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const rejectReason: string | undefined = b.rejectReason || undefined;
     const tenantId = rec.tenantId;
     const acc = rec.account;
+    if (approve && !acc) throw new Error("Account was deleted — cannot approve this payment");
 
     const ops: any[] = [
       prisma.paymentRequest.update({
@@ -37,20 +38,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (approve) {
       const amt = new Prisma.Decimal(rec.amount as any);
       const by = s.email || "superadmin";
-      const fhSnap = { tenantId, accountLogin: acc.login, accountName: acc.name };
+      const fhSnap = { tenantId, accountLogin: acc!.login, accountName: acc!.name };
       if (rec.kind === "DEPOSIT") {
-        ops.push(prisma.account.update({ where: { id: acc.id }, data: { deposit: { increment: amt } } }));
-        ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: acc.id, type: "DEPOSIT", amount: amt, description: rec.method ? `Deposit via ${rec.method}` : "Deposit", mode: "REALTIME", createdBy: by } }));
+        ops.push(prisma.account.update({ where: { id: acc!.id }, data: { deposit: { increment: amt } } }));
+        ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: acc!.id, type: "DEPOSIT", amount: amt, description: rec.method ? `Deposit via ${rec.method}` : "Deposit", mode: "REALTIME", createdBy: by } }));
       } else if (rec.kind === "WITHDRAWAL") {
-        ops.push(prisma.account.update({ where: { id: acc.id }, data: { withdrawal: { increment: amt } } }));
-        ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: acc.id, type: "WITHDRAWAL", amount: amt, description: rec.method ? `Withdrawal via ${rec.method}` : "Withdrawal", mode: "REALTIME", createdBy: by } }));
+        ops.push(prisma.account.update({ where: { id: acc!.id }, data: { withdrawal: { increment: amt } } }));
+        ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: acc!.id, type: "WITHDRAWAL", amount: amt, description: rec.method ? `Withdrawal via ${rec.method}` : "Withdrawal", mode: "REALTIME", createdBy: by } }));
       }
     }
 
     await prisma.$transaction(ops);
-    await audit(tenantId, "payment.sa." + status.toLowerCase(), (acc.login) + " " + rec.kind + " $" + rec.amount, s.email || "superadmin");
+    await audit(tenantId, "payment.sa." + status.toLowerCase(), (acc?.login ?? rec.accountLogin ?? rec.id) + " " + rec.kind + " $" + rec.amount, s.email || "superadmin");
 
-    if (acc.userId) {
+    if (acc?.userId) {
       const t = rec.kind === "DEPOSIT" ? "Deposit" : "Withdrawal";
       notify(tenantId, acc.userId, `${t} ${approve ? "Approved" : "Rejected"}`, `${t} of $${rec.amount} ${approve ? "approved ✓" : "rejected"}`, "FUNDS").catch(() => {});
       sendUserMail(tenantId, acc.userId, `${t} ${approve ? "Approved" : "Rejected"} – $${rec.amount}`,
