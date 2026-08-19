@@ -45,48 +45,49 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const amt = new Prisma.Decimal(rec.amount as any);
       const tenantId = s.tenantId as string;
       const by = s.email || "admin";
+      // Single fetch covering snapshot fields + fields needed for notifications/credit logic
+      const accFull = rec.accountId ? await prisma.account.findUnique({ where: { id: rec.accountId }, select: { login: true, name: true, userId: true, managerId: true, credit: true } }) : null;
+      const fhSnap = { tenantId, accountLogin: accFull?.login, accountName: accFull?.name };
 
       if (kind === "DEPOSIT") {
-        ops.push(prisma.account.update({ where: { id: rec.accountId }, data: { deposit: { increment: amt } } }));
-        ops.push(prisma.financialHistory.create({ data: { accountId: rec.accountId, type: "DEPOSIT", amount: amt, description: rec.method ? `Deposit via ${rec.method}` : "Deposit", mode: "REALTIME", createdBy: by } }));
+        ops.push(prisma.account.update({ where: { id: rec.accountId! }, data: { deposit: { increment: amt } } }));
+        ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: rec.accountId, type: "DEPOSIT", amount: amt, description: rec.method ? `Deposit via ${rec.method}` : "Deposit", mode: "REALTIME", createdBy: by } }));
       } else if (kind === "WITHDRAWAL") {
-        ops.push(prisma.account.update({ where: { id: rec.accountId }, data: { withdrawal: { increment: amt } } }));
-        ops.push(prisma.financialHistory.create({ data: { accountId: rec.accountId, type: "WITHDRAWAL", amount: amt, description: rec.method ? `Withdrawal via ${rec.method}` : "Withdrawal", mode: "REALTIME", createdBy: by } }));
+        ops.push(prisma.account.update({ where: { id: rec.accountId! }, data: { withdrawal: { increment: amt } } }));
+        ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: rec.accountId, type: "WITHDRAWAL", amount: amt, description: rec.method ? `Withdrawal via ${rec.method}` : "Withdrawal", mode: "REALTIME", createdBy: by } }));
       } else if (kind === "CREDIT_REQUEST") {
         // Add instant credit to account
         const settleTo = b.settleTo ? new Date(b.settleTo) : null;
-        const acc = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true, login: true, managerId: true, name: true } });
-        ops.push(prisma.account.update({ where: { id: rec.accountId }, data: { credit: { increment: amt }, ...(settleTo ? { creditSettleFrom: new Date(), creditSettleTo: settleTo } : {}) } }));
-        ops.push(prisma.financialHistory.create({ data: { accountId: rec.accountId, type: "CREDIT_IN", amount: amt, description: "Instant Credit — $" + Number(rec.amount).toFixed(2) + (settleTo ? " (due " + settleTo.toISOString().slice(0, 10) + ")" : ""), mode: "REALTIME", createdBy: by } }));
+        ops.push(prisma.account.update({ where: { id: rec.accountId! }, data: { credit: { increment: amt }, ...(settleTo ? { creditSettleFrom: new Date(), creditSettleTo: settleTo } : {}) } }));
+        ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: rec.accountId, type: "CREDIT_IN", amount: amt, description: "Instant Credit — $" + Number(rec.amount).toFixed(2) + (settleTo ? " (due " + settleTo.toISOString().slice(0, 10) + ")" : ""), mode: "REALTIME", createdBy: by } }));
         await prisma.$transaction(ops);
-        await audit(tenantId, "credit.instant.approved", (acc?.login || rec.accountId) + " instant credit $" + rec.amount + (settleTo ? " due " + settleTo.toISOString().slice(0, 10) : ""), by);
+        await audit(tenantId, "credit.instant.approved", (accFull?.login || rec.accountId) + " instant credit $" + rec.amount + (settleTo ? " due " + settleTo.toISOString().slice(0, 10) : ""), by);
         try {
-          if (acc?.userId) await notify(tenantId, acc.userId, "Instant Credit Approved", `Your instant credit of $${rec.amount} has been approved.`, "FUNDS").catch(() => {});
-          notifyStaff(tenantId, { title: "Instant Credit approved — " + (acc?.login || ""), body: `$${rec.amount} by ${by}`, type: "FUNDS" }, acc?.managerId).catch(() => {});
+          if (accFull?.userId) await notify(tenantId, accFull.userId, "Instant Credit Approved", `Your instant credit of $${rec.amount} has been approved.`, "FUNDS").catch(() => {});
+          notifyStaff(tenantId, { title: "Instant Credit approved — " + (accFull?.login || ""), body: `$${rec.amount} by ${by}`, type: "FUNDS" }, accFull?.managerId).catch(() => {});
         } catch {}
         return NextResponse.json({ ok: true });
       } else if (kind === "CREDIT_CLEAR") {
         // Clear credit + record deposit for the amount paid
-        const accInfo = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { credit: true, userId: true, login: true, managerId: true } });
-        const creditAmt = Math.min(Number(rec.amount), Number(accInfo?.credit || 0));
-        const willClearFully = Number(accInfo?.credit || 0) - creditAmt <= 0;
-        ops.push(prisma.account.update({ where: { id: rec.accountId }, data: { deposit: { increment: amt }, ...(creditAmt > 0 ? { credit: { decrement: new Prisma.Decimal(creditAmt) } } : {}), ...(willClearFully ? { creditSettleFrom: null, creditSettleTo: null } : {}) } }));
-        ops.push(prisma.financialHistory.create({ data: { accountId: rec.accountId, type: "DEPOSIT", amount: amt, description: "Credit Clearance Deposit", mode: "REALTIME", createdBy: by } }));
+        const creditAmt = Math.min(Number(rec.amount), Number(accFull?.credit || 0));
+        const willClearFully = Number(accFull?.credit || 0) - creditAmt <= 0;
+        ops.push(prisma.account.update({ where: { id: rec.accountId! }, data: { deposit: { increment: amt }, ...(creditAmt > 0 ? { credit: { decrement: new Prisma.Decimal(creditAmt) } } : {}), ...(willClearFully ? { creditSettleFrom: null, creditSettleTo: null } : {}) } }));
+        ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: rec.accountId, type: "DEPOSIT", amount: amt, description: "Credit Clearance Deposit", mode: "REALTIME", createdBy: by } }));
         if (creditAmt > 0) {
-          ops.push(prisma.financialHistory.create({ data: { accountId: rec.accountId, type: "CREDIT_OUT", amount: new Prisma.Decimal(creditAmt), description: "Instant Credit Cleared — $" + creditAmt.toFixed(2), mode: "REALTIME", createdBy: by } }));
+          ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: rec.accountId, type: "CREDIT_OUT", amount: new Prisma.Decimal(creditAmt), description: "Instant Credit Cleared — $" + creditAmt.toFixed(2), mode: "REALTIME", createdBy: by } }));
         }
         await prisma.$transaction(ops);
-        await audit(tenantId, "credit.clear.approved", (accInfo?.login || rec.accountId) + " credit cleared $" + creditAmt.toFixed(2) + " deposit $" + rec.amount, by);
+        await audit(tenantId, "credit.clear.approved", (accFull?.login || rec.accountId) + " credit cleared $" + creditAmt.toFixed(2) + " deposit $" + rec.amount, by);
         try {
-          if (accInfo?.userId) await notify(tenantId, accInfo.userId, "Credit Cleared", `Your credit clearance of $${rec.amount} has been approved. Credit reduced by $${creditAmt.toFixed(2)}.`, "FUNDS").catch(() => {});
-          notifyStaff(tenantId, { title: "Credit clearance approved — " + (accInfo?.login || ""), body: `$${rec.amount} by ${by}`, type: "FUNDS" }, accInfo?.managerId).catch(() => {});
+          if (accFull?.userId) await notify(tenantId, accFull.userId, "Credit Cleared", `Your credit clearance of $${rec.amount} has been approved. Credit reduced by $${creditAmt.toFixed(2)}.`, "FUNDS").catch(() => {});
+          notifyStaff(tenantId, { title: "Credit clearance approved — " + (accFull?.login || ""), body: `$${rec.amount} by ${by}`, type: "FUNDS" }, accFull?.managerId).catch(() => {});
         } catch {}
         return NextResponse.json({ ok: true });
       }
     }
 
     // Standard DEPOSIT/WITHDRAWAL flow
-    const stdAcc = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true, login: true, managerId: true, name: true } });
+    const stdAcc = rec.accountId ? await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true, login: true, managerId: true, name: true } }) : null;
     await prisma.$transaction(ops);
     await audit(s.tenantId as string, "payment." + status.toLowerCase(), (stdAcc?.login || rec.accountId) + " " + rec.kind + " $" + rec.amount + (rec.method ? " via " + rec.method : ""), s.email || "admin");
 

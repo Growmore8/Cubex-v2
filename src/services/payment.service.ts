@@ -13,9 +13,10 @@ export function listTenantPayments(tenantId: string) {
   });
 }
 
-export function createPayment(tenantId: string, accountId: string, kind: any, amount: number, method?: string, slipUrl?: string, note?: string) {
+export async function createPayment(tenantId: string, accountId: string, kind: any, amount: number, method?: string, slipUrl?: string, note?: string) {
+  const acc = await prisma.account.findUnique({ where: { id: accountId }, select: { login: true, name: true } });
   return prisma.paymentRequest.create({
-    data: { tenantId, accountId, kind, amount: new Prisma.Decimal(amount), method, slipUrl, note },
+    data: { tenantId, accountId, accountLogin: acc?.login, accountName: acc?.name, kind, amount: new Prisma.Decimal(amount), method, slipUrl, note },
   });
 }
 
@@ -36,7 +37,7 @@ export async function reviewPayment(tenantId: string, id: string, status: "APPRO
       if (updated.count === 0) throw new Error("Already reviewed");
       await tx.account.update({ where: { id: row.accountId }, data });
       await tx.financialHistory.create({
-        data: { accountId: row.accountId, type: row.kind as any, amount: amt, description: row.method || row.kind, mode: "REALTIME", createdBy: by },
+        data: { accountId: row.accountId, tenantId: row.tenantId, accountLogin: row.account.login, accountName: row.account.name, type: row.kind as any, amount: amt, description: row.method || row.kind, mode: "REALTIME", createdBy: by },
       });
     });
   } else {

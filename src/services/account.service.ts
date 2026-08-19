@@ -154,8 +154,7 @@ export async function adjustBalance(tenantId: string, id: string, type: string, 
   const backdated = appliedAt && !isNaN(appliedAt.getTime());
   const res = await prisma.$transaction(async (tx) => {
     await tx.account.update({ where: { id }, data });
-    // appliedAt lets staff back-date a manual entry (Manual Date & Time mode)
-    const fh: any = { accountId: id, type: type as any, amount: amt, description, mode: backdated ? "MANUAL" : "REALTIME", createdBy: by };
+    const fh: any = { accountId: id, tenantId, accountLogin: acc.login, accountName: acc.name, type: type as any, amount: amt, description, mode: backdated ? "MANUAL" : "REALTIME", createdBy: by };
     if (backdated) fh.appliedAt = appliedAt;
     await tx.financialHistory.create({ data: fh });
     return tx.account.findUnique({ where: { id } });
@@ -175,8 +174,7 @@ export async function manualPnl(tenantId: string, id: string, amount: number, no
   const acc = await prisma.account.findFirst({ where: { tenantId, id } });
   if (!acc) throw new Error("Account not found");
   await prisma.account.update({ where: { id }, data: { pnl: { increment: new Prisma.Decimal(amount) } } });
-  // Record in financial history so it shows for the client + desk (signed amount).
-  await prisma.financialHistory.create({ data: { accountId: id, type: "PNL_ADJUST" as any, amount: new Prisma.Decimal(amount), description: note || "Manual P/L adjustment", mode: "MANUAL" as any, createdBy: by } }).catch(() => {});
+  await prisma.financialHistory.create({ data: { accountId: id, tenantId, accountLogin: acc.login, accountName: acc.name, type: "PNL_ADJUST" as any, amount: new Prisma.Decimal(amount), description: note || "Manual P/L adjustment", mode: "MANUAL" as any, createdBy: by } }).catch(() => {});
   await audit(tenantId, "client.manualPnl", acc.login + " " + amount + " " + (note || ""), by);
   notifyStaff(tenantId, { type: "FUNDS", title: "Manual P/L — " + acc.login, body: (amount >= 0 ? "+" : "") + amount + (note ? " — " + note : "") + " by " + by }, acc.managerId).catch(() => {});
   return { ok: true };

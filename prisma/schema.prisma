@@ -234,18 +234,22 @@ model CopyRelation {
   @@index([followerAccId])
 }
 model FinancialHistory {
-  id          BigInt   @id @default(autoincrement())
-  accountId   String
-  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  type        FinType
-  amount      Decimal  @db.Decimal(18, 2)
-  description String?
-  reference   String?
-  mode        FinMode  @default(REALTIME)
-  appliedAt   DateTime @default(now())
-  createdBy   String   @default("admin")
-  createdAt   DateTime @default(now())
+  id           BigInt   @id @default(autoincrement())
+  accountId    String?
+  account      Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  tenantId     String?
+  accountLogin String?
+  accountName  String?
+  type         FinType
+  amount       Decimal  @db.Decimal(18, 2)
+  description  String?
+  reference    String?
+  mode         FinMode  @default(REALTIME)
+  appliedAt    DateTime @default(now())
+  createdBy    String   @default("admin")
+  createdAt    DateTime @default(now())
   @@index([accountId])
+  @@index([tenantId])
 }
 model Symbol {
   id         String  @id @default(uuid())
@@ -443,8 +447,10 @@ model PriceAlert {
 model PaymentRequest {
   id           String        @id @default(uuid())
   tenantId     String
-  accountId    String
-  account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId    String?
+  account      Account?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  accountLogin String?
+  accountName  String?
   kind         PaymentKind
   amount       Decimal       @db.Decimal(18, 2)
   method       String?

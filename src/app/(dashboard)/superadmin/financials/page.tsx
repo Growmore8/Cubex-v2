@@ -2,16 +2,31 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 
 type Tenant = { id: string; name: string };
+type DispFields = { login: string; name: string; email: string; type: string; tenantName: string };
 type PayRow = {
   id: string; kind: string; amount: string; method: string | null;
   slipUrl: string | null; note: string | null; status: string; createdAt: string;
-  account: { login: string; name: string | null; email: string | null; type: string; tenant: { name: string } };
+  account?: { login: string; name: string | null; email: string | null; type: string; tenant: { name: string } } | null;
+  _display?: DispFields;
 };
 type LedRow = {
   id: string; type: string; amount: string; description: string | null;
   mode: string; appliedAt: string; createdBy: string | null;
-  account: { login: string; name: string | null; type: string; tenantId: string; tenant: { name: string } };
+  account?: { login: string; name: string | null; type: string; tenantId: string; tenant: { name: string } } | null;
+  _display?: DispFields;
 };
+// Resolve display fields using live account or snapshot fallback
+function ra(r: PayRow | LedRow): DispFields {
+  if (r._display) return r._display;
+  const a = r.account;
+  return {
+    login:      a?.login ?? "—",
+    name:       a?.name  ?? "—",
+    email:      (a as any)?.email ?? "—",
+    type:       a?.type  ?? "—",
+    tenantName: a?.tenant?.name ?? "—",
+  };
+}
 
 const KINDS    = ["DEPOSIT","WITHDRAWAL","CREDIT_REQUEST","CREDIT_CLEAR"];
 const STATUSES = ["PENDING","APPROVED","REJECTED","CANCELLED"];
@@ -523,10 +538,11 @@ export default function SAFinancials() {
                     {rows.length===0
                       ? <tr><td colSpan={12}><div className="fin-empty"><i className="fa-regular fa-folder-open"></i>No records match your filters</div></td></tr>
                       : (rows as PayRow[]).map(r=>{
+                          const d=ra(r);
                           const tc=typeClr(r.kind), sc=statusClr(r.status);
                           const isIn=r.kind==="DEPOSIT"||r.kind==="CREDIT_REQUEST";
                           const isOpen=expanded.has(r.id);
-                          const hasDetail=!!(r.note||r.account.email||r.account.name);
+                          const hasDetail=!!(r.note||d.email!=="—"||d.name!=="—");
                           return (
                             <React.Fragment key={r.id}>
                               <tr>
@@ -540,12 +556,12 @@ export default function SAFinancials() {
                                   </button>
                                 </td>
                                 <td style={{ whiteSpace:"nowrap", color:"var(--text2)", fontSize:11 }}>{fmtDate(r.createdAt)}</td>
-                                <td><span className="fin-tenant-chip">{r.account.tenant.name}</span></td>
-                                <td><span className="fin-mono">{r.account.login}</span></td>
-                                <td style={{ fontSize:11 }}>{r.account.name||r.account.email||"—"}</td>
+                                <td><span className="fin-tenant-chip">{d.tenantName}</span></td>
+                                <td><span className="fin-mono">{d.login}</span></td>
+                                <td style={{ fontSize:11 }}>{d.name!=="—"?d.name:d.email!=="—"?d.email:"—"}</td>
                                 <td>
-                                  <span className="fin-badge" style={{ background: r.account.type==="DEMO"?"#f3e8ff":"#dbeafe", color: r.account.type==="DEMO"?"#7c3aed":"#1d4ed8", fontSize:10 }}>
-                                    {r.account.type}
+                                  <span className="fin-badge" style={{ background: d.type==="DEMO"?"#f3e8ff":"#dbeafe", color: d.type==="DEMO"?"#7c3aed":"#1d4ed8", fontSize:10 }}>
+                                    {d.type}
                                   </span>
                                 </td>
                                 <td>
@@ -586,16 +602,16 @@ export default function SAFinancials() {
                                     <div className="fin-detail-inner">
                                       <div className="fin-detail-item">
                                         <span className="fin-detail-label"><i className="fa-solid fa-hashtag" style={{ marginRight:3 }}></i>Account</span>
-                                        <span className="fin-detail-val fin-mono">{r.account.login} <span style={{ fontFamily:"inherit", fontWeight:400, color:"var(--text2)", fontSize:11 }}>({r.account.type})</span></span>
+                                        <span className="fin-detail-val fin-mono">{d.login} <span style={{ fontFamily:"inherit", fontWeight:400, color:"var(--text2)", fontSize:11 }}>({d.type})</span></span>
                                       </div>
                                       <div className="fin-detail-item">
                                         <span className="fin-detail-label"><i className="fa-solid fa-user" style={{ marginRight:3 }}></i>Client</span>
-                                        <span className="fin-detail-val">{r.account.name||"—"}</span>
+                                        <span className="fin-detail-val">{d.name!=="—"?d.name:"—"}</span>
                                       </div>
-                                      {r.account.email && (
+                                      {d.email!=="—" && (
                                         <div className="fin-detail-item">
                                           <span className="fin-detail-label"><i className="fa-solid fa-envelope" style={{ marginRight:3 }}></i>Email</span>
-                                          <span className="fin-detail-val">{r.account.email}</span>
+                                          <span className="fin-detail-val">{d.email}</span>
                                         </div>
                                       )}
                                       <div className="fin-detail-item">
@@ -670,17 +686,18 @@ export default function SAFinancials() {
                     {rows.length===0
                       ? <tr><td colSpan={10}><div className="fin-empty"><i className="fa-regular fa-folder-open"></i>No records match your filters</div></td></tr>
                       : (rows as LedRow[]).map(r=>{
+                          const d=ra(r);
                           const tc=typeClr(r.type);
                           const isIn=INFLOW_TYPES.has(r.type);
                           return (
                             <tr key={r.id}>
                               <td style={{ whiteSpace:"nowrap", color:"var(--text2)", fontSize:11 }}>{fmtDate(r.appliedAt)}</td>
-                              <td><span className="fin-tenant-chip">{r.account.tenant.name}</span></td>
-                              <td><span className="fin-mono">{r.account.login}</span></td>
-                              <td style={{ fontSize:11 }}>{r.account.name||"—"}</td>
+                              <td><span className="fin-tenant-chip">{d.tenantName}</span></td>
+                              <td><span className="fin-mono">{d.login}</span></td>
+                              <td style={{ fontSize:11 }}>{d.name!=="—"?d.name:"—"}</td>
                               <td>
-                                <span className="fin-badge" style={{ background: r.account.type==="DEMO"?"#f3e8ff":"#dbeafe", color: r.account.type==="DEMO"?"#7c3aed":"#1d4ed8", fontSize:10 }}>
-                                  {r.account.type}
+                                <span className="fin-badge" style={{ background: d.type==="DEMO"?"#f3e8ff":"#dbeafe", color: d.type==="DEMO"?"#7c3aed":"#1d4ed8", fontSize:10 }}>
+                                  {d.type}
                                 </span>
                               </td>
                               <td>

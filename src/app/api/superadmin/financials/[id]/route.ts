@@ -37,12 +37,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (approve) {
       const amt = new Prisma.Decimal(rec.amount as any);
       const by = s.email || "superadmin";
+      const fhSnap = { tenantId, accountLogin: acc.login, accountName: acc.name };
       if (rec.kind === "DEPOSIT") {
         ops.push(prisma.account.update({ where: { id: acc.id }, data: { deposit: { increment: amt } } }));
-        ops.push(prisma.financialHistory.create({ data: { accountId: acc.id, type: "DEPOSIT", amount: amt, description: rec.method ? `Deposit via ${rec.method}` : "Deposit", mode: "REALTIME", createdBy: by } }));
+        ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: acc.id, type: "DEPOSIT", amount: amt, description: rec.method ? `Deposit via ${rec.method}` : "Deposit", mode: "REALTIME", createdBy: by } }));
       } else if (rec.kind === "WITHDRAWAL") {
         ops.push(prisma.account.update({ where: { id: acc.id }, data: { withdrawal: { increment: amt } } }));
-        ops.push(prisma.financialHistory.create({ data: { accountId: acc.id, type: "WITHDRAWAL", amount: amt, description: rec.method ? `Withdrawal via ${rec.method}` : "Withdrawal", mode: "REALTIME", createdBy: by } }));
+        ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: acc.id, type: "WITHDRAWAL", amount: amt, description: rec.method ? `Withdrawal via ${rec.method}` : "Withdrawal", mode: "REALTIME", createdBy: by } }));
       }
     }
 

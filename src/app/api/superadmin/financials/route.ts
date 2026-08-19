@@ -255,12 +255,21 @@ export async function GET(req: Request) {
 
   // ── LEDGER ──────────────────────────────────────────────────────────────────
   if (tab === "ledger") {
-    const where: any = { account: accountWhere, ...dateRange("appliedAt") };
-    if (type) where.type = type;
+    // Build ledger WHERE: match active accounts via accountWhere OR orphaned records (account deleted)
+    const ledgerWhere: any = { ...dateRange("appliedAt") };
+    if (type) ledgerWhere.type = type;
+    const hasAccFilter = tenantId || accountType || search;
+    if (hasAccFilter) {
+      ledgerWhere.OR = [
+        { account: accountWhere },
+        // Also include orphaned rows (accountId=null) that still carry the tenantId snapshot
+        ...(tenantId && !accountType && !search ? [{ accountId: null, tenantId }] : []),
+      ];
+    }
 
     const [rows, total] = await Promise.all([
       prisma.financialHistory.findMany({
-        where,
+        where: ledgerWhere,
         orderBy: { appliedAt: "desc" },
         ...(isExport ? {} : { skip: page * PAGE, take: PAGE }),
         include: {
@@ -269,13 +278,21 @@ export async function GET(req: Request) {
           },
         },
       }),
-      prisma.financialHistory.count({ where }),
+      prisma.financialHistory.count({ where: ledgerWhere }),
     ]);
+
+    // Helper: resolve display fields using live account data or snapshot fallback
+    const ledgAcc = (r: any) => ({
+      tenantName: r.account?.tenant?.name ?? tenantId ? (tenants.find(t => t.id === (r.tenantId || tenantId))?.name ?? r.tenantId ?? "—") : "—",
+      login:      r.account?.login ?? r.accountLogin ?? "—",
+      name:       r.account?.name  ?? r.accountName  ?? "—",
+      type:       r.account?.type  ?? "—",
+    });
 
     if (doExport === "csv") {
       const csv = toCsv(
         ["Date", "Tenant", "Login", "Client", "Account Type", "Type", "Description", "Amount", "Mode", "Applied By"],
-        rows.map((r) => [fmtDt(r.appliedAt), r.account.tenant.name, r.account.login, r.account.name || "", r.account.type, r.type, r.description || "", r.amount.toString(), r.mode, r.createdBy || "system"])
+        rows.map((r) => { const a = ledgAcc(r); return [fmtDt(r.appliedAt), a.tenantName, a.login, a.name, a.type, r.type, r.description || "", r.amount.toString(), r.mode, r.createdBy || "system"]; })
       );
       return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=\"ledger-export.csv\"" } });
     }
@@ -298,14 +315,18 @@ export async function GET(req: Request) {
         dateTo      ? `To: ${dateTo}`                 : "",
         search      ? `Search: "${search}"`           : "",
       ].filter(Boolean).join("  ·  ");
-      const pdf = await buildPdf("ledger", rows, kpis, tenantName, subtitle, generated);
+      // Attach resolved display fields so buildPdf can access them
+      const pdfRows = rows.map(r => { const a = ledgAcc(r); return { ...r, account: { login: a.login, name: a.name, type: a.type, tenant: { name: a.tenantName } } }; });
+      const pdf = await buildPdf("ledger", pdfRows, kpis, tenantName, subtitle, generated);
       return new Response(new Uint8Array(pdf), {
         headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${tenantName.replace(/\s/g, "-")}-ledger.pdf"` },
       });
     }
 
-    const agg = await prisma.financialHistory.groupBy({ by: ["type"], where, _sum: { amount: true }, _count: { id: true } });
-    return json({ ok: true, tab: "ledger", rows, total, page, pages: Math.ceil(total / PAGE), agg, tenants });
+    const agg = await prisma.financialHistory.groupBy({ by: ["type"], where: ledgerWhere, _sum: { amount: true }, _count: { id: true } });
+    // Attach resolved display fields onto rows for the UI
+    const ledgerRows = rows.map(r => { const a = ledgAcc(r); return { ...r, _display: a }; });
+    return json({ ok: true, tab: "ledger", rows: ledgerRows, total, page, pages: Math.ceil(total / PAGE), agg, tenants });
   }
 
   // ── PAYMENT REQUESTS ────────────────────────────────────────────────────────
@@ -333,10 +354,19 @@ export async function GET(req: Request) {
     prisma.paymentRequest.count({ where: { ...where, status: "PENDING" } }),
   ]);
 
+  // Helper: resolve display fields for payment requests using live account or snapshot fallback
+  const reqAcc = (r: any) => ({
+    tenantName: r.account?.tenant?.name ?? (tenants.find(t => t.id === r.tenantId)?.name ?? r.tenantId ?? "—"),
+    login:      r.account?.login ?? r.accountLogin ?? "—",
+    name:       r.account?.name  ?? r.accountName  ?? "—",
+    email:      r.account?.email ?? "—",
+    type:       r.account?.type  ?? "—",
+  });
+
   if (doExport === "csv") {
     const csv = toCsv(
       ["Date", "Tenant", "Login", "Client", "Email", "Account Type", "Type", "Method", "Amount", "Status", "Note"],
-      rows.map((r) => [fmtDt(r.createdAt), r.account.tenant.name, r.account.login, r.account.name || "", r.account.email || "", r.account.type, r.kind, r.method || "", r.amount.toString(), r.status, r.note || ""])
+      rows.map((r) => { const a = reqAcc(r); return [fmtDt(r.createdAt), a.tenantName, a.login, a.name, a.email, a.type, r.kind, r.method || "", r.amount.toString(), r.status, r.note || ""]; })
     );
     return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=\"payment-requests-export.csv\"" } });
   }
@@ -359,7 +389,8 @@ export async function GET(req: Request) {
       dateTo      ? `To: ${dateTo}`                 : "",
       search      ? `Search: "${search}"`           : "",
     ].filter(Boolean).join("  ·  ");
-    const pdf = await buildPdf("requests", rows, kpis, tenantName, subtitle, generated);
+    const pdfReqRows = rows.map(r => { const a = reqAcc(r); return { ...r, account: { login: a.login, name: a.name, email: a.email, type: a.type, tenant: { name: a.tenantName } } }; });
+    const pdf = await buildPdf("requests", pdfReqRows, kpis, tenantName, subtitle, generated);
     return new Response(new Uint8Array(pdf), {
       headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${tenantName.replace(/\s/g, "-")}-payment-requests.pdf"` },
     });
@@ -371,5 +402,6 @@ export async function GET(req: Request) {
     _sum: { amount: true }, _count: { id: true },
   });
 
-  return json({ ok: true, tab: "requests", rows, total, page, pages: Math.ceil(total / PAGE), pending, kindAgg, tenants });
+  const reqRows = rows.map(r => { const a = reqAcc(r); return { ...r, _display: a }; });
+  return json({ ok: true, tab: "requests", rows: reqRows, total, page, pages: Math.ceil(total / PAGE), pending, kindAgg, tenants });
 }
