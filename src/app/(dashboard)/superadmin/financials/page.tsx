@@ -159,7 +159,7 @@ export default function SAFinancials() {
   const [accountType, setAccountType] = useState("");
   const [dateFrom, setDateFrom]       = useState("");
   const [dateTo, setDateTo]           = useState("");
-  const [slip, setSlip]         = useState<string|null>(null);
+  const [slip, setSlip]         = useState<string|null>(null); // stores paymentRequest.id
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [exportMenu, setExportMenu] = useState(false);
   const [acting, setActing]     = useState<string|null>(null);
@@ -561,7 +561,7 @@ export default function SAFinancials() {
                                 </td>
                                 <td>
                                   {r.slipUrl
-                                    ? <button onClick={()=>setSlip(r.slipUrl!)} style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontSize:11, color:"#1d4ed8", display:"inline-flex", alignItems:"center", gap:4 }}>
+                                    ? <button onClick={()=>setSlip(r.id)} style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontSize:11, color:"#1d4ed8", display:"inline-flex", alignItems:"center", gap:4 }}>
                                         <i className="fa-solid fa-image"></i>View
                                       </button>
                                     : <span style={{ color:"var(--text3)", fontSize:11 }}>—</span>
@@ -758,12 +758,9 @@ export default function SAFinancials() {
               <span style={{ fontWeight:700, fontSize:13 }}><i className="fa-solid fa-image" style={{ marginRight:6, color:"var(--accent)" }}></i>Payment Proof</span>
               <button onClick={()=>setSlip(null)} style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:7, width:30, height:30, cursor:"pointer", fontSize:14, color:"var(--text2)" }}>✕</button>
             </div>
-            <img src={slip} alt="Payment slip" style={{ width:"100%", borderRadius:8, border:"1px solid var(--border)", display:"block" }}
-              onError={e=>{(e.target as HTMLImageElement).replaceWith(Object.assign(document.createElement("div"),{textContent:"⚠️ Image could not be loaded. Use the link below to open it.",style:"padding:20px;text-align:center;color:var(--text2);font-size:12px;border:1px dashed var(--border);border-radius:8px;"} as any));}}
+            <img src={"/api/files/slip/" + slip} alt="Payment slip" style={{ width:"100%", borderRadius:8, border:"1px solid var(--border)", display:"block" }}
+              onError={e=>{(e.target as HTMLImageElement).replaceWith(Object.assign(document.createElement("div"),{textContent:"Image could not be loaded.",style:"padding:20px;text-align:center;color:var(--text2);font-size:12px;border:1px dashed var(--border);border-radius:8px;"} as any));}}
             />
-            <a href={slip} target="_blank" rel="noreferrer" style={{ display:"block", marginTop:12, textAlign:"center", fontSize:12, color:"#1d4ed8" }}>
-              <i className="fa-solid fa-arrow-up-right-from-square" style={{ marginRight:5 }}></i>Open in new tab
-            </a>
           </div>
         </div>
       )}
