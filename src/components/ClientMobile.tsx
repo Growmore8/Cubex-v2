@@ -1993,7 +1993,7 @@ export default function ClientMobile({ t }: { t: any }) {
                 <span className="font-bold" style={{ color: BUY }}>{_cSym}{fmt(balance)}</span>
               </div>
               <div className="my-2 border-t border-[var(--border)]" />
-              <div className="flex items-center justify-between py-1 text-[12px] font-bold"><span>Total Balance</span><span>{_cSym}{fmt(totalBal)}</span></div>
+              <div className="flex items-center justify-between py-1 text-[12px] font-bold"><span>Total Balance</span><span>{_cSym}{fmt(balance)}</span></div>
               <div className="mt-2 text-[10px] font-semibold text-[var(--muted)]">ACCOUNT DETAILS</div>
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Deposit</span><span>{_cSym}{fmt(Number(account?.deposit || 0))}</span></div>
               <div className="flex justify-between py-0.5 text-[12px]"><span className="text-[var(--muted)]">Withdrawal</span><span>{_cSym}{fmt(Number(account?.withdrawal || 0))}</span></div>

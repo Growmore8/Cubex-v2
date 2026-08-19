@@ -20,11 +20,11 @@ const FIN_TYPES= ["DEPOSIT","WITHDRAWAL","CREDIT_IN","CREDIT_OUT","BONUS","REFER
 const INFLOW_TYPES = new Set(["DEPOSIT","CREDIT_IN","BONUS","REFERRAL","INSURANCE","TRANSFER_IN"]);
 
 const typeIcon = (t: string) =>
-  t==="DEPOSIT"||t==="CREDIT_IN"||t==="CREDIT_REQUEST" ? "fa-arrow-down-to-line" :
-  t==="WITHDRAWAL"||t==="CREDIT_OUT"||t==="CREDIT_CLEAR" ? "fa-arrow-up-from-line" :
+  t==="DEPOSIT"||t==="CREDIT_IN"||t==="CREDIT_REQUEST" ? "fa-download" :
+  t==="WITHDRAWAL"||t==="CREDIT_OUT"||t==="CREDIT_CLEAR" ? "fa-upload" :
   t==="BONUS" ? "fa-gift" : t==="REFERRAL" ? "fa-user-plus" :
   t==="TRANSFER_IN"||t==="TRANSFER_OUT" ? "fa-right-left" :
-  t==="PNL_ADJUST" ? "fa-chart-line" : "fa-circle-dollar-to-slot";
+  t==="PNL_ADJUST" ? "fa-chart-line" : "fa-coins";
 
 const typeClr = (t: string) =>
   t==="DEPOSIT"||t==="CREDIT_IN"||t==="CREDIT_REQUEST" ? { bg:"#dcfce7",c:"#15803d" } :
@@ -118,6 +118,18 @@ const CSS = `
 .fin-expand-btn{width:24px;height:24px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
 .fin-expand-btn:hover{border-color:var(--accent);color:var(--text);}
 .fin-expand-btn.open{background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:var(--accent);color:var(--accent);}
+.fin-action-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:6px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;}
+.fin-action-btn.approve{background:#dcfce7;color:#15803d;}
+.fin-action-btn.approve:hover{background:#bbf7d0;}
+.fin-action-btn.reject{background:#fee2e2;color:#b91c1c;}
+.fin-action-btn.reject:hover{background:#fecaca;}
+.fin-action-btn:disabled{opacity:.5;cursor:not-allowed;}
+.fin-modal-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;}
+.fin-modal{background:var(--card);border-radius:14px;padding:22px;width:380px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+.fin-modal-title{font-weight:700;font-size:14px;margin-bottom:14px;}
+.fin-modal textarea{width:100%;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);padding:10px;font-size:12px;resize:vertical;min-height:80px;outline:none;}
+.fin-modal textarea:focus{border-color:var(--accent);}
+.fin-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
 .fin-detail-row td{padding:0 !important;border-bottom:2px solid var(--accent) !important;}
 .fin-detail-inner{padding:10px 14px 12px 42px;background:color-mix(in srgb,var(--accent) 5%,var(--bg2));display:flex;flex-wrap:wrap;gap:18px;}
 .fin-detail-item{display:flex;flex-direction:column;gap:3px;min-width:120px;}
@@ -150,6 +162,9 @@ export default function SAFinancials() {
   const [slip, setSlip]         = useState<string|null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [exportMenu, setExportMenu] = useState(false);
+  const [acting, setActing]     = useState<string|null>(null);
+  const [rejectModal, setRejectModal] = useState<{id:string}|null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<ReturnType<typeof setTimeout>|null>(null);
 
@@ -198,6 +213,20 @@ export default function SAFinancials() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  }
+
+  async function doAction(id: string, action: "approve"|"reject", reason?: string) {
+    setActing(id);
+    try {
+      const d = await fetch(`/api/superadmin/financials/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, rejectReason: reason }),
+      }).then(r => r.json());
+      if (!d.ok) { setErr(d.error || "Action failed"); }
+      else { load(page); }
+    } catch { setErr("Network error"); }
+    finally { setActing(null); }
   }
 
   // close export menu when clicking outside
@@ -308,7 +337,7 @@ export default function SAFinancials() {
                 <div className="fin-kpi-sub">{fmtFull(approvedDep)}</div>
               </div>
               <div className="fin-kpi-ico" style={{ background:"#dcfce7" }}>
-                <i className="fa-solid fa-arrow-down-to-line" style={{ color:"#16a34a" }}></i>
+                <i className="fa-solid fa-download" style={{ color:"#16a34a" }}></i>
               </div>
             </div>
           </div>
@@ -320,7 +349,7 @@ export default function SAFinancials() {
                 <div className="fin-kpi-sub">{fmtFull(approvedWd)}</div>
               </div>
               <div className="fin-kpi-ico" style={{ background:"#fee2e2" }}>
-                <i className="fa-solid fa-arrow-up-from-line" style={{ color:"#dc2626" }}></i>
+                <i className="fa-solid fa-upload" style={{ color:"#dc2626" }}></i>
               </div>
             </div>
           </div>
@@ -362,7 +391,7 @@ export default function SAFinancials() {
                 <div className="fin-kpi-sub">Deposits + credits + bonuses</div>
               </div>
               <div className="fin-kpi-ico" style={{ background:"#dcfce7" }}>
-                <i className="fa-solid fa-arrow-down-to-line" style={{ color:"#16a34a" }}></i>
+                <i className="fa-solid fa-download" style={{ color:"#16a34a" }}></i>
               </div>
             </div>
           </div>
@@ -374,7 +403,7 @@ export default function SAFinancials() {
                 <div className="fin-kpi-sub">Withdrawals + credit outs</div>
               </div>
               <div className="fin-kpi-ico" style={{ background:"#fee2e2" }}>
-                <i className="fa-solid fa-arrow-up-from-line" style={{ color:"#dc2626" }}></i>
+                <i className="fa-solid fa-upload" style={{ color:"#dc2626" }}></i>
               </div>
             </div>
           </div>
@@ -488,10 +517,11 @@ export default function SAFinancials() {
                     <th className="r">Amount</th>
                     <th>Status</th>
                     <th>Proof</th>
+                    <th>Actions</th>
                   </tr></thead>
                   <tbody>
                     {rows.length===0
-                      ? <tr><td colSpan={11}><div className="fin-empty"><i className="fa-regular fa-folder-open"></i>No records match your filters</div></td></tr>
+                      ? <tr><td colSpan={12}><div className="fin-empty"><i className="fa-regular fa-folder-open"></i>No records match your filters</div></td></tr>
                       : (rows as PayRow[]).map(r=>{
                           const tc=typeClr(r.kind), sc=statusClr(r.status);
                           const isIn=r.kind==="DEPOSIT"||r.kind==="CREDIT_REQUEST";
@@ -537,10 +567,22 @@ export default function SAFinancials() {
                                     : <span style={{ color:"var(--text3)", fontSize:11 }}>—</span>
                                   }
                                 </td>
+                                <td>
+                                  {r.status==="PENDING" && (r.kind === "DEPOSIT" || r.kind === "WITHDRAWAL") ? (
+                                    <div style={{ display:"flex", gap:4 }}>
+                                      <button className="fin-action-btn approve" disabled={acting===r.id} onClick={()=>doAction(r.id,"approve")}>
+                                        <i className="fa-solid fa-check"></i>Approve
+                                      </button>
+                                      <button className="fin-action-btn reject" disabled={acting===r.id} onClick={()=>{setRejectReason("");setRejectModal({id:r.id});}}>
+                                        <i className="fa-solid fa-xmark"></i>Reject
+                                      </button>
+                                    </div>
+                                  ) : <span style={{ color:"var(--text3)", fontSize:11 }}>—</span>}
+                                </td>
                               </tr>
                               {isOpen && (
                                 <tr className="fin-detail-row">
-                                  <td colSpan={11}>
+                                  <td colSpan={12}>
                                     <div className="fin-detail-inner">
                                       <div className="fin-detail-item">
                                         <span className="fin-detail-label"><i className="fa-solid fa-hashtag" style={{ marginRight:3 }}></i>Account</span>
@@ -678,6 +720,36 @@ export default function SAFinancials() {
         )}
       </div>
 
+      {/* Reject reason modal */}
+      {rejectModal && (
+        <div className="fin-modal-overlay" onClick={()=>setRejectModal(null)}>
+          <div className="fin-modal" onClick={e=>e.stopPropagation()}>
+            <div className="fin-modal-title"><i className="fa-solid fa-xmark" style={{ color:"#b91c1c", marginRight:8 }}></i>Reject Payment</div>
+            <div style={{ fontSize:12, color:"var(--text2)", marginBottom:10 }}>Optionally provide a reason to the client:</div>
+            <textarea
+              placeholder="Reason for rejection (optional)…"
+              value={rejectReason}
+              onChange={e=>setRejectReason(e.target.value)}
+              autoFocus
+            />
+            <div className="fin-modal-actions">
+              <button className="fin-btn" onClick={()=>setRejectModal(null)}>Cancel</button>
+              <button
+                className="fin-action-btn reject"
+                disabled={!!acting}
+                onClick={async()=>{
+                  await doAction(rejectModal.id,"reject",rejectReason||undefined);
+                  setRejectModal(null);
+                }}
+              >
+                {acting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-xmark"></i>}
+                Confirm Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Slip modal */}
       {slip && (
         <div onClick={()=>setSlip(null)} style={{ position:"fixed", inset:0, zIndex:9999, background:"rgba(0,0,0,0.78)", display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -686,7 +758,9 @@ export default function SAFinancials() {
               <span style={{ fontWeight:700, fontSize:13 }}><i className="fa-solid fa-image" style={{ marginRight:6, color:"var(--accent)" }}></i>Payment Proof</span>
               <button onClick={()=>setSlip(null)} style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:7, width:30, height:30, cursor:"pointer", fontSize:14, color:"var(--text2)" }}>✕</button>
             </div>
-            <img src={slip} alt="Payment slip" style={{ width:"100%", borderRadius:8, border:"1px solid var(--border)" }} onError={e=>{(e.target as HTMLImageElement).style.display="none";}} />
+            <img src={slip} alt="Payment slip" style={{ width:"100%", borderRadius:8, border:"1px solid var(--border)", display:"block" }}
+              onError={e=>{(e.target as HTMLImageElement).replaceWith(Object.assign(document.createElement("div"),{textContent:"⚠️ Image could not be loaded. Use the link below to open it.",style:"padding:20px;text-align:center;color:var(--text2);font-size:12px;border:1px dashed var(--border);border-radius:8px;"} as any));}}
+            />
             <a href={slip} target="_blank" rel="noreferrer" style={{ display:"block", marginTop:12, textAlign:"center", fontSize:12, color:"#1d4ed8" }}>
               <i className="fa-solid fa-arrow-up-right-from-square" style={{ marginRight:5 }}></i>Open in new tab
             </a>
