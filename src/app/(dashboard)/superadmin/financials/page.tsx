@@ -119,6 +119,7 @@ const CSS = `
 .fin-badge i{font-size:9px;}
 .fin-tenant-chip{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent);}
 .fin-mono{font-family:'Courier New',monospace;font-weight:700;}
+.fin-deleted-tag{display:inline-flex;align-items:center;gap:3px;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;margin-left:5px;vertical-align:middle;white-space:nowrap;}
 .fin-amount-pos{color:#15803d;font-family:'Courier New',monospace;font-weight:700;text-align:right;}
 .fin-amount-neg{color:#b91c1c;font-family:'Courier New',monospace;font-weight:700;text-align:right;}
 .fin-empty{text-align:center;padding:40px 0;color:var(--text2);font-size:13px;}
@@ -557,7 +558,10 @@ export default function SAFinancials() {
                                 </td>
                                 <td style={{ whiteSpace:"nowrap", color:"var(--text2)", fontSize:11 }}>{fmtDate(r.createdAt)}</td>
                                 <td><span className="fin-tenant-chip">{d.tenantName}</span></td>
-                                <td><span className="fin-mono">{d.login}</span></td>
+                                <td>
+                                  <span className="fin-mono">{d.login}</span>
+                                  {!r.account && <span className="fin-deleted-tag" title="Account was deleted — data shown from snapshot"><i className="fa-solid fa-triangle-exclamation"></i>Deleted</span>}
+                                </td>
                                 <td style={{ fontSize:11 }}>{d.name!=="—"?d.name:d.email!=="—"?d.email:"—"}</td>
                                 <td>
                                   <span className="fin-badge" style={{ background: d.type==="DEMO"?"#f3e8ff":"#dbeafe", color: d.type==="DEMO"?"#7c3aed":"#1d4ed8", fontSize:10 }}>
@@ -693,7 +697,10 @@ export default function SAFinancials() {
                             <tr key={r.id}>
                               <td style={{ whiteSpace:"nowrap", color:"var(--text2)", fontSize:11 }}>{fmtDate(r.appliedAt)}</td>
                               <td><span className="fin-tenant-chip">{d.tenantName}</span></td>
-                              <td><span className="fin-mono">{d.login}</span></td>
+                              <td>
+                                <span className="fin-mono">{d.login}</span>
+                                {!r.account && <span className="fin-deleted-tag" title="Account was deleted — data shown from snapshot"><i className="fa-solid fa-triangle-exclamation"></i>Deleted</span>}
+                              </td>
                               <td style={{ fontSize:11 }}>{d.name!=="—"?d.name:"—"}</td>
                               <td>
                                 <span className="fin-badge" style={{ background: d.type==="DEMO"?"#f3e8ff":"#dbeafe", color: d.type==="DEMO"?"#7c3aed":"#1d4ed8", fontSize:10 }}>
