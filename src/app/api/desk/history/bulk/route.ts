@@ -45,7 +45,7 @@ export async function POST(req: Request) {
         if (!row) continue;
         const rule = FIN[row.type];
         const ops: any[] = [];
-        if (rule) ops.push(prisma.account.update({ where: { id: row.accountId }, data: { [rule.col]: { increment: -rule.sign * Math.abs(Number(row.amount)) } } as any }));
+        if (rule && row.accountId) ops.push(prisma.account.update({ where: { id: row.accountId }, data: { [rule.col]: { increment: -rule.sign * Math.abs(Number(row.amount)) } } as any }));
         ops.push(prisma.financialHistory.delete({ where: { id: p.id } }));
         await prisma.$transaction(ops);
         done++;

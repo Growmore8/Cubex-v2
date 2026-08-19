@@ -35,7 +35,7 @@ export async function reviewPayment(tenantId: string, id: string, status: "APPRO
         data: { status: "APPROVED", reviewedBy: by },
       });
       if (updated.count === 0) throw new Error("Already reviewed");
-      await tx.account.update({ where: { id: row.accountId }, data });
+      await tx.account.update({ where: { id: row.accountId! }, data });
       await tx.financialHistory.create({
         data: { accountId: row.accountId, tenantId: row.tenantId, accountLogin: row.account.login, accountName: row.account.name, type: row.kind as any, amount: amt, description: row.method || row.kind, mode: "REALTIME", createdBy: by },
       });

@@ -48,9 +48,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       if (row.type === "PNL_ADJUST") {
         // Manual P/L stored signed — reverse it out of the account's pnl so the
         // balance/equity/ticker update everywhere.
-        ops.push(prisma.account.update({ where: { id: row.accountId }, data: { pnl: { decrement: Number(row.amount) } } }));
+        ops.push(prisma.account.update({ where: { id: row.accountId! }, data: { pnl: { decrement: Number(row.amount) } } }));
       } else if (rule) {
-        ops.push(prisma.account.update({ where: { id: row.accountId }, data: { [rule.col]: { increment: -rule.sign * Math.abs(Number(row.amount)) } } as any }));
+        ops.push(prisma.account.update({ where: { id: row.accountId! }, data: { [rule.col]: { increment: -rule.sign * Math.abs(Number(row.amount)) } } as any }));
       }
       ops.push(prisma.financialHistory.delete({ where: { id: p.id } }));
       // Transfer delete-sync: remove the paired entry on the other account too
@@ -58,7 +58,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
         const pair = await prisma.financialHistory.findFirst({ where: { reference: row.reference, NOT: { id: row.id } } });
         if (pair) {
           const prule = FIN[pair.type];
-          if (prule) ops.push(prisma.account.update({ where: { id: pair.accountId }, data: { [prule.col]: { increment: -prule.sign * Math.abs(Number(pair.amount)) } } as any }));
+          if (prule && pair.accountId) ops.push(prisma.account.update({ where: { id: pair.accountId }, data: { [prule.col]: { increment: -prule.sign * Math.abs(Number(pair.amount)) } } as any }));
           ops.push(prisma.financialHistory.delete({ where: { id: pair.id } }));
         }
       }
@@ -118,7 +118,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (b.description != null) data.description = String(b.description);
       const rule = FIN[row.type];
       const ops: any[] = [prisma.financialHistory.update({ where: { id: p.id }, data })];
-      if (amtDelta !== 0 && rule) ops.push(prisma.account.update({ where: { id: row.accountId }, data: { [rule.col]: { increment: rule.sign * amtDelta } } as any }));
+      if (amtDelta !== 0 && rule) ops.push(prisma.account.update({ where: { id: row.accountId! }, data: { [rule.col]: { increment: rule.sign * amtDelta } } as any }));
       await prisma.$transaction(ops);
     }
     await audit(s.tenantId!, "history.edit", p.kind + " " + p.id.toString(), s.email);
