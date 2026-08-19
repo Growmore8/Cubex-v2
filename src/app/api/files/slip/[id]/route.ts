@@ -12,7 +12,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const allowed =
     s.role === "SUPERADMIN" ||
     ((s.role === "ADMIN" || s.role === "MANAGER") && row.tenantId === s.tenantId) ||
-    (s.role === "CLIENT" && row.account.userId === s.sub);
+    (s.role === "CLIENT" && row.account?.userId === s.sub);
   if (!allowed) return NextResponse.json({ ok: false }, { status: 403 });
   const buf = await readUpload(row.slipUrl);
   return new Response(new Uint8Array(buf), { headers: { "Content-Type": contentType(row.slipUrl) } });
