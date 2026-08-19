@@ -39,7 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     } else {
       throw new Error("Unknown action");
     }
-    await audit(u.tenantId, "sa.staff." + b.action, u.email, s.email);
+    await audit(u.tenantId, "sa.staff." + b.action, u.email, s.email, "SUPERADMIN");
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

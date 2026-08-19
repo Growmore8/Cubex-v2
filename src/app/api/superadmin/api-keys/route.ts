@@ -32,19 +32,19 @@ export async function POST(req: Request) {
       if (!label) throw new Error("Label is required");
       const { raw, keyHash, prefix } = generateApiKey();
       await prisma.apiKey.create({ data: { tenantId: tenant.id, label, keyHash, prefix } });
-      await audit(tenant.id, "sa.apiKey.create", label, s.email).catch(() => {});
+      await audit(tenant.id, "sa.apiKey.create", label, s.email, "SUPERADMIN").catch(() => {});
       // raw key returned ONCE — never stored, never shown again
       return NextResponse.json({ ok: true, key: raw });
     } else if (b.action === "revoke") {
       const k = await prisma.apiKey.findUnique({ where: { id: b.id } });
       if (!k) throw new Error("Key not found");
       await prisma.apiKey.update({ where: { id: k.id }, data: { active: false } });
-      await audit(k.tenantId, "sa.apiKey.revoke", k.label, s.email).catch(() => {});
+      await audit(k.tenantId, "sa.apiKey.revoke", k.label, s.email, "SUPERADMIN").catch(() => {});
     } else if (b.action === "delete") {
       const k = await prisma.apiKey.findUnique({ where: { id: b.id } });
       if (!k) throw new Error("Key not found");
       await prisma.apiKey.delete({ where: { id: k.id } });
-      await audit(k.tenantId, "sa.apiKey.delete", k.label, s.email).catch(() => {});
+      await audit(k.tenantId, "sa.apiKey.delete", k.label, s.email, "SUPERADMIN").catch(() => {});
     } else throw new Error("Unknown action");
     return NextResponse.json({ ok: true });
   } catch (e: any) { return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 }); }

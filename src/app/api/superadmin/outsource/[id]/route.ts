@@ -120,7 +120,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           made++;
         } catch {}
       }
-      await audit(t.id, "sa.tenant.seedDemo", made + " clients", s.email).catch(() => {});
+      await audit(t.id, "sa.tenant.seedDemo", made + " clients", s.email, "SUPERADMIN").catch(() => {});
       return NextResponse.json({ ok: true, seeded: made });
     } else if (b.action === "sendWelcome") {
       const to = String(b.to || "").trim();
@@ -146,7 +146,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const brand: BrandInfo = { brandName: t.brandName || t.name, primaryColor: t.primaryColor, accentColor: t.accentColor, logoUrl: t.logoUrl };
         await sendPlatformMail({ to, subject: `Your ${brand.brandName} demo is ready`, fromName: brand.brandName, html: demoWelcomeEmail(brand, { url, email: admin.email, password, endsAt: sub?.endsAt ? String(sub.endsAt) : null, client: clientUser ? { email: clientEmail, password } : null }) });
       }
-      await audit(t.id, "sa.tenant.sendWelcome", sendEmail ? to : "no-email", s.email).catch(() => {});
+      await audit(t.id, "sa.tenant.sendWelcome", sendEmail ? to : "no-email", s.email, "SUPERADMIN").catch(() => {});
       return NextResponse.json({ ok: true });
     } else if (b.action === "delete") {
       await prisma.tenant.delete({ where: { id: t.id } });
@@ -154,7 +154,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       throw new Error("Unknown action");
     }
 
-    await audit(t.id, "sa.tenant." + b.action, t.name, s.email);
+    await audit(t.id, "sa.tenant." + b.action, t.name, s.email, "SUPERADMIN");
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

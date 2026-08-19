@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     const u = await prisma.user.create({ data: { tenantId: b.tenantId, email, name: b.name, passwordHash: await hashPassword(b.password), role: role as any, status: "ACTIVE" as any, perms: {} } });
     // Staff no longer get an auto-created trading account (it appeared as a
     // duplicate client of the same name).
-    await audit(b.tenantId, "sa.create." + role, email, s.email);
+    await audit(b.tenantId, "sa.create." + role, email, s.email, "SUPERADMIN");
     return NextResponse.json({ ok: true, id: u.id });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

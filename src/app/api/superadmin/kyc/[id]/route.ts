@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (b.action === "reject" && !String(b.note || "").trim()) throw new Error("A rejection reason is required");
     const doc: any = await prisma.kycDocument.update({ where: { id: id }, data: { status: status as any, ...(b.note ? { note: b.note } : {}) }, include: { account: true } });
     await prisma.account.update({ where: { id: doc.accountId }, data: { kycStatus: status as any } }).catch(() => {});
-    await audit(doc.account.tenantId, "sa.kyc." + b.action, doc.account.login, s.email);
+    await audit(doc.account.tenantId, "sa.kyc." + b.action, doc.account.login, s.email, "SUPERADMIN");
     // Notify the client of the decision
     if (doc.account.userId) {
       const map: Record<string, [string, string]> = {

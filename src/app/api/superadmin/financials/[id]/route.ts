@@ -49,7 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     await prisma.$transaction(ops);
-    await audit(tenantId, "payment.sa." + status.toLowerCase(), (acc?.login ?? rec.accountLogin ?? rec.id) + " " + rec.kind + " $" + rec.amount, s.email || "superadmin");
+    await audit(tenantId, "payment.sa." + status.toLowerCase(), (acc?.login ?? rec.accountLogin ?? rec.id) + " " + rec.kind + " $" + rec.amount, s.email || "superadmin", "SUPERADMIN");
 
     if (acc?.userId) {
       const t = rec.kind === "DEPOSIT" ? "Deposit" : "Withdrawal";

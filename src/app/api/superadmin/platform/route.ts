@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const mode = b.mode;
     if (["OPEN", "READONLY", "LOCKED"].indexOf(mode) === -1) throw new Error("Invalid mode");
     await prisma.setting.upsert({ where: { key: "platform" }, create: { key: "platform", value: { mode } }, update: { value: { mode } } });
-    try { await audit((s.tenantId as any), "platform.mode", mode, s.email); } catch (e) {}
+    try { await audit((s.tenantId as any), "platform.mode", mode, s.email, "SUPERADMIN"); } catch (e) {}
     return NextResponse.json({ ok: true });
   } catch (e: any) { return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 }); }
 }

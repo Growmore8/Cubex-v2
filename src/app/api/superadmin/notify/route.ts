@@ -136,7 +136,7 @@ export async function POST(req: Request) {
     // Web push + realtime so it reaches clients even when the app is closed.
     await Promise.all(recipients.map((u) => sendPushToUser(u.id, { title, body: signedBody }))).catch(() => {});
     try { emitRefresh({ kind: "notification", users: recipients.map((u) => u.id) }); } catch {}
-    await audit(null, "sa.notify", `${title} → ${scope} (${recipients.length})`, s.email);
+    await audit(null, "sa.notify", `${title} → ${scope} (${recipients.length})`, s.email, "SUPERADMIN");
     return NextResponse.json({ ok: true, count: recipients.length, batchId });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
