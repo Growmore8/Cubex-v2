@@ -283,7 +283,7 @@ export async function GET(req: Request) {
 
     // Helper: resolve display fields using live account data or snapshot fallback
     const ledgAcc = (r: any) => ({
-      tenantName: r.account?.tenant?.name ?? tenantId ? (tenants.find(t => t.id === (r.tenantId || tenantId))?.name ?? r.tenantId ?? "—") : "—",
+      tenantName: r.account?.tenant?.name ?? tenants.find(t => t.id === r.tenantId)?.name ?? r.tenantId ?? "—",
       login:      r.account?.login ?? r.accountLogin ?? "—",
       name:       r.account?.name  ?? r.accountName  ?? "—",
       type:       r.account?.type  ?? "—",
