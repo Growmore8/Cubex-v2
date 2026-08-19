@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Allow delete action regardless of status
     if (b.action === "delete") {
-      const delAcc = await prisma.account.findUnique({ where: { id: rec.accountId }, select: { login: true } });
+      const delAcc = rec.accountId ? await prisma.account.findUnique({ where: { id: rec.accountId }, select: { login: true } }) : null;
       await prisma.paymentRequest.delete({ where: { id: rec.id } });
       await audit(s.tenantId as string, "payment.deleted", (delAcc?.login || rec.accountId) + " " + rec.kind + " $" + rec.amount + " deleted", s.email || "admin");
       return NextResponse.json({ ok: true });
