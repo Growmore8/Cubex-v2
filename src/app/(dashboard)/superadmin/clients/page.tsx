@@ -4,6 +4,177 @@ import CountrySelect from "@/components/ui/CountrySelect";
 import { titleCaseName } from "@/lib/format";
 import AdjustBalanceDialog from "./AdjustBalanceDialog";
 
+// ── Per-account trading details (lazy-loaded on expand) ───────────────────
+function TradingSection({ accountId, m }: { accountId: string; m: (v: number) => string }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<any>(null);
+  const [showAllOpen, setShowAllOpen] = useState(false);
+  const [showAllClosed, setShowAllClosed] = useState(false);
+
+  async function toggle() {
+    if (!open && !data) {
+      setLoading(true);
+      try {
+        const r = await fetch("/api/superadmin/clients/" + accountId + "/trading").then((x) => x.json());
+        if (r.ok) setData(r);
+      } finally { setLoading(false); }
+    }
+    setOpen((v) => !v);
+  }
+
+  const pnlColor = (v: number) => v > 0 ? "#16a34a" : v < 0 ? "#dc2626" : "#6b7280";
+
+  return (
+    <div style={{ borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 6 }}>
+      <button
+        onClick={toggle}
+        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, color: "var(--text2)", background: "none", border: "none", cursor: "pointer", padding: "2px 0", width: "100%" }}
+      >
+        <i className={"fa-solid fa-chevron-" + (open ? "up" : "down")} style={{ fontSize: 9 }} />
+        <i className="fa-solid fa-chart-line" style={{ fontSize: 10, color: "#2563eb" }} />
+        Trading Details
+        {loading && <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 9, marginLeft: "auto" }} />}
+      </button>
+
+      {open && data && (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+
+          {/* Financial breakdown */}
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text2)", marginBottom: 5 }}>Financial Breakdown</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 5 }}>
+              {[
+                { label: "Deposit",    val: data.financials.deposit,    color: "#16a34a" },
+                { label: "Withdrawal", val: -data.financials.withdrawal, color: "#dc2626" },
+                { label: "Credit",     val: data.financials.credit,     color: "#2563eb" },
+                { label: "Bonus",      val: data.financials.bonus,      color: "#7c3aed" },
+                { label: "Insurance",  val: data.financials.insurance,  color: "#0891b2" },
+                { label: "Closed PnL", val: data.financials.closedPnl,  color: pnlColor(data.financials.closedPnl) },
+              ].map(({ label, val, color }) => (
+                <div key={label} style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 7, padding: "5px 7px" }}>
+                  <div style={{ fontSize: 9, color: "var(--text2)", marginBottom: 1 }}>{label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color }}>{val >= 0 ? "$" : "-$"}{m(Math.abs(val))}</div>
+                </div>
+              ))}
+            </div>
+            {/* Net balance line */}
+            <div style={{ marginTop: 6, fontSize: 11, color: "var(--text2)", display: "flex", justifyContent: "space-between" }}>
+              <span>Net Balance (deposits - withdrawals + credit + bonus + PnL)</span>
+              <span style={{ fontWeight: 700, color: "var(--text)" }}>
+                ${m(data.financials.deposit - data.financials.withdrawal + data.financials.credit + data.financials.bonus + data.financials.closedPnl)}
+              </span>
+            </div>
+          </div>
+
+          {/* Closed trade stats */}
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text2)", marginBottom: 5 }}>Closed Trade Stats</div>
+            {data.closedStats.count === 0 ? (
+              <div style={{ fontSize: 11, color: "var(--text2)", padding: "6px 0" }}>No closed trades.</div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 5 }}>
+                {[
+                  { label: "Trades", val: String(data.closedStats.count), color: "var(--text)" },
+                  { label: "Total PnL", val: (data.closedStats.totalPnl >= 0 ? "+$" : "-$") + m(Math.abs(data.closedStats.totalPnl)), color: pnlColor(data.closedStats.totalPnl) },
+                  { label: "Win Rate", val: data.closedStats.winRate + "%", color: data.closedStats.winRate >= 50 ? "#16a34a" : "#dc2626" },
+                  { label: "W / L", val: data.closedStats.wins + " / " + data.closedStats.losses, color: "var(--text)" },
+                ].map(({ label, val, color }) => (
+                  <div key={label} style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 7, padding: "5px 7px", textAlign: "center" }}>
+                    <div style={{ fontSize: 9, color: "var(--text2)" }}>{label}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color, marginTop: 1 }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Open trades */}
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text2)", marginBottom: 5, display: "flex", alignItems: "center", gap: 6 }}>
+              Open Positions
+              <span style={{ fontWeight: 400, color: "#2563eb" }}>{data.openTrades.length}</span>
+            </div>
+            {data.openTrades.length === 0 ? (
+              <div style={{ fontSize: 11, color: "var(--text2)", padding: "4px 0" }}>No open trades.</div>
+            ) : (
+              <>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10.5 }}>
+                    <thead>
+                      <tr style={{ background: "var(--bg2)" }}>
+                        {["Ticket", "Symbol", "Side", "Lots", "Open @", "SL", "TP"].map((h) => (
+                          <th key={h} style={{ padding: "4px 6px", textAlign: "left", fontWeight: 600, color: "var(--text2)", borderBottom: "1px solid var(--border)", fontSize: 9, textTransform: "uppercase" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(showAllOpen ? data.openTrades : data.openTrades.slice(0, 5)).map((t: any) => (
+                        <tr key={t.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                          <td style={{ padding: "4px 6px", fontFamily: "monospace", color: "var(--text2)" }}>{t.ticket}</td>
+                          <td style={{ padding: "4px 6px", fontWeight: 600 }}>{t.symbol}</td>
+                          <td style={{ padding: "4px 6px", fontWeight: 700, color: t.side === "BUY" ? "#16a34a" : "#dc2626" }}>{t.side}</td>
+                          <td style={{ padding: "4px 6px", fontFamily: "monospace" }}>{t.lots}</td>
+                          <td style={{ padding: "4px 6px", fontFamily: "monospace" }}>{t.openPrice}</td>
+                          <td style={{ padding: "4px 6px", fontFamily: "monospace", color: "var(--text2)" }}>{t.sl || "—"}</td>
+                          <td style={{ padding: "4px 6px", fontFamily: "monospace", color: "var(--text2)" }}>{t.tp || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {data.openTrades.length > 5 && (
+                  <button onClick={() => setShowAllOpen((v) => !v)} style={{ marginTop: 4, fontSize: 10, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                    {showAllOpen ? "Show less" : `Show all ${data.openTrades.length} open trades`}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Recent closed trades */}
+          {data.recentTrades.length > 0 && (
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text2)", marginBottom: 5 }}>Recent Closed Trades</div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10.5 }}>
+                  <thead>
+                    <tr style={{ background: "var(--bg2)" }}>
+                      {["Symbol", "Side", "Lots", "Open", "Close", "PnL", "Closed"].map((h) => (
+                        <th key={h} style={{ padding: "4px 6px", textAlign: "left", fontWeight: 600, color: "var(--text2)", borderBottom: "1px solid var(--border)", fontSize: 9, textTransform: "uppercase" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(showAllClosed ? data.recentTrades : data.recentTrades.slice(0, 5)).map((t: any) => (
+                      <tr key={t.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "4px 6px", fontWeight: 600 }}>{t.symbol}</td>
+                        <td style={{ padding: "4px 6px", fontWeight: 700, color: t.side === "BUY" ? "#16a34a" : "#dc2626" }}>{t.side}</td>
+                        <td style={{ padding: "4px 6px", fontFamily: "monospace" }}>{t.lots}</td>
+                        <td style={{ padding: "4px 6px", fontFamily: "monospace", color: "var(--text2)" }}>{t.openPrice}</td>
+                        <td style={{ padding: "4px 6px", fontFamily: "monospace", color: "var(--text2)" }}>{t.closePrice}</td>
+                        <td style={{ padding: "4px 6px", fontFamily: "monospace", fontWeight: 700, color: pnlColor(t.pnl) }}>
+                          {t.pnl >= 0 ? "+" : ""}{m(t.pnl)}
+                        </td>
+                        <td style={{ padding: "4px 6px", color: "var(--text2)", fontSize: 9 }}>{t.closedAt ? new Date(t.closedAt).toLocaleDateString() : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {data.recentTrades.length > 5 && (
+                <button onClick={() => setShowAllClosed((v) => !v)} style={{ marginTop: 4, fontSize: 10, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  {showAllClosed ? "Show less" : `Show all ${data.recentTrades.length} recent trades`}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const BLU = "#2563eb";
 const GRN = "#16a34a";
 const RED = "#dc2626";
@@ -57,6 +228,7 @@ function AccountCard({ a, tenants, m, act, openEdit, openMgr, setPwRow, setIdRow
         )}
         <button title="Delete" style={bs("#fff1f2")} onClick={() => setDelRow(a)}><i className="fa-solid fa-trash text-xs" style={{ color: RED }} /></button>
       </div>
+      <TradingSection accountId={a.id} m={m} />
     </div>
   );
 }
