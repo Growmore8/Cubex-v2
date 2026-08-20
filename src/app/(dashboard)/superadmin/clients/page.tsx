@@ -572,14 +572,14 @@ export default function SAClientsPage() {
       {/* ── ADJUST BALANCE ── */}
       <AdjustBalanceDialog
         open={!!moneyRow}
-        data={moneyRow ? { ...moneyForm, login: moneyRow.login } : null}
+        data={moneyRow ? { ...moneyForm, login: moneyRow.login, accountType: moneyRow.type } : null}
         setData={(v: any) => setMoneyForm(v)}
-        onClose={() => setMoneyRow(null)}
+        onClose={() => { setMoneyRow(null); setErr(""); }}
         error={err}
         onApply={async () => {
           if (!moneyRow) return;
-          const ok = await act(moneyRow.id, "adjustBalance", { txType: moneyForm.type, amount: parseFloat(moneyForm.amount), description: moneyForm.description });
-          if (ok) setMoneyRow(null);
+          const ok = await act(moneyRow.id, "balance", { type: moneyForm.type, amount: parseFloat(moneyForm.amount), description: moneyForm.description });
+          if (ok) { setMoneyRow(null); setMoneyForm({ type: "DEPOSIT", amount: "", description: "" }); }
         }}
       />
 
