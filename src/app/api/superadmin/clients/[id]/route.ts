@@ -89,7 +89,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       throw new Error("Unknown action");
     }
 
-    await audit(acc.tenantId, "sa.client." + b.action, acc.login, s.email, "SUPERADMIN");
+    const auditDetail = b.action === "balance"
+      ? `${acc.login} ${b.type} $${b.amount}${b.description ? " — " + b.description : ""}`
+      : acc.login;
+    await audit(acc.tenantId, "sa.client." + b.action, auditDetail, s.email, "SUPERADMIN");
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
