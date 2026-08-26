@@ -11,6 +11,11 @@ import { gnum, gprice } from "@/lib/format";
 import { getSpreadPips, getSaDefaultSpreadPips, pipForDigits } from "@/lib/spread";
 import { isMarketOpen } from "@/lib/market";
 import { replicateTrade, closeCopiedTrades } from "@/services/copy.service";
+import { Redis as IoRedis } from "ioredis";
+
+// Singleton Redis client for spread config cache (populated by server.js every 60s)
+const _g = global as any;
+const _spreadCache: IoRedis = _g.__tradeSpreadCache ?? (_g.__tradeSpreadCache = new IoRedis(process.env.REDIS_URL || "redis://localhost:6379"));
 
 export async function assertMarketOpen(symbol: string) {
   let cat: string | null = null;
@@ -64,42 +69,50 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
   const groupId = (account as any).groupId as string | null | undefined;
   const accountId = account.id as string | null | undefined;
 
-  // All DB + Redis reads in a single parallel batch — no sequential round-trips
-  const [rawBid, rawAsk, realBidRaw, symRow, globalSym, grpRow, accMarkup, symOverride] = await Promise.all([
+  // Try Redis spread cache first (written by server.js every 60s); fall back to DB on miss.
+  const [rawBid, rawAsk, realBidRaw, symCfgRaw, globalSym, grpCfgRaw, accMuRaw, symOvRaw] = await Promise.all([
     getPrice(symbol),
     getAsk(symbol),
     getBid(symbol),
-    prisma.symbol.findFirst({
-      where: { tenantId, symbol },
-      select: { digits: true, spreadType: true, commissionPerLot: true, swapLong: true, swapShort: true, spread: true },
-    }).catch(() => null),
+    _spreadCache.hget('cubex:sym-cfg', `${tenantId}:${symbol}`).catch(() => null),
     prisma.globalSymbol.findUnique({ where: { symbol }, select: { category: true } }).catch(() => null),
-    groupId ? (prisma.tradeGroup as any).findUnique({
-      where: { id: groupId },
-      select: { spread: true, spreadType: true, commissionPerLot: true },
-    }).catch(() => null) : null,
-    accountId ? prisma.account.findUnique({
-      where: { id: accountId },
-      select: { spreadMarkup: true },
-    }).catch(() => null) : null,
-    // Per-client per-symbol spread override (highest priority)
-    accountId ? prisma.accountSymbolOverride.findUnique({
-      where: { accountId_symbol: { accountId, symbol } },
-      select: { spreadOverride: true },
-    }).catch(() => null) : null,
+    groupId ? _spreadCache.hget('cubex:grp-cfg', groupId).catch(() => null) : null,
+    accountId ? _spreadCache.hget('cubex:acc-mu', accountId).catch(() => null) : null,
+    accountId ? _spreadCache.hget('cubex:acc-ov', `${accountId}:${symbol}`).catch(() => null) : null,
   ]);
 
   if (rawBid == null) throw new Error("No price for " + symbol);
-  const digits = symRow?.digits ?? 5;
+
+  // Parse cached values
+  const cachedSym = symCfgRaw ? (() => { try { return JSON.parse(symCfgRaw); } catch { return null; } })() : null;
+  const cachedGrp = grpCfgRaw ? (() => { try { return JSON.parse(grpCfgRaw); } catch { return null; } })() : null;
+  const cachedAccMu = accMuRaw !== null ? Number(accMuRaw) : null;
+  const cachedSymOv = symOvRaw !== null ? Number(symOvRaw) : null;
+
+  // DB fallback only when Redis cache is cold (first ~60s after deploy or Redis restart)
+  const [symRow, grpRow, accMarkup, symOverride] = await Promise.all([
+    cachedSym ? null : prisma.symbol.findFirst({ where: { tenantId, symbol }, select: { digits: true, spreadType: true, commissionPerLot: true, swapLong: true, swapShort: true, spread: true } }).catch(() => null),
+    (!cachedGrp && groupId) ? (prisma.tradeGroup as any).findUnique({ where: { id: groupId }, select: { spread: true, spreadType: true, commissionPerLot: true } }).catch(() => null) : null,
+    (cachedAccMu === null && accountId) ? prisma.account.findUnique({ where: { id: accountId }, select: { spreadMarkup: true } }).catch(() => null) : null,
+    (cachedSymOv === null && accountId) ? prisma.accountSymbolOverride.findUnique({ where: { accountId_symbol: { accountId, symbol } }, select: { spreadOverride: true } }).catch(() => null) : null,
+  ]);
+
+  // Merge cached + DB results into unified shape
+  const effectiveSym = cachedSym ?? symRow;
+  const effectiveGrp = cachedGrp ?? grpRow;
+  const effectiveAccMu = cachedAccMu ?? Number(accMarkup?.spreadMarkup ?? 0);
+  const effectiveOv = cachedSymOv !== null ? cachedSymOv : symOverride?.spreadOverride;
+
+  const digits = effectiveSym?.digits ?? 5;
   const pip = pipForDigits(digits);
 
   // Per-client-per-symbol override wins everything (0 = genuine zero spread)
-  const clientSymOverride = symOverride?.spreadOverride;
+  const clientSymOverride = effectiveOv;
   const hasOverride = clientSymOverride !== null && clientSymOverride !== undefined;
-  const grpSpreadMarkup = ((grpRow?.spreadType ?? "FIXED") === "FIXED") ? Number(grpRow?.spread ?? 0) : 0;
+  const grpSpreadMarkup = ((effectiveGrp?.spreadType ?? "FIXED") === "FIXED") ? Number(effectiveGrp?.spread ?? 0) : 0;
   const adminPips = hasOverride
     ? Number(clientSymOverride)
-    : Number(symRow?.spread ?? 0) + grpSpreadMarkup + Number(accMarkup?.spreadMarkup ?? 0);
+    : Number(effectiveSym?.spread ?? 0) + grpSpreadMarkup + effectiveAccMu;
 
   let bid: number;
   let ask: number;
@@ -124,7 +137,7 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
     ask = rawBid + effectivePips * pip;
   }
 
-  return { ask, bid, symRow, grpRow };
+  return { ask, bid, symRow: effectiveSym, grpRow: effectiveGrp };
 }
 
 export async function placeOrder(tenantId: string, userId: string, input: any) {
@@ -198,7 +211,7 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   }
 
   const label = `${account.login} ${input.side} ${input.symbol} ${input.lots}L @ ${openPrice}${commission > 0 ? ` commission:$${commission.toFixed(2)}` : ""}`;
-  audit(tenantId, "trade.open", label, account.login, "CLIENT" as any);
+  audit(tenantId, "trade.open", label, account.login, "CLIENT" as any).catch(() => {});
   notifyStaff(tenantId, { type: "TRADE", title: "Trade opened", body: label }, (account as any).managerId).catch(() => {});
 
 
@@ -266,7 +279,7 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
   });
 
   const label = `${(trade.account as any).login} ${trade.symbol} ${isPartial ? `partial close ${lots}L` : "closed"} @ ${gprice(price)} | PnL ${gnum(pnl, 2)}`;
-  audit(tenantId, "trade.close", label, trade.account.login, "CLIENT" as any);
+  audit(tenantId, "trade.close", label, trade.account.login, "CLIENT" as any).catch(() => {});
   notifyStaff(tenantId, { type: "TRADE", title: isPartial ? "Partial close" : "Trade closed", body: label }, trade.account.managerId).catch(() => {});
 
   // Close follower copy trades when master fully closes — fire-and-forget

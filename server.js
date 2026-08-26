@@ -893,8 +893,8 @@ const realBids = {};
 async function loadSpreads() {
   try {
     const [syms, grps, accs, symOvRows] = await Promise.all([
-      prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true, spreadType: true, spreadMax: true } }),
-      prisma.tradeGroup.findMany({ select: { id: true, spread: true, spreadType: true } }),
+      prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true, spreadType: true, spreadMax: true, digits: true, commissionPerLot: true, swapLong: true, swapShort: true } }),
+      prisma.tradeGroup.findMany({ select: { id: true, spread: true, spreadType: true, commissionPerLot: true } }),
       prisma.account.findMany({ where: { spreadMarkup: { gt: 0 } }, select: { id: true, spreadMarkup: true } }),
       prisma.accountSymbolOverride.findMany({ where: { spreadOverride: { not: null } }, select: { accountId: true, symbol: true, spreadOverride: true } }),
     ]);
@@ -909,6 +909,35 @@ async function loadSpreads() {
     // Clear and repopulate per-client-per-symbol overrides
     for (const k in accSymOverrides) delete accSymOverrides[k];
     for (const r of symOvRows) accSymOverrides[r.accountId + ":" + r.symbol] = Number(r.spreadOverride);
+    // Write spread config to Redis so trade.service.ts can read without hitting Postgres on every trade
+    try {
+      const rp = redis.pipeline();
+      rp.del('cubex:sym-cfg');
+      for (const s of syms) {
+        rp.hset('cubex:sym-cfg', s.tenantId + ':' + s.symbol, JSON.stringify({
+          digits: s.digits || 5,
+          spread: Number(s.spread || 0),
+          spreadType: s.spreadType || 'FLOATING',
+          commissionPerLot: Number(s.commissionPerLot || 0),
+          swapLong: Number(s.swapLong || 0),
+          swapShort: Number(s.swapShort || 0),
+        }));
+      }
+      rp.del('cubex:grp-cfg');
+      for (const g of grps) {
+        rp.hset('cubex:grp-cfg', g.id, JSON.stringify({
+          spread: Number(g.spread || 0),
+          spreadType: g.spreadType || 'FIXED',
+          commissionPerLot: Number(g.commissionPerLot || 0),
+        }));
+      }
+      rp.del('cubex:acc-mu');
+      for (const a of accs) rp.hset('cubex:acc-mu', a.id, String(Number(a.spreadMarkup)));
+      rp.del('cubex:acc-ov');
+      for (const r of symOvRows) rp.hset('cubex:acc-ov', r.accountId + ':' + r.symbol, String(Number(r.spreadOverride)));
+      rp.set('cubex:spreads-ts', Date.now().toString(), 'EX', 180);
+      await rp.exec();
+    } catch (_re) {}
     // Push spread updates to all connected clients — each tenant gets its own data
     if (global.__io) {
       for (const [tenantId, spreads] of Object.entries(tenantSpreadMap)) {
