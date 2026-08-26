@@ -879,29 +879,36 @@ function microTick() {
   }
 }
 
-// Spread cache: symbol (with floating support), group, and per-account markups.
-// symSpreads: "tenantId:symbol" → { min, max, type }
-// grpSpreads: groupId → pips
-// accMarkups: accountId → pips
-// realBids: symbol → latest real bid from exchange (Kraken/Binance), updated every tick
+// Spread cache: symbol (with floating support), group, per-account markups, and per-client-per-symbol overrides.
+// symSpreads:    "tenantId:symbol"  → { min, max, type }
+// grpSpreads:    groupId            → pips
+// accMarkups:    accountId          → pips  (account-wide additive markup)
+// accSymOverrides: "accountId:symbol" → pips (absolute override — highest priority; 0 = zero spread)
+// realBids:      symbol             → latest real bid from exchange (Kraken/Binance)
 const symSpreads = {};
 const grpSpreads = {};
 const accMarkups = {};
+const accSymOverrides = {};
 const realBids = {};
 async function loadSpreads() {
   try {
-    const syms = await prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true, spreadType: true, spreadMax: true } });
+    const [syms, grps, accs, symOvRows] = await Promise.all([
+      prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true, spreadType: true, spreadMax: true } }),
+      prisma.tradeGroup.findMany({ select: { id: true, spread: true, spreadType: true } }),
+      prisma.account.findMany({ where: { spreadMarkup: { gt: 0 } }, select: { id: true, spreadMarkup: true } }),
+      prisma.accountSymbolOverride.findMany({ where: { spreadOverride: { not: null } }, select: { accountId: true, symbol: true, spreadOverride: true } }),
+    ]);
     const tenantSpreadMap = {}; // tenantId → { symbol → {min,max,type} }
     for (const s of syms) {
       symSpreads[s.tenantId + ":" + s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FLOATING" };
       if (!tenantSpreadMap[s.tenantId]) tenantSpreadMap[s.tenantId] = {};
       tenantSpreadMap[s.tenantId][s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FLOATING" };
     }
-    const grps = await prisma.tradeGroup.findMany({ select: { id: true, spread: true, spreadType: true } });
     for (const g of grps) grpSpreads[g.id] = Number(g.spread || 0);
-    // Only load accounts that have a non-zero per-account spread markup (avoids full table scan)
-    const accs = await prisma.account.findMany({ where: { spreadMarkup: { gt: 0 } }, select: { id: true, spreadMarkup: true } });
     for (const a of accs) accMarkups[a.id] = Number(a.spreadMarkup);
+    // Clear and repopulate per-client-per-symbol overrides
+    for (const k in accSymOverrides) delete accSymOverrides[k];
+    for (const r of symOvRows) accSymOverrides[r.accountId + ":" + r.symbol] = Number(r.spreadOverride);
     // Push spread updates to all connected clients — each tenant gets its own data
     if (global.__io) {
       for (const [tenantId, spreads] of Object.entries(tenantSpreadMap)) {
@@ -920,11 +927,23 @@ function getSymSpreadPips(tenantId, symbol) {
   return isPeak ? s.min : s.min + (s.max - s.min);
 }
 function getSpreadPrice(tenantId, symbol, groupId, accountId) {
+  // Per-client-per-symbol override is absolute — bypasses symbol + group entirely
+  if (accountId) {
+    const ov = accSymOverrides[accountId + ":" + symbol];
+    if (ov !== undefined) {
+      const digits = (meta[symbol] && meta[symbol].digits) || 5;
+      return ov * Math.pow(10, -(digits - 1));
+    }
+  }
   const pips = getSymSpreadPips(tenantId, symbol) + (grpSpreads[groupId] || 0) + (accMarkups[accountId] || 0);
   const digits = (meta[symbol] && meta[symbol].digits) || 5;
   return pips * Math.pow(10, -(digits - 1));
 }
 function getBid(tenantId, symbol, groupId, accountId, ask) {
+  // Per-client-per-symbol override: always use fixed spread (ignores FLOATING type)
+  if (accountId && accSymOverrides[accountId + ":" + symbol] !== undefined) {
+    return ask - getSpreadPrice(tenantId, symbol, groupId, accountId);
+  }
   const s = symSpreads[tenantId + ":" + symbol];
   if (s && s.type === "FLOATING") {
     const rb = realBids[symbol];

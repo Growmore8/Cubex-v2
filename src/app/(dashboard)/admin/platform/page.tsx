@@ -188,6 +188,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [posMenu, setPosMenu] = useState<{ x: number; y: number; t: any } | null>(null);
   const [pos, setPos] = useState<any>(null);
   const [symOv, setSymOv] = useState<any>(null);
+  const [symOvTab, setSymOvTab] = useState<"access"|"spread">("access");
   const [mt, setMt] = useState<any>(null);
   const [mtMin, setMtMin] = useState(false);
   const [hEdit, setHEdit] = useState<any>(null);
@@ -697,10 +698,13 @@ const [selAcc, setSelAcc] = useState<any>(null);
   }
   async function openSymOv(acc: any) {
     setMenu(null);
+    setSymOvTab("access");
     const r = await fetch("/api/admin/clients/" + acc.id + "/symbols").then((x) => x.json()).catch(() => ({ ok: false }));
     const disabled: Record<string, boolean> = {};
     if (r.ok && Array.isArray(r.disabled)) r.disabled.forEach((s: string) => (disabled[s] = true));
-    setSymOv({ acc, disabled, q: "" });
+    const spreadOverrides: Record<string, string> = {};
+    if (r.ok && r.spreadOverrides) Object.entries(r.spreadOverrides).forEach(([sym, pips]) => { spreadOverrides[sym] = String(pips); });
+    setSymOv({ acc, disabled, spreadOverrides, q: "" });
   }
 
   function switchLayout(l: number) {
@@ -3439,46 +3443,103 @@ const [selAcc, setSelAcc] = useState<any>(null);
           setSymOv((o: any) => { const d = { ...o.disabled }; syms.forEach((s) => (d[s] = dis)); return { ...o, disabled: d }; });
           await Promise.all(syms.map((s) => fetch("/api/admin/clients/" + symOv.acc.id + "/symbols", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: s, disabled: dis }) })));
         };
+        const saveSpreadOverride = async (sym: string, val: string) => {
+          const trimmed = val.trim();
+          const payload = trimmed === "" ? { symbol: sym, spreadOverride: null } : { symbol: sym, spreadOverride: Number(trimmed) };
+          await fetch("/api/admin/clients/" + symOv.acc.id + "/symbols", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        };
         const q = (symOv.q || "").toLowerCase();
         const grouped: Record<string, any[]> = {};
         symbols.filter((s) => !q || (s.symbol + " " + (s.display || "")).toLowerCase().includes(q)).forEach((s) => { const c = s.category || "other"; (grouped[c] || (grouped[c] = [])).push(s); });
         const cats = Object.entries(grouped).sort((a, b) => (CAT_ORDER.indexOf(a[0]) === -1 ? 99 : CAT_ORDER.indexOf(a[0])) - (CAT_ORDER.indexOf(b[0]) === -1 ? 99 : CAT_ORDER.indexOf(b[0])));
         const catName = (c: string) => c === "metals" ? "PREC. METALS" : c.toUpperCase();
+        const spreadOvCount = Object.keys(symOv.spreadOverrides || {}).filter((k) => (symOv.spreadOverrides[k] ?? "") !== "").length;
         return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.18)" }}>
           <div className="ui-pop flex max-h-[88vh] w-[580px] max-w-[95vw] flex-col rounded-xl border" style={{ background: "var(--panel)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }} onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
             <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--red) 16%, transparent)", color: "#e05260" }}><i className="fa-solid fa-ban" /></span>
-              <div className="min-w-0 flex-1"><div className="text-sm font-semibold">Disable Symbols For Client</div><div className="truncate text-[11px] text-[var(--muted)]">{symOv.acc.name} • ID: {symOv.acc.login}</div></div>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent)" }}><i className="fa-solid fa-sliders" /></span>
+              <div className="min-w-0 flex-1"><div className="text-sm font-semibold">Symbol Settings — {symOv.acc.name}</div><div className="truncate text-[11px] text-[var(--muted)]">ID: {symOv.acc.login}</div></div>
               <button onClick={() => setSymOv(null)} className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><i className="fa-solid fa-xmark" /></button>
             </div>
+            {/* Tabs */}
+            <div className="flex border-b" style={{ borderColor: "var(--border)" }}>
+              {(["access", "spread"] as const).map((tab) => (
+                <button key={tab} onClick={() => setSymOvTab(tab)} className="flex items-center gap-1.5 px-4 py-2 text-[11px] font-semibold border-b-2 transition-colors" style={{ borderColor: symOvTab === tab ? "var(--accent)" : "transparent", color: symOvTab === tab ? "var(--accent)" : "var(--muted)" }}>
+                  <i className={"fa-solid " + (tab === "access" ? "fa-ban" : "fa-arrows-left-right")} style={{ fontSize: 9 }} />
+                  {tab === "access" ? "Symbol Access" : "Spread Override"}
+                  {tab === "spread" && spreadOvCount > 0 && <span className="rounded-full px-1.5 text-[9px]" style={{ background: "var(--accent)", color: "#fff" }}>{spreadOvCount}</span>}
+                </button>
+              ))}
+            </div>
+            {/* Search */}
             <div className="border-b px-4 py-2" style={{ borderColor: "var(--border)" }}>
               <input value={symOv.q || ""} onChange={(e) => setSymOv((o: any) => ({ ...o, q: e.target.value }))} placeholder="Search symbols…" className={inp + " mt-0"} />
-              <div className="mt-1 text-[10px] text-[var(--muted)]">Turning a symbol <span style={{ color: "#e05260" }}>off</span> here hides it from <b>this client only</b>. Other clients are unaffected.</div>
+              {symOvTab === "access" && <div className="mt-1 text-[10px] text-[var(--muted)]">Turning a symbol <span style={{ color: "#e05260" }}>off</span> hides it from <b>this client only</b>.</div>}
+              {symOvTab === "spread" && <div className="mt-1 text-[10px] text-[var(--muted)]">Enter pips to override spread for this client. <b>0</b> = zero spread. Leave blank = use default symbol spread.</div>}
             </div>
+            {/* Body */}
             <div className="flex-1 overflow-auto px-4 py-2">
-              {cats.map(([cat, list]) => {
-                const enabledCount = list.filter((s) => !symOv.disabled[s.symbol]).length;
-                const allOn = enabledCount === list.length;
-                return (<div key={cat} className="mb-3">
-                  <div className="mb-1.5 flex items-center gap-2">
-                    <span className="text-[10px] font-semibold text-[var(--muted)]">{catName(cat)}</span>
-                    <span className="rounded px-1.5 text-[9px]" style={{ background: "var(--soft)", color: "var(--muted)" }}>{enabledCount}/{list.length}</span>
-                    <button onClick={() => setDis(list.map((s) => s.symbol), allOn)} className="ml-auto rounded px-2 py-0.5 text-[10px]" style={{ background: "color-mix(in srgb, var(--red) 14%, transparent)", color: "#e05260" }}>{allOn ? "Disable All" : "Enable All"}</button>
+              {symOvTab === "access" && (<>
+                {cats.map(([cat, list]) => {
+                  const enabledCount = list.filter((s) => !symOv.disabled[s.symbol]).length;
+                  const allOn = enabledCount === list.length;
+                  return (<div key={cat} className="mb-3">
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span className="text-[10px] font-semibold text-[var(--muted)]">{catName(cat)}</span>
+                      <span className="rounded px-1.5 text-[9px]" style={{ background: "var(--soft)", color: "var(--muted)" }}>{enabledCount}/{list.length}</span>
+                      <button onClick={() => setDis(list.map((s) => s.symbol), allOn)} className="ml-auto rounded px-2 py-0.5 text-[10px]" style={{ background: "color-mix(in srgb, var(--red) 14%, transparent)", color: "#e05260" }}>{allOn ? "Disable All" : "Enable All"}</button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                      {list.map((s) => { const on = !symOv.disabled[s.symbol]; return (
+                        <button key={s.symbol} onClick={() => setDis([s.symbol], on)} className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-[11px]" style={{ borderColor: on ? "var(--border)" : "color-mix(in srgb, var(--red) 40%, var(--border))", background: "var(--bg)", opacity: on ? 1 : 0.7 }}>
+                          <span className="truncate">{s.display || s.symbol}</span>
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: on ? "#16c784" : "#e05260" }} />
+                        </button>); })}
+                    </div>
+                  </div>);
+                })}
+                {cats.length === 0 && <div className="py-6 text-center text-[var(--muted)]">No symbols match.</div>}
+              </>)}
+              {symOvTab === "spread" && (<>
+                {cats.map(([cat, list]) => (
+                  <div key={cat} className="mb-3">
+                    <div className="mb-1.5 text-[10px] font-semibold text-[var(--muted)]">{catName(cat)}</div>
+                    <div className="space-y-1">
+                      {list.map((s) => {
+                        const val = (symOv.spreadOverrides || {})[s.symbol];
+                        const hasOv = val !== undefined && val !== "";
+                        return (
+                          <div key={s.symbol} className="flex items-center gap-2 rounded-lg border px-3 py-1.5" style={{ borderColor: hasOv ? "var(--accent)" : "var(--border)", background: "var(--bg)" }}>
+                            <span className="w-[90px] shrink-0 text-[11px] font-semibold">{s.display || s.symbol}</span>
+                            <input
+                              type="number" min="0" step="0.1"
+                              placeholder="default"
+                              value={val ?? ""}
+                              onChange={(e) => setSymOv((o: any) => ({ ...o, spreadOverrides: { ...o.spreadOverrides, [s.symbol]: e.target.value } }))}
+                              onBlur={(e) => saveSpreadOverride(s.symbol, e.target.value)}
+                              className="w-[70px] rounded border px-2 py-1 text-[11px] font-mono"
+                              style={{ borderColor: "var(--border)", background: "var(--bg2)", color: "var(--text)" }}
+                            />
+                            <span className="text-[10px] text-[var(--muted)]">pips</span>
+                            {hasOv && (
+                              <button onClick={() => { setSymOv((o: any) => { const ov = { ...o.spreadOverrides }; delete ov[s.symbol]; return { ...o, spreadOverrides: ov }; }); saveSpreadOverride(s.symbol, ""); }} className="ml-auto text-[10px]" style={{ color: "#e05260" }} title="Reset to default">
+                                <i className="fa-solid fa-rotate-left" />
+                              </button>
+                            )}
+                            {!hasOv && <span className="ml-auto text-[9px] text-[var(--muted)]">default</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                    {list.map((s) => { const on = !symOv.disabled[s.symbol]; return (
-                      <button key={s.symbol} onClick={() => setDis([s.symbol], on)} className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-[11px]" style={{ borderColor: on ? "var(--border)" : "color-mix(in srgb, var(--red) 40%, var(--border))", background: "var(--bg)", opacity: on ? 1 : 0.7 }}>
-                        <span className="truncate">{s.display || s.symbol}</span>
-                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: on ? "#16c784" : "#e05260" }} />
-                      </button>); })}
-                  </div>
-                </div>);
-              })}
-              {cats.length === 0 && <div className="py-6 text-center text-[var(--muted)]">No symbols match.</div>}
+                ))}
+                {cats.length === 0 && <div className="py-6 text-center text-[var(--muted)]">No symbols match.</div>}
+              </>)}
             </div>
             <div className="border-t px-4 py-3" style={{ borderColor: "var(--border)" }}>
-              <button onClick={() => setSymOv(null)} className="w-full rounded-lg py-2 text-xs font-semibold" style={{ background: "#2563eb", color: "#fff" }}>Done</button>
+              <button onClick={() => setSymOv(null)} className="w-full rounded-lg py-2 text-xs font-semibold" style={{ background: "var(--accent)", color: "#fff" }}>Done</button>
             </div>
           </div>
         </div>

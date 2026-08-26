@@ -35,9 +35,9 @@ export async function nextTicket(tenantId: string): Promise<bigint> {
   }
 }
 
-export async function assertMargin(account: any, newTrade: { symbol: string; type: "BUY" | "SELL"; lots: number }, price: number) {
+export async function assertMargin(account: any, newTrade: { symbol: string; type: "BUY" | "SELL"; lots: number }, price: number, prefetchedTrades?: any[], prefetchedFxRate?: number) {
   const lev = account.leverage || 100;
-  const existing = await prisma.trade.findMany({ where: { accountId: account.id } });
+  const existing = prefetchedTrades ?? await prisma.trade.findMany({ where: { accountId: account.id } });
   const priceMap: Record<string, number> = { [newTrade.symbol]: price };
   // Fetch all missing prices in parallel instead of sequential await-in-loop
   const missing = [...new Set(existing.map((t) => t.symbol).filter((s) => priceMap[s] == null))];
@@ -49,8 +49,8 @@ export async function assertMargin(account: any, newTrade: { symbol: string; typ
     throw new Error("Trading suspended — please clear your outstanding credit before resuming.");
   }
   const balance = Number(account.deposit) + Number(account.pnl) - Number(account.withdrawal);
-  // Convert account-currency balance to USD so it can be compared to USD floating P&L and margin.
-  const fxRate = await getAccountFxRate(account.currency as string);
+  // Use pre-fetched FX rate when available (already fetched in parallel with price resolution)
+  const fxRate = prefetchedFxRate ?? await getAccountFxRate(account.currency as string);
   const equity = (balance + Number(account.credit || 0) + Number(account.bonus || 0) + Number(account.insurance || 0)) * fxRate + floating;
   const usedBefore = usedMargin(existing.map((t) => ({ symbol: t.symbol, type: t.type as "BUY" | "SELL", lots: Number(t.lots) })), lev, (sym) => priceMap[sym] ?? price);
   const after = [...existing.map((t) => ({ symbol: t.symbol, type: t.type as "BUY" | "SELL", lots: Number(t.lots) })), { symbol: newTrade.symbol, type: newTrade.type, lots: newTrade.lots }];
@@ -65,7 +65,7 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
   const accountId = account.id as string | null | undefined;
 
   // All DB + Redis reads in a single parallel batch — no sequential round-trips
-  const [rawBid, rawAsk, realBidRaw, symRow, globalSym, grpRow, accMarkup] = await Promise.all([
+  const [rawBid, rawAsk, realBidRaw, symRow, globalSym, grpRow, accMarkup, symOverride] = await Promise.all([
     getPrice(symbol),
     getAsk(symbol),
     getBid(symbol),
@@ -82,15 +82,24 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
       where: { id: accountId },
       select: { spreadMarkup: true },
     }).catch(() => null) : null,
+    // Per-client per-symbol spread override (highest priority)
+    accountId ? prisma.accountSymbolOverride.findUnique({
+      where: { accountId_symbol: { accountId, symbol } },
+      select: { spreadOverride: true },
+    }).catch(() => null) : null,
   ]);
 
   if (rawBid == null) throw new Error("No price for " + symbol);
   const digits = symRow?.digits ?? 5;
   const pip = pipForDigits(digits);
 
-  // Compute adminPips from already-fetched data (no sequential DB call)
+  // Per-client-per-symbol override wins everything (0 = genuine zero spread)
+  const clientSymOverride = symOverride?.spreadOverride;
+  const hasOverride = clientSymOverride !== null && clientSymOverride !== undefined;
   const grpSpreadMarkup = ((grpRow?.spreadType ?? "FIXED") === "FIXED") ? Number(grpRow?.spread ?? 0) : 0;
-  const adminPips = Number(symRow?.spread ?? 0) + grpSpreadMarkup + Number(accMarkup?.spreadMarkup ?? 0);
+  const adminPips = hasOverride
+    ? Number(clientSymOverride)
+    : Number(symRow?.spread ?? 0) + grpSpreadMarkup + Number(accMarkup?.spreadMarkup ?? 0);
 
   let bid: number;
   let ask: number;
@@ -126,11 +135,18 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   if (account.deactivated) throw new Error("Account is deactivated");
   if (account.locked) throw new Error("Account is locked (read-only)");
 
+  // Pre-fetch open trades in parallel with price resolution and market checks —
+  // assertMargin needs them but only requires accountId which we have immediately.
+  const existingTradesP = prisma.trade.findMany({ where: { accountId: account.id } });
+  const fxRateP = getAccountFxRate(account.currency as string);
+
   // Run all pre-trade checks and price resolution in parallel
-  const [, , priceResult] = await Promise.all([
+  const [, , priceResult, existingTrades, fxRate] = await Promise.all([
     assertTradingOpen(),
     assertMarketOpen(input.symbol),
     resolvePrice(tenantId, input.symbol, input.side, account),
+    existingTradesP,
+    fxRateP,
   ]);
   const { ask, bid, symRow, grpRow } = priceResult;
   const openPrice = input.side === "BUY" ? ask : bid;
@@ -138,7 +154,7 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   const slErr = validateSlTp(input.side, openPrice, input.sl, input.tp);
   if (slErr) throw new Error(slErr);
 
-  await assertMargin(account, { symbol: input.symbol, type: input.side, lots: Number(input.lots) }, ask);
+  await assertMargin(account, { symbol: input.symbol, type: input.side, lots: Number(input.lots) }, ask, existingTrades, fxRate);
 
   // Commission: group override takes priority over symbol default (grpRow already fetched in resolvePrice)
   let commRate = Number(symRow?.commissionPerLot ?? 0);
