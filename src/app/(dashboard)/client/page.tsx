@@ -87,6 +87,7 @@ export default function ClientTerminal() {
   const [symbolSpreads, setSymbolSpreads] = useState<Record<string, { min: number; max: number; type: string }>>({});
   const [groupSpread, setGroupSpread] = useState(0);
   const [accountSpreadMarkup, setAccountSpreadMarkup] = useState(0);
+  const [accSymOverrides, setAccSymOverrides] = useState<Record<string, number>>({});
   const [fxRate, setFxRate] = useState(1); // USD per 1 unit of account currency (1.0 for USD)
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [liveSpreadPips, setLiveSpreadPips] = useState<Record<string, number>>({});
@@ -412,6 +413,9 @@ export default function ClientTerminal() {
     // Real-time spread updates: admin changes spread → server pushes to tenant room → update instantly
     socket.on("sym-spreads", (spreads: Record<string, { min: number; max: number; type: string }>) => {
       startTransition(() => setSymbolSpreads((prev) => ({ ...prev, ...spreads })));
+    });
+    socket.on("acc-spreads", (ov: Record<string, number>) => {
+      startTransition(() => setAccSymOverrides(ov));
     });
     return () => { socket.disconnect(); clearInterval(clr); clearInterval(flushIv); };
   }, []);
@@ -774,6 +778,7 @@ export default function ClientTerminal() {
     if (raw == null) return Number(p.openPrice);
     if (p.type !== "SELL") return raw; // BUY closes at bid = prices[]
     // SELL closes at ask = bid + spread (mirrors _spreadPips/_spreadPx logic)
+    if (accSymOverrides[p.symbol] !== undefined) return raw + accSymOverrides[p.symbol] * pipOf(effectiveDg(dg(p.symbol), raw));
     const s = symbolSpreads[p.symbol];
     const grpAcc = groupSpread + accountSpreadMarkup;
     const liveSp = liveSpreadPips[p.symbol];
@@ -830,6 +835,8 @@ export default function ClientTerminal() {
   // FLOATING: sym.min during peak hours (Mon–Fri 08–17 UTC), sym.max off-hours.
   // Group/account FIXED markups are added on top.
   const _spreadPips = (sym: string) => {
+    // Per-client per-symbol override wins everything (0 = genuine zero spread)
+    if (accSymOverrides[sym] !== undefined) return accSymOverrides[sym];
     const s = symbolSpreads[sym];
     const grpAcc = groupSpread + accountSpreadMarkup;
     // Use real live spread from exchange when available (Binance/Kraken/Massive)
@@ -868,7 +875,7 @@ export default function ClientTerminal() {
   // and the 3s branding minimum has passed, then the app mounts.
   if (!splashGone) return <ClientSplash brand={splashBrand || brand} theme={theme} hiding={booted} />;
 
-  if (isMobile) return <ClientMobile t={{ features, theme, brand, account, accts, accId, pnlOnly, swapEnabled, readOnly, isTrial, needKyc, signals, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, accountSpreadMarkup, prices, liveSpreadPips, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, avatarUploading, uploadAvatar, fmt, csz, pnlOf: pnlOfAcc, cSym, fxRate, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]), creditRequest, creditLocked, openInstantCredit: () => setInstantCreditModal(true) }} />;
+  if (isMobile) return <ClientMobile t={{ features, theme, brand, account, accts, accId, pnlOnly, swapEnabled, readOnly, isTrial, needKyc, signals, openKyc: () => setWalletModal("kyc"), positions, pending, history, financials, notis, symbols, symbolSpreads, groupSpread, accountSpreadMarkup, accSymOverrides, prices, liveSpreadPips, dirs, selSym, vol, orderType, pendingPrice, sl, tp, err, balance, equity, floating, free, used, level, price, bid, ask, d, tf, TFS, setSelSym, setVol, setSl, setTp, setOrderType, setPendingPrice, setTf, place, quickTrade, placePending, close, cancelPending, switchAcc, openAccount, topUp, doTopUp, doTransfer, xfer, setXfer, xferModal, setXferModal, xferErr, toggleTheme, enablePush, disablePush, addPasskey, openPin: () => { setPinErr(""); setPinForm({}); setPinModal(true); }, favs, toggleFav, avatarUrl, avatarUploading, uploadAvatar, fmt, csz, pnlOf: pnlOfAcc, cSym, fxRate, dg, markAllNotifsRead, chartInd, setChartInd, chartCfg, setChartCfg, acctReqModal, setAcctReqModal, logout: async () => { localStorage.removeItem("cubex-remember"); await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }, pin: { pinLock, pinInput, setPinInput, pinErr, unlock, unlockPasskey, pinModal, setPinModal, pinHasPin, setPinHasPin, pinForm, setPinForm, savePin, disablePin: async () => { if (!confirm("Disable PIN? You will no longer need a PIN to open the app.")) return; const r = await fetch("/api/client/pin", { method: "DELETE" }).then((x) => x.json()).catch(() => ({ ok: false })); if (r.ok) { setPinHasPin(false); sessionStorage.removeItem("cubex-pin-ok"); } } }, cToasts, pushToast, dismissToasts: () => setCToasts([]), creditRequest, creditLocked, openInstantCredit: () => setInstantCreditModal(true) }} />;
   if (tenantSuspended) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 text-center px-6" style={{ background: "#0f172a", color: "#94a3b8" }}>

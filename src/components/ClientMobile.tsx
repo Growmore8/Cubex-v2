@@ -237,6 +237,9 @@ export default function ClientMobile({ t }: { t: any }) {
   const _mobGrpSpread = (): number => (t as any).groupSpread || 0;
   const _mobAccMarkup = (): number => (t as any).accountSpreadMarkup || 0;
   const _mobSpreadPips = (sym: string) => {
+    // Per-client per-symbol override wins everything (0 = genuine zero spread)
+    const mobAccOv: Record<string, number> = (t as any).accSymOverrides || {};
+    if (mobAccOv[sym] !== undefined) return mobAccOv[sym];
     const s = _mobSymSpreads()[sym];
     const grpAcc = _mobGrpSpread() + _mobAccMarkup();
     // Use real live spread from exchange when available (Binance/Kraken/Massive)
@@ -267,7 +270,7 @@ export default function ClientMobile({ t }: { t: any }) {
     const raw = prices[p.symbol];
     if (raw == null) return Number(p.openPrice);
     if (p.type !== "SELL") return raw;
-    const pips = _mobSpreadPips(p.symbol);
+    const pips = _mobSpreadPips(p.symbol); // already checks accSymOverrides
     return raw + pips * pipOf(eDg(p.symbol));
   };
 

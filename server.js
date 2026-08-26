@@ -914,6 +914,16 @@ async function loadSpreads() {
       for (const [tenantId, spreads] of Object.entries(tenantSpreadMap)) {
         global.__io.to("t:" + tenantId).emit("sym-spreads", spreads);
       }
+      // Push per-account overrides — each client socket gets their own view
+      const byAcc = {};
+      for (const key of Object.keys(accSymOverrides)) {
+        const ci = key.indexOf(":"); const aId = key.slice(0, ci), sym = key.slice(ci + 1);
+        if (!byAcc[aId]) byAcc[aId] = {};
+        byAcc[aId][sym] = accSymOverrides[key];
+      }
+      for (const [aId, ov] of Object.entries(byAcc)) {
+        global.__io.to("a:" + aId).emit("acc-spreads", ov);
+      }
     }
   } catch (e) { console.error("[spreads] load failed", e); }
 }
@@ -1476,6 +1486,22 @@ app.prepare().then(async () => {
       if (sess.role === "CLIENT" || sess.role === "MANAGER") {
         presenceConnect(socket, sess);
         socket.on("disconnect", () => presenceDisconnect(socket));
+      }
+      if (sess.role === "CLIENT") {
+        // Join account room and send per-account spread overrides immediately
+        prisma.account.findFirst({
+          where: { tenantId: sess.tenantId, userId: sess.sub },
+          select: { id: true },
+        }).then((acc) => {
+          if (!acc) return;
+          socket.data.accountId = acc.id;
+          socket.join("a:" + acc.id);
+          const ov = {};
+          for (const key of Object.keys(accSymOverrides)) {
+            if (key.startsWith(acc.id + ":")) ov[key.slice(acc.id.length + 1)] = accSymOverrides[key];
+          }
+          if (Object.keys(ov).length) socket.emit("acc-spreads", ov);
+        }).catch(() => {});
       }
     }
   });
