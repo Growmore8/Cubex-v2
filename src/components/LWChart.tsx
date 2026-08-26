@@ -673,10 +673,12 @@ function LWChart({
           const sock: Socket = io({ path: "/socket.io" });
           let done = false;
           const finish = () => { if (!done) { done = true; try { sock.disconnect(); } catch {} } };
-          sock.on("tick", ({ symbol: sym, price }: any) => {
-            if (!alive) { finish(); return; }
-            if (done || sym !== symRef.current || !(price > 0) || barsRef.current.length) return;
-            if (seed(synth(price, 5000))) finish();
+          sock.on("ticks", (batch: any[]) => {
+            for (const { symbol: sym, price } of batch) {
+              if (!alive) { finish(); return; }
+              if (done || sym !== symRef.current || !(price > 0) || barsRef.current.length) return;
+              if (seed(synth(price, 5000))) { finish(); return; }
+            }
           });
           // last resort: whatever live 1-min history the server already holds
           sock.on("history", (h: any) => { if (!barsRef.current.length) seed(h[symRef.current]); });
@@ -694,9 +696,11 @@ function LWChart({
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
     let pClose: number | null = null, pHi = -Infinity, pLo = Infinity;
-    socket.on("tick", ({ symbol: sym, price }: any) => {
-      if (sym !== symRef.current || price == null) return;
-      pClose = price; if (price > pHi) pHi = price; if (price < pLo) pLo = price;
+    socket.on("ticks", (batch: any[]) => {
+      for (const { symbol: sym, price } of batch) {
+        if (sym !== symRef.current || price == null) continue;
+        pClose = price; if (price > pHi) pHi = price; if (price < pLo) pLo = price;
+      }
     });
     const apply = () => {
       if (pClose == null || !seriesRef.current) return;

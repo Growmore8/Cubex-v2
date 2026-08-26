@@ -80,17 +80,19 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
     };
     socket.on("prices", (snap: Record<string, number>) => { startTransition(() => setPrices((pp) => ({ ...pp, ...snap }))); for (const k in snap) prev[k] = snap[k]; });
     // MT5 model: price = smoothed BID. real = exchange ASK (for live spread computation).
-    socket.on("tick", ({ symbol, price, bid, real }: any) => {
-      const pv = prev[symbol];
-      if (pv != null && pv !== price) pD[symbol] = price > pv ? 1 : -1;
-      prev[symbol] = price; pP[symbol] = price;
-      // Live spread = real ask − exchange bid (both from same LP tick)
-      if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
-        const d = effectiveDigits(digitsRef.current[symbol] ?? 2, price);
-        const sp = (real - bid) / pipOf(d);
-        const prev2 = prevSp[symbol];
-        if (prev2 != null && sp !== prev2) pSD[symbol] = sp > prev2 ? 1 : -1;
-        prevSp[symbol] = sp; pS[symbol] = sp;
+    socket.on("ticks", (batch: any[]) => {
+      for (const { symbol, price, bid, real } of batch) {
+        const pv = prev[symbol];
+        if (pv != null && pv !== price) pD[symbol] = price > pv ? 1 : -1;
+        prev[symbol] = price; pP[symbol] = price;
+        // Live spread = real ask − exchange bid (both from same LP tick)
+        if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
+          const d = effectiveDigits(digitsRef.current[symbol] ?? 2, price);
+          const sp = (real - bid) / pipOf(d);
+          const prev2 = prevSp[symbol];
+          if (prev2 != null && sp !== prev2) pSD[symbol] = sp > prev2 ? 1 : -1;
+          prevSp[symbol] = sp; pS[symbol] = sp;
+        }
       }
     });
     const fv = setInterval(flush, 120);

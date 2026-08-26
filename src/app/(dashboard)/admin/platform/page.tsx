@@ -470,14 +470,16 @@ const [selAcc, setSelAcc] = useState<any>(null);
       startTransition(() => setPrices((pp) => ({ ...pp, ...snapshot })));
       for (const k in snapshot) prevRef.current[k] = snapshot[k];
     });
-    socket.on("tick", ({ symbol, price, bid, real }: any) => {
-      const prev = prevRef.current[symbol];
-      if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
-      prevRef.current[symbol] = price;
-      pP[symbol] = price;
-      if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
-        const d = dg(symbol);
-        pS[symbol] = (real - bid) / pipOf(d);
+    socket.on("ticks", (batch: any[]) => {
+      for (const { symbol, price, bid, real } of batch) {
+        const prev = prevRef.current[symbol];
+        if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
+        prevRef.current[symbol] = price;
+        pP[symbol] = price;
+        if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
+          const d = dg(symbol);
+          pS[symbol] = (real - bid) / pipOf(d);
+        }
       }
     });
     const flushIv = setInterval(flush, 150);

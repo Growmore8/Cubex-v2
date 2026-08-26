@@ -371,23 +371,25 @@ export default function ClientTerminal() {
     };
     // MT5 model: price = smoothed BID (primary). real = exchange ASK (for live spread).
     // ask = price + spread, bid = price — no separate liveBids/liveAsks needed.
-    socket.on("tick", ({ symbol, price, bid, real }: any) => {
-      const prev = prevRef.current[symbol];
-      if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
-      prevRef.current[symbol] = price;
-      pP[symbol] = price;
-      if (!dailyOpenRef.current[symbol] && price > 0) {
-        dailyOpenRef.current[symbol] = price;
-        setDailyOpen((prev2) => prev2[symbol] ? prev2 : { ...prev2, [symbol]: price });
-      }
-      // Compute live exchange spread from real ask vs exchange bid for FLOATING display
-      if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
-        const d = DIGITS[symbol] ?? 2;
-        const sp2 = (real - bid) / pipOf(d);
-        const pv2 = prevSp[symbol];
-        if (pv2 != null && sp2 !== pv2) pSD[symbol] = sp2 > pv2 ? 1 : -1;
-        prevSp[symbol] = sp2;
-        pS[symbol] = sp2;
+    socket.on("ticks", (batch: any[]) => {
+      for (const { symbol, price, bid, real } of batch) {
+        const prev = prevRef.current[symbol];
+        if (prev != null && prev !== price) pD[symbol] = price > prev ? 1 : -1;
+        prevRef.current[symbol] = price;
+        pP[symbol] = price;
+        if (!dailyOpenRef.current[symbol] && price > 0) {
+          dailyOpenRef.current[symbol] = price;
+          setDailyOpen((prev2) => prev2[symbol] ? prev2 : { ...prev2, [symbol]: price });
+        }
+        // Compute live exchange spread from real ask vs exchange bid for FLOATING display
+        if (real != null && real > 0 && bid != null && bid > 0 && real > bid) {
+          const d = DIGITS[symbol] ?? 2;
+          const sp2 = (real - bid) / pipOf(d);
+          const pv2 = prevSp[symbol];
+          if (pv2 != null && sp2 !== pv2) pSD[symbol] = sp2 > pv2 ? 1 : -1;
+          prevSp[symbol] = sp2;
+          pS[symbol] = sp2;
+        }
       }
     });
     // Initial price snapshot on connect — seeds prices for frozen/closed markets so

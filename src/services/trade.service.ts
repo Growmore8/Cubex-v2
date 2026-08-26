@@ -70,12 +70,12 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
   const accountId = account.id as string | null | undefined;
 
   // Try Redis spread cache first (written by server.js every 60s); fall back to DB on miss.
-  const [rawBid, rawAsk, realBidRaw, symCfgRaw, globalSym, grpCfgRaw, accMuRaw, symOvRaw] = await Promise.all([
+  const [rawBid, rawAsk, realBidRaw, symCfgRaw, gsCatRaw, grpCfgRaw, accMuRaw, symOvRaw] = await Promise.all([
     getPrice(symbol),
     getAsk(symbol),
     getBid(symbol),
     _spreadCache.hget('cubex:sym-cfg', `${tenantId}:${symbol}`).catch(() => null),
-    prisma.globalSymbol.findUnique({ where: { symbol }, select: { category: true } }).catch(() => null),
+    _spreadCache.hget('cubex:gs-cat', symbol).catch(() => null),
     groupId ? _spreadCache.hget('cubex:grp-cfg', groupId).catch(() => null) : null,
     accountId ? _spreadCache.hget('cubex:acc-mu', accountId).catch(() => null) : null,
     accountId ? _spreadCache.hget('cubex:acc-ov', `${accountId}:${symbol}`).catch(() => null) : null,
@@ -131,7 +131,8 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
     // If tenant has no spread configured, fall back to SA-level default per category.
     let effectivePips = adminPips;
     if (effectivePips <= 0) {
-      effectivePips = await getSaDefaultSpreadPips(globalSym?.category || "forex");
+      const cat = gsCatRaw ?? (await prisma.globalSymbol.findUnique({ where: { symbol }, select: { category: true } }).catch(() => null))?.category ?? "forex";
+      effectivePips = await getSaDefaultSpreadPips(cat);
     }
     bid = rawBid;
     ask = rawBid + effectivePips * pip;

@@ -81,8 +81,9 @@ export default function ManagerDashboard() {
         if (data.spreads) setLiveSpread((s) => ({ ...s, ...data.spreads }));
       });
     });
-    sock.on("tick", ({ symbol, price }: any) => {
-      startTransition(() => setPrices((p) => ({ ...p, [symbol]: price })));
+    sock.on("ticks", (batch: any[]) => {
+      const upd: Record<string, number> = {}; for (const { symbol, price } of batch) upd[symbol] = price;
+      startTransition(() => setPrices((p) => ({ ...p, ...upd })));
     });
     sock.on("refresh", () => {
       // Re-fetch live data; reset loaded flags so tabs reload fresh data

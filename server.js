@@ -387,6 +387,19 @@ function applyPrice(sym, price, source) {
   else if (st.price == null) commitPrice(sym, p);
 }
 
+// Tick batching: buffer ticks and flush every 80ms as a single 'ticks' array event.
+// Cuts socket emit pressure from ~350/sec (per-symbol) to ~12/sec (batched).
+const _tickBatch = {};
+let _batchFlushTimer = null;
+function _flushTicks() {
+  _batchFlushTimer = null;
+  if (!global.__io) return;
+  const ticks = Object.values(_tickBatch);
+  if (!ticks.length) return;
+  for (const k in _tickBatch) delete _tickBatch[k];
+  global.__io.emit('ticks', ticks);
+}
+
 // Commit an actual DISPLAY price: update the forming candle, cache it, broadcast
 // the tick, and recompute any derived symbols that depend on this one.
 function commitPrice(sym, p) {
@@ -411,7 +424,8 @@ function commitPrice(sym, p) {
   // and make real - p negative, falsely suppressing the spread).
   const rawReal = (st.realAt && Date.now() - st.realAt < REAL_TTL && st.ask != null) ? st.ask : null;
   const real = (rawReal != null && rawReal > emitBid) ? rawReal : null;
-  if (global.__io) global.__io.emit("tick", { symbol: sym, price: p, bid: emitBid, real, candle });
+  _tickBatch[sym] = { symbol: sym, price: p, bid: emitBid, real, candle };
+  if (!_batchFlushTimer && global.__io) _batchFlushTimer = setTimeout(_flushTicks, 80);
   recomputeDerived(sym);
 }
 
@@ -892,11 +906,12 @@ const accSymOverrides = {};
 const realBids = {};
 async function loadSpreads() {
   try {
-    const [syms, grps, accs, symOvRows] = await Promise.all([
+    const [syms, grps, accs, symOvRows, globalSyms] = await Promise.all([
       prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true, spreadType: true, spreadMax: true, digits: true, commissionPerLot: true, swapLong: true, swapShort: true } }),
       prisma.tradeGroup.findMany({ select: { id: true, spread: true, spreadType: true, commissionPerLot: true } }),
       prisma.account.findMany({ where: { spreadMarkup: { gt: 0 } }, select: { id: true, spreadMarkup: true } }),
       prisma.accountSymbolOverride.findMany({ where: { spreadOverride: { not: null } }, select: { accountId: true, symbol: true, spreadOverride: true } }),
+      prisma.globalSymbol.findMany({ select: { symbol: true, category: true } }),
     ]);
     const tenantSpreadMap = {}; // tenantId → { symbol → {min,max,type} }
     for (const s of syms) {
@@ -935,6 +950,8 @@ async function loadSpreads() {
       for (const a of accs) rp.hset('cubex:acc-mu', a.id, String(Number(a.spreadMarkup)));
       rp.del('cubex:acc-ov');
       for (const r of symOvRows) rp.hset('cubex:acc-ov', r.accountId + ':' + r.symbol, String(Number(r.spreadOverride)));
+      rp.del('cubex:gs-cat');
+      for (const g of globalSyms) rp.hset('cubex:gs-cat', g.symbol, g.category || 'forex');
       rp.set('cubex:spreads-ts', Date.now().toString(), 'EX', 180);
       await rp.exec();
     } catch (_re) {}

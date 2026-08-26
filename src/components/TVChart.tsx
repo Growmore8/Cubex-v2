@@ -330,41 +330,43 @@ export default function TVChart({
         const isCrypto = /BTC|ETH|XRP|LTC|ADA|DOT|SOL|DOGE|MATIC|BNB/i.test(symbolInfo.name);
         const spikeThreshold = isCrypto ? 0.12 : 0.03;
 
-        sock.on("tick", ({ symbol: sym, price, real }: any) => {
-          if (sym !== symbolInfo.name || price == null) return;
-          const cb = realtimeCbRef.current; if (!cb) return;
-          // Spike filter: reject ticks that move beyond the threshold from the last close.
-          // Crypto uses 12%, forex/metals use 3% — stops bad feed ticks from creating huge wicks.
-          if (lastBarRef.current && lastBarRef.current.close > 0) {
-            if (Math.abs(price - lastBarRef.current.close) / lastBarRef.current.close > spikeThreshold) return;
-          }
-          const truePrice = real ?? price;
-          const barTimeMs = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
+        sock.on("ticks", (batch: any[]) => {
+          for (const { symbol: sym, price, real } of batch) {
+            if (sym !== symbolInfo.name || price == null) continue;
+            const cb = realtimeCbRef.current; if (!cb) continue;
+            // Spike filter: reject ticks that move beyond the threshold from the last close.
+            // Crypto uses 12%, forex/metals use 3% — stops bad feed ticks from creating huge wicks.
+            if (lastBarRef.current && lastBarRef.current.close > 0) {
+              if (Math.abs(price - lastBarRef.current.close) / lastBarRef.current.close > spikeThreshold) continue;
+            }
+            const truePrice = real ?? price;
+            const barTimeMs = Math.floor(Date.now() / 1000 / sec) * sec * 1000;
 
-          if (lastBarRef.current && lastBarRef.current.time === barTimeMs) {
-            const updated: Bar = {
-              ...lastBarRef.current,
-              high: Math.max(lastBarRef.current.high, price, truePrice),
-              low:  Math.min(lastBarRef.current.low,  price, truePrice),
-              close: price,
-            };
-            lastBarRef.current = updated;
-            cb(updated);
-            onCandleRef.current?.({ open: updated.open, high: updated.high, low: updated.low, close: updated.close });
-            const la = allBarsRef.current, lb = la[la.length - 1];
-            if (lb && lb.time === barTimeMs) { lb.high = updated.high; lb.low = updated.low; lb.close = updated.close; }
-          } else {
-            const open = lastBarRef.current?.close ?? price;
-            const newBar: Bar = {
-              time: barTimeMs, open,
-              high: Math.max(open, price, truePrice),
-              low:  Math.min(open, price, truePrice),
-              close: price, volume: 0,
-            };
-            lastBarRef.current = newBar;
-            cb(newBar);
-            onCandleRef.current?.({ open: newBar.open, high: newBar.high, low: newBar.low, close: newBar.close });
-            allBarsRef.current.push({ ...newBar });
+            if (lastBarRef.current && lastBarRef.current.time === barTimeMs) {
+              const updated: Bar = {
+                ...lastBarRef.current,
+                high: Math.max(lastBarRef.current.high, price, truePrice),
+                low:  Math.min(lastBarRef.current.low,  price, truePrice),
+                close: price,
+              };
+              lastBarRef.current = updated;
+              cb(updated);
+              onCandleRef.current?.({ open: updated.open, high: updated.high, low: updated.low, close: updated.close });
+              const la = allBarsRef.current, lb = la[la.length - 1];
+              if (lb && lb.time === barTimeMs) { lb.high = updated.high; lb.low = updated.low; lb.close = updated.close; }
+            } else {
+              const open = lastBarRef.current?.close ?? price;
+              const newBar: Bar = {
+                time: barTimeMs, open,
+                high: Math.max(open, price, truePrice),
+                low:  Math.min(open, price, truePrice),
+                close: price, volume: 0,
+              };
+              lastBarRef.current = newBar;
+              cb(newBar);
+              onCandleRef.current?.({ open: newBar.open, high: newBar.high, low: newBar.low, close: newBar.close });
+              allBarsRef.current.push({ ...newBar });
+            }
           }
         });
       },

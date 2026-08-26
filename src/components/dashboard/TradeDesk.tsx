@@ -40,7 +40,7 @@ export default function TradeDesk() {
 
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
-    socket.on("tick", ({ symbol, price }: any) => setPrices((p) => ({ ...p, [symbol]: price })));
+    socket.on("ticks", (batch: any[]) => { const upd: Record<string, number> = {}; for (const { symbol, price } of batch) upd[symbol] = price; setPrices((p) => ({ ...p, ...upd })); });
     socket.on("liquidation", () => { loadOpen(); loadReports(); });
     socket.on("refresh", () => { loadOpen(); loadHistory(); loadReports(); });
     const t = setInterval(loadOpen, 8000);
