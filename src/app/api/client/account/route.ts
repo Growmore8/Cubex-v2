@@ -114,6 +114,18 @@ export async function GET(req: Request) {
     if (account) accountSpreadMarkup = Number((account as any).spreadMarkup ?? 0);
   } catch {}
 
+  // Per-client per-symbol spread overrides (0 = zero spread, absolute override)
+  let accSymOverrides: Record<string, number> = {};
+  if (account) {
+    try {
+      const rows = await prisma.accountSymbolOverride.findMany({
+        where: { accountId: account.id, spreadOverride: { not: null } },
+        select: { symbol: true, spreadOverride: true },
+      });
+      for (const r of rows) accSymOverrides[r.symbol] = Number(r.spreadOverride);
+    } catch {}
+  }
+
   // tenant branding for the app header (never "CubeX")
   let brand: { name: string; logoUrl: string | null; primaryColor: string | null; accentColor: string | null } = { name: "", logoUrl: null, primaryColor: null, accentColor: null };
   try {
@@ -195,5 +207,6 @@ export async function GET(req: Request) {
     symbolSpreads,
     groupSpread,
     accountSpreadMarkup,
+    accSymOverrides,
   });
 }

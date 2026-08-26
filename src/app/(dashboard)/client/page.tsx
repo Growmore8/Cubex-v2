@@ -305,7 +305,7 @@ export default function ClientTerminal() {
       if (d.code === "TENANT_SUSPENDED") { setTenantSuspended(true); setDataReady(true); return; }
       setErr(d.error || "Failed"); return;
     }
-    setAccount(d.account); setKycVerified(!!d.kycVerified); setSwapEnabled(d.swapEnabled !== false); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); setPnlOnly(!!d.pnlOnly); if (d.brand) setBrand(d.brand); if (d.symbolSpreads) setSymbolSpreads(d.symbolSpreads); if (d.groupSpread != null) setGroupSpread(Number(d.groupSpread)); if (d.accountSpreadMarkup != null) setAccountSpreadMarkup(Number(d.accountSpreadMarkup)); if (d.fxRate != null) setFxRate(Number(d.fxRate) || 1);
+    setAccount(d.account); setKycVerified(!!d.kycVerified); setSwapEnabled(d.swapEnabled !== false); setPositions(d.positions); setHistory(d.history); setFinancials(d.financials || []); setSymbols(d.symbols); setPnlOnly(!!d.pnlOnly); if (d.brand) setBrand(d.brand); if (d.symbolSpreads) setSymbolSpreads(d.symbolSpreads); if (d.groupSpread != null) setGroupSpread(Number(d.groupSpread)); if (d.accountSpreadMarkup != null) setAccountSpreadMarkup(Number(d.accountSpreadMarkup)); if (d.accSymOverrides) setAccSymOverrides(d.accSymOverrides); if (d.fxRate != null) setFxRate(Number(d.fxRate) || 1);
     setCreditRequest(d.creditRequest || null); setCreditLocked(!!d.creditLocked);
     (d.symbols || []).forEach((s: any) => { DIGITS[s.symbol] = s.digits; });
     if (!selSymRef.current && d.symbols.length) setSelSym((d.symbols.find((s: any) => s.symbol === "BTCUSD") || d.symbols[0]).symbol);
