@@ -22,7 +22,7 @@ services:
     networks: [web]
 
   pgbouncer:
-    image: bitnami/pgbouncer:1
+    image: bitnami/pgbouncer:latest
     restart: unless-stopped
     environment:
       POSTGRESQL_HOST: postgres
