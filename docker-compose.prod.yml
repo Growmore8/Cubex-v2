@@ -21,34 +21,12 @@ services:
     depends_on: [app]
     networks: [web]
 
-  pgbouncer:
-    image: bitnami/pgbouncer:latest
-    restart: unless-stopped
-    environment:
-      POSTGRESQL_HOST: postgres
-      POSTGRESQL_PORT: "5432"
-      POSTGRESQL_USERNAME: ${DB_USER}
-      POSTGRESQL_PASSWORD: ${DB_PASSWORD}
-      POSTGRESQL_DATABASE: ${DB_NAME}
-      PGBOUNCER_DATABASE: ${DB_NAME}
-      PGBOUNCER_POOL_MODE: session
-      PGBOUNCER_MAX_CLIENT_CONN: "200"
-      PGBOUNCER_DEFAULT_POOL_SIZE: "20"
-      PGBOUNCER_MIN_POOL_SIZE: "5"
-      PGBOUNCER_RESERVE_POOL_SIZE: "5"
-      PGBOUNCER_IGNORE_STARTUP_PARAMETERS: extra_float_digits
-    depends_on: [postgres]
-    networks: [web]
-
   app:
     build: .
     image: cubex-app:latest
     restart: unless-stopped
     env_file: .env
-    environment:
-      # Route through PgBouncer (session mode — safe with all Prisma transaction forms)
-      DATABASE_URL: "postgresql://${DB_USER}:${DB_PASSWORD}@pgbouncer:5432/${DB_NAME}"
-    depends_on: [postgres, redis, pgbouncer]
+    depends_on: [postgres, redis]
     volumes:
       - cubex-uploads:/app/uploads
     networks: [web]
