@@ -413,7 +413,15 @@ function commitPrice(sym, p) {
   st.price = p;
   redis.set("price:" + sym, String(p));
   if (st.bid != null) { redis.set("bid:" + sym, String(st.bid)); realBids[sym] = st.bid; }
-  if (st.ask != null) { redis.set("ask:" + sym, String(st.ask)); } // real exchange ask for trade execution
+  // Write ask with a TTL matching REAL_TTL — if the LP feed goes silent the key expires
+  // naturally so getAsk() returns null and resolvePrice() falls back to configured spread.
+  // Without the TTL, a stale ask would be re-used forever, causing wrong execution prices.
+  if (st.ask != null && st.realAt) {
+    const ageMs = Date.now() - st.realAt;
+    if (ageMs < REAL_TTL) {
+      redis.set("ask:" + sym, String(st.ask), "EX", Math.max(1, Math.ceil((REAL_TTL - ageMs) / 1000)));
+    }
+  }
   // MT5 model: `price` is the smoothed BID (primary chart price).
   // `real` carries the exchange ASK so clients can compute the live spread (ask − bid).
   // Falls back to null when no live feed data within REAL_TTL.
