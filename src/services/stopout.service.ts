@@ -95,9 +95,11 @@ async function processAccount(tenantId: string, account: any): Promise<number> {
     const askMap: Record<string, number> = {};
     const bidMap: Record<string, number> = {};
     symbols.forEach((s, i) => {
-      askMap[s] = asks[i] ?? 0;
-      // Fall back to ask when no real bid is available
-      bidMap[s] = (bids[i] && bids[i]! > 0) ? bids[i]! : (askMap[s] ?? 0);
+      // Never store 0 — a zero price fed into pnlFor would produce a fictional
+      // catastrophic loss equal to -(openPrice × lots × contract), triggering a
+      // false stop-out. Use null so the closePrice guard below skips the trade.
+      askMap[s] = (asks[i] != null && asks[i]! > 0) ? asks[i]! : 0;
+      bidMap[s] = (bids[i] != null && bids[i]! > 0) ? bids[i]! : (askMap[s] > 0 ? askMap[s] : 0);
     });
 
     // Calculate floating P&L for all open positions

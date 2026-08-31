@@ -416,23 +416,26 @@ function commitPrice(sym, p) {
     if (st.realAt && Date.now() - st.realAt < REAL_TTL) {
       const bidTtl = Math.max(1, Math.ceil((REAL_TTL - (Date.now() - st.realAt)) / 1000));
       redis.set("bid:" + sym, String(st.bid), "EX", bidTtl);
+      realBids[sym] = st.bid;
     } else {
-      // Feed stale — remove bid key so resolvePrice falls back to display price.
-      // This also clears pre-fix keys that had no TTL.
+      // Feed stale: delete Redis key AND null out in-memory state so the monitor /
+      // liquidate / pending-order loops also see no stale bid and use their fallback.
       redis.del("bid:" + sym);
+      st.bid = null;
+      delete realBids[sym];
     }
-    realBids[sym] = st.bid;
   }
   // ask:sym must expire exactly when the feed goes stale so resolvePrice never
   // computes liveSpread using a stale ask against the current bid — that would
   // produce a gigantic artificial spread equal to (old_ask − current_bid).
+  // Also null st.ask so the server-side monitor/liquidate loops see no stale ask.
   if (st.ask != null && st.realAt) {
     const ageMs = Date.now() - st.realAt;
     if (ageMs < REAL_TTL) {
       redis.set("ask:" + sym, String(st.ask), "EX", Math.max(1, Math.ceil((REAL_TTL - ageMs) / 1000)));
     } else {
-      // Explicit delete clears any pre-fix key that was written without a TTL.
       redis.del("ask:" + sym);
+      st.ask = null;
     }
   }
   // MT5 model: `price` is the smoothed BID (primary chart price).

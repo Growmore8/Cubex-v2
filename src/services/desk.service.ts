@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { assertTradingOpen, assertCan } from "@/lib/perms";
-import { getPrice, getAsk, getAccountFxRate } from "@/lib/prices";
+import { getPrice, getAsk, getBid, getAccountFxRate } from "@/lib/prices";
 import instruments from "@/config/instruments";
 import { Prisma } from "@prisma/client";
 import { pnlFor } from "@/lib/trademath";
@@ -99,12 +99,13 @@ export async function manualTrade(s: any, input: any) {
   if (acc.locked) throw new Error("Account is locked");
   await assertTradingOpen();
   await assertCan(s, "manualTrade");
-  const liveBid = await getPrice(input.symbol);
-  const liveAsk = await getAsk(input.symbol);
+  const liveAsk = await getAsk(input.symbol);   // ask:sym — TTL-protected real ask
+  const liveBid = await getBid(input.symbol);   // bid:sym — TTL-protected real bid
+  const livePrice = await getPrice(input.symbol); // price:sym — display fallback
   // BUY opens at ask, SELL opens at bid — same as client trade placement
-  const defaultPx = input.type === "BUY" ? (liveAsk ?? liveBid) : (liveBid ?? liveAsk);
+  const defaultPx = input.type === "BUY" ? (liveAsk ?? livePrice) : (liveBid ?? livePrice);
   const openPrice = (input.openPrice != null && Number(input.openPrice) > 0) ? Number(input.openPrice) : defaultPx;
-  const live = liveAsk ?? liveBid;
+  const live = liveAsk ?? livePrice;
   if (openPrice == null) throw new Error("No price for " + input.symbol);
   // Same margin rule as the client: free margin must cover this trade.
   await assertMargin(acc, { symbol: input.symbol, type: input.type, lots: Number(input.lots) }, live ?? openPrice);
@@ -141,11 +142,14 @@ export async function forceClose(s: any, tradeId: string, opts?: { price?: numbe
   const trade = await prisma.trade.findFirst({ where: { id: BigInt(tradeId), account: accountWhere(s) }, include: { account: true } });
   if (!trade) throw new Error("Position not found");
   // Manual close: use the supplied price, else correct side price (BUY closes at bid, SELL closes at ask)
-  const fcBid = await getPrice(trade.symbol);
-  const fcAsk = await getAsk(trade.symbol);
+  // BUY closes at bid (real LP bid > display price > real ask as last resort).
+  // SELL closes at ask (real LP ask > display price > real bid as last resort).
+  const fcBid = await getBid(trade.symbol);      // bid:sym — TTL-protected
+  const fcAsk = await getAsk(trade.symbol);      // ask:sym — TTL-protected
+  const fcPrice = await getPrice(trade.symbol);  // price:sym — display fallback
   const price = (opts?.price != null && opts.price > 0)
     ? opts.price
-    : (trade.type === "BUY" ? (fcBid ?? fcAsk) : (fcAsk ?? fcBid));
+    : (trade.type === "BUY" ? (fcBid ?? fcPrice ?? fcAsk) : (fcAsk ?? fcPrice ?? fcBid));
   if (price == null) throw new Error("No price");
   const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
   // Convert USD P&L to the account's currency before crediting (mirrors closeOrder behaviour)
