@@ -798,7 +798,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
         {/* Deactivated only — active is the default, no extra dot needed */}
         {c.deactivated ? sIco("fa-ban", "#8b97a8", "Deactivated") : null}
         {/* Locked */}
-        {c.locked ? sIco("fa-lock", SELL, "Locked") : null}
+        {c.locked ? sIco("fa-lock", SELL, "Locked by Admin") : null}
+        {!c.locked && !c.deactivated && Number((c as any).credit || 0) > 0 && (c as any).creditSettleTo && new Date((c as any).creditSettleTo) < new Date() ? sIco("fa-money-bill-wave", "#7c3aed", "Credit Lock — settlement overdue") : null}
         {/* Do Not Liquidate */}
         {c.doNotLiquidate ? sIco("fa-hand", GOLD, "Do Not Liquidate (DNL)") : null}
         {/* KYC — only for live root (non-sub) accounts */}
@@ -1595,8 +1596,9 @@ const [selAcc, setSelAcc] = useState<any>(null);
                             const accFl = accPos.reduce((s: number, p: any) => s + pnlOf(p, prices[p.symbol] ?? Number(p.openPrice), csz(p.symbol)), 0);
                             const accUsed = accPos.reduce((s: number, p: any) => { const pr = prices[p.symbol] ?? Number(p.openPrice); const m = (Number(p.lots) * csz(p.symbol) * pr) / (Number(c.leverage) || 100); return s + (/JPY$/i.test(p.symbol) ? m / (pr || 1) : m); }, 0);
                             const accMl = accUsed > 0 ? ((bal + accFl) / accUsed) * 100 : null;
-                            const statusLabel = c.deactivated ? "Inactive" : c.locked ? "Locked" : "Active";
-                            const statusCol = c.deactivated ? GOLD : c.locked ? SELL : BUY;
+                            const isCreditLocked = !c.locked && !c.deactivated && Number((c as any).credit || 0) > 0 && (c as any).creditSettleTo && new Date((c as any).creditSettleTo) < new Date();
+                            const statusLabel = c.deactivated ? "Inactive" : c.locked ? "Admin Lock" : isCreditLocked ? "Credit Lock" : "Active";
+                            const statusCol = c.deactivated ? GOLD : (c.locked || isCreditLocked) ? SELL : BUY;
                             const kycApproved = c.type === "LIVE" && c.kycStatus === "APPROVED";
                             const kycPending = c.type === "LIVE" && c.kycStatus === "PENDING";
                             const kycRejected = c.type === "LIVE" && c.kycStatus === "REJECTED";
@@ -2968,7 +2970,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
               <div className="truncate text-[9px]" style={{ color: "var(--muted)" }}>{titleCaseName(menu.acc.name)}</div>
             </div>
             <div className="flex flex-col items-end gap-0.5">
-              {menu.acc.locked && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: SELL + "22", color: SELL }}>LOCKED</span>}
+              {menu.acc.locked && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: SELL + "22", color: SELL }}>ADMIN LOCK</span>}
+              {!menu.acc.locked && !menu.acc.deactivated && Number((menu.acc as any).credit || 0) > 0 && (menu.acc as any).creditSettleTo && new Date((menu.acc as any).creditSettleTo) < new Date() && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: "#7c3aed22", color: "#7c3aed" }}>CREDIT LOCK</span>}
               {menu.acc.deactivated && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: GOLD + "22", color: GOLD }}>INACTIVE</span>}
               {menu.acc.doNotLiquidate && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: "#a78bfa22", color: "#a78bfa" }}>DNL</span>}
             </div>

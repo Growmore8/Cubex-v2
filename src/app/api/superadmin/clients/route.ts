@@ -51,6 +51,8 @@ export async function GET() {
       balance: Number((a as any).deposit) - Number((a as any).withdrawal) + Number((a as any).credit) + Number((a as any).bonus) + Number((a as any).pnl),
       locked: (a as any).locked,
       deactivated: (a as any).deactivated,
+      credit: Number((a as any).credit || 0),
+      creditSettleTo: (a as any).creditSettleTo || null,
       isPool: (a as any).isPool,
       tenantId: a.tenantId,
       managerId: (a as any).managerId,

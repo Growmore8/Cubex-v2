@@ -180,6 +180,10 @@ const GRN = "#16a34a";
 const RED = "#dc2626";
 const AMB = "#b45309";
 
+function isCreditLocked(a: any) {
+  return !a.locked && !a.deactivated && Number(a.credit || 0) > 0 && a.creditSettleTo && new Date(a.creditSettleTo) < new Date();
+}
+
 // ── Account card rendered inside the detail panel ──────────────────────────
 function AccountCard({ a, tenants, m, act, openEdit, openMgr, setPwRow, setIdRow, setDelRow, setRepRow, setMoneyRow, setErr }: any) {
   const bs = (bg: string) => ({ background: bg, padding: "3px 8px", borderRadius: 4, border: "1px solid transparent", cursor: "pointer" });
@@ -190,7 +194,8 @@ function AccountCard({ a, tenants, m, act, openEdit, openMgr, setPwRow, setIdRow
   }
   function statusChip(a: any) {
     if (a.deactivated) return <span className="sab sab-amber" style={{ fontSize: 9 }}>Inactive</span>;
-    if (a.locked) return <span className="sab sab-red" style={{ fontSize: 9 }}>Locked</span>;
+    if (a.locked) return <span className="sab sab-red" style={{ fontSize: 9 }}>Admin Lock</span>;
+    if (isCreditLocked(a)) return <span className="sab" style={{ fontSize: 9, background: "#7c3aed18", color: "#7c3aed", border: "1px solid #7c3aed40" }}>Credit Lock</span>;
     return <span className="sab sab-green" style={{ fontSize: 9 }}>Active</span>;
   }
   return (
@@ -389,7 +394,8 @@ export default function SAClientsPage() {
     return <span className="text-gray-300 text-xs">—</span>;
   }
   function clientStatusText(client: any) {
-    if (client.accounts.some((a: any) => a.locked)) return <span className="text-xs font-semibold" style={{ color: RED }}>Locked</span>;
+    if (client.accounts.some((a: any) => a.locked)) return <span className="text-xs font-semibold" style={{ color: RED }}>Admin Lock</span>;
+    if (client.accounts.some((a: any) => isCreditLocked(a))) return <span className="text-xs font-semibold" style={{ color: "#7c3aed" }}>Credit Lock</span>;
     if (client.accounts.some((a: any) => a.deactivated)) return <span className="text-xs font-semibold" style={{ color: AMB }}>Inactive</span>;
     return <span className="text-xs font-semibold" style={{ color: GRN }}>Active</span>;
   }
