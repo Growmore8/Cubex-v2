@@ -102,8 +102,13 @@ export async function manualTrade(s: any, input: any) {
   const liveAsk = await getAsk(input.symbol);   // ask:sym — TTL-protected real ask
   const liveBid = await getBid(input.symbol);   // bid:sym — TTL-protected real bid
   const livePrice = await getPrice(input.symbol); // price:sym — display fallback
-  // BUY opens at ask, SELL opens at bid — same as client trade placement
-  const defaultPx = input.type === "BUY" ? (liveAsk ?? livePrice) : (liveBid ?? livePrice);
+  // BUY opens at ask, SELL opens at bid — same as client trade placement.
+  // Stale guard: reject ask/bid if they deviate > 1% from display price
+  // (same rule as resolvePrice — prevents stale Redis keys from setting wrong price).
+  const manualThreshold = livePrice != null ? livePrice * 0.01 : 0;
+  const safeManualAsk = (liveAsk != null && livePrice != null && Math.abs(liveAsk - livePrice) <= manualThreshold) ? liveAsk : null;
+  const safeManualBid = (liveBid != null && livePrice != null && Math.abs(liveBid - livePrice) <= manualThreshold) ? liveBid : null;
+  const defaultPx = input.type === "BUY" ? (safeManualAsk ?? livePrice) : (safeManualBid ?? livePrice);
   const openPrice = (input.openPrice != null && Number(input.openPrice) > 0) ? Number(input.openPrice) : defaultPx;
   const live = liveAsk ?? livePrice;
   if (openPrice == null) throw new Error("No price for " + input.symbol);
@@ -147,9 +152,14 @@ export async function forceClose(s: any, tradeId: string, opts?: { price?: numbe
   const fcBid = await getBid(trade.symbol);      // bid:sym — TTL-protected
   const fcAsk = await getAsk(trade.symbol);      // ask:sym — TTL-protected
   const fcPrice = await getPrice(trade.symbol);  // price:sym — display fallback
+  // Stale guard: if ask/bid deviates > 1% from display, treat as stale and
+  // fall back to display price. Mirrors the resolvePrice() deviation check.
+  const fcThreshold = fcPrice != null ? fcPrice * 0.01 : 0;
+  const safeFcAsk = (fcAsk != null && fcPrice != null && Math.abs(fcAsk - fcPrice) <= fcThreshold) ? fcAsk : null;
+  const safeFcBid = (fcBid != null && fcPrice != null && Math.abs(fcBid - fcPrice) <= fcThreshold) ? fcBid : null;
   const price = (opts?.price != null && opts.price > 0)
     ? opts.price
-    : (trade.type === "BUY" ? (fcBid ?? fcPrice ?? fcAsk) : (fcAsk ?? fcPrice ?? fcBid));
+    : (trade.type === "BUY" ? (safeFcBid ?? fcPrice ?? safeFcAsk) : (safeFcAsk ?? fcPrice ?? safeFcBid));
   if (price == null) throw new Error("No price");
   const pnl = pnlFor(trade.symbol, trade.type as any, Number(trade.openPrice), price, Number(trade.lots));
   // Convert USD P&L to the account's currency before crediting (mirrors closeOrder behaviour)

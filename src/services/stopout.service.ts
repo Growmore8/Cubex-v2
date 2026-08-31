@@ -85,12 +85,26 @@ async function processAccount(tenantId: string, account: any): Promise<number> {
     });
     if (!trades.length) break;
 
-    // Fetch all prices in parallel — ask for SELL close, bid for BUY close
+    // Fetch all prices in parallel — ask for SELL close, bid for BUY close.
+    // Apply the same 1%-of-display deviation guard as resolvePrice: if a stale
+    // ask or bid is > 1% away from the display price, treat it as absent so we
+    // fall back to the display price rather than using a wrong stale value.
     const symbols = [...new Set(trades.map((t) => t.symbol))];
+    const prices = await Promise.all(symbols.map((s) => getPrice(s)));
     const [asks, bids] = await Promise.all([
-      // getAsk() reads the real exchange ask (ask:SYMBOL); fall back to display BID when no real feed
-      Promise.all(symbols.map(async (s) => { const a = await getAsk(s); return (a != null && a > 0) ? a : getPrice(s); })),
-      Promise.all(symbols.map((s) => getBid(s))),
+      Promise.all(symbols.map(async (s, i) => {
+        const a = await getAsk(s);
+        const p = prices[i];
+        const threshold = p != null ? p * 0.01 : 0;
+        const safeAsk = (a != null && p != null && Math.abs(a - p) <= threshold) ? a : null;
+        return safeAsk ?? p;
+      })),
+      Promise.all(symbols.map(async (s, i) => {
+        const b = await getBid(s);
+        const p = prices[i];
+        const threshold = p != null ? p * 0.01 : 0;
+        return (b != null && p != null && Math.abs(b - p) <= threshold) ? b : null;
+      })),
     ]);
     const askMap: Record<string, number> = {};
     const bidMap: Record<string, number> = {};

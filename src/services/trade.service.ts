@@ -120,20 +120,29 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
   // Use real LP bid (bid:sym) when available; display price is the fallback.
   const realBid = (realBidRaw != null && realBidRaw > 0) ? realBidRaw : rawBid;
 
-  // Sanity check on REAL bid vs real ask (not display price vs real ask).
-  // Using display price here caused false negatives when the smoothed display
-  // lagged above the real ask on sharp downward moves — the check failed even
-  // though the real spread was perfectly normal, forcing the configured-spread
-  // fallback and making SELL execute at the wrong (higher) display price.
-  // Cap at 500 pips: anything beyond is a stale/inconsistent cache value.
+  // Two guards to detect stale Redis cache values:
+  //
+  // 1. Spread cap (500 pips): catches the case where ONE key is stale and the
+  //    other is current — e.g. ask:sym = 4,611 (stale), bid:sym = 4,453 (live).
+  //    Spread = 158 >> 500 pips → rejected.
+  //
+  // 2. Deviation cap (1% of display price): catches the case where BOTH keys
+  //    are stale at similar old values — e.g. ask:sym = 4,611.47 (stale),
+  //    bid:sym = 4,610.75 (stale), display = 4,453. Their mutual spread is only
+  //    72 pips (passes guard 1), but both are 158 units from display (~3.5%).
+  //    Without guard 2, SELL opens at 4,610.75 and BUY at 4,611.47 — both wrong.
   const MAX_LIVE_SPREAD_PIPS = 500;
-  const liveSpreadOk = rawAsk != null && rawAsk > realBid && (rawAsk - realBid) / pip <= MAX_LIVE_SPREAD_PIPS;
+  const MAX_STALE_DEVIATION = rawBid * 0.01; // 1% of display price
+  const askDeviationOk = rawAsk != null && Math.abs(rawAsk - rawBid) <= MAX_STALE_DEVIATION;
+  const bidDeviationOk = realBidRaw == null || Math.abs(realBidRaw - rawBid) <= MAX_STALE_DEVIATION;
+  const liveSpreadOk = askDeviationOk && bidDeviationOk
+    && rawAsk! > realBid && (rawAsk! - realBid) / pip <= MAX_LIVE_SPREAD_PIPS;
   if (liveSpreadOk) {
     // Execute at the real LP prices so buttons match execution exactly:
     // SELL button shows st.bid  → SELL executes at realBid (bid:sym)
     // BUY  button shows st.ask  → BUY  executes at rawAsk + configured markup
     bid = realBid;
-    ask = rawAsk + adminPips * pip;
+    ask = rawAsk! + adminPips * pip;
   } else {
     // Single-price feed (TD/FH): construct spread from tenant config.
     // If tenant has no spread configured, fall back to SA-level default per category.
