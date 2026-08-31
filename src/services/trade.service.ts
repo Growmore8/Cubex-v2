@@ -117,7 +117,13 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
   let bid: number;
   let ask: number;
 
-  if (rawAsk != null && rawAsk > rawBid) {
+  // liveSpread sanity: a stale ask:sym combined with a fresh bid:sym can produce
+  // an enormous artificial spread (e.g. stale ask 4611 − current bid 4456 = 154 on gold).
+  // Cap at 500 pips; anything beyond that means the cached values are inconsistent
+  // and we must fall back to the configured spread instead.
+  const MAX_LIVE_SPREAD_PIPS = 500;
+  const liveSpreadOk = rawAsk != null && rawAsk > rawBid && (rawAsk - rawBid) / pip <= MAX_LIVE_SPREAD_PIPS;
+  if (liveSpreadOk) {
     // Real exchange bid/ask from Massive/Binance/Kraken.
     // Anchor to the smoothed display price (rawBid = getPrice) so the execution price
     // matches what the client sees on screen, preventing slippage surprises from the

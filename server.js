@@ -412,14 +412,27 @@ function commitPrice(sym, p) {
   } else { candle.high = Math.max(candle.high, p); candle.low = Math.min(candle.low, p); candle.close = p; }
   st.price = p;
   redis.set("price:" + sym, String(p));
-  if (st.bid != null) { redis.set("bid:" + sym, String(st.bid)); realBids[sym] = st.bid; }
-  // Write ask with a TTL matching REAL_TTL — if the LP feed goes silent the key expires
-  // naturally so getAsk() returns null and resolvePrice() falls back to configured spread.
-  // Without the TTL, a stale ask would be re-used forever, causing wrong execution prices.
+  if (st.bid != null) {
+    if (st.realAt && Date.now() - st.realAt < REAL_TTL) {
+      const bidTtl = Math.max(1, Math.ceil((REAL_TTL - (Date.now() - st.realAt)) / 1000));
+      redis.set("bid:" + sym, String(st.bid), "EX", bidTtl);
+    } else {
+      // Feed stale — remove bid key so resolvePrice falls back to display price.
+      // This also clears pre-fix keys that had no TTL.
+      redis.del("bid:" + sym);
+    }
+    realBids[sym] = st.bid;
+  }
+  // ask:sym must expire exactly when the feed goes stale so resolvePrice never
+  // computes liveSpread using a stale ask against the current bid — that would
+  // produce a gigantic artificial spread equal to (old_ask − current_bid).
   if (st.ask != null && st.realAt) {
     const ageMs = Date.now() - st.realAt;
     if (ageMs < REAL_TTL) {
       redis.set("ask:" + sym, String(st.ask), "EX", Math.max(1, Math.ceil((REAL_TTL - ageMs) / 1000)));
+    } else {
+      // Explicit delete clears any pre-fix key that was written without a TTL.
+      redis.del("ask:" + sym);
     }
   }
   // MT5 model: `price` is the smoothed BID (primary chart price).
