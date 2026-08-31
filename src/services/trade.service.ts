@@ -117,21 +117,23 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
   let bid: number;
   let ask: number;
 
-  // liveSpread sanity: a stale ask:sym combined with a fresh bid:sym can produce
-  // an enormous artificial spread (e.g. stale ask 4611 − current bid 4456 = 154 on gold).
-  // Cap at 500 pips; anything beyond that means the cached values are inconsistent
-  // and we must fall back to the configured spread instead.
+  // Use real LP bid (bid:sym) when available; display price is the fallback.
+  const realBid = (realBidRaw != null && realBidRaw > 0) ? realBidRaw : rawBid;
+
+  // Sanity check on REAL bid vs real ask (not display price vs real ask).
+  // Using display price here caused false negatives when the smoothed display
+  // lagged above the real ask on sharp downward moves — the check failed even
+  // though the real spread was perfectly normal, forcing the configured-spread
+  // fallback and making SELL execute at the wrong (higher) display price.
+  // Cap at 500 pips: anything beyond is a stale/inconsistent cache value.
   const MAX_LIVE_SPREAD_PIPS = 500;
-  const liveSpreadOk = rawAsk != null && rawAsk > rawBid && (rawAsk - rawBid) / pip <= MAX_LIVE_SPREAD_PIPS;
+  const liveSpreadOk = rawAsk != null && rawAsk > realBid && (rawAsk - realBid) / pip <= MAX_LIVE_SPREAD_PIPS;
   if (liveSpreadOk) {
-    // Real exchange bid/ask from Massive/Binance/Kraken.
-    // Anchor to the smoothed display price (rawBid = getPrice) so the execution price
-    // matches what the client sees on screen, preventing slippage surprises from the
-    // display-smoothing lag. Real market spread is preserved on top.
-    const realBid = (realBidRaw != null && realBidRaw > 0) ? realBidRaw : rawBid;
-    const liveSpread = rawAsk - realBid; // actual exchange spread in price units
-    bid = rawBid;                        // display price = what client sees
-    ask = rawBid + liveSpread + adminPips * pip;
+    // Execute at the real LP prices so buttons match execution exactly:
+    // SELL button shows st.bid  → SELL executes at realBid (bid:sym)
+    // BUY  button shows st.ask  → BUY  executes at rawAsk + configured markup
+    bid = realBid;
+    ask = rawAsk + adminPips * pip;
   } else {
     // Single-price feed (TD/FH): construct spread from tenant config.
     // If tenant has no spread configured, fall back to SA-level default per category.
