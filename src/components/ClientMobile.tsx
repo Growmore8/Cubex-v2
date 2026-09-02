@@ -1564,7 +1564,7 @@ export default function ClientMobile({ t }: { t: any }) {
             <div className="border-t border-[var(--border)]" style={{ background: "var(--panel)" }}>
               {/* SELL | − lot + | BUY */}
               <div className="flex items-stretch gap-1 px-1.5 py-1.5 min-[380px]:gap-1.5 min-[380px]:px-2.5 min-[380px]:py-2">
-                <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", chartVol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, touchAction: "manipulation" }}>
+                <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "SELL", chartVol); }} disabled={!account || readOnly} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: SELLBTN, touchAction: "manipulation" }}>
                   <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Sell</div>
                   <div className="text-[12px] font-bold tabular-nums min-[380px]:text-[13px]">{bid != null ? gnum(bid, eDg(selSym)) : "…"}</div>
                 </button>
@@ -1573,7 +1573,7 @@ export default function ClientMobile({ t }: { t: any }) {
                   <input type="number" inputMode="decimal" step="0.01" autoComplete="off" value={chartVol} onChange={(e) => setChartVol(Number(e.target.value))} className="h-8 w-12 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-1 text-center text-[11px] font-bold tabular-nums text-[var(--text)] outline-none min-[380px]:h-9 min-[380px]:w-14 min-[380px]:text-[12px]" style={{ touchAction: "manipulation" }} />
                   <button onClick={() => setChartVol((v) => +(v + 0.01).toFixed(2))} className="flex h-8 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-base text-[var(--muted)] active:scale-95 min-[380px]:h-9 min-[380px]:w-8" style={{ background: "var(--soft)", touchAction: "manipulation" }}>+</button>
                 </div>
-                <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", chartVol); }} disabled={!account || account?.locked} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, touchAction: "manipulation" }}>
+                <button onPointerDown={(e) => { e.preventDefault(); quickTrade(selSym, "BUY", chartVol); }} disabled={!account || readOnly} className="flex-1 rounded-xl py-2.5 text-center text-white shadow-md transition active:scale-[0.98] disabled:opacity-50" style={{ background: BUYBTN, touchAction: "manipulation" }}>
                   <div className="text-[9px] font-semibold uppercase tracking-wide opacity-85">Buy</div>
                   <div className="text-[12px] font-bold tabular-nums min-[380px]:text-[13px]">{ask != null ? gnum(ask, eDg(selSym)) : "…"}</div>
                 </button>
@@ -1690,7 +1690,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
                     {/* SELL | Lot+Spread center | BUY */}
                     <div className="flex items-stretch gap-2">
-                      <button onPointerDown={(e) => { e.preventDefault(); doPlace("SELL"); }} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#ff6b78,#e0394a 70%,#b9293a)", touchAction: "manipulation" }}>
+                      <button onPointerDown={(e) => { e.preventDefault(); doPlace("SELL"); }} disabled={!account || readOnly} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#ff6b78,#e0394a 70%,#b9293a)", touchAction: "manipulation" }}>
                         <span className="text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down mr-0.5 text-[8px]" />Sell</span>
                         <span className="text-[15px] tabular-nums">{bid != null ? gnum(bid, dd) : "…"}</span>
                       </button>
@@ -1699,7 +1699,7 @@ export default function ClientMobile({ t }: { t: any }) {
                         <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>Lots</span>
                         <span className="text-[8px] font-semibold" style={{ color: "var(--muted)" }}>{Math.round(sprd * 10)}</span>
                       </div>
-                      <button onPointerDown={(e) => { e.preventDefault(); doPlace("BUY"); }} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)", touchAction: "manipulation" }}>
+                      <button onPointerDown={(e) => { e.preventDefault(); doPlace("BUY"); }} disabled={!account || readOnly} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)", touchAction: "manipulation" }}>
                         <span className="text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up mr-0.5 text-[8px]" />Buy</span>
                         <span className="text-[15px] tabular-nums">{ask != null ? gnum(ask, dd) : "…"}</span>
                       </button>
@@ -2304,7 +2304,7 @@ export default function ClientMobile({ t }: { t: any }) {
 
                 {/* SELL | Lot+Spread center | BUY */}
                 <div className="flex items-stretch gap-2">
-                  <button onClick={() => doPlace("SELL")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#ff6b78,#e0394a 70%,#b9293a)" }}>
+                  <button onClick={() => doPlace("SELL")} disabled={!account || readOnly} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#ff6b78,#e0394a 70%,#b9293a)" }}>
                     <span className="text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down mr-1 text-[9px]" />Sell</span>
                     <span className="text-[16px] tabular-nums">{bid != null ? gnum(bid, dd) : "…"}</span>
                   </button>
@@ -2313,7 +2313,7 @@ export default function ClientMobile({ t }: { t: any }) {
                     <span className="text-[7px] uppercase tracking-widest" style={{ color: "var(--muted)" }}>Lots</span>
                     <span className="text-[8px] font-semibold" style={{ color: "var(--muted)" }}>{Math.round(sprd * 10)}</span>
                   </div>
-                  <button onClick={() => doPlace("BUY")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)" }}>
+                  <button onClick={() => doPlace("BUY")} disabled={!account || readOnly} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3 font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)" }}>
                     <span className="text-[10px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up mr-1 text-[9px]" />Buy</span>
                     <span className="text-[16px] tabular-nums">{ask != null ? gnum(ask, dd) : "…"}</span>
                   </button>

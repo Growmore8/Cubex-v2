@@ -96,7 +96,9 @@ export async function reports(s: any) {
 export async function manualTrade(s: any, input: any) {
   const acc = await prisma.account.findFirst({ where: { id: input.accountId, ...accountWhere(s) } });
   if (!acc) throw new Error("Account not in your scope");
-  if (acc.locked) throw new Error("Account is locked");
+  // Admin staff can open trades on locked accounts (lock only restricts the client).
+  // Deactivated accounts are fully suspended and block everyone including admin.
+  if (acc.deactivated) throw new Error("Account is deactivated");
   await assertTradingOpen();
   await assertCan(s, "manualTrade");
   const liveAsk = await getAsk(input.symbol);   // ask:sym — TTL-protected real ask

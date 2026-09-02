@@ -1750,7 +1750,7 @@ export default function ClientTerminal() {
           {(rightTab === "TRADE" || rightTab === "DOM") && (
             <div className="shrink-0 border-t border-[var(--border)] p-2">
               <div className="flex items-stretch gap-1">
-                <button onClick={() => place("SELL")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#ff6b78,#e0394a 70%,#b9293a)" }}>
+                <button onClick={() => place("SELL")} disabled={!account || readOnly} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#ff6b78,#e0394a 70%,#b9293a)" }}>
                   <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-down text-[8px]" />Sell</span>
                   <span className="text-[14px] tabular-nums">{bid != null ? gnum(bid, d) : "…"}</span>
                 </button>
@@ -1758,7 +1758,7 @@ export default function ClientTerminal() {
                   <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--muted)" }}>{_spreadPips(selSym) > 0 ? Math.round(_spreadPips(selSym)) : "—"}</span>
                   <span className="text-[7px] uppercase tracking-wider" style={{ color: "var(--muted)" }}>pts</span>
                 </div>
-                <button onClick={() => place("BUY")} disabled={!account || account?.locked} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)" }}>
+                <button onClick={() => place("BUY")} disabled={!account || readOnly} className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-50" style={{ background: "linear-gradient(160deg,#5aa0ff,#2f81f7 70%,#1e63cc)" }}>
                   <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90"><i className="fa-solid fa-arrow-trend-up text-[8px]" />Buy</span>
                   <span className="text-[14px] tabular-nums">{ask != null ? gnum(ask, d) : "…"}</span>
                 </button>
