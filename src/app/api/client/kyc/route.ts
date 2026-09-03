@@ -1,15 +1,28 @@
 import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
-import { clientAccount, listClientKyc, createKyc } from "@/services/kyc.service";
+import { listClientKyc, createKyc } from "@/services/kyc.service";
 import { notifyStaff } from "@/services/notification.service";
 import { sendTenantSms } from "@/lib/sms";
 import { saveUpload } from "@/lib/upload";
 import { audit } from "@/lib/audit";
+import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+async function resolveAccount(tenantId: string, userId: string, accountId?: string | null) {
+  if (accountId) {
+    // Use the specific account the client submitted from — verify it belongs to them.
+    return prisma.account.findFirst({ where: { id: accountId, tenantId, userId } });
+  }
+  // Fallback: find any LIVE account for this user (prefer LIVE over DEMO).
+  return prisma.account.findFirst({ where: { tenantId, userId, type: "LIVE" } })
+    ?? prisma.account.findFirst({ where: { tenantId, userId } });
+}
+
+export async function GET(req: Request) {
   const s = await requireClient();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  const account = await clientAccount(s.tenantId!, s.sub);
+  const url = new URL(req.url);
+  const accountId = url.searchParams.get("accountId");
+  const account = await resolveAccount(s.tenantId!, s.sub, accountId);
   if (!account) return NextResponse.json({ ok: false, error: "No account" }, { status: 404 });
   const docs = await listClientKyc(account.id);
   return NextResponse.json({ ok: true, docs });
@@ -19,11 +32,12 @@ export async function POST(req: Request) {
   const s = await requireClient();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
-    const account = await clientAccount(s.tenantId!, s.sub);
+    const form = await req.formData();
+    const submittedAccountId = form.get("accountId") as string | null;
+    const account = await resolveAccount(s.tenantId!, s.sub, submittedAccountId);
     if (!account) throw new Error("No account");
     if ((account as any).type === "DEMO") throw new Error("KYC verification is only required for live accounts.");
     if ((account as any).kycStatus === "APPROVED") throw new Error("Your identity is already verified. No further documents are required.");
-    const form = await req.formData();
     const docType = String(form.get("docType") || "document");
     const file = form.get("file") as File | null;
     const back = form.get("back") as File | null;

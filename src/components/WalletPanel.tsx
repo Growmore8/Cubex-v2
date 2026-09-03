@@ -45,7 +45,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
   async function load() {
     const [pm, k, ac] = await Promise.all([
       fetch("/api/client/payment-methods").then((r) => r.json()).catch(() => ({})),
-      fetch("/api/client/kyc").then((r) => r.json()).catch(() => ({})),
+      fetch("/api/client/kyc" + (accountId ? "?accountId=" + encodeURIComponent(accountId) : "")).then((r) => r.json()).catch(() => ({})),
       fetch("/api/client/account" + (accountId ? "?accountId=" + encodeURIComponent(accountId) : "")).then((r) => r.json()).catch(() => ({})),
     ]);
     if (pm.ok) { setCrypto(pm.crypto || pm.wallets || []); setUpi(pm.upi || []); setBank(pm.bank || []); setLinks(pm.links || []); setMoonpayEnabled(!!pm.moonpay); }
@@ -150,8 +150,10 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
 
   async function uploadKyc(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setMsg(""); setSending(true);
+    const fd = new FormData(e.target as HTMLFormElement);
+    if (accountId) fd.set("accountId", accountId);
     let d: any;
-    try { d = await fetch("/api/client/kyc", { method: "POST", body: new FormData(e.target as HTMLFormElement) }).then((r) => r.json()); } catch { setSending(false); setErr("Network error — please try again"); return; }
+    try { d = await fetch("/api/client/kyc", { method: "POST", body: fd }).then((r) => r.json()); } catch { setSending(false); setErr("Network error — please try again"); return; }
     setSending(false);
     if (!d.ok) { setErr(d.error || "Upload failed"); return; }
     (e.target as HTMLFormElement).reset(); setMsg("Documents submitted for review. We will notify you once verified."); load();
