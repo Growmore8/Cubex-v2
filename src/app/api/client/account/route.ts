@@ -99,12 +99,29 @@ export async function GET(req: Request) {
   } catch { symbols = []; }
 
   // Spread data: per-symbol (fixed/floating) + group markup + account markup
+  // SA category defaults: used as feed-gap fallback for FLOATING when configured spread = 0
+  const SA_DEFAULTS: Record<string, number> = {
+    forex: 1.5, metals: 3, commodities: 3, crypto: 10, indices: 8, stocks: 5, energy: 3,
+  };
   let symbolSpreads: Record<string, { min: number; max: number; type: string }> = {};
   let groupSpread = 0;
   let accountSpreadMarkup = 0;
   try {
-    const tenantSyms = await prisma.symbol.findMany({ where: { tenantId: s.tenantId! }, select: { symbol: true, spread: true, spreadType: true, spreadMax: true } });
-    for (const ts of tenantSyms) symbolSpreads[ts.symbol] = { min: Number(ts.spread ?? 0), max: Number(ts.spreadMax ?? 0), type: ts.spreadType || "FLOATING" };
+    const tenantSyms = await prisma.symbol.findMany({
+      where: { tenantId: s.tenantId! },
+      select: { symbol: true, spread: true, spreadType: true, spreadMax: true, category: true },
+    });
+    for (const ts of tenantSyms) {
+      const type = ts.spreadType || "FLOATING";
+      const rawMin = Number(ts.spread ?? 0);
+      // FLOATING fallback: if DB spread is 0 (e.g., from a bulk-wipe bug), use SA category default
+      // so clients always see a sensible fallback when the live feed is absent.
+      // FIXED: use exactly what the tenant admin configured (even 0 is intentional).
+      const min = (type === "FLOATING" && rawMin <= 0)
+        ? (SA_DEFAULTS[ts.category || "forex"] ?? 1.5)
+        : rawMin;
+      symbolSpreads[ts.symbol] = { min, max: Number(ts.spreadMax ?? 0), type };
+    }
     if (account && (account as any).groupId) {
       const grp = await prisma.tradeGroup.findUnique({ where: { id: (account as any).groupId }, select: { spread: true, spreadType: true } });
       // FIXED = apply configured pip markup. FLOATING = live exchange spread, no extra markup.
