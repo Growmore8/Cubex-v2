@@ -222,6 +222,19 @@ function LWChart({
   const tfRef = useRef(tf);
   symRef.current = symbol; tfRef.current = tf;
 
+  // Remember the last-used timeframe per symbol (like MT5 / VertexFX).
+  // When the symbol changes, restore the saved TF; when TF changes, persist it.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("cubex-tf:" + symbol);
+      const valid = Object.keys(TF_SECONDS);
+      if (saved && valid.includes(saved) && saved !== tf) onTfChange?.(saved);
+    } catch {}
+  }, [symbol]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    try { localStorage.setItem("cubex-tf:" + symbol, tf); } catch {}
+  }, [symbol, tf]);
+
   // Drawing tools + indicators — `tool` may be controlled by a parent header.
   const [internalTool, setInternalTool] = useState<"none" | "hline" | "trend" | "erase">("none");
   const tool = toolProp !== undefined ? toolProp : internalTool;
@@ -609,29 +622,6 @@ function LWChart({
       try { seriesRef.current.setData(bars); barsRef.current = bars; try { chartRef.current?.timeScale().fitContent(); } catch {} onBarsLoaded.current(); onCandleUpdateRef.current?.(bars[bars.length - 1]); return true; }
       catch { return false; }
     }
-    // Build a plausible `count`-bar history (random walk) ending at `lastPrice`,
-    // so symbols the data feed can't supply (derived metals, grams, some indices)
-    // still get a full chart that connects seamlessly to the live price.
-    function synth(lastPrice: number, count: number) {
-      const sec = TF_SECONDS[tf] || 60;
-      const now = Math.floor(Date.now() / 1000 / sec) * sec;
-      const step = Math.pow(10, -digits);
-      const round = (n: number) => Number(n.toFixed(digits));
-      const tmp: any[] = [];
-      let close = lastPrice;
-      for (let i = 0; i < count; i++) {
-        const t = now - i * sec;
-        const vol = step * (6 + Math.random() * 22); // per-bar range in points
-        let open = close + (Math.random() - 0.5) * vol;
-        if (open <= 0) open = close;
-        const high = Math.max(open, close) + Math.random() * vol * 0.5;
-        const low = Math.max(step, Math.min(open, close) - Math.random() * vol * 0.5);
-        tmp.push({ time: t, open: round(open), high: round(high), low: round(low), close: round(close) });
-        close = open; // walk backwards
-      }
-      return tmp.reverse();
-    }
-
     // Instant open: seed the chart from the last cached bars for this symbol+tf so
     // it renders immediately on refresh, then the live fetch below refreshes it.
     const cacheKey = "cubex-candles:" + symbol + ":" + tf;
@@ -644,6 +634,20 @@ function LWChart({
         const ok = d && d.ok && seed(d.candles);
         if (ok && d.candles) {
           try { localStorage.setItem(cacheKey, JSON.stringify(d.candles.slice(-300))); } catch {}
+          // Seed the forming bar so a mid-candle connect gets the right open price.
+          // MT5 / VertexFX always send the current partial bar; we approximate by
+          // using the last historical bar's close as the open of the current bucket.
+          try {
+            const sec = TF_SECONDS[tf] || 60;
+            const nowBucket = Math.floor(Date.now() / 1000 / sec) * sec;
+            const bars = barsRef.current;
+            const last = bars[bars.length - 1];
+            if (last && last.time < nowBucket && seriesRef.current) {
+              const seedBar = { time: nowBucket, open: last.close, high: last.close, low: last.close, close: last.close };
+              bars.push(seedBar);
+              seriesRef.current.update(seedBar);
+            }
+          } catch {}
           // Enable left-scroll load-more for deeper history
           loadMoreRef.current = () => {
             if (!alive || loadingMoreRef.current || !barsRef.current.length) return;
@@ -667,21 +671,19 @@ function LWChart({
               .finally(() => { loadingMoreRef.current = false; });
           };
         }
-        // Fallback: the feed returned nothing for this symbol. Synthesize a full
-        // 5000-bar history seeded from the first live price we receive.
+        // Fallback: the feed returned nothing for this symbol.
+        // Use whatever 5-second candle history the server already holds in memory;
+        // the live-update loop will then build bars forward from ticks.
+        // No synthetic random-walk — never show fabricated price data.
         if (!ok) {
           const sock: Socket = io({ path: "/socket.io" });
           let done = false;
           const finish = () => { if (!done) { done = true; try { sock.disconnect(); } catch {} } };
-          sock.on("ticks", (batch: any[]) => {
-            for (const { symbol: sym, price } of batch) {
-              if (!alive) { finish(); return; }
-              if (done || sym !== symRef.current || !(price > 0) || barsRef.current.length) return;
-              if (seed(synth(price, 5000))) { finish(); return; }
-            }
+          sock.on("history", (h: any) => {
+            if (!alive || barsRef.current.length) { finish(); return; }
+            seed(h[symRef.current]);
+            finish();
           });
-          // last resort: whatever live 1-min history the server already holds
-          sock.on("history", (h: any) => { if (!barsRef.current.length) seed(h[symRef.current]); });
           setTimeout(finish, 5000);
         }
       })
