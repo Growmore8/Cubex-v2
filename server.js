@@ -944,7 +944,10 @@ const grpSpreads = {};
 const accMarkups = {};
 const accSymOverrides = {};
 const realBids = {};
+let _spreadsRunning = false;
 async function loadSpreads() {
+  if (_spreadsRunning) return;
+  _spreadsRunning = true;
   try {
     const [syms, grps, accs, symOvRows, globalSyms] = await Promise.all([
       prisma.symbol.findMany({ select: { tenantId: true, symbol: true, spread: true, spreadType: true, spreadMax: true, digits: true, commissionPerLot: true, swapLong: true, swapShort: true } }),
@@ -1011,7 +1014,7 @@ async function loadSpreads() {
         global.__io.to("a:" + aId).emit("acc-spreads", ov);
       }
     }
-  } catch (e) { console.error("[spreads] load failed", e); }
+  } catch (e) { console.error("[spreads] load failed", e); } finally { _spreadsRunning = false; }
 }
 // Compute floating or fixed symbol spread in pips.
 function getSymSpreadPips(tenantId, symbol) {
@@ -1136,9 +1139,14 @@ async function closeTpSl(t, reason, price, io) {
     const cs = cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : '$';
     const pnlAcc = pnl / fxRate;
     const swapAcc = swap / fxRate;
-    await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: t.accountId, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnlAcc, swap: swapAcc, commission: t.commission ?? 0, comment: t.comment || null, closeReason: reason, openedAt: t.openedAt } });
-    await prisma.trade.delete({ where: { id: t.id } });
-    await prisma.account.update({ where: { id: t.accountId }, data: { pnl: { increment: pnlAcc + swapAcc } } });
+    // Atomic: all three writes succeed or all roll back.
+    // Without a transaction, a crash between trade.delete and account.update would
+    // permanently lose the client's P&L with no way to recover automatically.
+    await prisma.$transaction([
+      prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: t.accountId, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnlAcc, swap: swapAcc, commission: t.commission ?? 0, comment: t.comment || null, closeReason: reason, openedAt: t.openedAt } }),
+      prisma.trade.delete({ where: { id: t.id } }),
+      prisma.account.update({ where: { id: t.accountId }, data: { pnl: { increment: pnlAcc + swapAcc } } }),
+    ]);
     if (t.account && t.account.userId) {
       const title = reason === "TP" ? "Take Profit hit ✓" : "Stop Loss hit";
       const body = `${t.symbol} ${t.type} closed @ ${price} | P/L ${pnlAcc >= 0 ? "+" : ""}${cs}${Math.abs(pnlAcc).toFixed(2)}`;
@@ -1160,6 +1168,7 @@ async function liquidate(acc, list, io) {
     const liqFxRate = acc.currency === 'EUR' ? (state['EURUSD']?.price || 1) : acc.currency === 'GBP' ? (state['GBPUSD']?.price || 1) : 1;
     const liqCs = acc.currency === 'EUR' ? '€' : acc.currency === 'GBP' ? '£' : '$';
     let total = 0; // accumulated in account currency
+    const txWrites = []; // build all DB writes first, execute atomically
     for (const t of list) {
       const _lst = state[t.symbol];
       const _lra = (_lst && _lst.ask > 0) ? _lst.ask : null;
@@ -1170,10 +1179,13 @@ async function liquidate(acc, list, io) {
       const pnlAcc = pnl / liqFxRate;
       const swapAcc = swapAmt / liqFxRate;
       total += pnlAcc + swapAcc;
-      await prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnlAcc, swap: swapAcc, commission: t.commission ?? 0, comment: t.comment || null, closeReason: "MC", openedAt: t.openedAt } });
-      await prisma.trade.delete({ where: { id: t.id } });
+      txWrites.push(prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnlAcc, swap: swapAcc, commission: t.commission ?? 0, comment: t.comment || null, closeReason: "MC", openedAt: t.openedAt } }));
+      txWrites.push(prisma.trade.delete({ where: { id: t.id } }));
     }
-    await prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: total } } });
+    txWrites.push(prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: total } } }));
+    // Atomic: all trades close + balance update succeed or all roll back.
+    // Without a transaction a crash mid-loop would delete trades without crediting P&L.
+    await prisma.$transaction(txWrites);
     const body = acc.login + " margin call — " + list.length + " trade(s) closed, P/L " + liqCs + Math.abs(total).toFixed(2);
     if (acc.userId) { await prisma.notification.create({ data: { tenantId: acc.tenantId, userId: acc.userId, title: "Stop out", body: "Positions liquidated at margin call", type: "TRADE" } }).catch(() => {}); pushToUser(acc.userId, { title: "Stop out", body: "Positions liquidated at margin call" }); }
     await notifyStaffRaw(acc.tenantId, { title: "⚠ Margin call — " + acc.login, body, type: "TRADE" }, acc.managerId);
@@ -1308,14 +1320,23 @@ async function monitor(io) {
   } catch (e) { console.error("[monitor]", e); } finally { _monitorRunning = false; }
 }
 
+const _filling = new Set(); // tracks pending-order IDs currently being filled
+let _pendingRunning = false;
 async function checkPending(io) {
+  // Reentrancy guard: if the previous cycle is still processing (slow DB), skip this tick.
+  // Without this, two concurrent cycles can both read the same pending order and double-fill it.
+  if (_pendingRunning) return;
+  _pendingRunning = true;
   try {
     const pend = await prisma.pendingOrder.findMany({ include: { account: true } });
     const now = new Date();
     for (const o of pend) {
+      // Per-order try/catch: one order failing (e.g. P2025 race on delete) must not
+      // abort the remaining orders in this cycle.
+      try {
       // GTD expiry: auto-cancel when expiresAt has passed
       if (o.expiresAt && now > o.expiresAt) {
-        await prisma.pendingOrder.delete({ where: { id: o.id } });
+        await prisma.pendingOrder.delete({ where: { id: o.id } }).catch((e) => { if (e?.code !== 'P2025') throw e; });
         const expBody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + Number(o.price) + " expired (GTD)";
         if (o.account?.userId) { await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order expired", body: expBody, type: "TRADE" } }).catch(() => {}); pushToUser(o.account.userId, { title: "Pending order expired", body: expBody }); }
         await prisma.auditLog.create({ data: { tenantId: o.account.tenantId, action: "order.expired", detail: (o.account.login || "") + " " + expBody, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
@@ -1346,6 +1367,8 @@ async function checkPending(io) {
         continue;
       }
       if (!fill) continue;
+      if (_filling.has(o.id)) continue; // secondary double-fill guard (belt + suspenders)
+      _filling.add(o.id);
       // BUY opens at ask, SELL opens at bid
       const openPx = o.side === "BUY" ? ask : bid;
       // Commission on pending fill
@@ -1357,17 +1380,19 @@ async function checkPending(io) {
         try { await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: openPx, sl: o.sl, tp: o.tp, commission: pendComm, comment: o.comment || null } }); filled = true; break; }
         catch (e) { if (_ta < 2 && e?.code === "P2002" && e?.meta?.target?.includes("ticket")) continue; throw e; }
       }
-      if (!filled) continue;
+      if (!filled) { _filling.delete(o.id); continue; }
       if (pendComm > 0) await prisma.account.update({ where: { id: o.accountId }, data: { pnl: { decrement: pendComm } } }).catch(() => {});
-      await prisma.pendingOrder.delete({ where: { id: o.id } });
+      await prisma.pendingOrder.delete({ where: { id: o.id } }).catch((e) => { if (e?.code !== 'P2025') throw e; });
+      _filling.delete(o.id);
       const pbody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + openPx;
       if (o.account && o.account.userId) { await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: pbody, type: "TRADE" } }).catch(() => {}); pushToUser(o.account.userId, { title: "Pending order filled", body: pbody }); }
       await notifyStaffRaw(o.account.tenantId, { title: "Pending filled — " + (o.account.login || ""), body: pbody, type: "TRADE" }, o.account.managerId);
       await prisma.auditLog.create({ data: { tenantId: o.account.tenantId, action: "order.filled", detail: (o.account.login || "") + " " + pbody, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
       io.emit("refresh", {});
       io.emit("refresh", { kind: "notification" }); // client + staff reload notifs (sound + toast)
+      } catch (e) { _filling.delete(o.id); console.error("[checkPending order]", o.id, e?.message || e); }
     }
-  } catch (e) { console.error("[checkPending]", e); }
+  } catch (e) { console.error("[checkPending]", e); } finally { _pendingRunning = false; }
 }
 // REST price poller — TD WebSocket only streams a subset of symbols on most
 // plans, so we batch-poll /price for every base symbol. One request covers all;
@@ -1422,7 +1447,10 @@ async function statementCronTick() {
   } catch (e) { /* transient — retried next hour */ }
 }
 // ── Price Alerts ─────────────────────────────────────────────────────────────
+let _alertsRunning = false;
 async function checkPriceAlerts(io) {
+  if (_alertsRunning) return;
+  _alertsRunning = true;
   try {
     const alerts = await prisma.priceAlert.findMany({ where: { triggered: false }, include: { account: true } });
     for (const al of alerts) {
@@ -1445,17 +1473,27 @@ async function checkPriceAlerts(io) {
       }
       if (io) io.emit("refresh", { kind: "notification" });
     }
-  } catch (e) { console.error("[alerts]", e); }
+  } catch (e) { console.error("[alerts]", e); } finally { _alertsRunning = false; }
 }
 
 // ── Swap Daily Cron ───────────────────────────────────────────────────────────
 // Runs at 00:00 UTC. Charges swapLong (BUY) or swapShort (SELL) pips × pip value × lots.
 // Triple on Wednesday (covers Sat+Sun, MT5 standard).
+let _swapRunning = false;
 async function swapCronTick() {
+  // Reentrancy guard: prevents double-charge if server restarts at midnight or
+  // the previous run hasn't finished (e.g. large DB under load).
+  if (_swapRunning) return;
+  _swapRunning = true;
   try {
     const now = new Date();
+    const today = now.toISOString().slice(0, 10); // YYYY-MM-DD UTC
     const day = now.getUTCDay(); // 0=Sun, 6=Sat
     if (day === 0 || day === 6) { console.log("[swap] weekend — skipping"); return; }
+    // Idempotency: store last-run date in settings so a restart near midnight
+    // cannot double-charge, and a missed day is detectable in the logs.
+    const lastRun = await prisma.setting.findUnique({ where: { key: 'swap_last_date' } });
+    if (lastRun?.value === today) { console.log("[swap] already ran today —", today, "— skipping"); return; }
     const isWed = day === 3; // Wednesday UTC
     const multiplier = isWed ? 3 : 1;
     // Only process tenants where swap is enabled
@@ -1483,8 +1521,10 @@ async function swapCronTick() {
       const swapAmt = swapRate * pip * Number(t.lots) * contract * multiplier;
       await prisma.trade.update({ where: { id: t.id }, data: { swap: { increment: new PrismaClient.Decimal(swapAmt) } } }).catch(() => {});
     }
-    console.log("[swap] processed", trades.length, "trades, multiplier:", multiplier);
-  } catch (e) { console.error("[swap]", e); }
+    // Mark today as done — prevents double-charge on same-day restart
+    await prisma.setting.upsert({ where: { key: 'swap_last_date' }, update: { value: today }, create: { key: 'swap_last_date', value: today } }).catch(() => {});
+    console.log("[swap] processed", trades.length, "trades, multiplier:", multiplier, "date:", today);
+  } catch (e) { console.error("[swap]", e); } finally { _swapRunning = false; }
 }
 function startSwapCron(io) {
   // Schedule to run at next 00:00 UTC then every 24h
