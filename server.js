@@ -1589,19 +1589,27 @@ app.prepare().then(async () => {
   try { await loadCatalog(); } catch (e) { console.error('[feed] catalog load failed:', e.message); }
   try { await loadSpreads(); setInterval(loadSpreads, 60000); } catch (e) { console.error('[spreads] initial load failed:', e.message); }
   // Auto-seed new global symbols to all tenants on every startup (background, non-blocking)
-  setTimeout(async () => {
-    try {
-      const port = process.env.PORT || 3000;
-      const secret = process.env.CRON_SECRET;
-      const headers = { "Content-Type": "application/json", ...(secret ? { "x-cron-secret": secret } : {}) };
-      const r = await fetch(`http://localhost:${port}/api/superadmin/seed-tenant-spreads`, { method: "POST", headers });
-      const d = await r.json().catch(() => ({}));
-      if (d.ok) {
+  // Retries every 15s up to 6 times (90s window) to wait for Next.js to be fully ready.
+  (async () => {
+    const port = process.env.PORT || 3000;
+    const secret = process.env.CRON_SECRET;
+    const headers = { "Content-Type": "application/json", ...(secret ? { "x-cron-secret": secret } : {}) };
+    for (let attempt = 1; attempt <= 6; attempt++) {
+      await new Promise((r) => setTimeout(r, 15000));
+      try {
+        const r = await fetch(`http://localhost:${port}/api/superadmin/seed-tenant-spreads`, { method: "POST", headers });
+        if (!r.ok) continue;
+        const d = await r.json().catch(() => ({}));
+        if (!d.ok) continue;
         const seeded = (d.results || []).filter((x) => x.seeded > 0);
-        if (seeded.length) console.log(`[seed] auto-seeded new symbols →`, seeded.map((x) => `${x.tenant}:+${x.seeded}`).join(", "));
+        if (seeded.length) console.log(`[seed] auto-seeded →`, seeded.map((x) => `${x.tenant}:+${x.seeded}`).join(", "));
+        else console.log("[seed] all tenants up to date");
+        break; // success — stop retrying
+      } catch (e) {
+        if (attempt === 6) console.warn("[seed] startup auto-seed gave up after 6 attempts:", e.message);
       }
-    } catch (e) { console.warn('[seed] startup auto-seed skipped:', e.message); }
-  }, 8000);
+    }
+  })();
   const server = createServer((req, res) => handle(req, res));
   const io = new Server(server, { path: "/socket.io" });
   global.__io = io;
