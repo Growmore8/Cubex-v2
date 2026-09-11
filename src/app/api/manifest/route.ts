@@ -6,31 +6,35 @@ import { getBrand } from "@/lib/brand";
 export async function GET() {
   const brand = await getBrand();
   const name = brand.name || "Trading Platform";
-  const icon = brand.logoUrl || undefined;
-  const type = icon?.endsWith(".svg")
-    ? "image/svg+xml"
-    : /\.jpe?g$/i.test(icon || "")
-    ? "image/jpeg"
-    : "image/png";
+  const logo = brand.logoUrl || null;
+  const color = brand.primaryColor || "#2563eb";
+
+  // Always include generated SVG fallback icons so the browser install prompt
+  // never gets blocked by a missing icon (required by Chrome/Safari).
+  const icons: { src: string; sizes: string; type: string; purpose: string }[] = [];
+  if (logo) {
+    const type = logo.endsWith(".svg") ? "image/svg+xml" : /\.jpe?g$/i.test(logo) ? "image/jpeg" : "image/png";
+    icons.push({ src: logo, sizes: "any", type, purpose: "any" });
+  }
+  icons.push(
+    { src: "/api/icon?size=192", sizes: "192x192", type: "image/svg+xml", purpose: "any" },
+    { src: "/api/icon?size=512", sizes: "512x512", type: "image/svg+xml", purpose: "maskable" },
+  );
 
   return NextResponse.json(
     {
       name,
       short_name: name.length > 12 ? name.slice(0, 12) : name,
-      description: `${name} trading platform`,
-      start_url: "/",
+      description: `${name} — trade global markets`,
+      start_url: "/client",
       scope: "/",
       display: "standalone",
       orientation: "portrait",
-      background_color: brand.primaryColor || "#131722",
-      theme_color: brand.primaryColor || "#131722",
-      icons: icon
-        ? [
-            { src: icon, sizes: "192x192", type, purpose: "any" },
-            { src: icon, sizes: "512x512", type, purpose: "any maskable" },
-          ]
-        : [],
+      background_color: "#131722",
+      theme_color: color,
+      icons,
+      categories: ["finance"],
     },
-    { headers: { "Content-Type": "application/manifest+json" } }
+    { headers: { "Content-Type": "application/manifest+json", "Cache-Control": "public, max-age=3600" } }
   );
 }
