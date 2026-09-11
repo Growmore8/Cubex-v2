@@ -35,9 +35,11 @@ const COL: Record<string, string> = {
 const METAL: Record<string, [string, string]> = {
   XAU: ["Au", "#eab308"], XAG: ["Ag", "#9ca3af"], XPT: ["Pt", "#94a3b8"], XPD: ["Pd", "#a3a3a3"],
   XTI: ["Oil", "#16a34a"], WTI: ["Oil", "#16a34a"],
+  // Silver gram base (after QUOTES strips USD/EUR etc.)
+  XAGG: ["Ag", "#9ca3af"],
   // Energy (full symbol — no quote suffix stripped)
   USOIL: ["Oil", "#16a34a"], UKOIL: ["Oil", "#64748b"], NATGAS: ["Gas", "#0ea5e9"], COPPER: ["Cu", "#b45309"],
-  // Gold gram
+  // Gold/silver gram
   GAU: ["Gau", "#eab308"],
 };
 const INDEX: Record<string, [string, string]> = {
@@ -67,7 +69,18 @@ const CRYPTO_COLORS: Record<string, string> = {
   FTM2:"#1969ff",ONE:"#00aeef",IOTA:"#131f37",NEO:"#58bf00",WAVES:"#0155ff",
   CELR:"#c0272d",ENJ:"#7866d5",KLAY:"#ff6e4a",ZIL:"#29ccc4",
 };
-const QUOTES = ["USDT", "USDC", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD", "BTC", "ETH"];
+const QUOTES = [
+  "USDT", "USDC",
+  // Majors
+  "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD",
+  // Crypto
+  "BTC", "ETH",
+  // Exotic forex quote currencies (so USDHKD→USD+HKD, EURNOK→EUR+NOK, etc.)
+  "HKD", "SGD", "TRY", "IDR", "MXN", "ZAR", "NOK", "SEK", "DKK", "PLN",
+  "INR", "KRW", "CNH", "CNY", "BRL", "AED", "THB", "MYR", "PHP",
+  // Metals as quote (so XAUXAG→XAU+XAG shows gold+silver chips)
+  "XAG", "XAU",
+];
 
 function Chip({ label, bg, size, ml }: { label: string; bg: string; size: number; ml: number }) {
   const fs = label.length >= 3 ? size * 0.34 : label.length === 2 ? size * 0.42 : size * 0.5;
@@ -122,8 +135,9 @@ function CryptoIconWithFallback({ base, size, ml }: { base: string; size: number
 }
 
 // Pure-alpha code that isn't crypto/metal/currency → treat as stock ticker
+// Allow up to 12 chars so Indian NSE tickers (BHARTIARTL, KOTAKBANK…) try StockIcon
 function looksLikeStock(code: string) {
-  return /^[A-Z]{1,5}$/.test(code) && !CCY[code] && !METAL[code];
+  return /^[A-Z]{1,12}$/.test(code) && !CCY[code] && !METAL[code] && !INDEX[code];
 }
 
 function assetIcon(code: string, size: number, ml: number): React.ReactNode {
