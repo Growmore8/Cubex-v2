@@ -119,6 +119,8 @@ export default function AdminDeskPage() {
   const [symQ, setSymQ] = useState(""); // Symbols tab search query
   const [symCat, setSymCat] = useState("all"); // Symbols tab category filter
   const [symEdit, setSymEdit] = useState<{ sym: string; spread: number; spreadType: string; spreadMax: number; id: string; swapLong: number; swapShort: number; commissionPerLot: number } | null>(null);
+  const [seedRunning, setSeedRunning] = useState(false);
+  const [seedMsg, setSeedMsg] = useState("");
   const [grpCtx, setGrpCtx] = useState<{ x: number; y: number; g: any } | null>(null);
   const [grpSub, setGrpSub] = useState(""); // which inline section is open in grpCtx panel
   const [grpForm, setGrpForm] = useState<Record<string, any>>({});
@@ -1818,7 +1820,21 @@ const [selAcc, setSelAcc] = useState<any>(null);
                       {cats.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
                     </select>
                     <span className="text-[10px]" style={{ color: "var(--muted)" }}>{filtered.length} / {adminSymbols.length} symbols</span>
-                    <span className="ml-auto text-[10px]" style={{ color: "var(--muted)" }}>Click a row to edit spread / swap / commission</span>
+                    <button
+                      disabled={seedRunning}
+                      onClick={async () => {
+                        setSeedRunning(true); setSeedMsg("");
+                        const r = await fetch("/api/admin/symbols/seed-spreads", { method: "POST" }).then((x) => x.json());
+                        setSeedRunning(false);
+                        setSeedMsg(r.ok ? `✓ Applied realistic defaults to ${r.count} symbol${r.count !== 1 ? "s" : ""}` : r.error || "Failed");
+                        if (r.ok) { const d = await fetch("/api/admin/symbols").then((x) => x.json()); if (d.ok) setAdminSymbols(d.symbols || []); }
+                        setTimeout(() => setSeedMsg(""), 4000);
+                      }}
+                      className="ml-auto h-7 rounded border px-2.5 text-[11px] font-semibold disabled:opacity-50"
+                      style={{ borderColor: "rgba(99,102,241,0.4)", color: "#6366f1", background: "rgba(99,102,241,0.08)", cursor: seedRunning ? "not-allowed" : "pointer" }}>
+                      {seedRunning ? "Applying…" : "Apply Realistic Defaults"}
+                    </button>
+                    {seedMsg && <span className="text-[10px]" style={{ color: seedMsg.startsWith("✓") ? "#22c55e" : "#ef4444" }}>{seedMsg}</span>}
                   </div>
                   {/* Table */}
                   <div className="flex-1 overflow-auto">

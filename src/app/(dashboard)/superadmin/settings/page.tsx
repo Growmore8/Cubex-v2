@@ -2,6 +2,48 @@
 import { useEffect, useState } from "react";
 import PasswordInput from "@/components/ui/PasswordInput";
 
+function SeedTenantSpreadsCard() {
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [err, setErr] = useState("");
+
+  async function run() {
+    setRunning(true); setResult(null); setErr("");
+    try {
+      const r = await fetch("/api/superadmin/seed-tenant-spreads", { method: "POST" });
+      const d = await r.json();
+      if (!d.ok) { setErr(d.error || "Failed"); } else { setResult(d); }
+    } catch { setErr("Request failed"); }
+    setRunning(false);
+  }
+
+  return (
+    <div className="space-y-3 ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+      <div className="text-sm font-semibold text-gray-700">Seed New Symbols to All Tenants</div>
+      <p className="text-xs text-gray-500">
+        Pushes any new global catalog symbols (e.g. COPPER, AUS200, new crypto) to every existing tenant that is missing them.
+        Safe to run multiple times — existing spread values set by admins are never overwritten.
+      </p>
+      {err && <div className="text-xs text-red-500">{err}</div>}
+      {result && (
+        <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">
+          ✓ Done — {result.results?.length ?? 0} tenant{result.results?.length !== 1 ? "s" : ""} processed
+          {result.results?.some((r: any) => r.seeded > 0) ? (
+            <ul className="mt-1 space-y-0.5">
+              {result.results.filter((r: any) => r.seeded > 0).map((r: any) => (
+                <li key={r.tenant}>{r.tenant}: +{r.seeded} symbol{r.seeded !== 1 ? "s" : ""}</li>
+              ))}
+            </ul>
+          ) : <div className="mt-1 text-green-700">All tenants already up to date.</div>}
+        </div>
+      )}
+      <button className="ui-btn ui-btn-primary px-3 py-1.5 text-sm disabled:opacity-50" onClick={run} disabled={running}>
+        {running ? <><i className="fa-solid fa-circle-notch fa-spin mr-1.5" />Running…</> : <><i className="fa-solid fa-layer-group mr-1.5" />Seed New Symbols to All Tenants</>}
+      </button>
+    </div>
+  );
+}
+
 function SwapRolloverCard() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -73,5 +115,6 @@ export default function SASettings() {
     </div>
     <button className="ui-btn ui-btn-primary px-4 py-2 text-sm" onClick={save}>Save Changes</button>
     <SwapRolloverCard />
+    <SeedTenantSpreadsCard />
   </div>);
 }
