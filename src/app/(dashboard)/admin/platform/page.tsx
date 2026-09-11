@@ -2630,7 +2630,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
               )}
             </div>
             <div className="mt-4 flex gap-2">
-              <button onClick={async () => { const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: isNaN(symEdit.spread) ? 0 : symEdit.spread, spreadType: symEdit.spreadType, spreadMax: 0, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: isNaN(symEdit.spread) ? 0 : symEdit.spread })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setAdminSymbols((prev) => prev.map((x) => x.id === symEdit.id ? { ...x, spread: isNaN(symEdit.spread) ? 0 : symEdit.spread, spreadType: symEdit.spreadType, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot } : x)); setOk(symEdit.sym + " saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
+              <button onClick={async () => { const isFloat = symEdit.spreadType === "FLOATING"; const pip = isFloat ? 0 : (isNaN(symEdit.spread) ? 0 : symEdit.spread); const r = await fetch("/api/admin/symbols/" + symEdit.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: pip, spreadType: symEdit.spreadType, spreadMax: 0, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot }) }); const d = await r.json(); if (d.ok) { setAdminSymSpreads((m) => ({ ...m, [symEdit.sym]: pip })); setAdminSymTypes((m) => ({ ...m, [symEdit.sym]: symEdit.spreadType })); setAdminSymMax((m) => ({ ...m, [symEdit.sym]: 0 })); setAdminSymbols((prev) => prev.map((x) => x.id === symEdit.id ? { ...x, spread: pip, spreadType: symEdit.spreadType, swapLong: symEdit.swapLong, swapShort: symEdit.swapShort, commissionPerLot: symEdit.commissionPerLot } : x)); setOk(symEdit.sym + " saved"); setSymEdit(null); } else setErr(d.error || "Failed"); }} className="flex-1 rounded-lg py-2 text-[11px] font-semibold text-white" style={{ background: "var(--accent)" }}>Save</button>
               <button onClick={() => setSymEdit(null)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-[11px] text-[var(--muted)]">Cancel</button>
             </div>
           </div>
@@ -2670,8 +2670,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 const { syms, spreadType, spread } = catEdit!;
                 await Promise.all(syms.map(async (sym) => {
                   const sid = adminSymIds[sym]; if (!sid) return;
-                  // FLOATING: keep each symbol's current spread value; only change the type
-                  const pip = spreadType === "FLOATING" ? ((adminSymSpreads[sym] ?? Number(spread)) || 0) : (Number(spread) || 0);
+                  // FLOATING: always reset spread to 0 (real bid/ask from feed, no fixed value)
+                  const pip = spreadType === "FLOATING" ? 0 : (Number(spread) || 0);
                   await fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: pip, spreadType, spreadMax: 0 }) }).catch(() => {});
                   setAdminSymSpreads((m) => ({ ...m, [sym]: pip }));
                   setAdminSymTypes((m) => ({ ...m, [sym]: spreadType }));
