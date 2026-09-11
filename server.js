@@ -220,7 +220,7 @@ function reconnectFeeds() {
   if (MASSIVE_KEY) { connectMassive(); connectMassiveCrypto(); }
 }
 
-const CANDLE_MS = 5000, HISTORY = 100, MONITOR_MS = 3000;
+const CANDLE_MS = 5000, HISTORY = 100, MONITOR_MS = 1000;
 const state = {}, meta = {}, feedToSym = {}, tdToSym = {}, fhLast = {};
 let symbols = [];
 
@@ -1225,7 +1225,7 @@ async function monitor(io) {
       if (used <= 0) continue;
       const mlvl = ((balanceUSD + floating) / used) * 100;
       if (mlvl <= mc) {
-        await liquidate(acc, list, io);
+        liquidate(acc, list, io); // fire-and-forget — liquidating Set prevents double-run
       } else {
         // Risk alerts: warn staff proactively before liquidation occurs.
         // Convert USD values to account currency for human-readable alert text.
@@ -1289,13 +1289,13 @@ async function monitor(io) {
           const newSl = bid - trailDist;
           if (newSl > Number(t.sl)) {
             if (bid <= newSl) { reason = "SL"; }
-            else { await prisma.trade.update({ where: { id: t.id }, data: { sl: newSl } }).catch(() => {}); }
+            else { prisma.trade.update({ where: { id: t.id }, data: { sl: newSl } }).catch(() => {}); }
           }
         } else {
           const newSl = ask + trailDist;
           if (newSl < Number(t.sl) || Number(t.sl) === 0) {
             if (ask >= newSl) { reason = "SL"; }
-            else { await prisma.trade.update({ where: { id: t.id }, data: { sl: newSl } }).catch(() => {}); }
+            else { prisma.trade.update({ where: { id: t.id }, data: { sl: newSl } }).catch(() => {}); }
           }
         }
       }
@@ -1613,7 +1613,7 @@ app.prepare().then(async () => {
   setInterval(pollFinnhubQuotes, 30000); // Quote fallback so prices stay real if the WS is quiet
   setInterval(microTick, 140);
   setInterval(() => monitor(io), MONITOR_MS);
-  setInterval(() => checkPending(io), 2000);
+  setInterval(() => checkPending(io), 1000);
   setInterval(() => checkPriceAlerts(io), 5000); // price alert monitor every 5s
   startSwapCron(io);
   startStatementCron();
