@@ -144,13 +144,14 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
               const rawSp = symbolSpreads && symbolSpreads[s.symbol];
               const cfgSpPips = (typeof rawSp === "object" && rawSp !== null ? (rawSp as any).min : (rawSp as number) || 0) + (groupSpread || 0);
               const isFixed = (symbolTypes as any)?.[s.symbol] === "FIXED";
-              // Spread priority: 1) real exchange bid/ask  2) admin configured  3) SA category default
+              // Spread priority: 1) real exchange bid/ask (FLOATING only)  2) admin configured  3) SA category default
+              // FIXED type always uses configured pips — live feed spread is ignored.
               const saDefault = saDefaultSpreads?.[s.category || "forex"] ?? 0;
               const basePips = cfgSpPips > 0 ? cfgSpPips : saDefault;
-              // When no live bid/ask, add subtle noise derived from price so spread appears
+              // When no live bid/ask (or FIXED type), add subtle noise derived from price so spread appears
               // dynamic to clients — never reveals it is a fixed/configured value.
               let spPips: number;
-              if (hasLive) {
+              if (!isFixed && hasLive) {
                 spPips = liveSp2!;
               } else if (basePips > 0 && p != null) {
                 const noise = (Math.sin(p * 97.3) * 0.05 + Math.cos(p * 317.1) * 0.04) * basePips;

@@ -783,7 +783,8 @@ export default function ClientTerminal() {
     if (accSymOverrides[p.symbol] !== undefined) return raw + accSymOverrides[p.symbol] * pipOf(effectiveDg(dg(p.symbol), raw));
     const s = symbolSpreads[p.symbol];
     const grpAcc = groupSpread + accountSpreadMarkup;
-    const liveSp = liveSpreadPips[p.symbol];
+    const isFixed = s?.type === "FIXED";
+    const liveSp = !isFixed ? liveSpreadPips[p.symbol] : null;
     const pips = (liveSp != null && liveSp > 0) ? liveSp + grpAcc : ((s?.min || 0) + grpAcc);
     const digits = effectiveDg(dg(p.symbol), raw);
     return raw + pips * pipOf(digits);
@@ -841,10 +842,14 @@ export default function ClientTerminal() {
     if (accSymOverrides[sym] !== undefined) return accSymOverrides[sym];
     const s = symbolSpreads[sym];
     const grpAcc = groupSpread + accountSpreadMarkup;
-    // Use real live spread from exchange when available (Binance/Kraken/Massive)
-    const liveSp = liveSpreadPips[sym];
-    if (liveSp != null && liveSp > 0) return liveSp + grpAcc;
-    // Fall back to SA/admin configured spread
+    const isFixed = s?.type === "FIXED";
+    // FLOATING: use real live spread from exchange (Binance/Kraken/Massive) when available
+    // FIXED: always use admin-configured pips — ignore feed spread
+    if (!isFixed) {
+      const liveSp = liveSpreadPips[sym];
+      if (liveSp != null && liveSp > 0) return liveSp + grpAcc;
+    }
+    // Configured spread (FIXED always lands here; FLOATING when feed data absent)
     const basePips = s ? (s.min || 0) : 0;
     const effective = basePips + grpAcc;
     if (effective <= 0) return 0;

@@ -242,10 +242,14 @@ export default function ClientMobile({ t }: { t: any }) {
     if (mobAccOv[sym] !== undefined) return mobAccOv[sym];
     const s = _mobSymSpreads()[sym];
     const grpAcc = _mobGrpSpread() + _mobAccMarkup();
-    // Use real live spread from exchange when available (Binance/Kraken/Massive)
-    const liveSp = t.liveSpreadPips[sym];
-    if (liveSp != null && liveSp > 0) return liveSp + grpAcc;
-    // Fall back to configured spread (SA default if admin hasn't set one)
+    const isFixed = s?.type === "FIXED";
+    // FLOATING: use real live spread from exchange when available (Binance/Kraken/Massive)
+    // FIXED: always use admin-configured pips — ignore feed spread
+    if (!isFixed) {
+      const liveSp = t.liveSpreadPips[sym];
+      if (liveSp != null && liveSp > 0) return liveSp + grpAcc;
+    }
+    // Fall back to configured spread (FIXED always lands here; FLOATING when feed data absent)
     const basePips = s ? (s.min || 0) : 0;
     const effective = basePips + grpAcc;
     if (effective <= 0) return 0;
