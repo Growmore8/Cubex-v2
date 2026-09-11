@@ -16,9 +16,6 @@ export async function POST() {
     const s = await requireSuperAdmin();
     if (s) authorized = true;
   }
-  // If no CRON_SECRET is configured, allow (single-server in-process call) but it
-  // is strongly recommended to set CRON_SECRET in production.
-  if (!authorized && !secret) authorized = true;
   if (!authorized) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   try {

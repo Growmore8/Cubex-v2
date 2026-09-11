@@ -14,7 +14,8 @@ import { rateLimit } from "@/lib/rateLimit";
 export async function POST(req: Request) {
   try {
     const h = await headers();
-    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || undefined;
+    const xffParts = (h.get("x-forwarded-for") || "").split(",");
+    const ip = xffParts[xffParts.length - 1]?.trim() || h.get("x-real-ip") || undefined;
     if (!rateLimit(`pinlogin:${ip || "unknown"}`, 8, 60_000)) {
       return NextResponse.json({ ok: false, error: "Too many attempts. Please wait a minute." }, { status: 429 });
     }

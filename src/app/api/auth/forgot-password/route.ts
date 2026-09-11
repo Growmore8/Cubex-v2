@@ -11,8 +11,9 @@ export async function POST(req: Request) {
     const { email } = schema.parse(await req.json());
     const h = await headers();
     const host = h.get("host");
-    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-    if (!rateLimit(`forgotpw:${ip}`, 5, 60_000)) {
+    const xffParts = (h.get("x-forwarded-for") || "").split(",");
+    const ip = xffParts[xffParts.length - 1]?.trim() || "unknown";
+    if (!rateLimit(`forgotpw:ip:${ip}`, 5, 60_000) || !rateLimit(`forgotpw:email:${email}`, 3, 60_000)) {
       return NextResponse.json({ ok: false, error: "Too many attempts. Please wait." }, { status: 429 });
     }
     await sendForgotPassword(host, email);

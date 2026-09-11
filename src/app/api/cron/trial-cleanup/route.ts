@@ -13,7 +13,8 @@ export async function POST() {
   let authorized = false;
   if (secret && provided === secret) authorized = true;
   if (!authorized) { const s = await requireSuperAdmin(); if (s) authorized = true; }
-  if (!authorized && !secret) authorized = true;
+  // Never fall through to "authorized=true" when secret is missing — that would
+  // allow unauthenticated access. Require either a valid secret OR a SuperAdmin session.
   if (!authorized) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   const grace = Number(process.env.TRIAL_GRACE_DAYS || 14);

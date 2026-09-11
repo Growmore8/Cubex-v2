@@ -17,8 +17,12 @@ export async function POST(req: Request) {
     const { email, password, remember } = schema.parse(await req.json());
     const h = await headers();
     const host = h.get("host");
-    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || undefined;
-    if (!rateLimit(`login:${ip || "unknown"}`, 10, 60_000)) {
+    // Take the LAST XFF entry (appended by our trusted proxy) to prevent header spoofing
+    const xffParts = (h.get("x-forwarded-for") || "").split(",");
+    const ip = (xffParts[xffParts.length - 1]?.trim()) || h.get("x-real-ip") || undefined;
+    // Rate-limit by both IP and email: IP prevents spraying, email prevents brute-force
+    // even when the attacker cycles IPs via X-Forwarded-For spoofing.
+    if (!rateLimit(`login:ip:${ip || "unknown"}`, 20, 60_000) || !rateLimit(`login:email:${email}`, 10, 60_000)) {
       return NextResponse.json({ ok: false, error: "Too many attempts. Please wait a minute." }, { status: 429 });
     }
     const session = await authenticate(host, email, password, ip, h.get("user-agent") || undefined);
