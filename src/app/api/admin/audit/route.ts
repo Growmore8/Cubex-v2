@@ -10,9 +10,10 @@ export async function GET() {
   await assertCan(s, "viewAudit");
   const logs = await listAudit(s.tenantId!);
 
-  // Parse logins from detail (first token that looks like a login: 6+ digits or DEMO+digits)
-  const loginRe = /^(DEMO\d+|\d{6,})/;
-  const logins = [...new Set(logs.map((l) => { const m = (l.detail || "").match(loginRe); return m ? m[1] : null; }).filter(Boolean) as string[])];
+  // Parse logins from detail — matches "(900038)" format (auth/disconnect) or "900038 ..." at start
+  const loginRe = /\((\d{5,6})\)|^(DEMO\d+|\d{5,6})\b/;
+  const getLogin = (detail: string) => { const m = detail.match(loginRe); return m ? (m[1] || m[2]) : null; };
+  const logins = [...new Set(logs.map((l) => getLogin(l.detail || "")).filter(Boolean) as string[])];
   // Also collect emails from performedBy to resolve actor names
   const emails = [...new Set(logs.map((l) => l.performedBy).filter((e) => e && e.includes("@")))];
 
@@ -25,8 +26,7 @@ export async function GET() {
   const actorMap = new Map(actors.map((u) => [u.email, u.name]));
 
   const enriched = logs.map((l) => {
-    const m = (l.detail || "").match(loginRe);
-    const targetLogin = m ? m[1] : null;
+    const targetLogin = getLogin(l.detail || "");
     const acc = targetLogin ? accMap.get(targetLogin) : null;
     return {
       ...l,

@@ -2,8 +2,9 @@
 import { useEffect, useState, useCallback } from "react";
 
 const catColor = (c: string) =>
-  c === "TRADE" ? "#16a34a" : c === "CLIENT" ? "#b45309" : c === "ADMIN" ? "#2563eb" :
-  c === "SUPERADMIN" ? "#7c3aed" : c === "MANAGER" ? "#0891b2" : "#64748b";
+  c === "TRADE" ? "#16a34a" : c === "FINANCIAL" ? "#d97706" : c === "CLIENT" ? "#b45309" :
+  c === "SYMBOL" ? "#0891b2" : c === "AUTH" ? "#475569" : c === "ADMIN" ? "#2563eb" :
+  c === "SUPERADMIN" ? "#7c3aed" : "#64748b";
 
 const CSS = `
 .aud-wrap{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
@@ -109,8 +110,8 @@ export default function SAAudit() {
         <input placeholder="Search action / detail / user…" value={q} onChange={e => setQ(e.target.value)} />
         <select value={cat} onChange={e => setCat(e.target.value)}>
           <option value="">All Categories</option>
-          <option>SUPERADMIN</option><option>ADMIN</option><option>MANAGER</option>
-          <option>CLIENT</option><option>TRADE</option>
+          <option>AUTH</option><option>TRADE</option><option>FINANCIAL</option>
+          <option>CLIENT</option><option>SYMBOL</option><option>ADMIN</option><option>SUPERADMIN</option>
         </select>
         <select value={co} onChange={e => setCo(e.target.value)}>
           <option value="">All Companies</option>

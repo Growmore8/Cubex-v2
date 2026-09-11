@@ -1649,8 +1649,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
               );
             })()}
             {tab === "audit" && (() => {
-              const AUDIT_CATS = ["ALL", "SUPERADMIN", "ADMIN", "MANAGER", "CLIENT"];
-              const AUDIT_COL: Record<string, string> = { SUPERADMIN: "#a78bfa", ADMIN: GOLD, MANAGER: "#38bdf8", CLIENT: BUY };
+              const AUDIT_CATS = ["ALL", "AUTH", "TRADE", "FINANCIAL", "CLIENT", "SYMBOL", "ADMIN", "SUPERADMIN"];
+              const AUDIT_COL: Record<string, string> = { SUPERADMIN: "#a78bfa", ADMIN: GOLD, AUTH: "#475569", TRADE: "#16a34a", FINANCIAL: "#d97706", CLIENT: BUY, SYMBOL: "#0891b2" };
               const auditRows = audit.filter((l: any) => {
                 if (auditCat !== "ALL" && (l.category || "ADMIN").toUpperCase() !== auditCat) return false;
                 if (!auditQ) return true;

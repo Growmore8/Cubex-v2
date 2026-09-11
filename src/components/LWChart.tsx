@@ -665,7 +665,7 @@ function LWChart({
                   .filter((c: any) => isFinite(c.time) && isFinite(c.close) && !existing.has(c.time));
                 if (!older.length) { loadMoreRef.current = null; return; }
                 const merged = [...older, ...barsRef.current].sort((a: any, b: any) => a.time - b.time);
-                try { seriesRef.current?.setData(merged); barsRef.current = merged; onBarsLoaded.current(); } catch {}
+                try { seriesRef.current?.setData(merged); barsRef.current = merged; setTimeout(() => { try { onBarsLoaded.current(); } catch {} }, 0); } catch {}
               })
               .catch(() => {})
               .finally(() => { loadingMoreRef.current = false; });
