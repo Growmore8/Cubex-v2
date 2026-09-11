@@ -2596,11 +2596,17 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   ); })}
                 </div>
               </div>
-              <div>
-                <div className="mb-1 text-[10px] text-[var(--muted)]">{symEdit.spreadType === "FLOATING" ? "Fallback spread (pips)" : "Spread (pips)"}</div>
-                <input type="number" min="0" step="1" value={isNaN(symEdit.spread) ? "" : symEdit.spread} onChange={(e) => { const v = e.target.value; setSymEdit((s) => s ? { ...s, spread: v === "" ? NaN : Math.max(0, parseInt(v) || 0) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
-                {symEdit.spreadType === "FLOATING" && <div className="mt-1 text-[9px]" style={{ color: "#22c55e" }}>Live bid/ask used when feed is active. This value applies only when no real price is available.</div>}
-              </div>
+              {symEdit.spreadType === "FLOATING" ? (
+                <div className="rounded border px-3 py-2.5 text-[11px]" style={{ borderColor: "#22c55e", background: "rgba(34,197,94,0.08)" }}>
+                  <div className="font-semibold mb-0.5" style={{ color: "#22c55e" }}>Live market spread</div>
+                  <div style={{ color: "var(--muted)" }}>Real bid/ask from the feed is used directly — no fixed value needed.</div>
+                </div>
+              ) : (
+                <div>
+                  <div className="mb-1 text-[10px] text-[var(--muted)]">Spread (pips)</div>
+                  <input type="number" min="0" step="1" value={isNaN(symEdit.spread) ? "" : symEdit.spread} onChange={(e) => { const v = e.target.value; setSymEdit((s) => s ? { ...s, spread: v === "" ? NaN : Math.max(0, parseInt(v) || 0) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                </div>
+              )}
               {swapEnabled && (
                 <div className="border-t border-[var(--border)] pt-3">
                   <div className="mb-1 text-[10px] font-semibold" style={{ color: "var(--muted)" }}>Swap rates (pips/night)</div>
@@ -2647,11 +2653,17 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   ); })}
                 </div>
               </div>
-              <div>
-                <div className="mb-1 text-[10px] text-[var(--muted)]">{catEdit.spreadType === "FLOATING" ? "Fallback spread (pips)" : "Spread (pips)"}</div>
-                <input type="number" min="0" step="1" value={isNaN(catEdit.spread) ? "" : catEdit.spread} onChange={(e) => { const v = e.target.value; setCatEdit((s) => s ? { ...s, spread: v === "" ? NaN : Math.max(0, parseInt(v) || 0) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
-                {catEdit.spreadType === "FLOATING" && <div className="mt-1 text-[9px]" style={{ color: "#22c55e" }}>Live bid/ask used when feed is active. This value applies only when no real price is available.</div>}
-              </div>
+              {catEdit.spreadType === "FLOATING" ? (
+                <div className="rounded border px-3 py-2.5 text-[11px]" style={{ borderColor: "#22c55e", background: "rgba(34,197,94,0.08)" }}>
+                  <div className="font-semibold mb-0.5" style={{ color: "#22c55e" }}>Live market spread</div>
+                  <div style={{ color: "var(--muted)" }}>Real bid/ask from the feed is used directly — no fixed value needed.</div>
+                </div>
+              ) : (
+                <div>
+                  <div className="mb-1 text-[10px] text-[var(--muted)]">Spread (pips)</div>
+                  <input type="number" min="0" step="1" value={isNaN(catEdit.spread) ? "" : catEdit.spread} onChange={(e) => { const v = e.target.value; setCatEdit((s) => s ? { ...s, spread: v === "" ? NaN : Math.max(0, parseInt(v) || 0) } : s); }} className="w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 text-[11px]" style={{ color: "var(--text)" }} />
+                </div>
+              )}
             </div>
             <div className="mt-4 flex gap-2">
               <button onClick={async () => {
