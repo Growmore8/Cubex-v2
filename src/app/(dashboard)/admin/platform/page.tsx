@@ -8,7 +8,7 @@ import PaymentsPanel from "@/components/PaymentsPanel";
 import KycPanel from "@/components/KycPanel";
 import ReferralPanel from "@/components/ReferralPanel";
 import RequestsPanel from "@/components/RequestsPanel";
-import KLineProChart from "@/components/KLineProChart";
+import KLineProChart from "@/components/ChartRouter";
 import ManagersModal from "@/components/admin/ManagersModal";
 import PaymentMethodsModal from "@/components/admin/PaymentMethodsModal";
 import DeskMarketWatch from "@/components/DeskMarketWatch";

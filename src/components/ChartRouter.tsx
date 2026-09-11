@@ -29,7 +29,7 @@ interface Props {
 // All other tenant domains use Lightweight Charts with the platform's own MT5 feed.
 const TV_LIBRARY_DOMAIN = "trade.growthcapitalltd.com";
 
-export default function KLineProChart(props: Props) {
+export default function ChartRouter(props: Props) {
   const [hostname, setHostname] = useState<string | null>(null);
 
   useEffect(() => {
