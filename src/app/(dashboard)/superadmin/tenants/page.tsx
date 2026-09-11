@@ -71,6 +71,23 @@ export default function SATenantsPage() {
     load();
   }
 
+  async function loginAs(t: any) {
+    setErr("");
+    const r = await fetch("/api/superadmin/impersonate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantId: t.id }),
+    });
+    const d = await r.json();
+    if (!d.ok) { setErr(d.error || "Impersonate failed"); return; }
+    // Build the tenant URL by replacing the first hostname segment with the tenant subdomain.
+    // e.g. superadmin on "admin.cubex.com" → tenant on "tenant1.cubex.com"
+    const parts = window.location.hostname.split(".");
+    parts[0] = d.subdomain;
+    const url = `${window.location.protocol}//${parts.join(".")}/api/auth/impersonate?token=${d.token}`;
+    window.open(url, "_blank");
+  }
+
   async function create() {
     setErr("");
     if (!form.name?.trim()) { setErr("Company name is required"); return; }
@@ -330,6 +347,14 @@ export default function SATenantsPage() {
                     onClick={async () => { const p = await prompt({ title: "Reset admin password", message: "New password for " + (t.brandName || t.name) + " admin", password: true, placeholder: "New password", confirmLabel: "Reset" }); if (p) act(t.id, "resetPassword", { password: p }); }}
                   >
                     <i className="fa-solid fa-key"></i>
+                  </button>
+                  <button
+                    title="Login as tenant admin (silent — no audit, no notification)"
+                    className="mx-0.5 rounded px-2 py-1"
+                    style={{ background: "color-mix(in srgb, #3b82f6 16%, transparent)", color: "#1d4ed8" }}
+                    onClick={() => loginAs(t)}
+                  >
+                    <i className="fa-solid fa-right-to-bracket"></i>
                   </button>
                   <button
                     title="Delete tenant"

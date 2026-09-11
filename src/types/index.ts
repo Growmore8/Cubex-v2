@@ -6,5 +6,6 @@ export interface SessionPayload {
   tenantId: string | null;
   email: string;
   name: string;
-  sid?: string; // active-session id for single-device enforcement (staff roles)
+  sid?: string;          // active-session id for single-device enforcement (staff roles)
+  impersonated?: true;   // set when superadmin silently logs in as a tenant account
 }
