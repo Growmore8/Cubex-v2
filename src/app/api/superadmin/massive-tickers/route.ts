@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { reloadCatalog } from "@/lib/realtime";
+import { seedDefaultSpreads } from "@/services/spreadDefaults.service";
+
+async function autoSeedAllTenants() {
+  try {
+    const tenants = await prisma.tenant.findMany({ select: { id: true } });
+    for (const t of tenants) {
+      await seedDefaultSpreads(t.id, false).catch(() => {});
+    }
+  } catch {}
+}
 
 interface MvTicker {
   symbol: string;
@@ -389,7 +399,7 @@ export async function POST(req: Request) {
       });
       added++;
     }
-    if (added > 0) reloadCatalog();
+    if (added > 0) { reloadCatalog(); autoSeedAllTenants(); }
     return NextResponse.json({ ok: true, added, skipped });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 500 });

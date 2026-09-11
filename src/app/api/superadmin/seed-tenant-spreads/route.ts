@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { seedDefaultSpreads } from "@/services/spreadDefaults.service";
 
 // SuperAdmin: seed default spreads for ALL tenants that have no spreads configured yet.
 // Safe to run multiple times — overwrite=false means manual spreads are never touched.
+// Accepts either a SuperAdmin session OR the CRON_SECRET header (for startup auto-seed).
 export async function POST() {
-  const s = await requireSuperAdmin();
-  if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  const h = await headers();
+  const secret = process.env.CRON_SECRET;
+  const provided = h.get("x-cron-secret");
+  const bySecret = secret && provided === secret;
+  if (!bySecret) {
+    const s = await requireSuperAdmin();
+    if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
   try {
     const tenants = await prisma.tenant.findMany({ select: { id: true, name: true } });
     const results: { tenant: string; seeded: number }[] = [];

@@ -1588,6 +1588,20 @@ function startDemoCleanup() {
 app.prepare().then(async () => {
   try { await loadCatalog(); } catch (e) { console.error('[feed] catalog load failed:', e.message); }
   try { await loadSpreads(); setInterval(loadSpreads, 60000); } catch (e) { console.error('[spreads] initial load failed:', e.message); }
+  // Auto-seed new global symbols to all tenants on every startup (background, non-blocking)
+  setTimeout(async () => {
+    try {
+      const port = process.env.PORT || 3000;
+      const secret = process.env.CRON_SECRET;
+      const headers = { "Content-Type": "application/json", ...(secret ? { "x-cron-secret": secret } : {}) };
+      const r = await fetch(`http://localhost:${port}/api/superadmin/seed-tenant-spreads`, { method: "POST", headers });
+      const d = await r.json().catch(() => ({}));
+      if (d.ok) {
+        const seeded = (d.results || []).filter((x) => x.seeded > 0);
+        if (seeded.length) console.log(`[seed] auto-seeded new symbols →`, seeded.map((x) => `${x.tenant}:+${x.seeded}`).join(", "));
+      }
+    } catch (e) { console.warn('[seed] startup auto-seed skipped:', e.message); }
+  }, 8000);
   const server = createServer((req, res) => handle(req, res));
   const io = new Server(server, { path: "/socket.io" });
   global.__io = io;

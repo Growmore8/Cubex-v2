@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { reloadCatalog } from "@/lib/realtime";
+import { seedDefaultSpreads } from "@/services/spreadDefaults.service";
+
+async function autoSeedAllTenants() {
+  try {
+    const tenants = await prisma.tenant.findMany({ select: { id: true } });
+    for (const t of tenants) {
+      await seedDefaultSpreads(t.id, false).catch(() => {});
+    }
+  } catch {}
+}
 
 export async function GET() {
   const s = await requireSuperAdmin();
@@ -26,5 +36,7 @@ export async function PATCH(req: Request) {
     await prisma.globalSymbol.update({ where: { symbol: body.symbol }, data: { enabled: body.enabled } });
   }
   reloadCatalog();
+  // Auto-seed newly enabled symbols to all tenants in background
+  if (body.enabled !== false) autoSeedAllTenants();
   return NextResponse.json({ ok: true });
 }
