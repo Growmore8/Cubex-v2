@@ -560,7 +560,9 @@ const KR_PAIR_TO_SYM = {
   "ADA/USD":"ADAUSD","DOT/USD":"DOTUSD","LINK/USD":"LINKUSD","AVAX/USD":"AVAXUSD",
   "LTC/USD":"LTCUSD","DOGE/USD":"DOGEUSD",
 };
-const KR_FOREX_PAIRS  = ["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/CAD","USD/CHF","USD/JPY","EUR/GBP","EUR/JPY","EUR/CAD","EUR/CHF","GBP/JPY","GBP/CHF","AUD/JPY","AUD/NZD","AUD/CAD","NZD/JPY","USD/HKD","USD/SGD","USD/TRY","USD/MXN","GBP/AUD","GBP/CAD","GBP/NZD","EUR/NZD","EUR/AUD","CAD/CHF","CAD/JPY","CHF/JPY","NZD/CAD","NZD/CHF"];
+// Kraken v1 WS only supports majors + a subset of crosses. Pairs not in their feed
+// return "Currency pair not supported" subscription errors — omit them here.
+const KR_FOREX_PAIRS  = ["EUR/USD","GBP/USD","AUD/USD","NZD/USD","USD/CAD","USD/CHF","USD/JPY","EUR/GBP","EUR/JPY","EUR/CAD","EUR/CHF","AUD/JPY","AUD/CAD","NZD/JPY","USD/HKD","USD/SGD","USD/TRY","USD/MXN","GBP/AUD","GBP/CAD","EUR/NZD","EUR/AUD","CAD/JPY","NZD/CAD","NZD/CHF"];
 const KR_METAL_PAIRS  = ["XAU/USD","XAG/USD"];
 const KR_CRYPTO_PAIRS = ["XBT/USD","ETH/USD","SOL/USD","XRP/USD","ADA/USD","DOT/USD","LINK/USD","AVAX/USD","LTC/USD","DOGE/USD"];
 let krWs = null;
@@ -596,8 +598,8 @@ function connectKraken() {
       const m = JSON.parse(data);
       if (m.event === "subscriptionStatus") {
         if (m.status === "error") {
+          // "Currency pair not supported" = pair not on Kraken WS feed — expected, not an error
           console.warn(`[KR] subscription rejected for ${m.pair}: ${m.errorMessage}`);
-          logFeedError("system", "KR", "SUBSCRIBE_ERROR", `${m.pair}: ${m.errorMessage}`);
         } else {
           console.log(`[KR] subscription ${m.status}: ${m.pair} (${m.subscription?.name})`);
         }
