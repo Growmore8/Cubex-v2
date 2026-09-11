@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
+import { getSaDefaultSpreadPips } from "@/lib/spread";
 import { Redis } from "ioredis";
 
 // POST { spreadType, spread? }
@@ -13,12 +14,8 @@ export async function POST(req: Request) {
     const type: string = spreadType === "FLOATING" ? "FLOATING" : "FIXED";
     const globals = await prisma.globalSymbol.findMany({ where: { enabled: true } });
 
-    // Category defaults used as feed-gap fallback for FLOATING and as seed for new rows
-    const CAT_DEFAULTS: Record<string, number> = {
-      forex: 1.5, metals: 3, commodities: 3, crypto: 10, indices: 8, stocks: 5, energy: 3,
-    };
-
-    // For existing rows: fetch current spreads so FLOATING doesn't overwrite them with 0
+    // For FLOATING: preserve existing spread as feed-gap fallback (never wipe to 0).
+    // New/zero rows get the SA-configured category default via getSaDefaultSpreadPips.
     const existing = await prisma.symbol.findMany({
       where: { tenantId: s.tenantId! },
       select: { symbol: true, spread: true },
@@ -26,19 +23,16 @@ export async function POST(req: Request) {
     const existingSpread: Record<string, number> = {};
     for (const e of existing) existingSpread[e.symbol] = Number(e.spread ?? 0);
 
-    await Promise.all(globals.map((g) => {
+    await Promise.all(globals.map(async (g) => {
       const cat = g.category || "forex";
       // FIXED: use admin-provided pip value for all rows
-      // FLOATING: preserve existing spread as feed-gap fallback (never wipe to 0);
-      //           new rows get category default so clients always have a sensible fallback
+      // FLOATING: preserve existing spread if > 0; new/zero rows get SA category default
       let pip: number;
       if (type === "FIXED") {
         pip = spread != null ? Number(spread) : 0;
       } else {
-        // Keep existing spread if > 0; new rows get category default
-        pip = (existingSpread[g.symbol] ?? 0) > 0
-          ? existingSpread[g.symbol]
-          : (CAT_DEFAULTS[cat] ?? 1.5);
+        const curSp = existingSpread[g.symbol] ?? 0;
+        pip = curSp > 0 ? curSp : await getSaDefaultSpreadPips(cat);
       }
 
       return prisma.symbol.upsert({

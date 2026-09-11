@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { reloadFeeds } from "@/lib/realtime";
+import { BUILT_IN_DEFAULTS } from "@/lib/spread";
 
 export async function GET() {
   const s = await requireSuperAdmin();
@@ -23,11 +24,11 @@ export async function GET() {
       manualPrimary: v.manualPrimary || null,
       currentPrimary: runtimePrimary,
       defaultSpreads: {
-        forex:       v.defaultSpreads?.forex       ?? 1.5,
-        crypto:      v.defaultSpreads?.crypto      ?? 10,
-        commodities: v.defaultSpreads?.commodities ?? 3,
-        indices:     v.defaultSpreads?.indices     ?? 8,
-        stocks:      v.defaultSpreads?.stocks      ?? 5,
+        forex:       v.defaultSpreads?.forex       ?? BUILT_IN_DEFAULTS.forex,
+        crypto:      v.defaultSpreads?.crypto      ?? BUILT_IN_DEFAULTS.crypto,
+        commodities: v.defaultSpreads?.commodities ?? BUILT_IN_DEFAULTS.commodities,
+        indices:     v.defaultSpreads?.indices     ?? BUILT_IN_DEFAULTS.indices,
+        stocks:      v.defaultSpreads?.stocks      ?? BUILT_IN_DEFAULTS.stocks,
       },
     },
   });
@@ -50,11 +51,11 @@ export async function POST(req: Request) {
       stockFeed:  ["FH","TD"].includes(b.stockFeed)  ? b.stockFeed : (existing.stockFeed || "TD"),
       manualPrimary: ["TD","FH","MV","BN","KR"].includes(b.manualPrimary) ? b.manualPrimary : (existing.manualPrimary || null),
       defaultSpreads: b.defaultSpreads ? {
-        forex:       Math.max(0, Number(b.defaultSpreads.forex       ?? existing.defaultSpreads?.forex       ?? 1.5)),
-        crypto:      Math.max(0, Number(b.defaultSpreads.crypto      ?? existing.defaultSpreads?.crypto      ?? 10)),
-        commodities: Math.max(0, Number(b.defaultSpreads.commodities ?? existing.defaultSpreads?.commodities ?? 3)),
-        indices:     Math.max(0, Number(b.defaultSpreads.indices     ?? existing.defaultSpreads?.indices     ?? 8)),
-        stocks:      Math.max(0, Number(b.defaultSpreads.stocks      ?? existing.defaultSpreads?.stocks      ?? 5)),
+        forex:       Math.max(0, Number(b.defaultSpreads.forex       ?? existing.defaultSpreads?.forex       ?? BUILT_IN_DEFAULTS.forex)),
+        crypto:      Math.max(0, Number(b.defaultSpreads.crypto      ?? existing.defaultSpreads?.crypto      ?? BUILT_IN_DEFAULTS.crypto)),
+        commodities: Math.max(0, Number(b.defaultSpreads.commodities ?? existing.defaultSpreads?.commodities ?? BUILT_IN_DEFAULTS.commodities)),
+        indices:     Math.max(0, Number(b.defaultSpreads.indices     ?? existing.defaultSpreads?.indices     ?? BUILT_IN_DEFAULTS.indices)),
+        stocks:      Math.max(0, Number(b.defaultSpreads.stocks      ?? existing.defaultSpreads?.stocks      ?? BUILT_IN_DEFAULTS.stocks)),
       } : (existing.defaultSpreads || null),
     };
     await prisma.setting.upsert({ where: { key: "feeds" }, create: { key: "feeds", value }, update: { value } });

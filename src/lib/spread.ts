@@ -48,22 +48,37 @@ async function getFeedsConfig() {
   return v;
 }
 
-const BUILT_IN_DEFAULTS: Record<string, number> = {
+// Single source of truth for factory-default minimum spreads per category.
+// The SA Feeds page (superadmin/feeds) lets SA admins override these at any time.
+// All runtime code must read from the DB via getSaDefaultSpreadPips() — never duplicate these numbers.
+export const BUILT_IN_DEFAULTS: Record<string, number> = {
   forex: 1.5,
   crypto: 20,
   commodities: 30,
   indices: 2,
   stocks: 5,
+  // metals and energy are sub-categories of commodities
+  metals: 30,
+  energy: 30,
 };
+
+// Normalise sub-categories to their parent DB key so DB lookups work correctly.
+// SA Feeds stores only: forex, crypto, commodities, indices, stocks.
+function normCat(cat: string): string {
+  const c = (cat || "forex").toLowerCase();
+  if (c === "metals" || c === "energy" || c === "agriculture") return "commodities";
+  return c;
+}
 
 export async function getSaDefaultSpreadPips(category: string): Promise<number> {
   try {
     const cfg = await getFeedsConfig();
     const ds = cfg.defaultSpreads || {};
-    const cat = (category || "forex").toLowerCase();
-    if (ds[cat] != null && Number(ds[cat]) >= 0) return Number(ds[cat]);
-    return BUILT_IN_DEFAULTS[cat] ?? 1.5;
+    const dbCat = normCat(category);
+    // DB value takes priority; fall back to built-in only if not configured yet.
+    if (ds[dbCat] != null && Number(ds[dbCat]) > 0) return Number(ds[dbCat]);
+    return BUILT_IN_DEFAULTS[dbCat] ?? BUILT_IN_DEFAULTS.forex;
   } catch {
-    return 1.5;
+    return BUILT_IN_DEFAULTS[normCat(category)] ?? BUILT_IN_DEFAULTS.forex;
   }
 }

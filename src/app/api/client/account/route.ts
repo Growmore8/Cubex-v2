@@ -6,6 +6,7 @@ import { getFundsPnlOnly, withdrawableBalance } from "@/services/fundSettings.se
 import { getAccountFxRate } from "@/lib/prices";
 import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
+import { getSaDefaultSpreadPips } from "@/lib/spread";
 
 export async function GET(req: Request) {
   const { session: s, suspended } = await getClientSession();
@@ -98,11 +99,10 @@ export async function GET(req: Request) {
     if (hidden.size) symbols = symbols.filter((x: any) => !hidden.has(x.symbol));
   } catch { symbols = []; }
 
-  // Spread data: per-symbol (fixed/floating) + group markup + account markup
-  // SA category defaults: used as feed-gap fallback for FLOATING when configured spread = 0
-  const SA_DEFAULTS: Record<string, number> = {
-    forex: 1.5, metals: 3, commodities: 3, crypto: 10, indices: 8, stocks: 5, energy: 3,
-  };
+  // Spread data: per-symbol (fixed/floating) + group markup + account markup.
+  // FLOATING: if DB spread is 0, getSaDefaultSpreadPips() returns the SA-configured
+  // category minimum so clients always have a sensible fallback when the live feed is absent.
+  // FIXED: use exactly what admin configured (0 is a valid intentional choice).
   let symbolSpreads: Record<string, { min: number; max: number; type: string }> = {};
   let groupSpread = 0;
   let accountSpreadMarkup = 0;
@@ -114,11 +114,8 @@ export async function GET(req: Request) {
     for (const ts of tenantSyms) {
       const type = ts.spreadType || "FLOATING";
       const rawMin = Number(ts.spread ?? 0);
-      // FLOATING fallback: if DB spread is 0 (e.g., from a bulk-wipe bug), use SA category default
-      // so clients always see a sensible fallback when the live feed is absent.
-      // FIXED: use exactly what the tenant admin configured (even 0 is intentional).
       const min = (type === "FLOATING" && rawMin <= 0)
-        ? (SA_DEFAULTS[ts.category || "forex"] ?? 1.5)
+        ? await getSaDefaultSpreadPips(ts.category || "forex")
         : rawMin;
       symbolSpreads[ts.symbol] = { min, max: Number(ts.spreadMax ?? 0), type };
     }
