@@ -154,8 +154,8 @@ function recordFeedFailure(feed) {
 
 // Determine which category a symbol belongs to (for per-category feed routing)
 // Uses catalog meta first (accurate for any symbol), falls back to heuristics.
-const INDEX_SYM_SET  = new Set(["US500","US30","US100","GER40","UK100","JP225","HK50","FRA40"]);
-const ENERGY_SYM_SET = new Set(["USOIL","UKOIL","NATGAS"]);
+const INDEX_SYM_SET  = new Set(["US500","US30","US100","GER40","UK100","JP225","HK50","FRA40","AUS200","EUSTX50","VIX","ESP35"]);
+const ENERGY_SYM_SET = new Set(["USOIL","UKOIL","NATGAS","COPPER"]);
 function getSymCategory(sym) {
   if (meta[sym] && meta[sym].cat) return meta[sym].cat; // catalog is authoritative
   if (INDEX_SYM_SET.has(sym))  return "indices";
@@ -330,8 +330,8 @@ function contractFor(cat, sym) {
   if (cat === "energy") return 100;
   return 100000;
 }
-const TD_INDEX_MAP = { US500: "SPX", US30: "DJI", US100: "IXIC", GER40: "DAX", UK100: "FTSE", JP225: "NI225", HK50: "HSI", FRA40: "CAC" };
-const TD_ENERGY_MAP = { USOIL: "WTI/USD", UKOIL: "BCO/USD", NATGAS: "NATGAS/USD" };
+const TD_INDEX_MAP = { US500: "SPX", US30: "DJI", US100: "IXIC", GER40: "DAX", UK100: "FTSE", JP225: "NI225", HK50: "HSI", FRA40: "CAC", AUS200: "AS51", EUSTX50: "STOXX50E", VIX: "VIX", ESP35: "IBEX35" };
+const TD_ENERGY_MAP = { USOIL: "WTI/USD", UKOIL: "BCO/USD", NATGAS: "NATGAS/USD", COPPER: "COPPER/USD" };
 function toTD(sym, cat) {
   if (cat === "crypto" || sym.endsWith("USDT")) return sym.replace(/USDT?$/, "") + "/USD";
   if (cat === "indices" && TD_INDEX_MAP[sym]) return TD_INDEX_MAP[sym];
