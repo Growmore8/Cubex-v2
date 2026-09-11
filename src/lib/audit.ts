@@ -27,7 +27,7 @@ function inferCategory(action: string, explicit: string): string {
 
 export function audit(tenantId: string | null, action: string, detail: string, performedBy: string, category: any = "ADMIN") {
   const cat = inferCategory(action, String(category));
-  return prisma.auditLog.create({ data: { tenantId, action, detail, performedBy, category: cat } }).catch(() => null);
+  return prisma.auditLog.create({ data: { tenantId, action, detail, performedBy, category: cat as any } }).catch(() => null);
 }
 
 export function listAudit(tenantId: string) {
