@@ -2670,8 +2670,11 @@ const [selAcc, setSelAcc] = useState<any>(null);
                 const { syms, spreadType, spread } = catEdit!;
                 await Promise.all(syms.map(async (sym) => {
                   const sid = adminSymIds[sym]; if (!sid) return;
-                  // FLOATING: keep each symbol's current spread as feed-gap fallback; only change the type
-                  const pip = spreadType === "FLOATING" ? (adminSymSpreads[sym] ?? 0) : (Number(spread) || 0);
+                  // FLOATING: keep each symbol's current spread as feed-gap fallback; only change the type.
+                  // If current spread is 0 (broken state), use category default so clients always have a fallback.
+                  const CAT_DEF: Record<string, number> = { forex: 1.5, metals: 3, commodities: 3, crypto: 10, indices: 8, stocks: 5, energy: 3 };
+                  const existingSp = adminSymSpreads[sym] ?? 0;
+                  const pip = spreadType === "FLOATING" ? (existingSp > 0 ? existingSp : (CAT_DEF[catEdit!.cat] ?? 1.5)) : (Number(spread) || 0);
                   await fetch("/api/admin/symbols/" + sid, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spread: pip, spreadType, spreadMax: 0 }) }).catch(() => {});
                   setAdminSymSpreads((m) => ({ ...m, [sym]: pip }));
                   setAdminSymTypes((m) => ({ ...m, [sym]: spreadType }));
