@@ -5,32 +5,33 @@ import { cookies } from "next/headers";
 
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 
-// Cookie that holds the superadmin's original session so it can be restored on exit.
 export const IMP_RETURN_COOKIE = "cubex_imp_return";
 
-// GET /api/auth/impersonate?token=<uuid>
-// Called from the superadmin's own browser (same domain).
-// Saves the current superadmin session as a backup cookie, then swaps cubex_session
-// to the impersonated tenant admin session and redirects to the dashboard.
-// No audit log, no login notification, no kick-out of the real tenant admin.
+// Build the correct public base URL — behind nginx the internal req.url is
+// localhost:3000, so we read x-forwarded-host / x-forwarded-proto instead.
+function publicBase(req: NextRequest): string {
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  if (host) return `${proto}://${host}`;
+  return req.nextUrl.origin; // direct (non-proxied) fallback
+}
+
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
-  if (!token) return NextResponse.redirect(new URL("/login?error=invalid_token", req.url));
+  const base = publicBase(req);
+  if (!token) return NextResponse.redirect(`${base}/login?error=invalid_token`);
 
-  // Redeem one-time token — deleted immediately so it cannot be replayed
   const raw = await redis.get(`imp:${token}`);
-  if (!raw) return NextResponse.redirect(new URL("/login?error=token_expired", req.url));
+  if (!raw) return NextResponse.redirect(`${base}/login?error=token_expired`);
   await redis.del(`imp:${token}`);
 
   let data: { userId: string; email: string; name: string; role: string; tenantId: string };
   try { data = JSON.parse(raw); } catch {
-    return NextResponse.redirect(new URL("/login?error=invalid_token", req.url));
+    return NextResponse.redirect(`${base}/login?error=invalid_token`);
   }
 
-  // Save the current session (superadmin) so we can restore it on exit
   const currentSession = (await cookies()).get(SESSION_COOKIE)?.value;
 
-  // Build impersonated session — no sid so single-device check is bypassed
   const jwt = await signSession({
     sub: data.userId,
     role: data.role as any,
@@ -45,14 +46,13 @@ export async function GET(req: NextRequest) {
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
     path: "/",
+    maxAge: 60 * 60 * 8,
   };
 
-  const res = NextResponse.redirect(new URL("/", req.url));
-  // Set the impersonated session as the active session
-  res.cookies.set(SESSION_COOKIE, jwt, { ...cookieOpts, maxAge: 60 * 60 * 8 });
-  // Back up the superadmin session so "Exit" can restore it
+  const res = NextResponse.redirect(`${base}/`);
+  res.cookies.set(SESSION_COOKIE, jwt, cookieOpts);
   if (currentSession) {
-    res.cookies.set(IMP_RETURN_COOKIE, currentSession, { ...cookieOpts, maxAge: 60 * 60 * 8 });
+    res.cookies.set(IMP_RETURN_COOKIE, currentSession, cookieOpts);
   }
   return res;
 }

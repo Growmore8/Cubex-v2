@@ -3,12 +3,17 @@ import { SESSION_COOKIE } from "@/lib/jwt";
 import { IMP_RETURN_COOKIE } from "@/app/api/auth/impersonate/route";
 import { cookies } from "next/headers";
 
-// GET /api/auth/impersonate-exit
-// Restores the superadmin's original session from the backup cookie and
-// redirects back to the tenants management page.
+function publicBase(req: NextRequest): string {
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  if (host) return `${proto}://${host}`;
+  return req.nextUrl.origin;
+}
+
 export async function GET(req: NextRequest) {
   const original = (await cookies()).get(IMP_RETURN_COOKIE)?.value;
-  const res = NextResponse.redirect(new URL("/superadmin/tenants", req.url));
+  const base = publicBase(req);
+  const res = NextResponse.redirect(`${base}/superadmin/tenants`);
 
   if (original) {
     res.cookies.set(SESSION_COOKIE, original, {
@@ -19,7 +24,6 @@ export async function GET(req: NextRequest) {
       maxAge: 60 * 60 * 8,
     });
   }
-  // Always clear the backup cookie
   res.cookies.set(IMP_RETURN_COOKIE, "", { path: "/", maxAge: 0 });
   return res;
 }
