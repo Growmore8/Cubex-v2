@@ -80,9 +80,19 @@ export default function SATenantsPage() {
     });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Impersonate failed"); return; }
-    // Navigate the current tab — same domain, session is swapped server-side.
-    // A purple banner will appear with an "Exit" button to restore the superadmin session.
-    window.location.href = "/api/auth/impersonate?token=" + d.token;
+    // Use the tenant's custom domain if set, otherwise build subdomain URL.
+    // Opens in a new tab — different domain = separate cookie jar, so the
+    // superadmin session on this tab is completely untouched.
+    let tenantOrigin: string;
+    if (d.customDomain) {
+      tenantOrigin = "https://" + d.customDomain;
+    } else {
+      // Derive base domain from current hostname (e.g. trade.cubexenterprises.com → cubexenterprises.com)
+      const parts = window.location.hostname.split(".");
+      const baseDomain = parts.length > 2 ? parts.slice(1).join(".") : parts.join(".");
+      tenantOrigin = window.location.protocol + "//" + d.subdomain + "." + baseDomain;
+    }
+    window.open(tenantOrigin + "/api/auth/impersonate?token=" + d.token, "_blank");
   }
 
   async function create() {

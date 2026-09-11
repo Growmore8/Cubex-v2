@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
   // Find the tenant and its primary admin user
   const [tenant, user] = await Promise.all([
-    prisma.tenant.findUnique({ where: { id: tenantId }, select: { subdomain: true } }),
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { subdomain: true, customDomain: true } }),
     prisma.user.findFirst({
       where: { tenantId, role: "ADMIN" },
       select: { id: true, email: true, name: true, role: true, tenantId: true },
@@ -34,5 +34,5 @@ export async function POST(req: NextRequest) {
     60
   );
 
-  return NextResponse.json({ ok: true, token, subdomain: tenant.subdomain });
+  return NextResponse.json({ ok: true, token, subdomain: tenant.subdomain, customDomain: tenant.customDomain || null });
 }
