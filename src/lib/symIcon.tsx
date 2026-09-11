@@ -33,7 +33,18 @@ const COL: Record<string, string> = {
   AED:"#16a34a",SAR:"#16a34a",INR:"#f97316",KRW:"#3b82f6",IDR:"#dc2626",
 };
 const METAL: Record<string, [string, string]> = {
-  XAU: ["Au", "#eab308"], XAG: ["Ag", "#9ca3af"], XPT: ["Pt", "#94a3b8"], XPD: ["Pd", "#a3a3a3"], XTI: ["Oil", "#16a34a"], WTI: ["Oil", "#16a34a"],
+  XAU: ["Au", "#eab308"], XAG: ["Ag", "#9ca3af"], XPT: ["Pt", "#94a3b8"], XPD: ["Pd", "#a3a3a3"],
+  XTI: ["Oil", "#16a34a"], WTI: ["Oil", "#16a34a"],
+  // Energy (full symbol — no quote suffix stripped)
+  USOIL: ["Oil", "#16a34a"], UKOIL: ["Oil", "#64748b"], NATGAS: ["Gas", "#0ea5e9"], COPPER: ["Cu", "#b45309"],
+  // Gold gram
+  GAU: ["Gau", "#eab308"],
+};
+const INDEX: Record<string, [string, string]> = {
+  US500: ["SPX", "#2563eb"], US30: ["DJI", "#7c3aed"], US100: ["NDX", "#0891b2"],
+  GER40: ["DAX", "#1e293b"], UK100: ["FTS", "#6366f1"], JP225: ["NIK", "#ef4444"],
+  HK50: ["HSI", "#dc2626"], FRA40: ["CAC", "#3b82f6"], AUS200: ["ASX", "#0ea5e9"],
+  EUSTX50: ["SX5", "#2563eb"], VIX: ["VIX", "#dc2626"], ESP35: ["IBX", "#f59e0b"],
 };
 // Crypto base symbols that have icons on jsdelivr (spothq/cryptocurrency-icons)
 const CRYPTO_COLORS: Record<string, string> = {
@@ -118,6 +129,7 @@ function looksLikeStock(code: string) {
 function assetIcon(code: string, size: number, ml: number): React.ReactNode {
   if (CRYPTO_COLORS[code] !== undefined || ["BTC","ETH","BNB","SOL","XRP","DOGE","ADA","LTC","TRX","DOT","AVAX","LINK","SHIB","UNI","ATOM","BCH","ETC","MATIC","FIL","XBT"].includes(code))
     return <CryptoIconWithFallback base={code} size={size} ml={ml} />;
+  if (INDEX[code]) return <Chip label={INDEX[code][0]} bg={INDEX[code][1]} size={size} ml={ml} />;
   if (METAL[code]) return <Chip label={METAL[code][0]} bg={METAL[code][1]} size={size} ml={ml} />;
   if (CCY[code]) return <Flag ccy={code} size={size} ml={ml} />;
   if (looksLikeStock(code)) return <StockIcon ticker={code} size={size} ml={ml} />;
