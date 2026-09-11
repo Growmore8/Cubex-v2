@@ -733,7 +733,7 @@ function LWChart({
         if (cur) onCandleUpdateRef.current?.(cur);
       } catch { /* out-of-order tick during a reseed — ignore */ }
     };
-    const iv = setInterval(apply, 80);
+    const iv = setInterval(apply, 50);
     return () => { socket.disconnect(); clearInterval(iv); };
   }, [symbol]);
 

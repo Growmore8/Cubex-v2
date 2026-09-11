@@ -403,8 +403,8 @@ function applyPrice(sym, price, source) {
   else if (st.price == null) commitPrice(sym, p);
 }
 
-// Tick batching: buffer ticks and flush every 80ms as a single 'ticks' array event.
-// Cuts socket emit pressure from ~350/sec (per-symbol) to ~12/sec (batched).
+// Tick batching: buffer ticks and flush every 50ms as a single 'ticks' array event.
+// Cuts socket emit pressure from ~350/sec (per-symbol) to ~20/sec (batched).
 const _tickBatch = {};
 let _batchFlushTimer = null;
 function _flushTicks() {
@@ -465,7 +465,7 @@ function commitPrice(sym, p) {
   const rawReal = (st.realAt && Date.now() - st.realAt < REAL_TTL && st.ask != null) ? st.ask : null;
   const real = (rawReal != null && rawReal > emitBid) ? rawReal : null;
   _tickBatch[sym] = { symbol: sym, price: p, bid: emitBid, real, candle };
-  if (!_batchFlushTimer && global.__io) _batchFlushTimer = setTimeout(_flushTicks, 80);
+  if (!_batchFlushTimer && global.__io) _batchFlushTimer = setTimeout(_flushTicks, 50);
   recomputeDerived(sym);
 }
 
