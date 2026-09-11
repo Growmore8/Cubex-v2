@@ -1056,8 +1056,8 @@ function getBid(tenantId, symbol, groupId, accountId, ask) {
       const pip = Math.pow(10, -(digits - 1));
       return Math.max(0, rb - (grpPips + accPips) * pip);
     }
-    // No real bid yet (feed not connected) — zero spread until feed reconnects
-    return ask;
+    // No real bid yet (feed not connected) — use configured spread as fallback
+    return ask - getSpreadPrice(tenantId, symbol, groupId, accountId);
   }
   // FIXED: configured pips
   return ask - getSpreadPrice(tenantId, symbol, groupId, accountId);
