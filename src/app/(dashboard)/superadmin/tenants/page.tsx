@@ -80,12 +80,9 @@ export default function SATenantsPage() {
     });
     const d = await r.json();
     if (!d.ok) { setErr(d.error || "Impersonate failed"); return; }
-    // Build the tenant URL by replacing the first hostname segment with the tenant subdomain.
-    // e.g. superadmin on "admin.cubex.com" → tenant on "tenant1.cubex.com"
-    const parts = window.location.hostname.split(".");
-    parts[0] = d.subdomain;
-    const url = `${window.location.protocol}//${parts.join(".")}/api/auth/impersonate?token=${d.token}`;
-    window.open(url, "_blank");
+    // Navigate the current tab — same domain, session is swapped server-side.
+    // A purple banner will appear with an "Exit" button to restore the superadmin session.
+    window.location.href = "/api/auth/impersonate?token=" + d.token;
   }
 
   async function create() {
