@@ -460,7 +460,7 @@ function LWChart({
       if (atrSeriesRef.current) { try { atrSeriesRef.current.setData(computeATR(barsRef.current)); } catch {} }
       if (adxSeriesRef.current) { try { adxSeriesRef.current.setData(computeADX(barsRef.current)); } catch {} }
     };
-    recomputeFromBars(); // sync all active indicator series after any state change
+    setTimeout(recomputeFromBars, 0); // defer off main thread so chart paints first
     onBarsLoaded.current = recomputeFromBars; // re-run when bars reload (symbol/tf change)
   }, [sma, ema, bb, rsi, macd, psar, cdl, sig, ribbon, stoch, atr, adx, symbol, tf, theme, digits, drawN, cfgKey]);
 
@@ -619,7 +619,7 @@ function LWChart({
         .sort((a: any, b: any) => a.time - b.time)
         .filter((c: any) => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
       if (!bars.length) return false;
-      try { seriesRef.current.setData(bars); barsRef.current = bars; try { chartRef.current?.timeScale().fitContent(); } catch {} onBarsLoaded.current(); onCandleUpdateRef.current?.(bars[bars.length - 1]); return true; }
+      try { seriesRef.current.setData(bars); barsRef.current = bars; try { chartRef.current?.timeScale().fitContent(); } catch {} setTimeout(() => { try { onBarsLoaded.current(); } catch {} }, 0); onCandleUpdateRef.current?.(bars[bars.length - 1]); return true; }
       catch { return false; }
     }
     // Instant open: seed the chart from the last cached bars for this symbol+tf so
@@ -664,7 +664,7 @@ function LWChart({
                   .map((c: any) => ({ time: Number(c.time), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }))
                   .filter((c: any) => isFinite(c.time) && isFinite(c.close) && !existing.has(c.time));
                 if (!older.length) { loadMoreRef.current = null; return; }
-                const merged = [...older, ...barsRef.current].sort((a: any, b: any) => a.time - b.time);
+                const merged = [...older, ...barsRef.current].sort((a: any, b: any) => a.time - b.time).slice(-5000);
                 try { seriesRef.current?.setData(merged); barsRef.current = merged; setTimeout(() => { try { onBarsLoaded.current(); } catch {} }, 0); } catch {}
               })
               .catch(() => {})
@@ -733,8 +733,16 @@ function LWChart({
         if (cur) onCandleUpdateRef.current?.(cur);
       } catch { /* out-of-order tick during a reseed — ignore */ }
     };
-    const iv = setInterval(apply, 50);
-    return () => { socket.disconnect(); clearInterval(iv); };
+    // 50 ms on desktop (20 Hz smooth), 100 ms on mobile (saves battery/heat),
+    // paused entirely when the tab is hidden (screen off / app backgrounded).
+    const isMobile = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+    let iv = setInterval(apply, isMobile ? 100 : 50);
+    const onVis = () => {
+      clearInterval(iv);
+      if (!document.hidden) iv = setInterval(apply, isMobile ? 100 : 50);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { socket.disconnect(); clearInterval(iv); document.removeEventListener("visibilitychange", onVis); };
   }, [symbol]);
 
   // Draw position / pending price lines (entry, SL, TP) — colored by order side
