@@ -117,15 +117,24 @@ export async function manualTrade(s: any, input: any) {
   // Same margin rule as the client: free margin must cover this trade.
   await assertMargin(acc, { symbol: input.symbol, type: input.type, lots: Number(input.lots) }, live ?? openPrice);
   const openedAt = input.openedAt ? new Date(input.openedAt) : undefined;
-  const ticket = await nextTicket(acc.tenantId);
-  const t = await prisma.trade.create({
-    data: { ticket, accountId: acc.id, symbol: input.symbol, type: input.type,
-      lots: new Prisma.Decimal(input.lots), openPrice: new Prisma.Decimal(openPrice),
-      sl: new Prisma.Decimal(input.sl || 0), tp: new Prisma.Decimal(input.tp || 0),
-      ...(input.trailingStop ? { trailingStop: new Prisma.Decimal(Number(input.trailingStop)) } : {}),
-      ...(input.comment ? { comment: input.comment } : {}),
-      ...(openedAt ? { openedAt } : {}) },
-  });
+  let t: any;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const ticket = await nextTicket(acc.tenantId);
+    try {
+      t = await prisma.trade.create({
+        data: { ticket, accountId: acc.id, symbol: input.symbol, type: input.type,
+          lots: new Prisma.Decimal(input.lots), openPrice: new Prisma.Decimal(openPrice),
+          sl: new Prisma.Decimal(input.sl || 0), tp: new Prisma.Decimal(input.tp || 0),
+          ...(input.trailingStop ? { trailingStop: new Prisma.Decimal(Number(input.trailingStop)) } : {}),
+          ...(input.comment ? { comment: input.comment } : {}),
+          ...(openedAt ? { openedAt } : {}) },
+      });
+      break;
+    } catch (e: any) {
+      if (attempt < 2 && e?.code === "P2002" && e?.meta?.target?.includes("ticket")) continue;
+      throw e;
+    }
+  }
   const label = `${acc.login} ${input.type} ${input.symbol} ${input.lots}L @ ${openPrice} (manual)`;
   audit(acc.tenantId, "trade.manual", label, s.email || "staff", s.role);
   notifyStaff(acc.tenantId, { type: "TRADE", title: "Manual trade", body: label }, acc.managerId).catch(() => {});

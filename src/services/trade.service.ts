@@ -24,6 +24,24 @@ export async function assertMarketOpen(symbol: string) {
 }
 
 export async function nextTicket(tenantId: string): Promise<bigint> {
+  // On first call for a tenant, seed the counter from the max ticket already in
+  // the DB (trades + history). This prevents collisions when the counter row is
+  // missing but trades already exist (e.g. after a DB restore or migration).
+  const existing = await prisma.counter.findUnique({ where: { tenantId_name: { tenantId, name: "ticket" } } });
+  if (!existing) {
+    const [maxTrade, maxHist] = await Promise.all([
+      prisma.trade.findFirst({ where: { account: { tenantId } }, orderBy: { ticket: "desc" }, select: { ticket: true } }),
+      prisma.tradeHistory.findFirst({ where: { account: { tenantId } }, orderBy: { ticket: "desc" }, select: { ticket: true } }),
+    ]);
+    const maxExisting = BigInt(Math.max(
+      Number(maxTrade?.ticket ?? 0n),
+      Number(maxHist?.ticket ?? 0n),
+      1000000,
+    ));
+    try {
+      await prisma.counter.create({ data: { tenantId, name: "ticket", nextVal: maxExisting + 1n } });
+    } catch { /* race: another request created it first — fall through to upsert */ }
+  }
   try {
     const c = await prisma.counter.upsert({
       where: { tenantId_name: { tenantId, name: "ticket" } },

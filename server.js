@@ -227,8 +227,24 @@ let symbols = [];
 function r(v, d) { return Number(v.toFixed(d)); }
 function bucketStart(ms) { return Math.floor(ms / CANDLE_MS) * CANDLE_MS; }
 
-// Short, per-tenant sequential trade ticket (matches src/services/trade.service.ts).
+// Short, per-tenant sequential trade ticket (mirrors src/services/trade.service.ts).
+// When the counter row is missing (first boot or DB restore), seed it from the
+// max ticket already in trades/history to prevent unique-constraint collisions.
 async function nextTicket(tenantId) {
+  const existing = await prisma.counter.findUnique({ where: { tenantId_name: { tenantId, name: "ticket" } } });
+  if (!existing) {
+    const [maxTrade, maxHist] = await Promise.all([
+      prisma.trade.findFirst({ where: { account: { tenantId } }, orderBy: { ticket: "desc" }, select: { ticket: true } }),
+      prisma.tradeHistory.findFirst({ where: { account: { tenantId } }, orderBy: { ticket: "desc" }, select: { ticket: true } }),
+    ]);
+    const maxExisting = BigInt(Math.max(
+      Number(maxTrade?.ticket ?? 0n),
+      Number(maxHist?.ticket ?? 0n),
+      1000000,
+    ));
+    try { await prisma.counter.create({ data: { tenantId, name: "ticket", nextVal: maxExisting + 1n } }); }
+    catch { /* race: created by another call — fall through */ }
+  }
   const c = await prisma.counter.upsert({
     where: { tenantId_name: { tenantId, name: "ticket" } },
     create: { tenantId, name: "ticket", nextVal: 1000001n },
@@ -1335,8 +1351,13 @@ async function checkPending(io) {
       // Commission on pending fill
       const symForComm = await prisma.symbol.findFirst({ where: { tenantId: o.account.tenantId, symbol: o.symbol }, select: { commissionPerLot: true } }).catch(() => null);
       const pendComm = Number(o.lots) * Number(symForComm?.commissionPerLot ?? 0);
-      const ticket = await nextTicket(o.account.tenantId);
-      await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: openPx, sl: o.sl, tp: o.tp, commission: pendComm, comment: o.comment || null } });
+      let filled = false;
+      for (let _ta = 0; _ta < 3; _ta++) {
+        const ticket = await nextTicket(o.account.tenantId);
+        try { await prisma.trade.create({ data: { ticket, accountId: o.accountId, symbol: o.symbol, type: o.side, lots: o.lots, openPrice: openPx, sl: o.sl, tp: o.tp, commission: pendComm, comment: o.comment || null } }); filled = true; break; }
+        catch (e) { if (_ta < 2 && e?.code === "P2002" && e?.meta?.target?.includes("ticket")) continue; throw e; }
+      }
+      if (!filled) continue;
       if (pendComm > 0) await prisma.account.update({ where: { id: o.accountId }, data: { pnl: { decrement: pendComm } } }).catch(() => {});
       await prisma.pendingOrder.delete({ where: { id: o.id } });
       const pbody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + openPx;
