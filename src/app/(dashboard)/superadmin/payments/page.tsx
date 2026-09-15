@@ -12,9 +12,16 @@ export default function SAPayments() {
   const [edit, setEdit] = useState<any>(null);
   const [confirmDel, setConfirmDel] = useState<any>(null);
 
-  async function load() {
+  async function load(overrideSource?: PaymentSource) {
     try {
-      const d = await fetch("/api/superadmin/payments?scope=" + encodeURIComponent(scope)).then((r) => r.json());
+      const curTenantForLoad = scope !== "global" ? tenants.find((t) => t.id === scope) : null;
+      const src = overrideSource ?? (curTenantForLoad?.paymentMethodSource || null);
+      // Pass addedBy so SA-custom and tenant-managed rows stay separate in the list
+      const addedBy = scope !== "global" && src === "sa_custom" ? "sa"
+        : scope !== "global" && src === "tenant" ? "tenant"
+        : null;
+      const url = "/api/superadmin/payments?scope=" + encodeURIComponent(scope) + (addedBy ? "&addedBy=" + addedBy : "");
+      const d = await fetch(url).then((r) => r.json());
       if (d.ok) { setWallets(d.wallets || []); setTenants(d.tenants || []); }
     } catch (e) {}
   }
@@ -54,6 +61,8 @@ export default function SAPayments() {
     // "tenant" source implies allowing tenant self-service
     await post({ kind: "perm", tenantId, paymentMethodSource: src, allow: src === "tenant" });
     setTenants((prev) => prev.map((x) => x.id === tenantId ? { ...x, paymentMethodSource: src, ownPaymentMethods: src === "tenant" } : x));
+    // Reload wallet list filtered by the new source
+    await load(src);
   }
 
   const curTenant = scope !== "global" ? tenants.find((t) => t.id === scope) : null;
@@ -130,7 +139,14 @@ export default function SAPayments() {
           <span className="rounded px-2 py-0.5 text-xs font-semibold" style={{ background: tb.bg, color: tb.c }}>{w.type === "CRYPTO" ? w.network : w.type}</span>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium">{w.label || w.asset}</div>
-            <div className="break-all text-xs text-gray-400">{w.type === "LINK" ? w.url : w.address}</div>
+            {w.type === "BANK" ? (
+              <div className="text-xs text-gray-400">
+                {(w.details as any)?.accountName && <span className="mr-2 font-medium text-gray-500">{(w.details as any).accountName}</span>}
+                <span className="break-all">{w.address}</span>
+              </div>
+            ) : (
+              <div className="break-all text-xs text-gray-400">{w.type === "LINK" ? w.url : w.address}</div>
+            )}
           </div>
           <span className="text-xs" style={{ color: w.active ? "#16a34a" : "#94a3b8" }}>{w.active ? "Active" : "Off"}</span>
           <button title="Edit" className="mx-0.5 rounded px-2 py-1" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent2)" }} onClick={() => openEdit(w)}><i className="fa-solid fa-pen"></i></button>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireClient } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
+import { walletAddedBy } from "@/lib/paymentMethod";
 
 export async function GET() {
   const s = await requireClient();
@@ -22,8 +23,14 @@ export async function GET() {
   let all: any[];
   if (source === "global") {
     all = await prisma.cryptoWallet.findMany({ where: { active: true, tenantId: null }, orderBy: { createdAt: "asc" } });
-  } else if (source === "sa_custom" || source === "tenant") {
-    all = await prisma.cryptoWallet.findMany({ where: { active: true, tenantId: s.tenantId! }, orderBy: { createdAt: "asc" } });
+  } else if (source === "sa_custom") {
+    // Show only SA-configured rows for this tenant (_addedBy = "sa")
+    const rows = await prisma.cryptoWallet.findMany({ where: { active: true, tenantId: s.tenantId! }, orderBy: { createdAt: "asc" } });
+    all = rows.filter((w) => walletAddedBy(w) === "sa");
+  } else if (source === "tenant") {
+    // Show only tenant-admin-managed rows (_addedBy = "tenant" or legacy untagged)
+    const rows = await prisma.cryptoWallet.findMany({ where: { active: true, tenantId: s.tenantId! }, orderBy: { createdAt: "asc" } });
+    all = rows.filter((w) => walletAddedBy(w) === "tenant");
   } else {
     // auto backward-compat: own rows take priority over global
     const selfService = !!perms.ownPaymentMethods;

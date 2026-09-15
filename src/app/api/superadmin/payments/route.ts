@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
-import { buildWalletData, assertWalletValid } from "@/lib/paymentMethod";
+import { buildWalletData, assertWalletValid, walletAddedBy } from "@/lib/paymentMethod";
 
 // scope: "global" => tenantId null (default for all tenants); else a tenant id.
 function scopeToTenantId(scope: string | null): string | null {
@@ -14,7 +14,14 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const scope = url.searchParams.get("scope");
   const tenantId = scopeToTenantId(scope);
-  const wallets = await prisma.cryptoWallet.findMany({ where: { tenantId }, orderBy: { createdAt: "asc" } });
+  // When viewing a specific tenant, filter by addedBy so SA-custom and tenant-managed don't mix.
+  // "sa" → only rows tagged _addedBy:"sa"; "tenant" → rows with no tag or _addedBy:"tenant".
+  // Global scope (tenantId=null) always shows all rows.
+  const addedByFilter = url.searchParams.get("addedBy"); // "sa" | "tenant" | null
+  const allRows = await prisma.cryptoWallet.findMany({ where: { tenantId }, orderBy: { createdAt: "asc" } });
+  const wallets = (tenantId && addedByFilter)
+    ? allRows.filter((w) => walletAddedBy(w) === addedByFilter)
+    : allRows;
   const tenants = await prisma.tenant.findMany({ select: { id: true, name: true, brandName: true, permissions: true }, orderBy: { name: "asc" } });
   // legacy single-URL local payment setting (kept for back-compat, shows as a LINK method)
   const setting = await prisma.setting.findUnique({ where: { key: "payments" } }).catch(() => null);
@@ -33,7 +40,9 @@ export async function POST(req: Request) {
     const b = await req.json();
     if (b.kind === "wallet") {
       const tenantId = scopeToTenantId(b.scope);
-      const data = buildWalletData(b);
+      // Tag per-tenant SA rows so they stay separate from tenant-admin rows.
+      // Global rows (tenantId=null) need no tag.
+      const data = buildWalletData(b, tenantId ? "sa" : undefined);
       if (b.action === "add") {
         assertWalletValid(data);
         await prisma.cryptoWallet.create({ data: { ...data, tenantId } });

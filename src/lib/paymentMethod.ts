@@ -14,7 +14,8 @@ export type WalletData = {
 };
 
 // Build the CryptoWallet `data` payload from a request body.
-export function buildWalletData(b: any): WalletData {
+// Pass addedBy to tag the row so SA-configured and tenant-managed methods stay separate.
+export function buildWalletData(b: any, addedBy?: "sa" | "tenant"): WalletData {
   const type = String(b.type || "CRYPTO").toUpperCase();
   if (type === "BANK") {
     const bank = b.bank || {};
@@ -29,7 +30,7 @@ export function buildWalletData(b: any): WalletData {
       address: accountNumber, // so list rows have something to show
       label: bankName || b.label || null,
       url: null,
-      details: { accountNumber, accountName, bankName, ifsc },
+      details: { accountNumber, accountName, bankName, ifsc, ...(addedBy ? { _addedBy: addedBy } : {}) },
       active: b.active !== false,
     };
   }
@@ -40,9 +41,15 @@ export function buildWalletData(b: any): WalletData {
     address: b.address || "",
     label: b.label || null,
     url: b.url || null,
-    details: null,
+    details: addedBy ? { _addedBy: addedBy } : null,
     active: b.active !== false,
   };
+}
+
+// Read the _addedBy tag from a wallet row's details.
+// Rows created before this feature have no tag → treated as "tenant" (backward compat).
+export function walletAddedBy(w: { details: any }): "sa" | "tenant" {
+  return (w.details as any)?._addedBy === "sa" ? "sa" : "tenant";
 }
 
 // Throw if the built data is missing required fields for its type.
