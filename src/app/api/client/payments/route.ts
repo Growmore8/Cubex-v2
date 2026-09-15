@@ -59,8 +59,13 @@ export async function POST(req: Request) {
       const movable = withdrawableBalance(account as any, pnlOnly);
       if (amount > movable) throw new Error(pnlOnly ? `Only your profit (PNL) balance is withdrawable (max ${movable.toFixed(2)})` : "Insufficient balance");
     }
-    let slipUrl: string | undefined;
+    // Deposit requests must include a payment slip — enforced here so API calls
+    // outside the UI cannot bypass the requirement either.
     const file = form.get("file") as File | null;
+    if (kind === "DEPOSIT" && (!file || file.size === 0)) {
+      throw new Error("Payment slip is required. Please upload your transfer receipt.");
+    }
+    let slipUrl: string | undefined;
     if (file && file.size > 0) slipUrl = await saveUpload(file, "slips/" + account.id);
     await createPayment(s.tenantId!, account.id, kind, amount, method, slipUrl, note);
     const kindLabel: Record<string, string> = { DEPOSIT: "Deposit request", WITHDRAWAL: "Withdrawal request", CREDIT_REQUEST: "Instant Credit request", CREDIT_CLEAR: "Credit Clearance request" };

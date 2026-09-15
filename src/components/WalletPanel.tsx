@@ -105,6 +105,9 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     e.preventDefault(); setErr(""); setMsg("");
     const amt = Number(dAmount); if (!(amt > 0)) { setErr("Enter an amount"); return; }
     const fd = new FormData(e.target as HTMLFormElement);
+    // Slip is mandatory — reject before hitting the server
+    const slip = fd.get("file") as File | null;
+    if (!slip || slip.size === 0) { setErr("Please upload your payment slip before submitting."); return; }
     fd.set("kind", "DEPOSIT"); fd.set("amount", String(amt));
     const label = depWallet ? (depWallet.asset + " " + depWallet.network) : depUpi ? ("UPI " + (depUpi.label || "")) : depBank ? "Bank Transfer" : "Crypto";
     fd.set("method", label);
@@ -284,7 +287,7 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
         </>)}
         <div className="grid grid-cols-2 gap-3">
           <div><div className={lbl}>Amount (USD)</div><input className={input} type="number" step="0.01" value={dAmount} onChange={(e) => setDAmount(e.target.value)} placeholder="0.00" required /></div>
-          <div><div className={lbl}>Slip (image or PDF)</div><input className={input} type="file" name="file" accept="image/*,application/pdf" /></div>
+          <div><div className={lbl}>Payment Slip <span style={{ color: "#ef5350" }}>*</span></div><input className={input} type="file" name="file" accept="image/*,application/pdf" required /></div>
         </div>
         <div><div className={lbl}>Note (optional)</div><textarea name="note" rows={2} className={input} placeholder="Reference, transaction hash…" /></div>
         <div className="flex gap-2"><button type="button" onClick={() => setDepSel(null)} className="flex-1 rounded-lg border py-2 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>Cancel</button><button disabled={sending} className="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white disabled:opacity-60"><i className="fa-solid fa-paper-plane mr-1" /> {sending ? "Submitting…" : "Submit"}</button></div>
