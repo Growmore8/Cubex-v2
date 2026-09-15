@@ -1139,7 +1139,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   const isFloatSym = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING";
                   const cfgSp = adminSymSpreads[sym] || 0; const liveSp = liveSpreadPips[sym];
                   const spPips = (isFloatSym ? (liveSp != null && liveSp > 0 ? liveSp : cfgSp) : cfgSp) + deskExtraSpread;
-                  return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} showBuiltinOHLC={false} hideNativeTf onTfChange={setTf} />;
+                  return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} showBuiltinOHLC={false} onTfChange={setTf} />;
                 })()}
               </div>
             ))}
