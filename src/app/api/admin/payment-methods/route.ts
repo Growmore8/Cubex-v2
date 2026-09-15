@@ -11,13 +11,18 @@ async function allowed(tenantId: string): Promise<boolean> {
 export async function GET() {
   const s = await requireAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  const can = await allowed(s.tenantId!);
-  // Tenant admin sees only rows they manage (_addedBy = "tenant" or legacy untagged).
-  // SA-custom rows (_addedBy = "sa") are managed by SA only.
+  const t = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { permissions: true } });
+  const perms: any = (t?.permissions as any) || {};
+  const can = !!perms.ownPaymentMethods;
+  const paymentMethodSource: string | null = perms.paymentMethodSource || null;
   const allOwn = await prisma.cryptoWallet.findMany({ where: { tenantId: s.tenantId! }, orderBy: { createdAt: "asc" } });
+  // When SA is managing this tenant's methods, ALL rows are SA-owned (including
+  // legacy rows added before _addedBy tagging was deployed, which have no tag).
+  const saOwn = paymentMethodSource === "sa_custom" ? allOwn : allOwn.filter((w) => walletAddedBy(w) === "sa");
+  // Rows the tenant admin manages (tagged "tenant" or legacy untagged — only relevant when tenant-managed)
   const own = allOwn.filter((w) => walletAddedBy(w) === "tenant");
   const globals = await prisma.cryptoWallet.findMany({ where: { tenantId: null, active: true }, orderBy: { createdAt: "asc" } });
-  return NextResponse.json({ ok: true, allowed: can, own, globals });
+  return NextResponse.json({ ok: true, allowed: can, paymentMethodSource, own, saOwn, globals });
 }
 
 export async function POST(req: Request) {

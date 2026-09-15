@@ -9,7 +9,9 @@ const NETS = ["BEP20", "ERC20", "TRC20"];
 
 export default function PaymentMethodsModal({ onClose }: { onClose: () => void }) {
   const [allowed, setAllowed] = useState(false);
+  const [paymentMethodSource, setPaymentMethodSource] = useState<string | null>(null);
   const [own, setOwn] = useState<any[]>([]);
+  const [saOwn, setSaOwn] = useState<any[]>([]);
   const [globals, setGlobals] = useState<any[]>([]);
   const [edit, setEdit] = useState<any>(null);
   const [confirmDel, setConfirmDel] = useState<any>(null);
@@ -17,7 +19,7 @@ export default function PaymentMethodsModal({ onClose }: { onClose: () => void }
 
   async function load() {
     const m = await fetch("/api/admin/payment-methods").then((r) => r.json()).catch(() => ({}));
-    if (m.ok) { setAllowed(!!m.allowed); setOwn(m.own || []); setGlobals(m.globals || []); }
+    if (m.ok) { setAllowed(!!m.allowed); setPaymentMethodSource(m.paymentMethodSource || null); setOwn(m.own || []); setSaOwn(m.saOwn || []); setGlobals(m.globals || []); }
   }
   useEffect(() => { load(); }, []);
 
@@ -58,14 +60,21 @@ export default function PaymentMethodsModal({ onClose }: { onClose: () => void }
   const card = "ui-pop desk-modal rounded-2xl border p-5 shadow-2xl bg-[var(--panel)] text-[var(--text)] border-[var(--border)]";
   const typeBadge = (t: string) => t === "UPI" ? { bg: "rgba(14,116,144,.18)", c: "#22d3ee" } : t === "LINK" ? { bg: "rgba(217,119,6,.18)", c: "#f59e0b" } : { bg: "var(--soft)", c: "var(--muted)" };
 
-  function MethodRow({ w }: { w: any }) {
+  function MethodRow({ w, readOnly }: { w: any; readOnly?: boolean }) {
     const tb = typeBadge(w.type);
+    const d: any = w.details || {};
+    const label = w.type === "BANK" ? (d.accountName || w.label || "Bank") : (w.label || w.asset);
+    const sub = w.type === "BANK"
+      ? [d.accountNumber && `Acct: ${d.accountNumber}`, d.bankName].filter(Boolean).join(" · ")
+      : w.type === "LINK" ? w.url : w.address;
     return (<div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--soft)] p-2">
       <span className="rounded px-2 py-0.5 text-xs font-semibold" style={{ background: tb.bg, color: tb.c }}>{w.type === "CRYPTO" ? w.network : w.type}</span>
-      <div className="min-w-0 flex-1"><div className="text-sm font-medium">{w.label || w.asset}</div><div className="break-all text-xs text-[var(--muted)]">{w.type === "LINK" ? w.url : w.address}</div></div>
+      <div className="min-w-0 flex-1"><div className="text-sm font-medium">{label}</div><div className="break-all text-xs text-[var(--muted)]">{sub}</div></div>
       <span className="text-xs" style={{ color: w.active ? "#16a34a" : "var(--muted)" }}>{w.active ? "Active" : "Off"}</span>
-      <button title="Edit" className="rounded px-2 py-1" style={{ background: "var(--soft)", color: "var(--accent)" }} onClick={() => openEdit(w)}><i className="fa-solid fa-pen" /></button>
-      <button title="Delete" className="rounded px-2 py-1" style={{ background: "rgba(220,38,38,.15)", color: "#dc2626" }} onClick={() => setConfirmDel(w)}><i className="fa-solid fa-trash" /></button>
+      {!readOnly && <>
+        <button title="Edit" className="rounded px-2 py-1" style={{ background: "var(--soft)", color: "var(--accent)" }} onClick={() => openEdit(w)}><i className="fa-solid fa-pen" /></button>
+        <button title="Delete" className="rounded px-2 py-1" style={{ background: "rgba(220,38,38,.15)", color: "#dc2626" }} onClick={() => setConfirmDel(w)}><i className="fa-solid fa-trash" /></button>
+      </>}
     </div>);
   }
 
@@ -80,24 +89,38 @@ export default function PaymentMethodsModal({ onClose }: { onClose: () => void }
           <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--soft)]"><i className="fa-solid fa-xmark" /></button>
         </div>
 
-        {!allowed ? (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--soft)] p-4 text-center text-sm text-[var(--muted)]">
-            Your plan doesn&apos;t allow adding your own payment methods. Contact the platform owner to enable this.
-          </div>
-        ) : (<>
-          <div className="mb-3 flex justify-end gap-1.5">
-            <button className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--accent)" }} onClick={() => newMethod("CRYPTO")}>+ Crypto</button>
-            <button className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--text)]" onClick={() => newMethod("UPI")}>+ UPI</button>
-            <button className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--text)]" onClick={() => newMethod("BANK")}>+ Bank</button>
-            <button className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--text)]" onClick={() => newMethod("LINK")}>+ Local Link</button>
-          </div>
-          <div className="space-y-2">
-            {own.map((w) => <MethodRow key={w.id} w={w} />)}
-            {own.length === 0 && <div className="rounded-xl border border-dashed border-[var(--border)] py-6 text-center text-sm text-[var(--muted)]">No methods added yet. Add one above.</div>}
-          </div>
-          {/* Global/platform defaults are intentionally NOT shown once the tenant can
-              manage its own methods (clients see only the tenant's methods then). */}
-        </>)}
+        {allowed ? (
+          /* Own methods — tenant can add / edit / delete */
+          <>
+            <div className="mb-3 flex justify-end gap-1.5">
+              <button className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--accent)" }} onClick={() => newMethod("CRYPTO")}>+ Crypto</button>
+              <button className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--text)]" onClick={() => newMethod("UPI")}>+ UPI</button>
+              <button className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--text)]" onClick={() => newMethod("BANK")}>+ Bank</button>
+              <button className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--text)]" onClick={() => newMethod("LINK")}>+ Local Link</button>
+            </div>
+            <div className="space-y-2">
+              {own.map((w) => <MethodRow key={w.id} w={w} />)}
+              {own.length === 0 && <div className="rounded-xl border border-dashed border-[var(--border)] py-6 text-center text-sm text-[var(--muted)]">No methods added yet. Add your payment methods above.</div>}
+            </div>
+          </>
+        ) : (
+          /* Read-only: show SA-custom or global methods with restriction note */
+          <>
+            <div className="space-y-2">
+              {(paymentMethodSource === "sa_custom" ? saOwn : globals).map((w: any) => (
+                <MethodRow key={w.id} w={w} readOnly />
+              ))}
+              {(paymentMethodSource === "sa_custom" ? saOwn : globals).length === 0 && (
+                <div className="rounded-xl border border-dashed border-[var(--border)] py-6 text-center text-sm text-[var(--muted)]">
+                  {paymentMethodSource === "sa_custom" ? "No methods configured yet. Contact your platform provider." : "No global methods configured yet."}
+                </div>
+              )}
+            </div>
+            <div className="mt-3 text-center text-[11px] text-[var(--muted)]">
+              Your plan doesn&apos;t allow adding your own payment methods. Contact the platform owner to enable this.
+            </div>
+          </>
+        )}
 
         {err && <div className="mt-3 text-sm text-red-500">{err}</div>}
 

@@ -24,9 +24,9 @@ export async function GET() {
   if (source === "global") {
     all = await prisma.cryptoWallet.findMany({ where: { active: true, tenantId: null }, orderBy: { createdAt: "asc" } });
   } else if (source === "sa_custom") {
-    // Show only SA-configured rows for this tenant (_addedBy = "sa")
-    const rows = await prisma.cryptoWallet.findMany({ where: { active: true, tenantId: s.tenantId! }, orderBy: { createdAt: "asc" } });
-    all = rows.filter((w) => walletAddedBy(w) === "sa");
+    // Show all SA-managed rows for this tenant. No _addedBy filter because rows
+    // added before tagging was deployed have no tag but are still SA-managed.
+    all = await prisma.cryptoWallet.findMany({ where: { active: true, tenantId: s.tenantId! }, orderBy: { createdAt: "asc" } });
   } else if (source === "tenant") {
     // Show only tenant-admin-managed rows (_addedBy = "tenant" or legacy untagged)
     const rows = await prisma.cryptoWallet.findMany({ where: { active: true, tenantId: s.tenantId! }, orderBy: { createdAt: "asc" } });
