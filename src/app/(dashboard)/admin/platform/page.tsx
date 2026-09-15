@@ -1096,7 +1096,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
           <div className="grid min-h-0 flex-1 gap-px bg-[var(--border)]" style={{ gridTemplateColumns: layout === 1 ? "1fr" : "1fr 1fr", gridTemplateRows: layout === 4 ? "1fr 1fr" : "1fr" }}>
             {shown.length === 0 ? <div className="flex items-center justify-center text-[var(--muted)]">No chart open.</div> : shown.map(({ sym, i }) => (
               <div key={"tile" + i} className="relative min-h-0 overflow-hidden bg-[var(--bg)]" onClick={() => setActive(i)}>
-                {/* Buy/Sell overlay \u2014 top-left, positioned below TV header (~38px) + left sidebar (~40px) */}
+                {/* Buy/Sell overlay \u2014 top-left, positioned below TV header (38px) with 8px buffer */}
                 {(() => {
                   const p = prices[sym]; const d = dg(sym); const pip = pipOf(d);
                   const isFloatO = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING";
@@ -1104,7 +1104,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   const bid = p != null ? gnum(p, d) : "\u2014";
                   const ask = p != null ? gnum(p + spO * pip, d) : "\u2014";
                   return (
-                    <div style={{ position: "absolute", top: 36, left: 68, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ position: "absolute", top: 46, left: 52, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
                       {showBuySell ? (
                         <div style={{ display: "flex", gap: 5, alignItems: "center", background: "rgba(10,13,20,0.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 10, padding: "5px 7px", boxShadow: "0 4px 18px rgba(0,0,0,0.45)" }}>
                           <button onClick={() => place(sym, "SELL")} className="hover:brightness-110 active:scale-95" style={{ background: SELLBTN, color: "#fff", border: "none", borderRadius: 7, padding: "5px 11px", fontSize: 12, fontWeight: 700, lineHeight: 1, cursor: "pointer", boxShadow: `0 2px 8px ${SELLBTN}66`, display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minWidth: 62 }}>
@@ -1139,7 +1139,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   const isFloatSym = (adminSymTypes[sym] ?? "FLOATING") === "FLOATING";
                   const cfgSp = adminSymSpreads[sym] || 0; const liveSp = liveSpreadPips[sym];
                   const spPips = (isFloatSym ? (liveSp != null && liveSp > 0 ? liveSp : cfgSp) : cfgSp) + deskExtraSpread;
-                  return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} showBuiltinOHLC={false} onTfChange={setTf} />;
+                  return <KLineProChart symbol={sym} tf={tf} theme={theme} digits={dg(sym)} symbols={symbols} positions={pos} spreadPips={spPips} onSymbolChange={(sm) => replaceTile(i, sm)} showBuiltinOHLC={false} hideNativeTf onTfChange={setTf} />;
                 })()}
               </div>
             ))}

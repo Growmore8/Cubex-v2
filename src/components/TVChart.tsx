@@ -58,7 +58,7 @@ function loadScript(): Promise<void> {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TVChart({
   symbol, tf, theme, digits = 5,
-  positions, symbols, bare, showDrawingTools, chartType, onSymbolChange, onCandleUpdate, onActionsReady, spreadPips, onFullscreenRequest, showBuiltinOHLC,
+  positions, symbols, bare, showDrawingTools, chartType, onSymbolChange, onCandleUpdate, onActionsReady, spreadPips, onFullscreenRequest, showBuiltinOHLC, hideNativeTf,
 }: {
   symbol: string;
   tf: string;
@@ -77,6 +77,8 @@ export default function TVChart({
   onFullscreenRequest?: () => void;
   /** When false: hides TV's native OHLC legend (use when the parent renders its own OHLC overlay). Default: true. */
   showBuiltinOHLC?: boolean;
+  /** When true: removes TV's native timeframe selector from the header. Use when the parent provides its own TF controls to prevent dropdown conflicts with overlaid UI. */
+  hideNativeTf?: boolean;
 }) {
   const containerRef   = useRef<HTMLDivElement>(null);
   const widgetRef      = useRef<any>(null);
@@ -389,6 +391,7 @@ export default function TVChart({
     // When parent supplies onFullscreenRequest, replace TV's native fullscreen button (which
     // uses requestFullscreen() and fails silently on iOS Safari) with our own button.
     if (onFullscreenReqRef.current) disabledFeatures.push("header_fullscreen_button");
+    if (hideNativeTf) disabledFeatures.push("header_resolutions");
     if (bare) {
       disabledFeatures.push("header_toolbar", "header_indicators", "header_chart_type", "header_resolutions");
       if (!showDrawingTools) disabledFeatures.push("left_toolbar");

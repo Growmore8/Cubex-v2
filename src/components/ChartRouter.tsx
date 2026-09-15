@@ -22,6 +22,7 @@ interface Props {
   onActionsReady?: (actions: TVChartActions) => void;
   spreadPips?: number;
   showBuiltinOHLC?: boolean;
+  hideNativeTf?: boolean;
   onTfChange?: (tf: string) => void;
 }
 
