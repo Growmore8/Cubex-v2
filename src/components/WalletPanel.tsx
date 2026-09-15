@@ -207,6 +207,12 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     )}
 
     {/* ── DEPOSIT ── */}
+    {tab === "deposit" && !isDemo && (
+      <div className="ui-fade-up flex items-start gap-2 rounded-xl px-3 py-2.5 text-[11px] font-medium" style={{ background: "rgba(240,184,41,0.12)", color: "#f0b829", border: "1px solid rgba(240,184,41,0.25)" }}>
+        <span className="mt-0.5 shrink-0">⚠️</span>
+        <span><strong>Deposit only through this platform.</strong> Transfers made outside this system are not recognised and will not be credited to your account. Unauthorised transfers <strong>may affect your capital.</strong></span>
+      </div>
+    )}
     {tab === "deposit" && isDemo && demoNotice}
     {tab === "deposit" && !isDemo && (depSel?.kind === "moonpay" ? (
       <form onSubmit={submitMoonPay} className="ui-card ui-fade-up space-y-4 p-4">
@@ -306,6 +312,12 @@ export default function WalletPanel({ initialTab = "deposit", onClose, tabs, acc
     ))}
 
     {/* ── WITHDRAW ── */}
+    {tab === "withdraw" && !isDemo && (
+      <div className="ui-fade-up flex items-start gap-2 rounded-xl px-3 py-2.5 text-[11px] font-medium" style={{ background: "rgba(240,184,41,0.12)", color: "#f0b829", border: "1px solid rgba(240,184,41,0.25)" }}>
+        <span className="mt-0.5 shrink-0">⚠️</span>
+        <span><strong>Withdraw only through this system.</strong> Do not transfer funds or share account details outside this platform. Unauthorised withdrawals <strong>may affect your capital.</strong></span>
+      </div>
+    )}
     {tab === "withdraw" && isDemo && demoNotice}
     {tab === "withdraw" && !isDemo && acctCredit > 0 && (
       <div className="ui-card ui-fade-up space-y-3 p-4">
