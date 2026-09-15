@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     ok: true,
     wallets,
     xynder: (setting && setting.value) || {},
-    tenants: tenants.map((t) => ({ id: t.id, name: t.brandName || t.name, ownPaymentMethods: !!((t.permissions as any) || {}).ownPaymentMethods })),
+    tenants: tenants.map((t) => ({ id: t.id, name: t.brandName || t.name, ownPaymentMethods: !!((t.permissions as any) || {}).ownPaymentMethods, paymentMethodSource: ((t.permissions as any) || {}).paymentMethodSource || null })),
   });
 }
 
@@ -44,10 +44,10 @@ export async function POST(req: Request) {
         await prisma.cryptoWallet.delete({ where: { id: b.id } });
       } else throw new Error("Unknown action");
     } else if (b.kind === "perm") {
-      // toggle whether a tenant admin may add their own payment methods
       const t = await prisma.tenant.findUnique({ where: { id: b.tenantId }, select: { permissions: true } });
       const perms: any = (t && t.permissions) || {};
-      perms.ownPaymentMethods = !!b.allow;
+      if (b.allow !== undefined) perms.ownPaymentMethods = !!b.allow;
+      if (b.paymentMethodSource !== undefined) perms.paymentMethodSource = b.paymentMethodSource;
       await prisma.tenant.update({ where: { id: b.tenantId }, data: { permissions: perms } });
     } else if (b.kind === "xynder") {
       await prisma.setting.upsert({ where: { key: "payments" }, create: { key: "payments", value: { url: b.url || "", active: !!b.active } }, update: { value: { url: b.url || "", active: !!b.active } } });

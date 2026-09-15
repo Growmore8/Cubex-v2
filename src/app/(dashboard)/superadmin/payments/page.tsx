@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 
-type Tenant = { id: string; name: string; ownPaymentMethods: boolean };
+type PaymentSource = "global" | "sa_custom" | "tenant";
+type Tenant = { id: string; name: string; ownPaymentMethods: boolean; paymentMethodSource: PaymentSource | null };
 
 export default function SAPayments() {
   const [wallets, setWallets] = useState<any[]>([]);
@@ -49,6 +50,17 @@ export default function SAPayments() {
     await post({ kind: "perm", tenantId: t.id, allow });
     setTenants((prev) => prev.map((x) => (x.id === t.id ? { ...x, ownPaymentMethods: allow } : x)));
   }
+  async function setTenantSource(tenantId: string, src: PaymentSource) {
+    // "tenant" source implies allowing tenant self-service
+    await post({ kind: "perm", tenantId, paymentMethodSource: src, allow: src === "tenant" });
+    setTenants((prev) => prev.map((x) => x.id === tenantId ? { ...x, paymentMethodSource: src, ownPaymentMethods: src === "tenant" } : x));
+  }
+
+  const curTenant = scope !== "global" ? tenants.find((t) => t.id === scope) : null;
+  // Effective source: if not set, auto-detect from rows (backward compat)
+  const tenantSource: PaymentSource = curTenant?.paymentMethodSource || (wallets.length > 0 ? "sa_custom" : "global");
+  // Show + buttons only when SA is managing this scope
+  const canAddMethods = scope === "global" || tenantSource === "sa_custom";
 
   const inp = "ui-input rounded-md border px-2 py-1.5 text-sm"; const NETS = ["BEP20", "ERC20", "TRC20"];
   const scopeName = scope === "global" ? "All tenants (global default)" : (tenants.find((t) => t.id === scope)?.name || "Tenant");
@@ -75,15 +87,42 @@ export default function SAPayments() {
       <p className="mt-1 text-xs text-gray-400">Global methods are the fallback for tenants with none of their own. Once a tenant configures its own methods, that tenant&apos;s clients see only those — the global methods are hidden for them.</p>
     </div>
 
+    {/* Per-tenant payment source selector — only shown when a tenant is selected */}
+    {curTenant && (
+      <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
+        <div className="mb-2 font-semibold">Payment source — <span className="text-gray-500">{curTenant.name}</span></div>
+        <p className="mb-3 text-xs text-gray-400">Choose where <strong>{curTenant.name}</strong> clients see payment methods when they deposit.</p>
+        <div className="space-y-2">
+          {([
+            { val: "global",    label: "Global methods",    desc: "Clients see the SA-configured global methods (All tenants)" },
+            { val: "sa_custom", label: "SA custom",         desc: "You configure specific methods for this tenant below — clients see only these" },
+            { val: "tenant",    label: "Tenant-managed",    desc: "Tenant admin manages their own methods via their back office" },
+          ] as { val: PaymentSource; label: string; desc: string }[]).map(({ val, label, desc }) => (
+            <label key={val} className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-gray-50"
+              style={{ borderColor: tenantSource === val ? "#2563eb" : "#e2e8f0", background: tenantSource === val ? "#eff6ff" : undefined }}>
+              <input type="radio" name="paymentSource" value={val} checked={tenantSource === val}
+                onChange={() => setTenantSource(curTenant.id, val)} className="mt-0.5" />
+              <div>
+                <div className="text-sm font-medium" style={{ color: tenantSource === val ? "#1d4ed8" : undefined }}>{label}</div>
+                <div className="text-xs text-gray-400">{desc}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+    )}
+
     {/* Methods list */}
     <div className="ui-card bg-white p-4" style={{ borderColor: "#e2e8f0" }}>
       <div className="mb-2 flex items-center justify-between">
         <div className="font-semibold">Methods — <span className="text-gray-500">{scopeName}</span></div>
         <div className="flex gap-1">
+          {canAddMethods && (<>
           <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#2563eb", borderColor: "transparent" }} onClick={() => newMethod("CRYPTO")}>+ Crypto</button>
           <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#0891b2", borderColor: "transparent" }} onClick={() => newMethod("UPI")}>+ UPI</button>
           <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#4f46e5", borderColor: "transparent" }} onClick={() => newMethod("BANK")}>+ Bank</button>
           <button className="ui-btn px-2.5 py-1.5 text-xs text-white" style={{ background: "#d97706", borderColor: "transparent" }} onClick={() => newMethod("LINK")}>+ Local Link</button>
+          </>)}
         </div>
       </div>
       <div className="space-y-2">
@@ -97,7 +136,13 @@ export default function SAPayments() {
           <button title="Edit" className="mx-0.5 rounded px-2 py-1" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent2)" }} onClick={() => openEdit(w)}><i className="fa-solid fa-pen"></i></button>
           <button title="Delete" className="mx-0.5 rounded px-2 py-1" style={{ background: "color-mix(in srgb, var(--red) 16%, transparent)", color: "#b91c1c" }} onClick={() => setConfirmDel(w)}><i className="fa-solid fa-trash"></i></button>
         </div>); })}
-        {wallets.length === 0 && <div className="text-sm text-gray-400">No methods for this scope yet.</div>}
+        {wallets.length === 0 && (
+          curTenant && tenantSource === "global"
+            ? <div className="rounded-lg bg-blue-50 p-3 text-xs text-blue-700">Clients see the global SA methods. Select <strong>SA custom</strong> above to add methods specific to this tenant.</div>
+            : curTenant && tenantSource === "tenant"
+              ? <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">Tenant admin manages their own methods. No methods have been added yet — clients will see nothing until the tenant adds some.</div>
+              : <div className="text-sm text-gray-400">No methods for this scope yet.</div>
+        )}
       </div>
     </div>
 
