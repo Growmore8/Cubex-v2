@@ -1206,7 +1206,8 @@ async function monitor(io) {
     const trades = await prisma.trade.findMany({ include: { account: true } });
     const byAcc = {};
     for (const t of trades) (byAcc[t.accountId] || (byAcc[t.accountId] = { acc: t.account, list: [] })).list.push(t);
-    for (const id of Object.keys(byAcc)) {
+    // MC/margin section — isolated try/catch so any error here cannot block the TP/SL loop below
+    try { for (const id of Object.keys(byAcc)) {
       const { acc, list } = byAcc[id]; const mc = Number(acc.mcLevel);
       if (!(mc > 0) || acc.doNotLiquidate) continue;
       // Skip liquidation check when all traded symbols have closed markets
@@ -1275,10 +1276,11 @@ async function monitor(io) {
           riskCooldown.delete(kFloat);
         }
       }
-    }
+    } } catch (e) { console.error("[monitor/mc]", e); }
     // TP/SL: BUY triggered on bid, SELL triggered on ask (MT5 style)
     // Skip when market is closed — prices are frozen, so TP/SL must not fire on weekend.
     for (const t of trades) {
+      try {
       if (closing.has(t.id.toString())) continue;
       if (!isMarketOpen(t.symbol, meta[t.symbol] && meta[t.symbol].cat)) continue;
       const st = state[t.symbol];
@@ -1318,6 +1320,7 @@ async function monitor(io) {
         const closePrice = reason === "TP" ? tp : reason === "SL" ? sl : (t.type === "BUY" ? bid : ask);
         closeTpSl(t, reason, closePrice, io);
       }
+      } catch (e) { console.error("[monitor/tpsl]", t.id, e?.message || e); }
     }
   } catch (e) { console.error("[monitor]", e); } finally { _monitorRunning = false; }
 }
