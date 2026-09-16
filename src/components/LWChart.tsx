@@ -720,7 +720,8 @@ function LWChart({
         const sec = TF_SECONDS[tfRef.current] || 60;
         const last = bars[bars.length - 1];
         if (Math.floor(Date.now() / 1000) - last.time < sec * 3) return;
-        fetch(`/api/candles?symbol=${encodeURIComponent(symRef.current)}&tf=${tfRef.current}&limit=300`, { cache: "no-store" })
+        const rcLimit = (tfRef.current === "1M" || tfRef.current === "5M" || tfRef.current === "15M") ? 5000 : 2000;
+        fetch(`/api/candles?symbol=${encodeURIComponent(symRef.current)}&tf=${tfRef.current}&limit=${rcLimit}`, { cache: "no-store" })
           .then((r) => r.json())
           .then((d) => {
             if (!d.ok || !d.candles?.length || !seriesRef.current) return;
