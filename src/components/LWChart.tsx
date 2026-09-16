@@ -627,7 +627,10 @@ function LWChart({
     const cacheKey = "cubex-candles:" + symbol + ":" + tf;
     try { const cached = JSON.parse(localStorage.getItem(cacheKey) || "null"); if (cached && cached.length) seed(cached); } catch {}
 
-    fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${tf}&limit=2000`, { cache: "no-store" })
+    // Request more bars for short TFs so at least 1 month of history is visible.
+    // TD Pro plan supports up to 5000 bars per request.
+    const histLimit = (tf === "1M" || tf === "5M" || tf === "15M") ? 5000 : 2000;
+    fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${tf}&limit=${histLimit}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
         if (!alive) return;
@@ -635,19 +638,27 @@ function LWChart({
         if (ok && d.candles) {
           try { localStorage.setItem(cacheKey, JSON.stringify(d.candles.slice(-300))); } catch {}
           // Seed the forming bar so a mid-candle connect gets the right open price.
-          // MT5 / VertexFX always send the current partial bar; we approximate by
-          // using the last historical bar's close as the open of the current bucket.
+          // Skip if the gap between the last historical bar and now is large (> 5 bars):
+          // a large gap means the data has a real hole; seeding from a stale close would
+          // create a giant candle spanning the whole gap. Live ticks will open the first
+          // bar naturally at the real current price instead.
           try {
             const sec = TF_SECONDS[tf] || 60;
             const nowBucket = Math.floor(Date.now() / 1000 / sec) * sec;
             const bars = barsRef.current;
             const last = bars[bars.length - 1];
-            if (last && last.time < nowBucket && seriesRef.current) {
-              const seedBar = { time: nowBucket, open: last.close, high: last.close, low: last.close, close: last.close };
-              bars.push(seedBar);
-              seriesRef.current.update(seedBar);
+            if (last && last.time < nowBucket) {
+              const gapBars = Math.floor((nowBucket - last.time) / sec);
+              if (gapBars <= 5 && seriesRef.current) {
+                const seedBar = { time: nowBucket, open: last.close, high: last.close, low: last.close, close: last.close };
+                bars.push(seedBar);
+                seriesRef.current.update(seedBar);
+              }
             }
           } catch {}
+          // For very short TFs, auto-prefetch one extra page of older bars on load
+          // so users see more history without having to scroll left manually.
+          if (tf === "1M" || tf === "5M") setTimeout(() => { try { loadMoreRef.current?.(); } catch {} }, 600);
           // Enable left-scroll load-more for deeper history
           loadMoreRef.current = () => {
             if (!alive || loadingMoreRef.current || !barsRef.current.length) return;
@@ -698,6 +709,40 @@ function LWChart({
   useEffect(() => {
     const socket: Socket = io({ path: "/socket.io" });
     let pClose: number | null = null, pHi = -Infinity, pLo = Infinity;
+    // On reconnect after a server outage: re-fetch recent bars to fill any gap that
+    // built up while the socket was disconnected. Skip the very first connect.
+    let connectedOnce = false;
+    socket.on("connect", () => {
+      if (!connectedOnce) { connectedOnce = true; return; }
+      try {
+        const bars = barsRef.current;
+        if (!bars.length) return;
+        const sec = TF_SECONDS[tfRef.current] || 60;
+        const last = bars[bars.length - 1];
+        if (Math.floor(Date.now() / 1000) - last.time < sec * 3) return;
+        fetch(`/api/candles?symbol=${encodeURIComponent(symRef.current)}&tf=${tfRef.current}&limit=300`, { cache: "no-store" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (!d.ok || !d.candles?.length || !seriesRef.current) return;
+            const existing = new Set(barsRef.current.map((b: any) => b.time));
+            const fresh = d.candles
+              .map((c: any) => ({ time: Number(c.time), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) }))
+              .filter((c: any) => isFinite(c.time) && isFinite(c.close) && !existing.has(c.time));
+            if (!fresh.length) return;
+            const merged = [...barsRef.current, ...fresh].sort((a: any, b: any) => a.time - b.time).slice(-5000);
+            try { seriesRef.current?.setData(merged); barsRef.current = merged; } catch {}
+            const sec2 = TF_SECONDS[tfRef.current] || 60;
+            const nb = Math.floor(Date.now() / 1000 / sec2) * sec2;
+            const newLast = barsRef.current[barsRef.current.length - 1];
+            if (newLast && newLast.time < nb && Math.floor((nb - newLast.time) / sec2) <= 5) {
+              const sb = { time: nb, open: newLast.close, high: newLast.close, low: newLast.close, close: newLast.close };
+              barsRef.current.push(sb);
+              try { seriesRef.current?.update(sb); } catch {}
+            }
+          })
+          .catch(() => {});
+      } catch {}
+    });
     socket.on("ticks", (batch: any[]) => {
       for (const { symbol: sym, price } of batch) {
         if (sym !== symRef.current || price == null) continue;
