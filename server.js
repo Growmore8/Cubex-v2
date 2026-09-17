@@ -1097,8 +1097,10 @@ function fastTpSl(sym) {
     if (t.symbol !== sym || closing.has(t.id.toString()) || !t.account) continue;
     try {
       const realAsk = (st.ask != null && st.ask > 0) ? st.ask : null;
-      const ask = realAsk ?? (st.price + getSpreadPrice(t.account.tenantId, sym, t.account.groupId, t.account.id));
-      const bid = getBid(t.account.tenantId, sym, t.account.groupId, t.account.id, ask);
+      // When no real exchange ask: use real bid (no markup) as fallback so SELL TP/SL
+      // is not pushed out of range by a large configured spread.
+      const ask = realAsk ?? (realBids[sym] ?? st.price);
+      const bid = realAsk ? getBid(t.account.tenantId, sym, t.account.groupId, t.account.id, realAsk) : (realBids[sym] ?? st.price);
       const sl = Number(t.sl), tp = Number(t.tp);
       let reason = null;
       if (t.type === "BUY") {
@@ -1326,10 +1328,11 @@ async function monitor(io) {
       if (!isMarketOpen(t.symbol, meta[t.symbol] && meta[t.symbol].cat)) continue;
       const st = state[t.symbol];
       if (!st || st.price == null) continue;
-      // Use real exchange ask when available; otherwise construct from display BID + configured spread
+      // Use real exchange ask when available; when not, fall back to real bid (no markup)
+      // so SELL TP/SL is not pushed out of range by a large configured spread.
       const realAsk = (st.ask != null && st.ask > 0) ? st.ask : null;
-      const ask = realAsk ?? (st.price + getSpreadPrice(t.account.tenantId, t.symbol, t.account.groupId, t.account.id));
-      const bid = getBid(t.account.tenantId, t.symbol, t.account.groupId, t.account.id, ask);
+      const ask = realAsk ?? (realBids[t.symbol] ?? st.price);
+      const bid = realAsk ? getBid(t.account.tenantId, t.symbol, t.account.groupId, t.account.id, realAsk) : (realBids[t.symbol] ?? st.price);
       const sl = Number(t.sl), tp = Number(t.tp);
       let reason = null;
       if (t.type === "BUY") {
