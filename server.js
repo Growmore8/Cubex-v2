@@ -1093,23 +1093,26 @@ function fastTpSl(sym) {
   if (!isMarketOpen(sym, meta[sym] && meta[sym].cat)) return;
   const st = state[sym]; if (!st || st.price == null) return;
   for (const t of _openTrades) {
-    if (t.symbol !== sym || closing.has(t.id.toString())) continue;
-    const realAsk = (st.ask != null && st.ask > 0) ? st.ask : null;
-    const ask = realAsk ?? (st.price + getSpreadPrice(t.account.tenantId, sym, t.account.groupId, t.account.id));
-    const bid = getBid(t.account.tenantId, sym, t.account.groupId, t.account.id, ask);
-    const sl = Number(t.sl), tp = Number(t.tp);
-    let reason = null;
-    if (t.type === "BUY") {
-      if (tp > 0 && bid >= tp) reason = "TP";
-      else if (sl > 0 && bid <= sl) reason = "SL";
-    } else {
-      if (tp > 0 && ask <= tp) reason = "TP";
-      else if (sl > 0 && ask >= sl) reason = "SL";
-    }
-    if (reason) {
-      const closePrice = reason === "TP" ? tp : sl;
-      closeTpSl(t, reason, closePrice, global.__io);
-    }
+    // guard: skip wrong symbol, already-closing trades, or orphaned trades (deleted account)
+    if (t.symbol !== sym || closing.has(t.id.toString()) || !t.account) continue;
+    try {
+      const realAsk = (st.ask != null && st.ask > 0) ? st.ask : null;
+      const ask = realAsk ?? (st.price + getSpreadPrice(t.account.tenantId, sym, t.account.groupId, t.account.id));
+      const bid = getBid(t.account.tenantId, sym, t.account.groupId, t.account.id, ask);
+      const sl = Number(t.sl), tp = Number(t.tp);
+      let reason = null;
+      if (t.type === "BUY") {
+        if (tp > 0 && bid >= tp) reason = "TP";
+        else if (sl > 0 && bid <= sl) reason = "SL";
+      } else {
+        if (tp > 0 && ask <= tp) reason = "TP";
+        else if (sl > 0 && ask >= sl) reason = "SL";
+      }
+      if (reason) {
+        const closePrice = reason === "TP" ? tp : sl;
+        closeTpSl(t, reason, closePrice, global.__io);
+      }
+    } catch (e) { console.error("[fastTpSl]", sym, t.id, e?.message || e); }
   }
 }
 
