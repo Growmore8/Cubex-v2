@@ -466,6 +466,7 @@ function commitPrice(sym, p) {
   const real = (rawReal != null && rawReal > emitBid) ? rawReal : null;
   _tickBatch[sym] = { symbol: sym, price: p, bid: emitBid, real, candle };
   if (!_batchFlushTimer && global.__io) _batchFlushTimer = setTimeout(_flushTicks, 50);
+  fastTpSl(sym); // tick-level TP/SL — fires within ~140ms instead of waiting for 1s monitor
   recomputeDerived(sym);
 }
 
@@ -1077,6 +1078,41 @@ function calcPnl(symbol, type, openPrice, price, lots) {
 }
 const liquidating = new Set(); // guard: prevent double-liquidation of same account
 const closing = new Set();    // guard: prevent double-close of same trade (TP/SL)
+
+// In-memory open-trade cache for tick-level TP/SL detection.
+// The 1s monitor can miss brief price touches; this cache lets us check every tick (~140ms).
+let _openTrades = [];
+async function loadOpenTrades() {
+  try { _openTrades = await prisma.trade.findMany({ include: { account: true } }); } catch {}
+}
+
+// Check TP/SL for one symbol on every committed price update — fires within ~140ms of trigger.
+// Mirrors the monitor's TP/SL logic but runs per-tick rather than once per second.
+function fastTpSl(sym) {
+  if (!global.__io || !_openTrades.length) return;
+  if (!isMarketOpen(sym, meta[sym] && meta[sym].cat)) return;
+  const st = state[sym]; if (!st || st.price == null) return;
+  for (const t of _openTrades) {
+    if (t.symbol !== sym || closing.has(t.id.toString())) continue;
+    const realAsk = (st.ask != null && st.ask > 0) ? st.ask : null;
+    const ask = realAsk ?? (st.price + getSpreadPrice(t.account.tenantId, sym, t.account.groupId, t.account.id));
+    const bid = getBid(t.account.tenantId, sym, t.account.groupId, t.account.id, ask);
+    const sl = Number(t.sl), tp = Number(t.tp);
+    let reason = null;
+    if (t.type === "BUY") {
+      if (tp > 0 && bid >= tp) reason = "TP";
+      else if (sl > 0 && bid <= sl) reason = "SL";
+    } else {
+      if (tp > 0 && ask <= tp) reason = "TP";
+      else if (sl > 0 && ask >= sl) reason = "SL";
+    }
+    if (reason) {
+      const closePrice = reason === "TP" ? tp : sl;
+      closeTpSl(t, reason, closePrice, global.__io);
+    }
+  }
+}
+
 // Risk alert cooldown — key: "accountId:condition", value: last-alert timestamp.
 // Prevents spamming the same alert every 3s when an account is in a prolonged risk state.
 const riskCooldown = new Map();
@@ -1149,6 +1185,8 @@ async function closeTpSl(t, reason, price, io) {
       prisma.trade.delete({ where: { id: t.id } }),
       prisma.account.update({ where: { id: t.accountId }, data: { pnl: { increment: pnlAcc + swapAcc } } }),
     ]);
+    // Evict closed trade from tick-level cache immediately so fastTpSl won't retry it
+    _openTrades = _openTrades.filter((x) => x.id !== t.id);
     if (t.account && t.account.userId) {
       const title = reason === "TP" ? "Take Profit hit ✓" : "Stop Loss hit";
       const body = `${t.symbol} ${t.type} closed @ ${price} | P/L ${pnlAcc >= 0 ? "+" : ""}${cs}${Math.abs(pnlAcc).toFixed(2)}`;
@@ -1678,6 +1716,8 @@ app.prepare().then(async () => {
   // 57 symbols × 1 credit = 57 credits per call. At 60s: 57/min → leaves ~550/min for WS + overhead.
   setInterval(pollPrices, 60000);
   setInterval(pollFinnhubQuotes, 30000); // Quote fallback so prices stay real if the WS is quiet
+  loadOpenTrades(); // initial load for tick-level TP/SL cache
+  setInterval(loadOpenTrades, 3000); // refresh open trades every 3s (catch new trades/SL changes)
   setInterval(microTick, 140);
   setInterval(() => monitor(io), MONITOR_MS);
   setInterval(() => checkPending(io), 1000);
