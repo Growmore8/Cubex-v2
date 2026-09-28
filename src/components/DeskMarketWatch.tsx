@@ -171,7 +171,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
                   onContextMenu={(e) => e.preventDefault()}
                   className={"grid cursor-pointer grid-cols-[1fr_64px_64px_36px] items-stretch py-1 hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}
                   style={{ borderRadius: 3, minHeight: 22, opacity: isOff ? 0.45 : 1 }}>
-                  <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} /><span className="truncate">{s.symbol}</span>{isOff && <span className="text-[8px] rounded px-1" style={{ background: "rgba(224,82,96,0.18)", color: "#ef5350" }}>OFF</span>}</span>
+                  <span className="flex min-w-0 items-center gap-2 pl-2 text-left"><SymIcon symbol={s.symbol} feed={s.feed} /><span className="truncate">{s.symbol}</span>{isOff && <span className="text-[8px] rounded px-1" style={{ background: "rgba(224,82,96,0.18)", color: "#ef5350" }}>OFF</span>}</span>
                   <PriceCell value={bid} dir={dir} />
                   <PriceCell value={ask} dir={dir} />
                   <span className="flex items-center justify-end pr-1">

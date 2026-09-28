@@ -116,6 +116,26 @@ function StockIcon({ ticker, size, ml }: { ticker: string; size: number; ml: num
   );
 }
 
+// India stock logo: tries Yahoo Finance NSE/BSE suffixes on Parqet → plain ticker → chip
+function IndiaStockIcon({ ticker, exchange, size, ml }: { ticker: string; exchange: "NSE" | "BSE"; size: number; ml: number }) {
+  const [stage, setStage] = useState(0);
+  const suffix = exchange === "BSE" ? ".BO" : ".NS";
+  const altSuffix = exchange === "BSE" ? ".NS" : ".BO";
+  const srcs = [
+    `https://assets.parqet.com/logos/symbol/${ticker}${suffix}?format=png`,
+    `https://assets.parqet.com/logos/symbol/${ticker}${altSuffix}?format=png`,
+    `https://assets.parqet.com/logos/symbol/${ticker}?format=png`,
+    `https://financialmodelingprep.com/image-stock/${ticker}.png`,
+  ];
+  if (stage >= srcs.length) return <Chip label={ticker.slice(0, 4)} bg="#f97316" size={size} ml={ml} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={srcs[stage]} alt={ticker} loading="lazy" referrerPolicy="no-referrer"
+      onError={() => setStage((s) => s + 1)}
+      style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #0a0d12", marginLeft: ml, flex: "none" }} />
+  );
+}
+
 // CryptoIcon with CoinGecko CDN fallback for coins not on jsdelivr
 function CryptoIconWithFallback({ base, size, ml }: { base: string; size: number; ml: number }) {
   const [stage, setStage] = useState(0);
@@ -140,23 +160,25 @@ function looksLikeStock(code: string) {
   return /^[A-Z]{1,12}$/.test(code) && !CCY[code] && !METAL[code] && !INDEX[code];
 }
 
-function assetIcon(code: string, size: number, ml: number): React.ReactNode {
+function assetIcon(code: string, size: number, ml: number, feed?: string): React.ReactNode {
   if (CRYPTO_COLORS[code] !== undefined || ["BTC","ETH","BNB","SOL","XRP","DOGE","ADA","LTC","TRX","DOT","AVAX","LINK","SHIB","UNI","ATOM","BCH","ETC","MATIC","FIL","XBT"].includes(code))
     return <CryptoIconWithFallback base={code} size={size} ml={ml} />;
   if (INDEX[code]) return <Chip label={INDEX[code][0]} bg={INDEX[code][1]} size={size} ml={ml} />;
   if (METAL[code]) return <Chip label={METAL[code][0]} bg={METAL[code][1]} size={size} ml={ml} />;
   if (CCY[code]) return <Flag ccy={code} size={size} ml={ml} />;
+  if (feed && /^NSE:/.test(feed)) return <IndiaStockIcon ticker={code} exchange="NSE" size={size} ml={ml} />;
+  if (feed && /^BSE:/.test(feed)) return <IndiaStockIcon ticker={code} exchange="BSE" size={size} ml={ml} />;
   if (looksLikeStock(code)) return <StockIcon ticker={code} size={size} ml={ml} />;
   return null;
 }
 
-export function SymIcon({ symbol, size = 18 }: { symbol: string; size?: number }) {
+export function SymIcon({ symbol, size = 18, feed }: { symbol: string; size?: number; feed?: string }) {
   const s = (symbol || "").toUpperCase();
   let base = s, quote = "";
   for (const q of QUOTES) { if (s.length > q.length && s.endsWith(q)) { quote = q; base = s.slice(0, s.length - q.length); break; } }
   const quoteCode = quote === "USDT" || quote === "USDC" ? "USD" : quote;
   // Base always renders (asset icon, or a lettered chip for stocks/indices/unknown).
-  const baseEl = assetIcon(base, size, 0) || <Chip label={base.slice(0, 3)} bg="#475569" size={size} ml={0} />;
+  const baseEl = assetIcon(base, size, 0, feed) || <Chip label={base.slice(0, 3)} bg="#475569" size={size} ml={0} />;
   const quoteEl = quoteCode ? (assetIcon(quoteCode, size, -size * 0.42) || <Chip label={CODE[quoteCode] || quoteCode.slice(0, 2)} bg={COL[quoteCode] || "#475569"} size={size} ml={-size * 0.42} />) : null;
   return <span style={{ display: "inline-flex", alignItems: "center", flex: "none" }}>{baseEl}{quoteEl}</span>;
 }
