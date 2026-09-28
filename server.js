@@ -466,7 +466,7 @@ function commitPrice(sym, p) {
   const real = (rawReal != null && rawReal > emitBid) ? rawReal : null;
   _tickBatch[sym] = { symbol: sym, price: p, bid: emitBid, real, candle };
   if (!_batchFlushTimer && global.__io) _batchFlushTimer = setTimeout(_flushTicks, 50);
-  fastTpSl(sym); // tick-level TP/SL — fires within ~140ms instead of waiting for 1s monitor
+  try { fastTpSl(sym); } catch (e) { console.error("[fastTpSl]", sym, e?.message || e); }
   recomputeDerived(sym);
 }
 
@@ -662,12 +662,15 @@ const MV_SYMBOLS = new Set([
   "XAUUSD","XAGUSD","XPTUSD","XPDUSD",
 ]);
 
+let _mvRetryDelay = 5000; // exponential backoff state for Massive forex reconnects
+let _mvAuthFailed = false;
 function connectMassive() {
   if (!MASSIVE_KEY) return;
   if (mvWs) { try { mvWs.removeAllListeners(); mvWs.terminate(); } catch (_) {} mvWs = null; }
   const url = `${MV_BASE_URL}/forex`;
   mvWs = new WebSocket(url);
   mvWs.on("open", () => {
+    _mvRetryDelay = 5000; _mvAuthFailed = false;
     console.log("[MV] connected, authenticating...");
     mvWs.send(JSON.stringify({ action: "auth", params: MASSIVE_KEY }));
   });
@@ -681,7 +684,8 @@ function connectMassive() {
             mvWs.send(JSON.stringify({ action: "subscribe", params: "C.*" }));
             recordFeedSuccess("MV");
           } else if (m.status === "auth_failed") {
-            console.error("[MV] auth failed:", m.message);
+            console.error("[MV] auth failed — check MASSIVE_KEY:", m.message);
+            _mvAuthFailed = true;
             recordFeedFailure("MV");
           }
         } else if (m.ev === "C" && m.b != null && m.a != null) {
@@ -697,7 +701,14 @@ function connectMassive() {
       }
     } catch (e) {}
   });
-  mvWs.on("close", () => { console.log("[MV] closed"); recordFeedFailure("MV"); setTimeout(() => { if (MASSIVE_KEY) connectMassive(); }, 5000); });
+  mvWs.on("close", () => {
+    console.log("[MV] closed"); recordFeedFailure("MV");
+    if (!MASSIVE_KEY) return;
+    // Auth failures use a 60s cooldown; connection errors use exponential backoff (cap 60s)
+    const delay = _mvAuthFailed ? 60000 : Math.min(_mvRetryDelay *= 2, 60000);
+    _mvAuthFailed = false;
+    setTimeout(() => { if (MASSIVE_KEY) connectMassive(); }, delay);
+  });
   mvWs.on("error", (e) => { console.error("[MV]", e.message); recordFeedFailure("MV"); });
 }
 
@@ -705,11 +716,13 @@ function connectMassive() {
 // Subscribe: {"action":"subscribe","params":"XQ.*"}  (XQ = eXchange Quotes, bid/ask)
 // Message:   {"ev":"XQ","p":"BTCUSD","b":65000.00,"a":65001.00,...}
 let mvCryptoWs = null;
+let _mvCAuthFailed = false;
 function connectMassiveCrypto() {
   if (!MASSIVE_KEY || CRYPTO_FEED !== "MV") return;
   if (mvCryptoWs) { try { mvCryptoWs.removeAllListeners(); mvCryptoWs.terminate(); } catch (_) {} mvCryptoWs = null; }
   mvCryptoWs = new WebSocket(`${MV_BASE_URL}/crypto`);
   mvCryptoWs.on("open", () => {
+    _mvCAuthFailed = false;
     console.log("[MV-C] connected, authenticating...");
     mvCryptoWs.send(JSON.stringify({ action: "auth", params: MASSIVE_KEY }));
   });
@@ -724,7 +737,8 @@ function connectMassiveCrypto() {
             mvCryptoWs.send(JSON.stringify({ action: "subscribe", params: "XT.*" }));
             recordFeedSuccess("MV");
           } else if (m.status === "auth_failed") {
-            console.error("[MV-C] auth failed:", m.message);
+            console.error("[MV-C] auth failed — check MASSIVE_KEY:", m.message);
+            _mvCAuthFailed = true;
             recordFeedFailure("MV");
           } else {
             console.log("[MV-C] status:", m.status, m.message || "");
@@ -774,7 +788,13 @@ function connectMassiveCrypto() {
       }
     } catch (e) {}
   });
-  mvCryptoWs.on("close", () => { console.log("[MV-C] closed"); recordFeedFailure("MV"); setTimeout(() => { if (MASSIVE_KEY && CRYPTO_FEED === "MV") connectMassiveCrypto(); }, 5000); });
+  mvCryptoWs.on("close", () => {
+    console.log("[MV-C] closed"); recordFeedFailure("MV");
+    if (!MASSIVE_KEY || CRYPTO_FEED !== "MV") return;
+    const delay = _mvCAuthFailed ? 60000 : 30000;
+    _mvCAuthFailed = false;
+    setTimeout(() => { if (MASSIVE_KEY && CRYPTO_FEED === "MV") connectMassiveCrypto(); }, delay);
+  });
   mvCryptoWs.on("error", (e) => { console.error("[MV-C]", e.message); recordFeedFailure("MV"); });
 }
 
