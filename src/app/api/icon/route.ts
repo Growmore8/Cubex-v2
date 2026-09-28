@@ -1,8 +1,11 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest } from "next/server";
+import { ImageResponse } from "next/og";
 import { getBrand } from "@/lib/brand";
 
-// Dynamic PWA icon — returns an SVG with the tenant's primary color and brand initial.
-// Used as fallback when the tenant has no logoUrl set.
+// Dynamic PWA icon — returns a PNG so Android Chrome accepts it as a home-screen icon.
+// SVG icons are ignored by Chrome for Android; ImageResponse produces a proper raster PNG.
+// If the tenant has a logo URL, it is composited into the PNG at the requested size.
+// Falls back to a branded letter-initial tile when no logo is set.
 export async function GET(req: NextRequest) {
   const size = Math.min(Math.max(Number(req.nextUrl.searchParams.get("size") || 192), 48), 512);
   const brand = await getBrand();
@@ -11,16 +14,48 @@ export async function GET(req: NextRequest) {
   const r = Math.round(size * 0.18);
   const fs = Math.round(size * 0.46);
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <rect width="${size}" height="${size}" rx="${r}" fill="${color}"/>
-  <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white"
-    font-size="${fs}" font-weight="700" font-family="system-ui,-apple-system,sans-serif">${initial}</text>
-</svg>`;
+  let content;
+  if (brand.logoUrl) {
+    content = (
+      <div
+        style={{
+          width: size,
+          height: size,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#131722",
+        }}
+      >
+        {/* @ts-expect-error — JSX inside ImageResponse uses React 18 types */}
+        <img src={brand.logoUrl} width={size} height={size} style={{ objectFit: "contain" }} />
+      </div>
+    );
+  } else {
+    content = (
+      <div
+        style={{
+          width: size,
+          height: size,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: color,
+          borderRadius: r,
+        }}
+      >
+        <span style={{ color: "#ffffff", fontSize: fs, fontWeight: 700, fontFamily: "system-ui" }}>
+          {initial}
+        </span>
+      </div>
+    );
+  }
 
-  return new NextResponse(svg, {
+  return new ImageResponse(content as any, {
+    width: size,
+    height: size,
     headers: {
-      "Content-Type": "image/svg+xml",
-      "Cache-Control": "public, max-age=3600, s-maxage=3600",
+      "Cache-Control": "public, max-age=86400, s-maxage=86400",
     },
   });
 }
