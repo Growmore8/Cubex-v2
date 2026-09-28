@@ -11,9 +11,11 @@ export async function GET() {
   const logo = brand.logoUrl || null;
   const color = brand.primaryColor || "#2563eb";
 
-  // Version hash: last 8 chars of base64-encoded logo URL (or "0" for no logo).
-  // Changing the logo changes the hash → Chrome treats icons as new → re-fetches them.
-  const v = logo ? Buffer.from(logo).toString("base64url").slice(-8) : "0";
+  // Version hash: logo URL + deploy timestamp so Chrome re-fetches the icon
+  // whenever the logo changes OR when a new build is deployed.
+  const buildTs = process.env.BUILD_TIMESTAMP || "0";
+  const raw = (logo || "") + buildTs;
+  const v = Buffer.from(raw).toString("base64url").slice(-8);
 
   const icons = [
     { src: `/api/icon?size=192&v=${v}`, sizes: "192x192", type: "image/png", purpose: "any" },

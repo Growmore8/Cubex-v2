@@ -22,10 +22,15 @@ services:
     networks: [web]
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-0}
     image: cubex-app:latest
     restart: unless-stopped
     env_file: .env
+    environment:
+      BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-0}
     depends_on: [postgres, redis]
     volumes:
       - cubex-uploads:/app/uploads

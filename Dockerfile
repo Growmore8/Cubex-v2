@@ -15,6 +15,10 @@ RUN npm ci
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Embed build timestamp so the PWA manifest generates a new icon URL on each deploy,
+# forcing Chrome to re-fetch the home-screen icon instead of serving a stale cache.
+ARG BUILD_TIMESTAMP
+ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 RUN npm run build
 
 # ---- runtime ----
