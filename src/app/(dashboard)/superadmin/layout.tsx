@@ -149,6 +149,22 @@ const CSS = `
 .sa-shell .sa-notif-detail{font-size:11px;color:var(--text2);line-height:1.4;}
 .sa-shell .sa-notif-time{font-size:10px;color:var(--text3);margin-top:4px;}
 .sa-shell .sa-notif-empty{padding:40px 20px;text-align:center;color:var(--text2);font-size:12px;}
+/* ── mobile ── */
+.sa-shell .sb-hamburger{display:none;position:fixed;top:12px;left:12px;z-index:10001;width:40px;height:40px;border-radius:10px;background:var(--navy);border:none;color:var(--gold);font-size:16px;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.35);}
+.sa-shell .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9997;}
+.sa-shell .sb-overlay.open{display:block;}
+@media(max-width:768px){
+  .sa-shell .sb-hamburger{display:flex;}
+  .sa-shell .sidebar{position:fixed;left:-240px;top:0;z-index:9998;transition:left .25s ease;height:100vh;}
+  .sa-shell .sidebar.open{left:0;}
+  .sa-shell .sa-main{padding-top:64px;padding-left:14px;padding-right:14px;}
+  .sa-shell .stats{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}
+  .sa-shell .quick-row{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:480px){
+  .sa-shell .stats{grid-template-columns:1fr 1fr;}
+  .sa-shell .quick-row{grid-template-columns:1fr;}
+}
 `;
 
 export default function SuperadminLayout({ children }: { children: React.ReactNode }) {
@@ -160,6 +176,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   const [notifs, setNotifs] = useState<any[]>([]);
   const [unread, setUnread] = useState(0);
   const [panel, setPanel] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const prev = useRef<number>(-1);
   const volRef = useRef(1.5);
   const [idleWarn, setIdleWarn] = useState(false);
@@ -242,13 +259,17 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   return (
     <div className={"sa-shell" + (dark ? " dark" : "")}>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
-      <aside className="sidebar">
+      <button className="sb-hamburger" onClick={() => setSidebarOpen((o) => !o)} aria-label="Menu">
+        <i className={"fa-solid " + (sidebarOpen ? "fa-xmark" : "fa-bars")}></i>
+      </button>
+      <div className={"sb-overlay" + (sidebarOpen ? " open" : "")} onClick={() => setSidebarOpen(false)} />
+      <aside className={"sidebar" + (sidebarOpen ? " open" : "")}>
         <div className="sb-brand"><div className="sb-brand-title"><i className="fa-solid fa-crown" style={{ marginRight: 6 }}></i>Super Admin</div></div>
         <div className="sb-menu">
           {NAV.map((n) => (
             <div key={n.href}>
               {n.section && <div className="sb-section">{n.section}</div>}
-              <Link href={n.href} className={"sb-item" + (n.sub ? " sb-sub" : "") + (path === n.href ? " active" : "")}>
+              <Link href={n.href} className={"sb-item" + (n.sub ? " sb-sub" : "") + (path === n.href ? " active" : "")} onClick={() => setSidebarOpen(false)}>
                 <i className={"fa-solid " + n.icon}></i>{n.label}
               </Link>
             </div>
