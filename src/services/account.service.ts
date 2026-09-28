@@ -149,7 +149,9 @@ export async function adjustBalance(tenantId: string, id: string, type: string, 
   else if (type === "CREDIT_IN") data = { credit: { increment: amt } };
   else if (type === "CREDIT_OUT") data = { credit: { decrement: amt } };
   else if (type === "BONUS" || type === "REFERRAL") data = { bonus: { increment: amt } };
+  else if (type === "BONUS_OUT") data = { bonus: { decrement: amt } };
   else if (type === "INSURANCE") data = { insurance: { increment: amt } };
+  else if (type === "INSURANCE_OUT") data = { insurance: { decrement: amt } };
   else throw new Error("Invalid type");
   const backdated = appliedAt && !isNaN(appliedAt.getTime());
   const res = await prisma.$transaction(async (tx) => {
@@ -162,7 +164,7 @@ export async function adjustBalance(tenantId: string, id: string, type: string, 
   await audit(tenantId, "balance." + type, acc.login + " " + amount, by);
   // Notify the client (funds sound) + their manager
   try {
-    const verb: Record<string, string> = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", CREDIT_IN: "Credit added", CREDIT_OUT: "Credit removed", BONUS: "Bonus", INSURANCE: "Insurance" };
+    const verb: Record<string, string> = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", CREDIT_IN: "Credit added", CREDIT_OUT: "Credit removed", BONUS: "Bonus added", BONUS_OUT: "Bonus removed", INSURANCE: "Insurance added", INSURANCE_OUT: "Insurance removed" };
     const label = (verb[type] || type) + " " + amount + (description ? " — " + description : "");
     if (acc.userId) await notify(tenantId, acc.userId, verb[type] || type, label, "FUNDS");
     await notifyStaff(tenantId, { type: "FUNDS", title: (verb[type] || type), body: acc.login + " " + amount }, acc.managerId);

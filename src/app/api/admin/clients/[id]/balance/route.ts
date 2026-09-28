@@ -6,7 +6,7 @@ import { assertCan } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
 
 const schema = z.object({
-  type: z.enum(["DEPOSIT", "WITHDRAWAL", "CREDIT_IN", "CREDIT_OUT", "BONUS", "INSURANCE"]),
+  type: z.enum(["DEPOSIT", "WITHDRAWAL", "CREDIT_IN", "CREDIT_OUT", "BONUS", "BONUS_OUT", "INSURANCE", "INSURANCE_OUT"]),
   amount: z.number().positive(),
   description: z.string().optional(),
   appliedAt: z.string().optional(),
@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     await assertWritable(s);
     const { type, amount, description, appliedAt, settleTo, bonusExpiryAt } = schema.parse(await req.json());
-    const balMap: Record<string, string> = { DEPOSIT: "processDeposits", WITHDRAWAL: "processWithdrawals", CREDIT_IN: "creditBonus", CREDIT_OUT: "creditBonus", BONUS: "creditBonus", INSURANCE: "creditBonus" };
+    const balMap: Record<string, string> = { DEPOSIT: "processDeposits", WITHDRAWAL: "processWithdrawals", CREDIT_IN: "creditBonus", CREDIT_OUT: "creditBonus", BONUS: "creditBonus", BONUS_OUT: "creditBonus", INSURANCE: "creditBonus", INSURANCE_OUT: "creditBonus" };
     await assertCan(s, balMap[type] || "adjustBalance");
     const when = appliedAt ? new Date(appliedAt) : null;
     const account = await adjustBalance(s.tenantId!, id, type, amount, description || "", s.email, when);

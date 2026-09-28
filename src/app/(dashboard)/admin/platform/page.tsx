@@ -1373,7 +1373,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                     const fin2 = (types: string[]) => rows.filter((r: any) => r.kind === "FIN" && types.includes(String(r.type))).reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
                     const plRows2 = rows.filter((r: any) => r.kind === "TRADE" || (r.kind === "FIN" && String(r.type) === "PNL_ADJUST"));
                     const tradePL2 = plRows2.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
-                    const deposits2 = fin2(["DEPOSIT"]); const withdrawals2 = fin2(["WITHDRAWAL"]); const credit2 = fin2(["CREDIT_IN", "CREDIT_OUT", "BONUS", "INSURANCE"]);
+                    const deposits2 = fin2(["DEPOSIT"]); const withdrawals2 = fin2(["WITHDRAWAL"]); const credit2 = fin2(["CREDIT_IN", "CREDIT_OUT", "BONUS", "BONUS_OUT", "INSURANCE", "INSURANCE_OUT"]);
                     const net2 = rows.reduce((a: number, r: any) => a + Number(r.pnl || 0), 0);
                     const cell2 = (label: string, val: number) => (<span className="whitespace-nowrap"><span style={{ color: "var(--muted)" }}>{label} </span><span style={{ color: val > 0 ? BUY : val < 0 ? SELL : "var(--text)", fontWeight: 700 }}>{val > 0 ? "+" : ""}{gnum(val, 2)}</span></span>);
                     return (
@@ -3019,8 +3019,10 @@ const [selAcc, setSelAcc] = useState<any>(null);
                   {can("processWithdrawals") && <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>{mIco("fa-arrow-up-from-bracket", GOLD)}Withdrawal</button>}
                   {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-circle-plus", BUY)}Credit In</button>}
                   {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-circle-minus", GOLD)}Credit Out</button>}
-                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus")} className={subi} style={{ color: BUY }}>{mIco("fa-gift", BUY)}Bonus</button>}
-                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance")} className={subi}>{mIco("fa-umbrella")}Insurance</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "BONUS", "Bonus In")} className={subi} style={{ color: BUY }}>{mIco("fa-gift", BUY)}Bonus In</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "BONUS_OUT", "Bonus Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-gift", GOLD)}Bonus Out</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "INSURANCE", "Insurance In")} className={subi} style={{ color: BUY }}>{mIco("fa-umbrella", BUY)}Insurance In</button>}
+                  {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "INSURANCE_OUT", "Insurance Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-umbrella", GOLD)}Insurance Out</button>}
                   {can("editFinancial") && <button onClick={() => openAct("manualpnl", menu.acc)} className={subi}>{mIco("fa-money-bill-trend-up")}Manual P/L</button>}
                   {can("editFinancial") && <button onClick={() => reconcileAcc(menu.acc)} className={subi}>{mIco("fa-scale-balanced")}Recalculate Balance</button>}
                   {can("transferFunds") && <button onClick={() => openAct("transfer", menu.acc)} className={subi}>{mIco("fa-money-bill-transfer")}Transfer Between Accounts</button>}
