@@ -1724,7 +1724,7 @@ app.prepare().then(async () => {
   setInterval(pollFinnhubQuotes, 30000); // Quote fallback so prices stay real if the WS is quiet
   loadOpenTrades(); // initial load for tick-level TP/SL cache
   setInterval(loadOpenTrades, 3000); // refresh open trades every 3s (catch new trades/SL changes)
-  setInterval(microTick, 140);
+  setInterval(microTick, 250);
   setInterval(() => monitor(io), MONITOR_MS);
   setInterval(() => checkPending(io), 1000);
   setInterval(() => checkPriceAlerts(io), 5000); // price alert monitor every 5s
