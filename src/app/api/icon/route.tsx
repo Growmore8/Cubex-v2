@@ -27,7 +27,6 @@ export async function GET(req: NextRequest) {
           background: "#131722",
         }}
       >
-        {/* @ts-expect-error — JSX inside ImageResponse uses React 18 types */}
         <img src={brand.logoUrl} width={size} height={size} style={{ objectFit: "contain" }} />
       </div>
     );
