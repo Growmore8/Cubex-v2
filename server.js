@@ -209,6 +209,8 @@ async function loadFeedConfig() {
 }
 // Tear down and re-open all feed sockets with current keys (after a config change).
 function reconnectFeeds() {
+  _mvPermanentlyDisabled = false; // allow retry after manual config change (e.g. plan upgrade)
+  _mvCAuthFailed = false;
   for (const ws of [tdWs, fhWs, mvWs, mvCryptoWs, bnWs, krWs]) {
     try { if (ws) { ws.removeAllListeners(); ws.close(); } } catch (e) {}
   }
@@ -664,8 +666,9 @@ const MV_SYMBOLS = new Set([
 
 let _mvRetryDelay = 5000; // exponential backoff state for Massive forex reconnects
 let _mvAuthFailed = false;
+let _mvPermanentlyDisabled = false; // set true after auth_failed — prevents loop even if DB restores key
 function connectMassive() {
-  if (!MASSIVE_KEY) return;
+  if (!MASSIVE_KEY || _mvPermanentlyDisabled) return;
   if (mvWs) { try { mvWs.removeAllListeners(); mvWs.terminate(); } catch (_) {} mvWs = null; }
   const url = `${MV_BASE_URL}/forex`;
   mvWs = new WebSocket(url);
@@ -684,8 +687,9 @@ function connectMassive() {
             mvWs.send(JSON.stringify({ action: "subscribe", params: "C.*" }));
             recordFeedSuccess("MV");
           } else if (m.status === "auth_failed") {
-            console.error("[MV] auth failed — check MASSIVE_KEY:", m.message);
+            console.error("[MV] auth failed — disabling Massive for this session (upgrade plan at massive.com/pricing or remove key):", m.message);
             _mvAuthFailed = true;
+            _mvPermanentlyDisabled = true; // stop all reconnects until next process restart
             recordFeedFailure("MV");
           }
         } else if (m.ev === "C" && m.b != null && m.a != null) {
