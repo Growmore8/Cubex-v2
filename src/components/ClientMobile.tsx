@@ -104,6 +104,7 @@ const BUYBTN = "#2f81f7", SELLBTN = "#f6465d";
 const LOTS = [0.01, 0.05, 0.1, 0.5, 1];
 
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
+function symCat(s: any) { return (s.feed && /^(NSE|BSE):/.test(s.feed)) ? "india" : (s.category || "other"); }
 
 // Keep a heavy tab mounted after first open (so re-entry is instant — no remount of
 // the chart / quotes list). `display:contents` means the active layout is identical
@@ -543,10 +544,10 @@ export default function ClientMobile({ t }: { t: any }) {
   const initial = (account?.ownerName || account?.name || "U").charAt(0).toUpperCase();
 
   // categories — ordered Crypto, Forex, Indices, then the rest
-  const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "agriculture", "other"];
+  const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "india", "energy", "agriculture", "other"];
   const cats = useMemo(() => {
     const cs: string[] = [];
-    (symbols || []).forEach((s: any) => { const c = cap(s.category || "Other"); if (!cs.includes(c)) cs.push(c); });
+    (symbols || []).forEach((s: any) => { const c = cap(symCat(s)); if (!cs.includes(c)) cs.push(c); });
     cs.sort((a, b) => { const ia = CAT_ORDER.indexOf(a.toLowerCase()); const ib = CAT_ORDER.indexOf(b.toLowerCase()); return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib); });
     return cs;
   }, [symbols]);
@@ -559,7 +560,7 @@ export default function ClientMobile({ t }: { t: any }) {
       if (!sym.includes(q) && !disp.includes(q)) return false;
     }
     if (qcat === "favs") return (favs || []).includes(s.symbol);
-    return cap(s.category || "Other") === qcat;
+    return cap(symCat(s)) === qcat;
   }), [symbols, search, qcat, favs]);
 
   const pctOf = (sym: string) => {
@@ -1445,7 +1446,7 @@ export default function ClientMobile({ t }: { t: any }) {
             <div className="mb-3 flex gap-4 overflow-x-auto pb-1 text-[12px]" style={{ scrollbarWidth: "none" }}>
               <button onPointerDown={() => startTransition(() => setQcat("favs"))} className="whitespace-nowrap pb-1 font-semibold" style={{ color: qcat === "favs" ? BLUE : "var(--muted)", borderBottom: qcat === "favs" ? `2px solid ${BLUE}` : "2px solid transparent", touchAction: "manipulation" }}><i className="fa-solid fa-star mr-1" />Favourites</button>
               {cats.map((c) => (
-                <button key={c} onPointerDown={() => startTransition(() => setQcat(c))} className="whitespace-nowrap pb-1 font-semibold" style={{ color: qcat === c ? BLUE : "var(--muted)", borderBottom: qcat === c ? `2px solid ${BLUE}` : "2px solid transparent", touchAction: "manipulation" }}>{c}</button>
+                <button key={c} onPointerDown={() => startTransition(() => setQcat(c))} className="whitespace-nowrap pb-1 font-semibold" style={{ color: qcat === c ? BLUE : "var(--muted)", borderBottom: qcat === c ? `2px solid ${BLUE}` : "2px solid transparent", touchAction: "manipulation" }}>{c === "India" ? "NSE / BSE" : c}</button>
               ))}
             </div>
             <div className="space-y-2.5">
