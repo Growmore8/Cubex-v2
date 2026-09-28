@@ -5,9 +5,9 @@ import PriceCell from "./PriceCell";
 import { gnum } from "@/lib/format";
 import { SymIcon } from "@/lib/symIcon";
 
-type Sym = { symbol: string; display?: string; category?: string; digits?: number };
+type Sym = { symbol: string; display?: string; category?: string; digits?: number; feed?: string };
 
-const CAT_ORDER = ["forex", "crypto", "commodities", "metals", "stocks", "indices", "energy", "agriculture", "other"];
+const CAT_ORDER = ["forex", "crypto", "commodities", "metals", "stocks", "india", "indices", "energy", "agriculture", "other"];
 
 const CAT_LABEL: Record<string, string> = {
   forex: "Forex",
@@ -15,6 +15,7 @@ const CAT_LABEL: Record<string, string> = {
   commodities: "Metals",
   metals: "Metals",
   stocks: "Stocks",
+  india: "NSE / BSE (India)",
   indices: "Indices",
   energy: "Energy",
   agriculture: "Agriculture",
@@ -106,7 +107,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
   const q = search.trim().toLowerCase();
   const groups: Record<string, Sym[]> = {};
   symbols.filter((s) => !q || (s.symbol + " " + (s.display || "")).toLowerCase().includes(q))
-    .forEach((s) => { const cat = s.category || "other"; (groups[cat] || (groups[cat] = [])).push(s); });
+    .forEach((s) => { const cat = (s.feed && /^(NSE|BSE):/.test(s.feed)) ? "india" : (s.category || "other"); (groups[cat] || (groups[cat] = [])).push(s); });
   const ordered = Object.entries(groups).sort((a, b) => {
     const ia = CAT_ORDER.indexOf(a[0]); const ib = CAT_ORDER.indexOf(b[0]);
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
