@@ -154,6 +154,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const [copyErr, setCopyErr] = useState("");
   const [menu, setMenu] = useState<{ x: number; y: number; acc: any } | null>(null);
   const [menuSub, setMenuSub] = useState("");
+  const [forceLiqAcc, setForceLiqAcc] = useState<any>(null);
+  const [forceLiqLoading, setForceLiqLoading] = useState(false);
   const [act, setAct] = useState<any>(null);
   const [actMin, setActMin] = useState(false);
   const [aform, setAform] = useState<any>({});
@@ -522,6 +524,17 @@ const [selAcc, setSelAcc] = useState<any>(null);
   async function delTradesBulk(ids: string[]) { for (const id of ids) { await fetch("/api/desk/trades/" + id, { method: "DELETE" }); } setTradeSel({}); loadAll(); }
   function unlinkSub(c: any) { askConfirm(`Unlink sub-account ${c.login} from its parent? It becomes a standalone account.`, async () => { const r = await fetch("/api/admin/clients/" + c.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "unlinkSub" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else { setOk("Sub-account unlinked"); loadAll(); } }, false); }
   function delClient(acc: any) { setMenu(null); askDelete(`Delete ${acc.login} - ${acc.name}? This permanently removes the client and cannot be undone.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadAll(); }); }
+  async function doForceLiquidate() {
+    if (!forceLiqAcc) return;
+    setForceLiqLoading(true); setErr("");
+    try {
+      const r = await fetch("/api/desk/accounts/" + forceLiqAcc.id + "/force-liquidate", { method: "POST" });
+      const d = await r.json();
+      if (!d.ok) setErr(d.error || "Force liquidation failed");
+      else { setForceLiqAcc(null); loadAll(); }
+    } catch { setErr("Force liquidation failed"); }
+    setForceLiqLoading(false);
+  }
   function reconcileAcc(acc: any) { setMenu(null); askConfirm(`Recalculate balance for ${acc.login} - ${acc.name}? This rebuilds realized P/L from the surviving closed trades and manual P/L entries (fixes balances left wrong after a deleted manual P/L). Deposits, withdrawals and credit are not touched.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reconcile" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else { setOk(`Balance recalculated (P/L ${d.before?.toFixed?.(2)} → ${d.after?.toFixed?.(2)})`); loadAll(); } }, false); }
 
   function openAct(kind: string, acc: any, finType?: string, label?: string) { setMenu(null); setMenuSub(""); setErr(""); setAform({}); setActMin(false); setAct({ kind, acc, finType, label }); }
@@ -3015,7 +3028,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
               </button>
               {menuSub === "money" && (
                 <div className={flyCls} style={flySty}>
-                  {can("processDeposits") && <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>{mIco("fa-arrow-down-to-bracket", BUY)}Deposit</button>}
+                  {can("processDeposits") && <button onClick={() => openAct("money", menu.acc, "DEPOSIT", "Deposit")} className={subi} style={{ color: BUY }}>{mIco("fa-circle-arrow-down", BUY)}Deposit</button>}
                   {can("processWithdrawals") && <button onClick={() => openAct("money", menu.acc, "WITHDRAWAL", "Withdrawal")} className={subi} style={{ color: GOLD }}>{mIco("fa-arrow-up-from-bracket", GOLD)}Withdrawal</button>}
                   {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_IN", "Credit In")} className={subi} style={{ color: BUY }}>{mIco("fa-circle-plus", BUY)}Credit In</button>}
                   {can("creditBonus") && <button onClick={() => openAct("money", menu.acc, "CREDIT_OUT", "Credit Out")} className={subi} style={{ color: GOLD }}>{mIco("fa-circle-minus", GOLD)}Credit Out</button>}
@@ -3133,10 +3146,42 @@ const [selAcc, setSelAcc] = useState<any>(null);
           </div>)}
 
           <div className="my-1 border-t" style={{ borderColor: "var(--border)" }} />
+          {can("closeTrades") && (
+            <button onClick={() => { setMenu(null); setForceLiqAcc(menu.acc); }} className={mi} style={{ color: SELL }}>
+              {mIco("fa-fire-flame-curved", SELL)}Force Liquidation / Wipe
+            </button>
+          )}
           {can("deleteClients") && <button onClick={() => delClient(menu.acc)} className={mi} style={{ color: SELL }}>{mIco("fa-trash", SELL)}Delete Client</button>}
         </div>
       </>);
       })()}
+
+      {/* Force Liquidation / Wipe confirmation modal */}
+      {forceLiqAcc && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={() => !forceLiqLoading && setForceLiqAcc(null)}>
+          <div className="w-[420px] max-w-[95vw] rounded-xl border p-5 shadow-2xl" style={{ background: "var(--panel)", borderColor: SELL, color: "var(--text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 flex items-center gap-2.5 text-sm font-bold" style={{ color: SELL }}>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: SELL + "22" }}>
+                <i className="fa-solid fa-fire-flame-curved text-base" style={{ color: SELL }} />
+              </span>
+              Force Liquidation / Wipe
+            </div>
+            <div className="mb-1 text-[11px] font-semibold text-[var(--muted)]">{forceLiqAcc.login} — {forceLiqAcc.name}</div>
+            <div className="my-3 rounded-lg border p-3 text-[11px] leading-relaxed" style={{ borderColor: SELL + "55", background: SELL + "0d", color: "var(--text)" }}>
+              <p className="mb-1 font-semibold" style={{ color: SELL }}>⚠ This action is irreversible.</p>
+              <p>1. All open trades will be <strong>force-closed at current market price.</strong></p>
+              <p>2. The trading balance will be <strong>zeroed out</strong> (deposit + P/L − withdrawal → $0).</p>
+              <p className="mt-1 text-[var(--muted)]">Credit, bonus and insurance balances are not affected.</p>
+            </div>
+            <div className="flex gap-2">
+              <button disabled={forceLiqLoading} onClick={() => setForceLiqAcc(null)} className="flex-1 rounded-lg border py-2 text-xs transition-opacity hover:opacity-75" style={{ borderColor: "var(--border)" }}>Cancel</button>
+              <button disabled={forceLiqLoading} onClick={doForceLiquidate} className="flex-1 rounded-lg py-2 text-xs font-bold transition-opacity hover:opacity-80" style={{ background: SELL, color: "#fff" }}>
+                {forceLiqLoading ? <><i className="fa-solid fa-spinner fa-spin mr-1" />Processing…</> : <><i className="fa-solid fa-fire-flame-curved mr-1" />Confirm Liquidation</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {ticket && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.18)" }}>
