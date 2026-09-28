@@ -872,8 +872,8 @@ export default function ClientTerminal() {
   const cSym = currencySymbol(account?.currency);
   const groups: Record<string, any[]> = {};
   const mwq = mwSearch.trim().toLowerCase();
-  symbols.filter((s) => !mwq || (s.symbol + " " + (s.display || "")).toLowerCase().includes(mwq)).forEach((s) => { const c = s.category || "other"; (groups[c] || (groups[c] = [])).push(s); });
-  const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "energy", "agriculture", "other"];
+  symbols.filter((s) => !mwq || (s.symbol + " " + (s.display || "")).toLowerCase().includes(mwq)).forEach((s) => { const c = ((s as any).feed && /^(NSE|BSE):/.test((s as any).feed)) ? "india" : (s.category || "other"); (groups[c] || (groups[c] = [])).push(s); });
+  const CAT_ORDER = ["crypto", "forex", "indices", "metals", "stocks", "india", "energy", "agriculture", "other"];
   const orderedGroups = Object.entries(groups).sort((a, b) => { const ia = CAT_ORDER.indexOf(a[0]); const ib = CAT_ORDER.indexOf(b[0]); return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib); });
   const histShown = history.filter((h: any) => { if (histRange === "all") return true; const t = new Date(h.closedAt).getTime(); const now = Date.now(); const day = 86400000; if (histRange === "today") return t >= now - day; if (histRange === "week") return t >= now - 7 * day; return t >= now - 30 * day; });
   const tab = (active: boolean) => "px-3 py-1.5 text-[11px] " + (active ? "" : "text-[var(--muted)]");
@@ -1328,10 +1328,10 @@ export default function ClientTerminal() {
             )}
             {orderedGroups.map(([c, list]) => (
               <div key={c}>
-                <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c.toUpperCase()}</div>
+                <div onClick={() => toggleCat(c)} className="mt-1 cursor-pointer rounded bg-[var(--soft)] px-1.5 py-1 text-[10px] font-semibold text-[var(--muted)]">{collapsed[c] ? "\u25B8" : "\u25BE"} {c === "india" ? "NSE / BSE (India)" : c.toUpperCase()}</div>
                 {!collapsed[c] && list.map((s) => { const p = prices[s.symbol]; const dd = eDg(s.symbol); const spPx = _spreadPx(s.symbol); const a = p != null ? p + spPx : null; const b = p ?? null; const dir = dirs[s.symbol] || 0; const sp = _spreadPips(s.symbol); const spDir = spreadDirs[s.symbol] || 0; const dOpen = dailyOpen[s.symbol]; const pct = dOpen && p ? ((p - dOpen) / dOpen) * 100 : null; return (
                   <div key={s.symbol} onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, sym: s.symbol }); }} className={"grid grid-cols-[minmax(72px,1fr)_58px_58px_26px_40px] items-center px-2 py-1 transition-colors hover:bg-[var(--soft)] " + (selSym === s.symbol ? "bg-[var(--soft)]" : "")}>
-                    <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} /><span className="truncate">{s.symbol}</span></button>
+                    <button onClick={() => setSelSym(s.symbol)} className="flex min-w-0 items-center gap-2 text-left"><SymIcon symbol={s.symbol} size={16} feed={(s as any).feed} /><span className="truncate">{s.symbol}</span></button>
                     <PriceCell value={b != null ? gnum(b, dd) : "..."} dir={dir} />
                     <PriceCell value={a != null ? gnum(a, dd) : "..."} dir={dir} />
                     <span className="text-right pr-1 tabular-nums" style={{ fontSize: 9, fontWeight: spDir !== 0 ? 700 : 500, color: spDir > 0 ? "#e05260" : spDir < 0 ? "#16c784" : "var(--muted)", transition: "color 0.55s ease-out" }}>{sp > 0 ? Math.round(sp * (dg(s.symbol) >= 3 ? 10 : 1)) : "\u2014"}</span>

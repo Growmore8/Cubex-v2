@@ -90,13 +90,17 @@ export async function GET(req: Request) {
     symbols = await prisma.globalSymbol.findMany({
       where: { enabled: true },
       orderBy: { symbol: "asc" },
-      select: { symbol: true, display: true, category: true, digits: true },
+      select: { symbol: true, display: true, category: true, digits: true, feed: true },
     });
     const hidden = await getDisabledSetFor(s);
     // Per-account overrides: a symbol the admin switched off for THIS specific account.
     const ovr = account ? await prisma.accountSymbolOverride.findMany({ where: { accountId: account.id, disabled: true }, select: { symbol: true } }) : [];
     for (const o of ovr) hidden.add(o.symbol);
     if (hidden.size) symbols = symbols.filter((x: any) => !hidden.has(x.symbol));
+    // Filter NSE/BSE India stocks for tenants that don't have the indiaStocks feature
+    const tenant = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { features: true } });
+    const indiaEnabled = !!(tenant?.features as any)?.indiaStocks;
+    if (!indiaEnabled) symbols = symbols.filter((x: any) => !x.feed || !/^(NSE|BSE):/.test(x.feed));
   } catch { symbols = []; }
 
   // Spread data: per-symbol (fixed/floating) + group markup + account markup.
