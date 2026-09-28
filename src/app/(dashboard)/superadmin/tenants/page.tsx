@@ -11,6 +11,7 @@ const FEATURE_FLAGS: { key: string; label: string; desc: string }[] = [
   { key: "marketNewsFeed",    label: "Market News Feed",   desc: "Show live market news in the client trading panel" },
   { key: "economicCalendar",  label: "Economic Calendar",  desc: "Show the economic events calendar in the client panel" },
   { key: "moonpayPayment",    label: "MoonPay Card Deposit", desc: "Enable MoonPay card payment (debit/credit cards in INR, LKR, USD, 150+ currencies) — requires MOONPAY_PK and MOONPAY_SK env vars" },
+  { key: "indiaStocks",       label: "NSE / BSE India Stocks", desc: "Grant this tenant access to NSE and BSE India stock symbols — seeds all enabled India stocks to their symbol catalog" },
 ];
 
 const PERM_GROUPS: { sec: string; items: [string, string][] }[] = [

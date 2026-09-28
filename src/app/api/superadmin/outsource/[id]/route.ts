@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { effectiveSeatsForPlan } from "@/services/tenant.service";
+import { seedIndiaStocksForTenant, unseedIndiaStocksForTenant } from "@/services/spreadDefaults.service";
 import { createClient, adjustBalance } from "@/services/account.service";
 import { sendPlatformMail } from "@/lib/mailer";
 import { demoWelcomeEmail, tenantActiveEmail, type BrandInfo } from "@/lib/email-templates";
@@ -42,7 +43,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (b.allowRegistration !== undefined && currentSub?.status !== "TRIALING") data.allowRegistration = !!b.allowRegistration;
       if (currentSub?.status === "TRIALING") data.allowRegistration = false;
       if (b.swapEnabled !== undefined) data.swapEnabled = !!b.swapEnabled;
-      if (b.features && typeof b.features === "object") data.features = b.features;
+      if (b.features && typeof b.features === "object") {
+        const oldFeats: any = t.features || {};
+        const newFeats: any = b.features;
+        data.features = newFeats;
+        // Seed or disable NSE/BSE India stocks based on the indiaStocks feature flag
+        if (!oldFeats.indiaStocks && newFeats.indiaStocks) {
+          seedIndiaStocksForTenant(t.id).catch(() => {});
+        } else if (oldFeats.indiaStocks && !newFeats.indiaStocks) {
+          unseedIndiaStocksForTenant(t.id).catch(() => {});
+        }
+      }
       await prisma.tenant.update({ where: { id: t.id }, data });
       // Plan can also be changed here; seats follow the (live) package limit.
       if (b.plan) {

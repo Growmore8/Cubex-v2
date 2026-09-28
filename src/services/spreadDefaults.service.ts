@@ -59,6 +59,40 @@ const DIGITS_FIX: Record<string, number> = {
  *   Symbols with spread > 0 that admin set manually are NEVER touched.
  * overwrite=true: force-resets ALL symbols (used by admin "Realistic defaults" button).
  */
+const INDIA_FEED_FILTER = {
+  OR: [{ feed: { startsWith: "NSE:" } }, { feed: { startsWith: "BSE:" } }],
+};
+
+/** Seed all enabled NSE/BSE GlobalSymbols to a tenant (spread=0, admin sets manually). */
+export async function seedIndiaStocksForTenant(tenantId: string): Promise<number> {
+  const globals = await prisma.globalSymbol.findMany({ where: { enabled: true, ...INDIA_FEED_FILTER } });
+  let count = 0;
+  for (const g of globals) {
+    const existing = await prisma.symbol.findUnique({ where: { tenantId_symbol: { tenantId, symbol: g.symbol } } });
+    if (existing) {
+      if (!existing.enabled) {
+        await prisma.symbol.update({ where: { tenantId_symbol: { tenantId, symbol: g.symbol } }, data: { enabled: true } });
+        count++;
+      }
+    } else {
+      await prisma.symbol.create({
+        data: { tenantId, symbol: g.symbol, display: g.display || g.symbol, category: g.category || "stocks", digits: g.digits ?? 2, feed: (g as any).feed || null, spread: 0, spreadType: "FIXED", spreadMax: 0 },
+      });
+      count++;
+    }
+  }
+  return count;
+}
+
+/** Disable NSE/BSE symbols for a tenant (keeps rows so manual spreads survive re-enable). */
+export async function unseedIndiaStocksForTenant(tenantId: string): Promise<number> {
+  const result = await prisma.symbol.updateMany({
+    where: { tenantId, OR: [{ feed: { startsWith: "NSE:" } }, { feed: { startsWith: "BSE:" } }] },
+    data: { enabled: false },
+  });
+  return result.count;
+}
+
 export async function seedDefaultSpreads(tenantId: string, overwrite = false): Promise<number> {
   const globals = await prisma.globalSymbol.findMany({ where: { enabled: true } });
   let count = 0;
