@@ -23,10 +23,9 @@
 	}
 }
 
-# --- Landing page (static) on the apex + www ; automatic TLS ---
+# --- Landing page (Next.js container) on the apex + www ; automatic TLS ---
 {$DOMAIN}, www.{$DOMAIN} {
-	root * /srv/landing
-	file_server
+	reverse_proxy landing:3000
 	encode gzip
 }
 
