@@ -658,6 +658,8 @@ enum AuditCategory {
   ADMIN
   MANAGER
   CLIENT
+  TRADE
+  FINANCE
 }
 enum PaymentKind {
   DEPOSIT
