@@ -38,8 +38,7 @@ trade.{$DOMAIN} {
 # Demo tenant subdomains (*.orbitfxsolution.com) fall through to the :443
 # catch-all below and hit the app (on-demand TLS).
 orbitfxsolution.com, www.orbitfxsolution.com {
-	root * /srv/landing
-	file_server
+	reverse_proxy landing:3000
 	encode gzip
 }
 
