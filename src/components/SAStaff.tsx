@@ -38,6 +38,11 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
   // Delete confirm
   const [delRow, setDelRow] = useState<any>(null);
 
+  // Bulk select
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDel, setBulkDel] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   async function load() {
     try {
       const d = await fetch("/api/superadmin/staff?role=" + role).then((r) => r.json());
@@ -100,6 +105,20 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
     setPermFor(null);
   }
 
+  async function bulkDelete() {
+    setBulkBusy(true);
+    for (const id of Array.from(selected)) {
+      await fetch("/api/superadmin/staff/" + id, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete" }),
+      });
+    }
+    setSelected(new Set());
+    setBulkDel(false);
+    setBulkBusy(false);
+    load();
+  }
+
   const roleLabel = role === "ADMIN" ? "admin" : "manager";
   const filtered = rows.filter((u: any) => {
     if (!q) return true;
@@ -132,12 +151,30 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
         <div className="flex items-center gap-2 border-b px-4 py-2.5" style={{ borderColor: "var(--border)" }}>
           <i className="fa-solid fa-magnifying-glass text-[11px] text-gray-400" />
           <input className="flex-1 border-none bg-transparent text-sm outline-none" placeholder="Search name / email / company" value={q} onChange={(e) => setQ(e.target.value)} />
+          {selected.size > 0 && (
+            <button onClick={() => setBulkDel(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ background: "rgba(220,38,38,.12)", color: "#dc2626", border: "1px solid rgba(220,38,38,.3)" }}>
+              <i className="fa-solid fa-trash text-[10px]" /> Delete {selected.size} selected
+            </button>
+          )}
+          {selected.size > 0 && (
+            <button onClick={() => setSelected(new Set())} className="text-xs text-gray-400 hover:text-gray-200">Clear</button>
+          )}
           <span className="text-xs text-gray-400">{filtered.length} {roleLabel}{filtered.length !== 1 ? "s" : ""}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="sa-table sa-grid">
             <thead>
               <tr>
+                <th style={{ width: 36 }}>
+                  <input type="checkbox"
+                    checked={filtered.length > 0 && filtered.every((u: any) => selected.has(u.id))}
+                    onChange={(e) => {
+                      const next = new Set(selected);
+                      filtered.forEach((u: any) => e.target.checked ? next.add(u.id) : next.delete(u.id));
+                      setSelected(next);
+                    }}
+                  />
+                </th>
                 {["Name / Email", "Tenant", "Status", "Last Login", "Last IP", "Permissions", "Actions"].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
@@ -145,7 +182,14 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
             </thead>
             <tbody>
               {filtered.map((u: any) => (
-                <tr key={u.id}>
+                <tr key={u.id} style={selected.has(u.id) ? { background: "rgba(220,38,38,.06)" } : {}}>
+                  <td className="px-3 py-2.5" style={{ width: 36 }}>
+                    <input type="checkbox" checked={selected.has(u.id)} onChange={(e) => {
+                      const next = new Set(selected);
+                      e.target.checked ? next.add(u.id) : next.delete(u.id);
+                      setSelected(next);
+                    }} />
+                  </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-start gap-2">
                       <span className="mt-1.5"><PresenceDot online={u.online} /></span>
@@ -196,7 +240,7 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td className="px-3 py-8 text-center text-gray-400" colSpan={7}>No {role.toLowerCase()}s found.</td></tr>
+                <tr><td className="px-3 py-8 text-center text-gray-400" colSpan={8}>No {role.toLowerCase()}s found.</td></tr>
               )}
             </tbody>
           </table>
@@ -312,6 +356,25 @@ export default function StaffConsole({ role, title, subtitle, newLabel }: { role
             <div className="mt-4 flex justify-end gap-2">
               <button className="ui-btn ui-btn-ghost px-3 py-2 text-sm" onClick={() => setPermFor(null)}>Cancel</button>
               <button className="ui-btn ui-btn-primary px-4 py-2 text-sm font-medium" onClick={savePerms}>Save Permissions</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── BULK DELETE CONFIRM ── */}
+      {bulkDel && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={() => setBulkDel(false)}>
+          <div className="ui-card ui-pop w-[380px] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 flex items-center justify-between">
+              <div className="font-semibold text-red-600">Bulk Delete</div>
+              <button onClick={() => setBulkDel(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"><i className="fa-solid fa-xmark text-sm" /></button>
+            </div>
+            <p className="mb-4 text-sm text-gray-600">Permanently delete <span className="font-semibold">{selected.size} {roleLabel}{selected.size !== 1 ? "s" : ""}</span>? This cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <button className="ui-btn ui-btn-ghost px-4 py-2 text-sm" onClick={() => setBulkDel(false)} disabled={bulkBusy}>Cancel</button>
+              <button className="ui-btn bg-red-600 px-4 py-2 text-sm font-medium text-white" onClick={bulkDelete} disabled={bulkBusy}>
+                {bulkBusy ? "Deleting…" : `Delete ${selected.size}`}
+              </button>
             </div>
           </div>
         </div>

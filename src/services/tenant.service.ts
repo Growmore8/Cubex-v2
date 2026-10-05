@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { PACKAGES } from "@/config/packages";
 import { seedDefaultSpreads } from "@/services/spreadDefaults.service";
+import { invalidateTenantCache } from "@/lib/tenant";
 
 const PKG_SETTING_KEY = "platform.packages";
 
@@ -115,11 +116,13 @@ export async function createTenant(input: {
   return tenant;
 }
 
-export function updateTenant(id: string, data: {
+export async function updateTenant(id: string, data: {
   name?: string; brandName?: string; logoUrl?: string; primaryColor?: string; accentColor?: string;
   supportEmail?: string; status?: any; customDomain?: string | null; allowRegistration?: boolean;
 }) {
-  return prisma.tenant.update({ where: { id }, data });
+  const result = await prisma.tenant.update({ where: { id }, data });
+  invalidateTenantCache(); // flush cache so branding changes take effect immediately
+  return result;
 }
 
 export function updateSubscription(tenantId: string, data: { plan?: any; status?: any; seats?: number }) {

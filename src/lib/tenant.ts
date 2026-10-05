@@ -29,10 +29,29 @@ export function parseSubdomain(host: string | null): string | null {
   return null;
 }
 
+// In-memory tenant cache: avoids a DB round-trip on every page render.
+// getBrand() is called by layout, metadata, icon, manifest — all per-request.
+// 60-second TTL is short enough that logo/colour changes propagate quickly.
+const _cache = new Map<string, { data: any; exp: number }>();
+const TTL = 60_000;
+
+export function invalidateTenantCache(host?: string) {
+  if (host) _cache.delete(host.split(":")[0].toLowerCase());
+  else _cache.clear();
+}
+
 export async function resolveTenant(host: string | null) {
   if (!host) return null;
-  const sub = parseSubdomain(host);
-  if (sub) return prisma.tenant.findUnique({ where: { subdomain: sub } });
-  const domain = host.split(":")[0].toLowerCase();
-  return prisma.tenant.findFirst({ where: { customDomain: domain } });
+  const h = host.split(":")[0].toLowerCase();
+
+  const hit = _cache.get(h);
+  if (hit && hit.exp > Date.now()) return hit.data;
+
+  const sub = parseSubdomain(h);
+  const data = sub
+    ? await prisma.tenant.findUnique({ where: { subdomain: sub } })
+    : await prisma.tenant.findUnique({ where: { customDomain: h } });
+
+  _cache.set(h, { data, exp: Date.now() + TTL });
+  return data;
 }
