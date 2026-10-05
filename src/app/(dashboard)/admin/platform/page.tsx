@@ -3092,9 +3092,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
             </button>
             {menuSub === "settings" && (
               <div className={flyCls} style={flySty}>
-                <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
-                <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
-                <button onClick={() => openAct("settings", menu.acc)} className={subi}>{mIco("fa-sliders", "#b45309")}Max Lot Size &amp; Settings</button>
+                <button onClick={() => openAct("settings", menu.acc)} className={subi}>{mIco("fa-sliders", "#b45309")}Account Settings</button>
                 <button onClick={() => { openSymOv(menu.acc); }} className={subi}>{mIco("fa-eye-slash", "var(--accent)")}Symbol Settings</button>
                 <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
               </div>
