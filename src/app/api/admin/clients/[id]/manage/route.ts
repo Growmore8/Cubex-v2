@@ -8,6 +8,7 @@ import { notify } from "@/services/notification.service";
 import { assertSeatAvailable } from "@/services/tenant.service";
 import { applyClientEmail } from "@/services/account.service";
 import { titleCaseName } from "@/lib/format";
+import { emitRefresh } from "@/lib/realtime";
 
 const MANAGER_ALLOWED = ["status", "deactivate", "statusAll", "deactivateAll", "rename", "pool", "clearPin", "assign"];
 
@@ -220,6 +221,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       default:
         throw new Error("Unknown action");
     }
+    try { emitRefresh(); } catch {}
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

@@ -6,6 +6,7 @@ import { notify, notifyStaff } from "@/services/notification.service";
 import { assertSeatAvailable } from "@/services/tenant.service";
 import { titleCaseName } from "@/lib/format";
 import { randomUUID } from "crypto";
+import { emitRefresh } from "@/lib/realtime";
 
 export function listClients(tenantId: string, managerId?: string | null) {
   return prisma.account.findMany({
@@ -161,6 +162,7 @@ export async function adjustBalance(tenantId: string, id: string, type: string, 
     await tx.financialHistory.create({ data: fh });
     return tx.account.findUnique({ where: { id } });
   });
+  try { emitRefresh(); } catch {}
   await audit(tenantId, "balance." + type, acc.login + " " + amount, by);
   // Notify the client (funds sound) + their manager
   try {
