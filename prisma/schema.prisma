@@ -122,6 +122,7 @@ model Account {
   leverage        Int                @default(100)
   currency        Currency           @default(USD)
   mcLevel         Decimal            @default(50) @db.Decimal(6, 2)
+  maxLotSize      Decimal?           @db.Decimal(10, 2)
   swapFree        Boolean            @default(false) // Islamic account — no swap charged
   doNotLiquidate  Boolean            @default(false)
   locked          Boolean            @default(false)

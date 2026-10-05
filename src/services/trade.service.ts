@@ -183,6 +183,10 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   if (!account) throw new Error("No trading account");
   if (account.deactivated) throw new Error("Account is deactivated");
   if (account.locked) throw new Error("Account is locked (read-only)");
+  if (account.maxLotSize !== null && account.maxLotSize !== undefined) {
+    const max = Number(account.maxLotSize);
+    if (Number(input.lots) > max) throw new Error(`Lot size exceeds the maximum allowed for this account (max ${max} lots)`);
+  }
 
   // Pre-fetch open trades in parallel with price resolution and market checks —
   // assertMargin needs them but only requires accountId which we have immediately.

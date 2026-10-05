@@ -206,6 +206,7 @@ function AccountCard({ a, tenants, m, act, openEdit, openMgr, setPwRow, setIdRow
           {a.isPool && <span className="text-[9px] font-semibold" style={{ color: AMB }}>POOL</span>}
           {kycChip(a.kyc, a.type)}
           {statusChip(a)}
+          {a.maxLotSize && <span className="rounded px-1 py-px text-[8px] font-bold" style={{ background: "rgba(234,179,8,.15)", color: "#b45309" }}>MAX {Number(a.maxLotSize)}L</span>}
         </div>
         <div className="text-right">
           <div className="font-semibold text-sm">${m(a.balance)}</div>

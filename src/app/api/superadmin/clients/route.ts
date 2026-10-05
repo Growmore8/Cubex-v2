@@ -62,6 +62,7 @@ export async function GET() {
       kyc: (a as any).kyc[0]?.status || null,
       joined: a.createdAt,
       hasUser: !!a.userId,
+      maxLotSize: (a as any).maxLotSize ?? null,
     });
   }
 
