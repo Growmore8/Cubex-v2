@@ -538,8 +538,8 @@ const [selAcc, setSelAcc] = useState<any>(null);
   function reconcileAcc(acc: any) { setMenu(null); askConfirm(`Recalculate balance for ${acc.login} - ${acc.name}? This rebuilds realized P/L from the surviving closed trades and manual P/L entries (fixes balances left wrong after a deleted manual P/L). Deposits, withdrawals and credit are not touched.`, async () => { const r = await fetch("/api/admin/clients/" + acc.id + "/manage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reconcile" }) }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else { setOk(`Balance recalculated (P/L ${d.before?.toFixed?.(2)} → ${d.after?.toFixed?.(2)})`); loadAll(); } }, false); }
 
   function openAct(kind: string, acc: any, finType?: string, label?: string) { setMenu(null); setMenuSub(""); setErr(""); setAform({}); setActMin(false); setAct({ kind, acc, finType, label }); }
-  function actTitle() { if (!act) return ""; const m: any = { money: act.label, manualpnl: "Manual P/L", transfer: "Transfer Between Accounts", rename: "Client Details", accountid: "Change Account ID", password: "Change Password", assignmgr: "Assign Manager", assign: "Assign Manager & Group", settings: "Account Settings", subaccount: "Create Sub-Account", assigngroup: "Assign Group", leverage: "Change Leverage", mclevel: "Margin Call Level", spreadmarkup: "Spread Markup" }; return m[act.kind] || "Action"; }
-  function actIcon() { if (!act) return "fa-circle"; const m: any = { money: "fa-dollar-sign", manualpnl: "fa-chart-line", transfer: "fa-right-left", rename: "fa-user-pen", accountid: "fa-id-card", password: "fa-key", assignmgr: "fa-user-tie", assign: "fa-user-tie", settings: "fa-sliders", subaccount: "fa-sitemap", assigngroup: "fa-layer-group", leverage: "fa-gauge-high", mclevel: "fa-triangle-exclamation", spreadmarkup: "fa-arrows-left-right" }; return m[act.kind] || "fa-circle"; }
+  function actTitle() { if (!act) return ""; const m: any = { money: act.label, manualpnl: "Manual P/L", transfer: "Transfer Between Accounts", rename: "Client Details", accountid: "Change Account ID", password: "Change Password", assignmgr: "Assign Manager", assign: "Assign Manager & Group", settings: "Account Settings", subaccount: "Create Sub-Account", assigngroup: "Assign Group", leverage: "Change Leverage", mclevel: "Margin Call Level", maxlotsize: "Max Lot Size", spreadmarkup: "Spread Markup" }; return m[act.kind] || "Action"; }
+  function actIcon() { if (!act) return "fa-circle"; const m: any = { money: "fa-dollar-sign", manualpnl: "fa-chart-line", transfer: "fa-right-left", rename: "fa-user-pen", accountid: "fa-id-card", password: "fa-key", assignmgr: "fa-user-tie", assign: "fa-user-tie", settings: "fa-sliders", subaccount: "fa-sitemap", assigngroup: "fa-layer-group", leverage: "fa-gauge-high", mclevel: "fa-triangle-exclamation", maxlotsize: "fa-sliders", spreadmarkup: "fa-arrows-left-right" }; return m[act.kind] || "fa-circle"; }
   function actPrimary() {
     if (!act) return { label: "Confirm", color: BUY, fg: "#04140e" };
     const m: any = {
@@ -587,6 +587,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
     else if (act.kind === "assign") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "assign", managerId: (aform.managerId ?? act.acc.managerId) || null, groupId: (aform.groupId ?? act.acc.groupId) || null }; }
     else if (act.kind === "leverage") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", leverage: Number(aform.leverage ?? act.acc.leverage) }; }
     else if (act.kind === "mclevel") { url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", mcLevel: Number(aform.mcLevel ?? act.acc.mcLevel), doNotLiquidate: aform.doNotLiquidate ?? act.acc.doNotLiquidate }; }
+    else if (act.kind === "maxlotsize") { const mls = aform.maxLotSize; url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", maxLotSize: mls === "" || mls === null ? null : (mls !== undefined ? Number(mls) : null) }; }
     else if (act.kind === "spreadmarkup") { const smType = aform.spreadMarkupType ?? act.acc.spreadMarkupType ?? "FIXED"; url = "/api/admin/clients/" + id + "/manage"; body = { action: "settings", spreadMarkup: smType === "FLOATING" ? 0 : Number(aform.spreadMarkup ?? act.acc.spreadMarkup ?? 0), spreadMarkupType: smType, spreadMarkupMax: 0 }; }
     else return;
     const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -3092,7 +3093,9 @@ const [selAcc, setSelAcc] = useState<any>(null);
             </button>
             {menuSub === "settings" && (
               <div className={flyCls} style={flySty}>
-                <button onClick={() => openAct("settings", menu.acc)} className={subi}>{mIco("fa-sliders", "#b45309")}Account Settings</button>
+                <button onClick={() => openAct("leverage", menu.acc)} className={subi}>{mIco("fa-gauge-high")}Change Leverage</button>
+                <button onClick={() => openAct("mclevel", menu.acc)} className={subi}>{mIco("fa-triangle-exclamation")}Set Margin Call Level</button>
+                <button onClick={() => openAct("maxlotsize", menu.acc)} className={subi}>{mIco("fa-sliders", "#b45309")}Max Lot Size</button>
                 <button onClick={() => { openSymOv(menu.acc); }} className={subi}>{mIco("fa-eye-slash", "var(--accent)")}Symbol Settings</button>
                 <button onClick={() => doPool(menu.acc)} className={subi}>{mIco(menu.acc.isPool ? "fa-circle-minus" : "fa-circle-plus", "#a78bfa")}{menu.acc.isPool ? "Demote from Pool" : "Promote to Pool"}</button>
               </div>
@@ -3364,6 +3367,15 @@ const [selAcc, setSelAcc] = useState<any>(null);
             {act.kind === "mclevel" && (<>
               <div><div className={flab}>MC Level % (0 = OFF)</div><input type="number" className={inp} value={aform.mcLevel ?? act.acc.mcLevel} onChange={(e) => af("mcLevel", e.target.value)} autoFocus /></div>
               <label className="flex items-center gap-2 text-[11px]"><span className="text-[var(--muted)]">Do Not Liquidate:</span><input type="checkbox" checked={!!(aform.doNotLiquidate ?? act.acc.doNotLiquidate)} onChange={(e) => af("doNotLiquidate", e.target.checked)} /> Enable (account will NOT be liquidated)</label>
+            </>)}
+            {act.kind === "maxlotsize" && (<>
+              <div><div className={flab}>Max Lot Size <span className="font-normal text-[var(--muted)]">(leave blank = no limit)</span></div>
+                <input type="number" step="0.01" min="0.01" className={inp} placeholder="e.g. 5.00" autoFocus
+                  value={aform.maxLotSize ?? (act.acc.maxLotSize != null ? Number(act.acc.maxLotSize) : "")}
+                  onChange={(e) => af("maxLotSize", e.target.value)} />
+              </div>
+              {act.acc.maxLotSize != null && <div className="text-[11px]" style={{ color: "#b45309" }}>Current limit: <b>{Number(act.acc.maxLotSize)} lots</b> — leave blank to remove</div>}
+              {act.acc.maxLotSize == null && <div className="text-[11px] text-[var(--muted)]">No limit currently set.</div>}
             </>)}
             {act.kind === "spreadmarkup" && (<>
               <div className="mb-2 text-[10px] text-[var(--muted)]">Extra markup added on top of symbol + group spread for this account only.</div>
