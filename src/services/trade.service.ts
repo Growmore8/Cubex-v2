@@ -11,6 +11,7 @@ import { gnum, gprice } from "@/lib/format";
 import { getSpreadPips, getSaDefaultSpreadPips, pipForDigits } from "@/lib/spread";
 import { isMarketOpen } from "@/lib/market";
 import { replicateTrade, closeCopiedTrades } from "@/services/copy.service";
+import { emitRefresh } from "@/lib/realtime";
 import { Redis as IoRedis } from "ioredis";
 
 // Singleton Redis client for spread config cache (populated by server.js every 60s)
@@ -207,7 +208,7 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
   const slErr = validateSlTp(input.side, openPrice, input.sl, input.tp);
   if (slErr) throw new Error(slErr);
 
-  await assertMargin(account, { symbol: input.symbol, type: input.side, lots: Number(input.lots) }, ask, existingTrades, fxRate);
+  await assertMargin(account, { symbol: input.symbol, type: input.side, lots: Number(input.lots) }, openPrice, existingTrades, fxRate);
 
   // Commission: group override takes priority over symbol default (grpRow already fetched in resolvePrice)
   let commRate = Number(symRow?.commissionPerLot ?? 0);
@@ -249,6 +250,7 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
     const commFxRate = await commFxRateP;
     await prisma.account.update({ where: { id: account.id }, data: { pnl: { decrement: new Prisma.Decimal(commission / commFxRate) } } });
   }
+  try { emitRefresh(); } catch {}
 
   const label = `${account.login} ${input.side} ${input.symbol} ${input.lots}L @ ${openPrice}${commission > 0 ? ` commission:$${commission.toFixed(2)}` : ""}`;
   audit(tenantId, "trade.open", label, account.login, "CLIENT" as any).catch(() => {});
@@ -317,6 +319,7 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
       await tx.trade.delete({ where: { id: trade.id } });
     }
   });
+  try { emitRefresh(); } catch {}
 
   const label = `${(trade.account as any).login} ${trade.symbol} ${isPartial ? `partial close ${lots}L` : "closed"} @ ${gprice(price)} | PnL ${gnum(pnl, 2)}`;
   audit(tenantId, "trade.close", label, trade.account.login, "CLIENT" as any).catch(() => {});

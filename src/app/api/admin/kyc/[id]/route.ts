@@ -6,6 +6,7 @@ import { notify, notifyStaff } from "@/services/notification.service";
 import { syncAccountKyc } from "@/services/kyc.service";
 import { sendUserMail } from "@/lib/tenant-mail";
 import { kycStatusEmail } from "@/lib/email-templates";
+import { emitRefresh } from "@/lib/realtime";
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,6 +18,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     await prisma.kycDocument.delete({ where: { id } });
     await syncAccountKyc(rec.accountId); // reflect the latest remaining doc (or clear)
     await audit(s.tenantId as string, "kyc.delete", rec.account.login + " " + rec.docType, s.email || "admin");
+    try { emitRefresh(); } catch {}
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });
@@ -55,6 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     // Confirmation to staff + superadmin.
     notifyStaff(s.tenantId as string, { title: "KYC " + (status === "APPROVED" ? "approved" : "rejected") + " — " + rec.account.login, body: rec.docType + " by " + (s.email || "admin"), type: "NOTICE" }, rec.account.managerId).catch(() => {});
+    try { emitRefresh(); } catch {}
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

@@ -201,6 +201,7 @@ export async function GET(req: Request) {
       creditSettleFrom: (account as any).creditSettleFrom || null,
       creditSettleTo: (account as any).creditSettleTo || null,
       bonusExpiryAt: (account as any).bonusExpiryAt || null,
+      maxLotSize: (account as any).maxLotSize != null ? Number((account as any).maxLotSize) : null,
     } : null,
     financials: account ? account.financials.map((f) => ({
       id: f.id.toString(), type: f.type, amount: Number(f.amount), description: f.description, appliedAt: f.appliedAt,

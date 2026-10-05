@@ -8,6 +8,7 @@ import { notify, notifyStaff } from "@/services/notification.service";
 import { sendUserMail } from "@/lib/tenant-mail";
 import { depositWithdrawalEmail } from "@/lib/email-templates";
 import { adjustBalance } from "@/services/account.service";
+import { emitRefresh } from "@/lib/realtime";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,6 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const delAcc = rec.accountId ? await prisma.account.findUnique({ where: { id: rec.accountId }, select: { login: true } }) : null;
       await prisma.paymentRequest.delete({ where: { id: rec.id } });
       await audit(s.tenantId as string, "payment.deleted", (delAcc?.login || rec.accountId) + " " + rec.kind + " $" + rec.amount + " deleted", s.email || "admin");
+      try { emitRefresh(); } catch {}
       return NextResponse.json({ ok: true });
     }
 
@@ -61,6 +63,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         ops.push(prisma.account.update({ where: { id: rec.accountId! }, data: { credit: { increment: amt }, ...(settleTo ? { creditSettleFrom: new Date(), creditSettleTo: settleTo } : {}) } }));
         ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: rec.accountId, type: "CREDIT_IN", amount: amt, description: "Instant Credit — $" + Number(rec.amount).toFixed(2) + (settleTo ? " (due " + settleTo.toISOString().slice(0, 10) + ")" : ""), mode: "REALTIME", createdBy: by } }));
         await prisma.$transaction(ops);
+        try { emitRefresh(); } catch {}
         await audit(tenantId, "credit.instant.approved", (accFull?.login || rec.accountId) + " instant credit $" + rec.amount + (settleTo ? " due " + settleTo.toISOString().slice(0, 10) : ""), by);
         try {
           if (accFull?.userId) await notify(tenantId, accFull.userId, "Instant Credit Approved", `Your instant credit of $${rec.amount} has been approved.`, "FUNDS").catch(() => {});
@@ -77,6 +80,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           ops.push(prisma.financialHistory.create({ data: { ...fhSnap, accountId: rec.accountId, type: "CREDIT_OUT", amount: new Prisma.Decimal(creditAmt), description: "Instant Credit Cleared — $" + creditAmt.toFixed(2), mode: "REALTIME", createdBy: by } }));
         }
         await prisma.$transaction(ops);
+        try { emitRefresh(); } catch {}
         await audit(tenantId, "credit.clear.approved", (accFull?.login || rec.accountId) + " credit cleared $" + creditAmt.toFixed(2) + " deposit $" + rec.amount, by);
         try {
           if (accFull?.userId) await notify(tenantId, accFull.userId, "Credit Cleared", `Your credit clearance of $${rec.amount} has been approved. Credit reduced by $${creditAmt.toFixed(2)}.`, "FUNDS").catch(() => {});
@@ -89,6 +93,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Standard DEPOSIT/WITHDRAWAL flow
     const stdAcc = rec.accountId ? await prisma.account.findUnique({ where: { id: rec.accountId }, select: { userId: true, login: true, managerId: true, name: true } }) : null;
     await prisma.$transaction(ops);
+    try { emitRefresh(); } catch {}
     await audit(s.tenantId as string, "payment." + status.toLowerCase(), (stdAcc?.login || rec.accountId) + " " + rec.kind + " $" + rec.amount + (rec.method ? " via " + rec.method : ""), s.email || "admin");
 
     // Referral reward on deposit approval

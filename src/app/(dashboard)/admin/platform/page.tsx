@@ -491,8 +491,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
     socket.on("liquidation", () => { loadAll(); loadNotifs(); loadAccHistory(selAccRef.current?.id); });
     socket.on("refresh", () => { loadAll(); loadNotifs(); loadAccHistory(selAccRef.current?.id); });
-    const t = setInterval(() => fetch("/api/desk/trades").then((r) => r.json()).then((d) => d.ok && setOpen(d.trades)).catch(() => {}), 7000);
-    return () => { socket.disconnect(); clearInterval(t); clearInterval(clr); clearInterval(flushIv); };
+    return () => { socket.disconnect(); clearInterval(clr); clearInterval(flushIv); };
   }, []);
 
   function dragX(e: any, which: "nav" | "mw") { e.preventDefault(); const sx = e.clientX; const sw = which === "nav" ? navW : mwW; const mv = (ev: any) => { const dx = ev.clientX - sx; if (which === "nav") setNavW(Math.max(120, Math.min(360, sw + dx))); else setMwW(Math.max(120, Math.min(380, sw - dx))); }; const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }; document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); }
