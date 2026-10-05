@@ -44,7 +44,70 @@ const CSS = `
 type Item = { id: string; action: string; detail: string | null; category: string; by: string | null; company: string | null; at: string };
 type Confirm = { msg: string; onOk: () => void };
 
+function AuditGate({ onUnlock }: { onUnlock: () => void }) {
+  const [gatePass, setGatePass] = useState("");
+  const [gateErr,  setGateErr]  = useState("");
+  const [gateBusy, setGateBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setGateErr(""); setGateBusy(true);
+    try {
+      const d = await fetch("/api/superadmin/audit-gate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: gatePass }),
+      }).then(r => r.json());
+      if (d.ok) {
+        try { sessionStorage.setItem("audit-gate", "1"); } catch {}
+        onUnlock();
+      } else {
+        setGateErr("Incorrect password");
+        setGatePass("");
+      }
+    } catch { setGateErr("Connection error"); }
+    finally { setGateBusy(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }}>
+      <form onSubmit={submit} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, padding: 32, width: 360, maxWidth: "92vw", boxShadow: "0 24px 60px rgba(0,0,0,0.6)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "color-mix(in srgb,#7c3aed 18%,transparent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="fa-solid fa-shield-halved" style={{ color: "#7c3aed", fontSize: 20 }} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>Audit Log Access</div>
+            <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 2 }}>Separate security password required</div>
+          </div>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted-foreground)", marginBottom: 6 }}>Security Password</div>
+          <input type="password" autoFocus value={gatePass}
+            onChange={(e) => { setGatePass(e.target.value); setGateErr(""); }}
+            placeholder="Enter audit password"
+            style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${gateErr ? "#f87171" : "var(--border)"}`, background: "var(--bg)", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+          />
+          {gateErr && <div style={{ color: "#f87171", fontSize: 11, marginTop: 5 }}><i className="fa-solid fa-circle-exclamation" style={{ marginRight: 4 }} />{gateErr}</div>}
+        </div>
+        <button type="submit" disabled={gateBusy || !gatePass}
+          style={{ width: "100%", padding: "11px 0", borderRadius: 9, border: "none", background: "#7c3aed", color: "#fff", fontWeight: 700, fontSize: 14, cursor: gateBusy ? "wait" : "pointer", opacity: !gatePass ? 0.5 : 1 }}>
+          {gateBusy ? "Verifying…" : "Unlock Audit Log"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function SAAudit() {
+  const [unlocked, setUnlocked] = useState(false);
+  useEffect(() => {
+    try { if (sessionStorage.getItem("audit-gate") === "1") setUnlocked(true); } catch {}
+  }, []);
+  if (!unlocked) return <AuditGate onUnlock={() => setUnlocked(true)} />;
+  return <AuditContent />;
+}
+
+function AuditContent() {
   const [items, setItems]     = useState<Item[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [q, setQ]             = useState("");
