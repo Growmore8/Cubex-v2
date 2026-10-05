@@ -467,7 +467,7 @@ export default function SAClientsPage() {
           <table className="sa-table">
             <thead>
               <tr>
-                {["CLIENT", "COUNTRY", "TENANT", "DEMO ACCOUNTS", "LIVE ACCOUNTS", "ONLINE", "JOINED", "KYC", "STATUS", ""].map((h) => <th key={h}>{h}</th>)}
+                {["CLIENT", "COUNTRY", "PROMO", "TENANT", "DEMO ACCOUNTS", "LIVE ACCOUNTS", "ONLINE", "JOINED", "KYC", "STATUS", ""].map((h) => <th key={h}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -491,6 +491,11 @@ export default function SAClientsPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-sm text-gray-600">{client.country || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-3 py-2.5">
+                      {client.promoCode
+                        ? <span className="rounded-full px-2 py-0.5 text-[11px] font-bold tracking-widest" style={{ background: "rgba(37,99,235,.1)", color: "#2563eb" }}>{client.promoCode}</span>
+                        : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
                     <td className="px-3 py-2.5 text-sm">
                       {tenantNames.length > 0
                         ? tenantNames.join(", ")
@@ -573,6 +578,7 @@ export default function SAClientsPage() {
                 <div className="space-y-1.5">
                   {detailClient.phone && <div className="flex items-center gap-2 text-sm"><i className="fa-solid fa-phone w-4 text-center text-gray-400 text-[10px]" />{detailClient.phone}</div>}
                   {detailClient.country && <div className="flex items-center gap-2 text-sm"><i className="fa-solid fa-globe w-4 text-center text-gray-400 text-[10px]" />{detailClient.country}</div>}
+                  {detailClient.promoCode && <div className="flex items-center gap-2 text-sm"><i className="fa-solid fa-tag w-4 text-center text-gray-400 text-[10px]" /><span className="rounded-full px-2 py-0.5 text-[11px] font-bold tracking-widest" style={{ background: "rgba(37,99,235,.1)", color: "#2563eb" }}>{detailClient.promoCode}</span></div>}
                   {detailClient.lastLoginIp && <div className="flex items-center gap-2 text-sm"><i className="fa-solid fa-location-dot w-4 text-center text-gray-400 text-[10px]" /><span className="font-mono text-xs">{detailClient.lastLoginIp}</span></div>}
                   <div className="flex items-center gap-2 text-sm"><i className="fa-solid fa-calendar w-4 text-center text-gray-400 text-[10px]" />Joined {new Date(detailClient.joined).toLocaleDateString()}</div>
                   {detailClient.isOnline && (

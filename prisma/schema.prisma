@@ -95,6 +95,7 @@ model User {
   totpEnabled     Boolean    @default(false)
   referralCode    String?    @unique
   referredById    String?
+  promoCode       String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   accounts        Account[]  @relation("AccountOwner")

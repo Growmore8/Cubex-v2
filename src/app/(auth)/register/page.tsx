@@ -44,6 +44,8 @@ function RegisterForm() {
   const [phone, setPhone] = useState("");
   const [country, setCountry] = useState("");
   const [password, setPassword] = useState("");
+  const [promoCode, setPromoCode] = useState(searchParams.get("promo") || "");
+  const [showPromo, setShowPromo] = useState(!!(searchParams.get("promo")));
   const [err, setErr] = useState("");
   const [existing, setExisting] = useState(false); // email already a client -> offer Sign in
   const [loading, setLoading] = useState(false);
@@ -91,6 +93,7 @@ function RegisterForm() {
         country: country || undefined,
         type,
         tenantSlug,
+        ...(promoCode.trim() ? { promoCode: promoCode.trim() } : {}),
       }),
     });
     const d = await r.json();
@@ -232,6 +235,23 @@ function RegisterForm() {
       <CountrySelect value={country} onChange={setCountry} className={fieldCls} style={inputStyle} />
 
       <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)} className={fieldCls} style={inputStyle} placeholder="Password (min 6)" />
+
+      {/* Promo code — collapsible; auto-shown when ?promo= is in the URL */}
+      {!showPromo ? (
+        <button type="button" onClick={() => setShowPromo(true)} className="text-xs font-medium hover:underline" style={{ color: "var(--brand-primary)" }}>
+          Have a promo code?
+        </button>
+      ) : (
+        <div className="relative">
+          <i className="fa-solid fa-tag pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }} />
+          <input
+            value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+            className={fieldCls + " pl-10 uppercase tracking-widest"}
+            style={inputStyle} placeholder="PROMO CODE"
+            maxLength={30}
+          />
+        </div>
+      )}
 
       <button type="submit" disabled={loading}
         style={{ background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))` }}

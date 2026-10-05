@@ -1573,12 +1573,12 @@ const [selAcc, setSelAcc] = useState<any>(null);
                     <table className="w-full border-collapse [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-1.5 [&_th]:px-1.5">
                       <thead><tr className="border-b border-[var(--border)] sticky top-0 bg-[var(--panel)] z-10">
                         <SortTh tbl="cli" k="login" label="Login" cls={thc} /><SortTh tbl="cli" k="name" label="Name" cls={thc} /><SortTh tbl="cli" k="email" label="Email" cls={thc} />
-                        <SortTh tbl="cli" k="phone" label="Phone" cls={thc} /><SortTh tbl="cli" k="country" label="Country" cls={thc} /><SortTh tbl="cli" k="manager" label="Manager" cls={thc} />
+                        <SortTh tbl="cli" k="phone" label="Phone" cls={thc} /><SortTh tbl="cli" k="country" label="Country" cls={thc} /><th className={thc}>Promo</th><SortTh tbl="cli" k="manager" label="Manager" cls={thc} />
                         <SortTh tbl="cli" k="type" label="Type" cls={thc} /><SortTh tbl="cli" k="balance" label="Balance" cls={thc} /><SortTh tbl="cli" k="online" label="Online" cls={thc} />
                         <SortTh tbl="cli" k="ip" label="Last IP" cls={thc} /><SortTh tbl="cli" k="status" label="Status" cls={thc} /><th className={thc + " text-right"}>Actions</th>
                       </tr></thead>
                       <tbody>
-                        {cliRows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={12}>No clients.</td></tr> : (() => {
+                        {cliRows.length === 0 ? <tr><td className="px-2 py-3 text-[var(--muted)]" colSpan={13}>No clients.</td></tr> : (() => {
                           // Group same-user LIVE + DEMO accounts together
                           const byUser = new Map<string, any[]>();
                           const noUser: any[] = [];
@@ -1630,6 +1630,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                                 <td className="px-2 py-1 text-[var(--muted)]">{isDemoSub ? <span style={{ color: "rgba(99,102,241,0.5)" }}>↑</span> : email}</td>
                                 <td className="px-2 py-1 text-[var(--muted)]">{isDemoSub ? "" : (c.phone || "-")}</td>
                                 <td className="px-2 py-1 text-[var(--muted)]">{isDemoSub ? "" : (c.country || "-")}</td>
+                                <td className="px-2 py-1">{!isDemoSub && c.user?.promoCode ? <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold tracking-widest" style={{ background: "rgba(37,99,235,.1)", color: "#2563eb" }}>{c.user.promoCode}</span> : <span className="text-[var(--muted)]">—</span>}</td>
                                 <td className="px-2 py-1 text-[var(--muted)]">{c.manager?.name || "-"}</td>
                                 <td className="px-2 py-1">
                                   <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ background: c.type === "LIVE" ? BUY + "22" : "#6366f122", color: c.type === "LIVE" ? BUY : "#818cf8" }}>{c.type}</span>

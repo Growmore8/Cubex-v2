@@ -163,6 +163,7 @@ export async function registerClient(
   type: "DEMO" | "LIVE" = "LIVE",
   tenantSlug?: string,
   referralCode?: string,
+  promoCode?: string,
 ): Promise<RegisterResult> {
   let tenant: any = await resolveTenant(host);
   if (!tenant && tenantSlug) {
@@ -232,6 +233,7 @@ export async function registerClient(
       data: {
         tenantId: tenant!.id, email: lowerEmail, name, passwordHash, role: "CLIENT",
         ...(emailToken ? { emailToken } : {}),
+        ...(promoCode ? { promoCode: promoCode.trim().toUpperCase() } : {}),
       },
     });
     const login = await nextLogin(tx, tenant!.id, type);
