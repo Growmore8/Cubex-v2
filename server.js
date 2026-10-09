@@ -1106,19 +1106,28 @@ const closing = new Set();    // guard: prevent double-close of same trade (TP/S
 // In-memory open-trade cache for tick-level TP/SL detection.
 // The 1s monitor can miss brief price touches; this cache lets us check every tick (~140ms).
 let _openTrades = [];
+let _openTradesBySymbol = {}; // symbol → trade[] index — avoids O(n_trades) scan on every tick
 async function loadOpenTrades() {
-  try { _openTrades = await prisma.trade.findMany({ include: { account: true } }); } catch {}
+  try {
+    const trades = await prisma.trade.findMany({ include: { account: true } });
+    _openTrades = trades;
+    const bySym = {};
+    for (const t of trades) { if (!bySym[t.symbol]) bySym[t.symbol] = []; bySym[t.symbol].push(t); }
+    _openTradesBySymbol = bySym;
+  } catch {}
 }
 
 // Check TP/SL for one symbol on every committed price update — fires within ~140ms of trigger.
-// Mirrors the monitor's TP/SL logic but runs per-tick rather than once per second.
+// Uses the symbol-indexed cache so each call is O(trades_for_this_symbol), not O(all_trades).
 function fastTpSl(sym) {
-  if (!global.__io || !_openTrades.length) return;
+  if (!global.__io) return;
+  const symTrades = _openTradesBySymbol[sym];
+  if (!symTrades || !symTrades.length) return;
   if (!isMarketOpen(sym, meta[sym] && meta[sym].cat)) return;
   const st = state[sym]; if (!st || st.price == null) return;
-  for (const t of _openTrades) {
-    // guard: skip wrong symbol, already-closing trades, or orphaned trades (deleted account)
-    if (t.symbol !== sym || closing.has(t.id.toString()) || !t.account) continue;
+  for (const t of symTrades) {
+    // guard: already-closing trades, or orphaned trades (deleted account)
+    if (closing.has(t.id.toString()) || !t.account) continue;
     try {
       const realAsk = (st.ask != null && st.ask > 0) ? st.ask : null;
       // When no real exchange ask: use real bid (no markup) as fallback so SELL TP/SL
@@ -1216,6 +1225,7 @@ async function closeTpSl(t, reason, price, io) {
     ]);
     // Evict closed trade from tick-level cache immediately so fastTpSl won't retry it
     _openTrades = _openTrades.filter((x) => x.id !== t.id);
+    if (_openTradesBySymbol[t.symbol]) _openTradesBySymbol[t.symbol] = _openTradesBySymbol[t.symbol].filter((x) => x.id !== t.id);
     if (t.account && t.account.userId) {
       const title = reason === "TP" ? "Take Profit hit ✓" : "Stop Loss hit";
       const body = `${t.symbol} ${t.type} closed @ ${price} | P/L ${pnlAcc >= 0 ? "+" : ""}${cs}${Math.abs(pnlAcc).toFixed(2)}`;
@@ -1747,10 +1757,10 @@ app.prepare().then(async () => {
   setInterval(pollPrices, 60000);
   setInterval(pollFinnhubQuotes, 30000); // Quote fallback so prices stay real if the WS is quiet
   loadOpenTrades(); // initial load for tick-level TP/SL cache
-  setInterval(loadOpenTrades, 3000); // refresh open trades every 3s (catch new trades/SL changes)
-  setInterval(microTick, 250);
-  setInterval(() => monitor(io), MONITOR_MS);
-  setInterval(() => checkPending(io), 1000);
+  setInterval(loadOpenTrades, 5000); // refresh open trades every 5s (catch new trades/SL changes)
+  setInterval(microTick, 400);
+  setInterval(() => monitor(io), 3000); // 3s is sufficient; fastTpSl covers sub-second TP/SL
+  setInterval(() => checkPending(io), 3000);
   setInterval(() => checkPriceAlerts(io), 5000); // price alert monitor every 5s
   startSwapCron(io);
   startStatementCron();
