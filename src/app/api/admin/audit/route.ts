@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
 import { listAudit } from "@/lib/audit";
 import { assertCan } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   await assertCan(s, "viewAudit");
   const logs = await listAudit(s.tenantId!);

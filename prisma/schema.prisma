@@ -192,6 +192,7 @@ model Trade {
   swap          Decimal  @default(0) @db.Decimal(18, 2)
   comment       String?
   masterTradeId BigInt?  // set on follower trades; null on master or standalone trades
+  ip            String?  // client IP when placed via client-side API; null for admin/server-placed trades
   openedAt      DateTime @default(now())
   createdAt     DateTime @default(now())
   @@index([accountId])
@@ -215,6 +216,7 @@ model TradeHistory {
   swap        Decimal     @default(0) @db.Decimal(18, 2)
   comment     String?
   closeReason CloseReason @default(MANUAL)
+  ip          String?     // client IP copied from Trade at close time; null for admin/server-placed trades
   openedAt    DateTime
   closedAt    DateTime    @default(now())
   @@index([accountId])

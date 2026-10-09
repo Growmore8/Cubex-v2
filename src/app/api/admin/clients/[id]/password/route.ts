@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
 import { resetPassword } from "@/services/account.service";
 
 const schema = z.object({ password: z.string().min(6) });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const { password } = schema.parse(await req.json());

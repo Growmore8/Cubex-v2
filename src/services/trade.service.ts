@@ -177,7 +177,7 @@ async function resolvePrice(tenantId: string, symbol: string, side: "BUY" | "SEL
   return { ask, bid, symRow: effectiveSym, grpRow: effectiveGrp };
 }
 
-export async function placeOrder(tenantId: string, userId: string, input: any) {
+export async function placeOrder(tenantId: string, userId: string, input: any, ip?: string) {
   const account = input.accountId
     ? await prisma.account.findFirst({ where: { tenantId, userId, id: input.accountId } })
     : await prisma.account.findFirst({ where: { tenantId, userId }, orderBy: { createdAt: "asc" } });
@@ -236,6 +236,7 @@ export async function placeOrder(tenantId: string, userId: string, input: any) {
           commission: new Prisma.Decimal(commission),
           trailingStop: new Prisma.Decimal(trailingStop),
           comment: input.comment || null,
+          ip: ip || null,
         },
       });
       break;
@@ -305,6 +306,7 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
         swap: new Prisma.Decimal(swapAcc),
         comment: trade.comment,
         openedAt: trade.openedAt,
+        ip: (trade as any).ip || null,
       },
     });
     // Only credit the price-based P&L — swap was already applied to account.pnl

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
+import { assertCan } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
 import { notifyTenantClients } from "@/services/notification.service";
 import { audit } from "@/lib/audit";
@@ -15,7 +16,7 @@ const schema = z.object({
 });
 
 export async function GET() {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   const signals = await prisma.signal.findMany({
     where: { tenantId: s.tenantId! },
@@ -25,9 +26,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
+    await assertCan(s, "sendNotifications");
     const body = schema.parse(await req.json());
     const signal = await prisma.signal.create({
       data: {

@@ -1,4 +1,5 @@
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
+import { assertCan } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
 
 function csvRow(vals: unknown[]): string {
@@ -6,8 +7,9 @@ function csvRow(vals: unknown[]): string {
 }
 
 export async function GET(req: Request) {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return new Response("Forbidden", { status: 403 });
+  try { await assertCan(s, "exportPdf"); } catch { return new Response("Forbidden", { status: 403 }); }
 
   const url = new URL(req.url);
   const from = url.searchParams.get("from");

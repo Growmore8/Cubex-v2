@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin, requireAdminOrManager } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
 import { listClients, createClient } from "@/services/account.service";
 import { assertCan } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
@@ -35,7 +35,7 @@ const schema = z.object({
 }).refine((d) => d.isPool || (d.email && d.email.length > 0), { message: "Email is required", path: ["email"] });
 
 export async function POST(req: Request) {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     await assertCan(s, "createClients");

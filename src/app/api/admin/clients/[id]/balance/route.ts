@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin, assertWritable } from "@/lib/guard";
+import { requireAdminOrManager, assertWritable } from "@/lib/guard";
 import { adjustBalance } from "@/services/account.service";
 import { assertCan } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +18,7 @@ const schema = z.object({
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     await assertWritable(s);

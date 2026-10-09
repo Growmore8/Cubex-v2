@@ -1219,7 +1219,7 @@ async function closeTpSl(t, reason, price, io) {
     // Without a transaction, a crash between trade.delete and account.update would
     // permanently lose the client's P&L with no way to recover automatically.
     await prisma.$transaction([
-      prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: t.accountId, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnlAcc, swap: swapAcc, commission: t.commission ?? 0, comment: t.comment || null, closeReason: reason, openedAt: t.openedAt } }),
+      prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: t.accountId, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnlAcc, swap: swapAcc, commission: t.commission ?? 0, comment: t.comment || null, closeReason: reason, openedAt: t.openedAt, ip: t.ip || null } }),
       prisma.trade.delete({ where: { id: t.id } }),
       prisma.account.update({ where: { id: t.accountId }, data: { pnl: { increment: pnlAcc + swapAcc } } }),
     ]);
@@ -1258,7 +1258,7 @@ async function liquidate(acc, list, io) {
       const pnlAcc = pnl / liqFxRate;
       const swapAcc = swapAmt / liqFxRate;
       total += pnlAcc + swapAcc;
-      txWrites.push(prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnlAcc, swap: swapAcc, commission: t.commission ?? 0, comment: t.comment || null, closeReason: "MC", openedAt: t.openedAt } }));
+      txWrites.push(prisma.tradeHistory.create({ data: { ticket: t.ticket, accountId: acc.id, symbol: t.symbol, side: t.type, lots: t.lots, openPrice: t.openPrice, closePrice: price, sl: t.sl, tp: t.tp, pnl: pnlAcc, swap: swapAcc, commission: t.commission ?? 0, comment: t.comment || null, closeReason: "MC", openedAt: t.openedAt, ip: t.ip || null } }));
       txWrites.push(prisma.trade.delete({ where: { id: t.id } }));
     }
     txWrites.push(prisma.account.update({ where: { id: acc.id }, data: { pnl: { increment: total } } }));

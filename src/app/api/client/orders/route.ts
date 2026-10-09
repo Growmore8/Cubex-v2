@@ -20,7 +20,8 @@ export async function POST(req: Request) {
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const input = schema.parse(await req.json());
-    const trade = await placeOrder(s.tenantId!, s.sub, input);
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || undefined;
+    const trade = await placeOrder(s.tenantId!, s.sub, input, ip);
     emitRefresh();
     return NextResponse.json({ ok: true, trade });
   } catch (e: any) {

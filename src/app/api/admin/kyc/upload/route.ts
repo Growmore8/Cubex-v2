@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { createKyc } from "@/services/kyc.service";
 import { saveUpload } from "@/lib/upload";
@@ -7,7 +7,7 @@ import { audit } from "@/lib/audit";
 import { notify } from "@/services/notification.service";
 
 export async function POST(req: Request) {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const form = await req.formData();
