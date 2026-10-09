@@ -271,7 +271,7 @@ export async function placeOrder(tenantId: string, userId: string, input: any, i
   };
 }
 
-export async function closeOrder(tenantId: string, userId: string, tradeId: string, closeLots?: number) {
+export async function closeOrder(tenantId: string, userId: string, tradeId: string, closeLots?: number, closeIp?: string) {
   const trade = await prisma.trade.findFirst({ where: { id: BigInt(tradeId), account: { tenantId, userId } }, include: { account: true } });
   if (!trade) throw new Error("Position not found");
   if (trade.account.deactivated) throw new Error("Account is deactivated");
@@ -307,6 +307,7 @@ export async function closeOrder(tenantId: string, userId: string, tradeId: stri
         comment: trade.comment,
         openedAt: trade.openedAt,
         ip: (trade as any).ip || null,
+        closeIp: closeIp || null,
       },
     });
     // Only credit the price-based P&L — swap was already applied to account.pnl

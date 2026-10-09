@@ -216,7 +216,8 @@ model TradeHistory {
   swap        Decimal     @default(0) @db.Decimal(18, 2)
   comment     String?
   closeReason CloseReason @default(MANUAL)
-  ip          String?     // client IP copied from Trade at close time; null for admin/server-placed trades
+  ip          String?     // client IP at trade open time; null for admin/server-placed trades
+  closeIp     String?     // client IP when client manually closed; null for admin/TP/SL/MC closes
   openedAt    DateTime
   closedAt    DateTime    @default(now())
   @@index([accountId])

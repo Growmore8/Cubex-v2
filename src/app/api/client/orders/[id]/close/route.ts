@@ -10,7 +10,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const body = await req.json().catch(() => ({}));
     const closeLots = body.lots ? Number(body.lots) : undefined; // optional partial close
-    const result = await closeOrder(s.tenantId!, s.sub, id, closeLots);
+    const closeIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || undefined;
+    const result = await closeOrder(s.tenantId!, s.sub, id, closeLots, closeIp);
     emitRefresh();
     return NextResponse.json({ ok: true, ...result });
   } catch (e: any) {

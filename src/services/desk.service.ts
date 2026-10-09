@@ -27,6 +27,7 @@ export async function listOpen(s: any) {
     symbol: t.symbol, type: t.type, lots: Number(t.lots),
     openPrice: Number(t.openPrice), sl: Number(t.sl), tp: Number(t.tp), openedAt: t.openedAt,
     commission: Number((t as any).commission ?? 0), swap: Number((t as any).swap ?? 0), comment: (t as any).comment || null,
+    ip: (t as any).ip || null,
   }));
 }
 
