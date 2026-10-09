@@ -43,6 +43,11 @@ export async function POST(req: Request) {
     if (!(amount > 0)) throw new Error("Amount must be positive");
     // Demo accounts have no real funds — no deposits/withdrawals/credit.
     if (account.type === "DEMO") throw new Error("This action is not available for demo accounts.");
+    // One pending request per kind at a time — must be approved or rejected before submitting another
+    if (kind === "DEPOSIT" || kind === "WITHDRAWAL") {
+      const existing = await prisma.paymentRequest.findFirst({ where: { accountId: account.id, kind: kind as any, status: "PENDING" } });
+      if (existing) throw new Error(`You already have a pending ${kind.toLowerCase()} request of $${Number(existing.amount).toFixed(2)}. Please wait for it to be approved or rejected before submitting another.`);
+    }
     // CREDIT_REQUEST: 250–1000, one pending at a time
     if (kind === "CREDIT_REQUEST") {
       if (amount < 250 || amount > 1000) throw new Error("Instant credit amount must be between $250 and $1,000");
