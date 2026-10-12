@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { assertCan } from "@/lib/perms";
@@ -19,7 +19,7 @@ function parseId(raw: string): { kind: "TRADE" | "FIN"; id: bigint } | null {
 }
 
 export async function POST(req: Request) {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const b = await req.json();
