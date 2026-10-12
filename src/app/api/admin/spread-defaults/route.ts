@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
 import { getSaDefaultSpreadPips } from "@/lib/spread";
 
 export async function GET() {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false }, { status: 403 });
   const [forex, crypto, commodities, indices, stocks] = await Promise.all([
     getSaDefaultSpreadPips("forex"),

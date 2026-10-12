@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
+import { assertCan } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
 import { notifyTenantClients } from "@/services/notification.service";
 import { audit } from "@/lib/audit";
@@ -8,9 +9,10 @@ import { audit } from "@/lib/audit";
 const schema = z.object({ title: z.string().min(1), body: z.string().optional() });
 
 export async function POST(req: Request) {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
+    await assertCan(s, "sendNotifications");
     const { title, body } = schema.parse(await req.json());
     const tenant = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { name: true, brandName: true } });
     const brand = (tenant?.brandName || tenant?.name || "").trim();

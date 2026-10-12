@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
 import { assertCan } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
 import { forceClose } from "@/services/desk.service";
@@ -8,7 +8,7 @@ import { audit } from "@/lib/audit";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     await assertCan(s, "closeTrades");

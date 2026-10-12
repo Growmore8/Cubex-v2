@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
 import { listSymbols, createSymbol } from "@/services/symbol.service";
 
 export async function GET() {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   const symbols = await listSymbols(s.tenantId!);
   return NextResponse.json({ ok: true, symbols });
@@ -18,7 +18,7 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try { const sym = await createSymbol(s.tenantId!, schema.parse(await req.json())); return NextResponse.json({ ok: true, symbol: sym }); }
   catch (e: any) { return NextResponse.json({ ok: false, error: (e.code === "P2002" ? "Already added" : (e.message || "Failed")) }, { status: 400 }); }

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/guard";
+import { requireAdminOrManager } from "@/lib/guard";
 import { listGroups, createGroup } from "@/services/group.service";
 
 export async function GET() {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   const groups = await listGroups(s.tenantId!);
   return NextResponse.json({ ok: true, groups: groups.map((g) => ({
@@ -18,7 +18,7 @@ export async function GET() {
 const schema = z.object({ name: z.string().min(1), spread: z.number().optional(), managerId: z.string().nullable().optional(), config: z.any().optional(), swapEnabled: z.boolean().optional(), swapMultiplier: z.number().optional(), commissionPerLot: z.number().optional() });
 
 export async function POST(req: Request) {
-  const s = await requireAdmin();
+  const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   try {
     const input = schema.parse(await req.json());
