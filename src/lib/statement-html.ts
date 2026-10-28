@@ -146,8 +146,8 @@ export function statementHtml(input: StatementHtmlInput): string {
 </style></head><body>
   <div class="noprint"><button onclick="window.print()" style="background:${accent};color:#fff;border:0;padding:8px 16px;border-radius:6px;cursor:pointer">Print / Save as PDF</button></div>
   <div class="head">
-    ${t.logoUrl ? `<img src="${esc(t.logoUrl)}" alt="">` : ""}
-    <div><div class="brand">${esc(brandName)}</div>${t.slogan ? `<div class="slogan">${esc(t.slogan)}</div>` : ""}</div>
+    ${t.logoUrl ? `<img src="${esc(t.logoUrl)}" alt="${esc(brandName)}">` : ""}
+    <div>${!t.logoUrl ? `<div class="brand">${esc(brandName)}</div>` : ""}${t.slogan ? `<div class="slogan">${esc(t.slogan)}</div>` : ""}</div>
     <div class="meta">Account Statement<br>${new Date().toLocaleString()}</div>
   </div>
   <h2>Account</h2>
