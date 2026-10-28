@@ -76,17 +76,27 @@ async function finnhubCandles(feed: string, tf: string, fhKey: string): Promise<
   } catch { return null; }
 }
 
+// Common index name → Twelve Data symbol. Used when no feed is configured.
+const INDEX_TD_MAP: Record<string, string> = {
+  US100: "NDX", US500: "SPX", US30: "DJIA", US2000: "RUT",
+  GER40: "DAX", UK100: "FTSE", FRA40: "FCHI", ESP35: "IBEX35",
+  EUSTX50: "SX5E", AUS200: "XJO", JP225: "N225",
+  HK50: "HSI", CN50: "SHCOMP", VIX: "VIX",
+};
+
 // Map an internal symbol (e.g. "XAUUSD", "GBPUSD", "BTCUSD") to a Twelve Data symbol.
 function tdSymbol(sym: string, feed?: string | null): string {
-  // Only honor `feed` if it is actually a TwelveData symbol (e.g. "XAU/USD").
-  // The catalog stores Finnhub feeds here (e.g. "OANDA:XAU_USD"), which TD
-  // rejects — those must be ignored so we fall back to the derived mapping.
-  if (feed && feed.includes("/") && !feed.includes(":")) return feed;
+  // Honor any feed that is NOT a Finnhub feed (Finnhub feeds contain ":").
+  // This allows admin to override per-symbol via the globalSymbol.feed field
+  // with a plain TD symbol like "NDX" or a slash-pair like "XAU/USD".
+  if (feed && !feed.includes(":")) return feed;
   const s = sym.toUpperCase();
   if (/^[A-Z]{6}$/.test(s)) return s.slice(0, 3) + "/" + s.slice(3); // FX / metals pair
   if (/^(XAU|XAG|XPT|XPD)/.test(s) && s.length >= 6) return s.slice(0, 3) + "/" + s.slice(3);
   if (s.endsWith("USDT")) return s.replace("USDT", "") + "/USD";
   if (s.endsWith("USD") && s.length > 3 && !/^[A-Z]{6}$/.test(s)) return s.slice(0, s.length - 3) + "/USD";
+  // Known index names → correct TD symbol (avoids wrong instrument matches)
+  if (INDEX_TD_MAP[s]) return INDEX_TD_MAP[s];
   return s; // stocks/indices as-is
 }
 
