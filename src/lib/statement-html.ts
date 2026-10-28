@@ -143,11 +143,12 @@ export function statementHtml(input: StatementHtmlInput): string {
   .foot{margin-top:28px;border-top:1px solid #e5e7eb;padding-top:10px;color:#9ca3af;font-size:10px;text-align:center}
   .noprint{margin-bottom:14px}
   @media print{.noprint{display:none}}
+  @page{margin:0}body{padding:32px}
 </style></head><body>
   <div class="noprint"><button onclick="window.print()" style="background:${accent};color:#fff;border:0;padding:8px 16px;border-radius:6px;cursor:pointer">Print / Save as PDF</button></div>
   <div class="head">
-    ${t.logoUrl ? `<img src="${esc(t.logoUrl)}" alt="${esc(brandName)}">` : ""}
-    <div>${!t.logoUrl ? `<div class="brand">${esc(brandName)}</div>` : ""}${t.slogan ? `<div class="slogan">${esc(t.slogan)}</div>` : ""}</div>
+    ${t.logoUrl ? `<img src="${esc(t.logoUrl)}" alt="">` : ""}
+    <div><div class="brand">${esc(brandName)}</div>${t.slogan ? `<div class="slogan">${esc(t.slogan)}</div>` : ""}</div>
     <div class="meta">Account Statement<br>${new Date().toLocaleString()}</div>
   </div>
   <h2>Account</h2>
