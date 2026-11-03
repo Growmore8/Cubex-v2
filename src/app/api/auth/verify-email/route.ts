@@ -5,7 +5,7 @@ import { verifyEmail } from "@/services/auth.service";
 import { signSession, SESSION_COOKIE } from "@/lib/jwt";
 import { ROLE_HOME } from "@/config/roles";
 
-const schema = z.object({ email: z.string().email(), token: z.string().min(1) });
+const schema = z.object({ email: z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email address"), token: z.string().min(1) });
 
 export async function POST(req: Request) {
   try {

@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { deviceFromUA } from "@/lib/presence";
 import { rateLimit } from "@/lib/rateLimit";
 
-const schema = z.object({ email: z.string().email(), password: z.string().min(1), remember: z.boolean().optional() });
+const schema = z.object({ email: z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email address"), password: z.string().min(1), remember: z.boolean().optional() });
 
 export async function POST(req: Request) {
   try {

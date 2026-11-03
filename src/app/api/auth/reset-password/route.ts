@@ -3,7 +3,7 @@ import { z } from "zod";
 import { headers } from "next/headers";
 import { resetPassword } from "@/services/auth.service";
 
-const schema = z.object({ email: z.string().email(), token: z.string().min(1), password: z.string().min(6) });
+const schema = z.object({ email: z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email address"), token: z.string().min(1), password: z.string().min(6) });
 
 export async function POST(req: Request) {
   try {

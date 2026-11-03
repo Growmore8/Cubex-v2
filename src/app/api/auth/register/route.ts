@@ -8,7 +8,7 @@ import { rateLimit } from "@/lib/rateLimit";
 
 const schema = z.object({
   name: z.string().min(2),
-  email: z.string().email(),
+  email: z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email address"),
   password: z.string().min(6),
   phone: z.string().optional(),
   country: z.string().optional(),

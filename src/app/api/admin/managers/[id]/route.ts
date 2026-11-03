@@ -7,7 +7,7 @@ import { audit } from "@/lib/audit";
 
 const schema = z.object({
   name: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email address").optional(),
   password: z.string().min(6).optional(),
   status: z.enum(["ACTIVE", "SUSPENDED", "LOCKED"]).optional(),
   perms: z.record(z.string(), z.boolean()).optional(),

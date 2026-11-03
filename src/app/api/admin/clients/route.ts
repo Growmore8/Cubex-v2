@@ -29,7 +29,7 @@ export async function GET(req: Request) {
 
 const schema = z.object({
   // Pool accounts log in by Live ID and need no email — allow blank/missing email.
-  name: z.string().min(2), email: z.union([z.string().email(), z.literal(""), z.undefined()]).optional(), password: z.string().min(6),
+  name: z.string().min(2), email: z.union([z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email address"), z.literal(""), z.undefined()]).optional(), password: z.string().min(6),
   type: z.enum(["LIVE", "DEMO"]).optional(), leverage: z.number().int().positive().optional(),
   currency: z.enum(["USD", "EUR", "GBP"]).optional(), managerId: z.string().nullable().optional(), phone: z.string().optional(), country: z.string().optional(), isPool: z.boolean().optional(),
 }).refine((d) => d.isPool || (d.email && d.email.length > 0), { message: "Email is required", path: ["email"] });

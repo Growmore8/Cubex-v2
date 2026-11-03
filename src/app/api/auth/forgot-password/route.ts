@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { sendForgotPassword } from "@/services/auth.service";
 import { rateLimit } from "@/lib/rateLimit";
 
-const schema = z.object({ email: z.string().email() });
+const schema = z.object({ email: z.string().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email address") });
 
 export async function POST(req: Request) {
   try {
