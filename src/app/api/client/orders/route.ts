@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireClient } from "@/lib/guard";
 import { placeOrder } from "@/services/trade.service";
-import { emitRefresh } from "@/lib/realtime";
 
 const schema = z.object({
   symbol: z.string(),
@@ -22,7 +21,6 @@ export async function POST(req: Request) {
     const input = schema.parse(await req.json());
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || undefined;
     const trade = await placeOrder(s.tenantId!, s.sub, input, ip);
-    emitRefresh();
     return NextResponse.json({ ok: true, trade });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Order failed" }, { status: 400 });

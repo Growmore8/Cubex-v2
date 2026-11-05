@@ -166,6 +166,9 @@ model Account {
   updatedAt        DateTime           @updatedAt
   @@unique([tenantId, login])
   @@index([tenantId])
+  @@index([tenantId, managerId])
+  @@index([userId])
+  @@index([tenantId, type])
   @@index([expiresAt])
 }
 model Counter {
@@ -196,6 +199,7 @@ model Trade {
   openedAt      DateTime @default(now())
   createdAt     DateTime @default(now())
   @@index([accountId])
+  @@index([accountId, openedAt(sort: Desc)])
   @@index([symbol])
   @@index([masterTradeId])
 }
@@ -221,6 +225,7 @@ model TradeHistory {
   openedAt    DateTime
   closedAt    DateTime    @default(now())
   @@index([accountId])
+  @@index([accountId, closedAt(sort: Desc)])
   @@index([closedAt])
 }
 model CopyRelation {
@@ -364,6 +369,7 @@ model AuditLog {
   createdAt   DateTime      @default(now())
   @@index([category])
   @@index([createdAt])
+  @@index([tenantId, createdAt(sort: Desc)])
 }
 model Setting {
   key       String   @id

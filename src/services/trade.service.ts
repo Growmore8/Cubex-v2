@@ -18,9 +18,16 @@ import { Redis as IoRedis } from "ioredis";
 const _g = global as any;
 const _spreadCache: IoRedis = _g.__tradeSpreadCache ?? (_g.__tradeSpreadCache = new IoRedis(process.env.REDIS_URL || "redis://localhost:6379"));
 
+// In-process cache for symbol category (market hours check). Category never changes
+// at runtime so a process-lifetime Map is safe — worst case a restart clears it.
+const _symCatCache = new Map<string, string | null>();
+
 export async function assertMarketOpen(symbol: string) {
-  let cat: string | null = null;
-  try { const gs = await prisma.globalSymbol.findUnique({ where: { symbol }, select: { category: true } }); cat = gs?.category || null; } catch {}
+  let cat: string | null | undefined = _symCatCache.get(symbol);
+  if (cat === undefined) {
+    try { const gs = await prisma.globalSymbol.findUnique({ where: { symbol }, select: { category: true } }); cat = gs?.category || null; } catch { cat = null; }
+    _symCatCache.set(symbol, cat);
+  }
   if (!isMarketOpen(symbol, cat)) throw new Error("Market is closed for " + symbol + ". Trading resumes when the market reopens.");
 }
 
