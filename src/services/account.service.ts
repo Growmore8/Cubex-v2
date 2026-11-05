@@ -180,6 +180,7 @@ export async function manualPnl(tenantId: string, id: string, amount: number, no
   if (!acc) throw new Error("Account not found");
   await prisma.account.update({ where: { id }, data: { pnl: { increment: new Prisma.Decimal(amount) } } });
   await prisma.financialHistory.create({ data: { accountId: id, tenantId, accountLogin: acc.login, accountName: acc.name, type: "PNL_ADJUST" as any, amount: new Prisma.Decimal(amount), description: note || "Manual P/L adjustment", mode: "MANUAL" as any, createdBy: by } }).catch(() => {});
+  try { emitRefresh(); } catch {}
   await audit(tenantId, "client.manualPnl", acc.login + " " + amount + " " + (note || ""), by);
   notifyStaff(tenantId, { type: "FUNDS", title: "Manual P/L — " + acc.login, body: (amount >= 0 ? "+" : "") + amount + (note ? " — " + note : "") + " by " + by }, acc.managerId).catch(() => {});
   return { ok: true };

@@ -6,6 +6,7 @@ import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
 import { validateSlTp } from "@/lib/trademath";
 import { notifyStaff } from "@/services/notification.service";
+import { emitRefresh } from "@/lib/realtime";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,6 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (b.openedAt !== undefined && b.openedAt) data.openedAt = new Date(b.openedAt);
     if (b.type !== undefined && (b.type === "BUY" || b.type === "SELL")) data.type = b.type;
     await prisma.trade.update({ where: { id: t.id }, data });
+    emitRefresh();
     await audit(s.tenantId as string, "trade.modify", t.symbol + " " + JSON.stringify(data), s.email || "admin");
     notifyStaff(s.tenantId as string, { title: "Trade modified — " + (t.account.login || ""), body: t.symbol + " #" + t.ticket + " by " + (s.email || "staff"), type: "TRADE" }, t.account.managerId).catch(() => {});
     return NextResponse.json({ ok: true });

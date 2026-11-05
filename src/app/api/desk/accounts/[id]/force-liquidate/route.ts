@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { forceClose } from "@/services/desk.service";
 import { adjustBalance } from "@/services/account.service";
 import { audit } from "@/lib/audit";
+import { emitRefresh } from "@/lib/realtime";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -53,6 +54,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       s.email,
     );
 
+    emitRefresh();
     return NextResponse.json({ ok: true, closedCount, balanceBefore: rounded, errors });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

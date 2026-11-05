@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireStaff, assertWritable } from "@/lib/guard";
 import { assertCan } from "@/lib/perms";
 import { manualTrade } from "@/services/desk.service";
+import { emitRefresh } from "@/lib/realtime";
 
 const schema = z.object({
   accountId: z.string(), symbol: z.string(), type: z.enum(["BUY", "SELL"]),
@@ -20,6 +21,7 @@ export async function POST(req: Request) {
     await assertCan(s, "manualTrade");
     const input = schema.parse(await req.json());
     const trade = await manualTrade(s, input);
+    emitRefresh();
     return NextResponse.json({ ok: true, trade });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

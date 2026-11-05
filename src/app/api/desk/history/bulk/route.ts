@@ -3,6 +3,7 @@ import { requireAdminOrManager } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { assertCan } from "@/lib/perms";
+import { emitRefresh } from "@/lib/realtime";
 
 const FIN: Record<string, { col: string; sign: number }> = {
   DEPOSIT: { col: "deposit", sign: 1 }, WITHDRAWAL: { col: "withdrawal", sign: 1 },
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
       }
     }
     await audit(s.tenantId!, "history.bulkDelete", done + " rows", s.email);
+    emitRefresh();
     return NextResponse.json({ ok: true, deleted: done });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message || "Failed" }, { status: 400 });

@@ -101,11 +101,14 @@ export async function manualTrade(s: any, input: any) {
   // Admin staff can open trades on locked accounts (lock only restricts the client).
   // Deactivated accounts are fully suspended and block everyone including admin.
   if (acc.deactivated) throw new Error("Account is deactivated");
-  await assertTradingOpen();
-  await assertCan(s, "manualTrade");
-  const liveAsk = await getAsk(input.symbol);   // ask:sym — TTL-protected real ask
-  const liveBid = await getBid(input.symbol);   // bid:sym — TTL-protected real bid
-  const livePrice = await getPrice(input.symbol); // price:sym — display fallback
+  // Run permission check, market open check, and all 3 price lookups in parallel
+  const [, , liveAsk, liveBid, livePrice] = await Promise.all([
+    assertTradingOpen(),
+    assertCan(s, "manualTrade"),
+    getAsk(input.symbol),    // ask:sym — TTL-protected real ask
+    getBid(input.symbol),    // bid:sym — TTL-protected real bid
+    getPrice(input.symbol),  // price:sym — display fallback
+  ]);
   // BUY opens at ask, SELL opens at bid — same as client trade placement.
   // Stale guard: reject ask/bid if they deviate > 1% from display price
   // (same rule as resolvePrice — prevents stale Redis keys from setting wrong price).

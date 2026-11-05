@@ -125,6 +125,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const before = Number(acc.pnl);
         await prisma.account.update({ where: { id: acc.id }, data: { pnl: new Prisma.Decimal(after) } });
         await audit(tenantId, "client.reconcile", `${acc.login} pnl ${before} -> ${after} (trades ${tradePnl} + manual ${manualPnl})`, actor);
+        try { emitRefresh(); } catch {}
         return NextResponse.json({ ok: true, before, after, delta: after - before });
       }
       case "transfer": {
