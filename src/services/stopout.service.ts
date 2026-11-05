@@ -70,19 +70,22 @@ export async function runStopOut(tenantIdFilter?: string): Promise<StopOutResult
 async function processAccount(tenantId: string, account: any): Promise<number> {
   let closed = 0;
 
+  // Fetch account balance and open trades once — update in-memory after each close
+  // to avoid N×2 DB round-trips when multiple positions need liquidation.
+  let acc = await prisma.account.findUnique({
+    where: { id: account.id },
+    select: { deposit: true, withdrawal: true, credit: true, bonus: true, pnl: true, leverage: true, mcLevel: true },
+  });
+  if (!acc) return 0;
+
+  let trades = await prisma.trade.findMany({
+    where: { accountId: account.id },
+    select: { id: true, ticket: true, symbol: true, type: true, lots: true, openPrice: true, swap: true, openedAt: true },
+  });
+  if (!trades.length) return 0;
+
   // Up to 20 forced closes per account per cycle to prevent runaway loops
   for (let iter = 0; iter < 20; iter++) {
-    // Re-fetch account each pass so pnl/balance reflects prior closes in this cycle
-    const acc = await prisma.account.findUnique({
-      where: { id: account.id },
-      select: { deposit: true, withdrawal: true, credit: true, bonus: true, pnl: true, leverage: true, mcLevel: true },
-    });
-    if (!acc) break;
-
-    const trades = await prisma.trade.findMany({
-      where: { accountId: account.id },
-      select: { id: true, ticket: true, symbol: true, type: true, lots: true, openPrice: true, swap: true, openedAt: true },
-    });
     if (!trades.length) break;
 
     // Fetch all prices in parallel — ask for SELL close, bid for BUY close.
@@ -190,6 +193,10 @@ async function processAccount(tenantId: string, account: any): Promise<number> {
     const label = `STOP-OUT ${account.login} ${worstTrade.type} ${sym} ${lots}L @ ${gprice(closePrice)} | P&L ${gnum(pnl, 2)} | MarginLevel was ${marginLevel.toFixed(1)}%`;
     audit(tenantId, "trade.stopout", label, account.login, "CLIENT" as any).catch(() => {});
     notifyStaff(tenantId, { type: "TRADE", title: "⛔ Stop-Out Executed", body: label }, account.managerId).catch(() => {});
+
+    // Update in-memory balance and remove closed trade — avoids 2 DB round-trips next iteration
+    acc = { ...acc, pnl: new Prisma.Decimal(Number(acc.pnl) + pnl) };
+    trades = trades.filter((t) => t.id !== worstTrade.id);
 
     closed++;
   }

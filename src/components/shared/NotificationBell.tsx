@@ -19,7 +19,7 @@ export default function NotificationBell() {
     primed.current = true;
     setItems(d.items); setUnread(d.unread);
   }
-  useEffect(() => { load(); const t = setInterval(load, 12000); return () => clearInterval(t); }, []);
+  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
 
   async function openAndRead() {
     setOpen((v) => !v);

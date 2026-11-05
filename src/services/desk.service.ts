@@ -19,6 +19,7 @@ export async function listOpen(s: any) {
   const trades = await prisma.trade.findMany({
     where: { account: accountWhere(s) },
     orderBy: { openedAt: "desc" },
+    take: 500,
     include: { account: { select: { login: true, name: true } } },
   });
   return trades.map((t) => ({

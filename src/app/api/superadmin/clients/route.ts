@@ -9,6 +9,7 @@ export async function GET() {
 
   const accts = await prisma.account.findMany({
     orderBy: { createdAt: "desc" },
+    take: 2000,
     include: {
       user: { select: { id: true, email: true, name: true, lastLoginIp: true, lastSeenAt: true, lastDevice: true, promoCode: true } },
       tenant: { select: { name: true, brandName: true } },

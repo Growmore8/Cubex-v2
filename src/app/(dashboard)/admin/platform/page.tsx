@@ -301,7 +301,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   }, [selAcc?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   async function loadPending() { try { const d = await fetch("/api/desk/pending").then((r) => r.json()); if (d.ok) setPendingOrders(d.pending || []); } catch {} }
-  useEffect(() => { loadPending(); const t = setInterval(loadPending, 6000); return () => clearInterval(t); }, []);
+  useEffect(() => { loadPending(); }, []);
   async function cancelPending(id: string) { const r = await fetch("/api/desk/pending/" + id, { method: "DELETE" }); const d = await r.json(); if (!d.ok) setErr(d.error || "Failed"); else loadPending(); }
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<any[]>([]);

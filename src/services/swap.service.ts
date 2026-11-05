@@ -63,6 +63,7 @@ export async function runSwapRollover(tenantIdFilter?: string): Promise<Rollover
 
       let tenantCount = 0;
       const accountDeltas = new Map<string, number>();
+      const tradeUpdates: { id: bigint; amount: number }[] = [];
 
       for (const trade of trades) {
         if (trade.account.swapFree) continue;
@@ -83,13 +84,18 @@ export async function runSwapRollover(tenantIdFilter?: string): Promise<Rollover
         const swapAmount = swapRate * pip * Number(trade.lots) * cs * mult;
         if (swapAmount === 0) continue;
 
-        await prisma.trade.update({
-          where: { id: trade.id },
-          data: { swap: { increment: new Prisma.Decimal(swapAmount) } },
-        });
-
+        tradeUpdates.push({ id: trade.id, amount: swapAmount });
         accountDeltas.set(trade.account.id, (accountDeltas.get(trade.account.id) ?? 0) + swapAmount);
         tenantCount++;
+      }
+
+      // Batch all trade swap updates in one transaction instead of N serial round-trips
+      if (tradeUpdates.length) {
+        await prisma.$transaction(
+          tradeUpdates.map((u) =>
+            prisma.trade.update({ where: { id: u.id }, data: { swap: { increment: new Prisma.Decimal(u.amount) } } })
+          )
+        );
       }
 
       for (const [accountId, delta] of accountDeltas) {
