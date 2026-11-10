@@ -1,5 +1,5 @@
 // ── Offline shell caching ──
-const CACHE = "cubex-shell-v1";
+const CACHE = "cubex-shell-v2";
 const SHELL = ["/login", "/client"];
 
 self.addEventListener("install", function (event) {
@@ -30,7 +30,9 @@ self.addEventListener("fetch", function (event) {
     );
     return;
   }
-  // Static assets: cache-first
+  // Static assets: cache-first, with graceful network-failure fallback.
+  // Without the .catch(), a rejected fetch() (timeout/ERR_FAILED) propagates as
+  // a SW network error, which blocks the browser from retrying natively.
   event.respondWith(
     caches.match(event.request).then(function (cached) {
       if (cached) return cached;
@@ -40,6 +42,11 @@ self.addEventListener("fetch", function (event) {
           caches.open(CACHE).then(function (c) { c.put(event.request, clone); });
         }
         return res;
+      }).catch(function () {
+        // Network failed and nothing cached — return an empty 503 so the SW
+        // doesn't swallow the error silently; the browser will show a load error
+        // rather than a frozen blank page.
+        return new Response("", { status: 503, statusText: "Offline" });
       });
     })
   );
