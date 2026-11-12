@@ -1594,7 +1594,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
                     <input value={cliQ} onChange={(e) => setCliQ(e.target.value)} placeholder="Search login / name / email" className="rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-0.5 text-[var(--text)] min-w-[160px]" />
                     <select value={cliType} onChange={(e) => setCliType(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All Types</option><option value="LIVE">Live</option><option value="DEMO">Demo</option></select>
                     <select value={cliStatus} onChange={(e) => setCliStatus(e.target.value)} className="rounded border border-[var(--border)] bg-[var(--bg)] px-1 py-0.5 text-[var(--text)]"><option value="ALL">All Status</option><option value="ACTIVE">Active</option><option value="LOCKED">Locked</option><option value="INACTIVE">Inactive</option></select>
-                    <span className="text-[var(--muted)]">{cliRows.length} clients</span>
+                    <span className="text-[var(--muted)]">{new Set(cliRows.map((c: any) => c.userId || c.id)).size} clients</span>
                   </div>
                   <div className="flex-1 overflow-auto">
                     <table className="w-full border-collapse [&_td]:border-b [&_td]:border-[color-mix(in_srgb,var(--border)_38%,transparent)] [&_td]:px-1.5 [&_th]:px-1.5">
@@ -1766,7 +1766,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
             {/* ── OVERVIEW tab ── */}
             {tab === "overview" && !dataReady && <div className="flex h-full items-center justify-center text-[11px]" style={{ color: "var(--muted)" }}><i className="fa-solid fa-circle-notch fa-spin mr-2" />Loading…</div>}
             {tab === "overview" && dataReady && (() => {
-              const totalClients = clients.length;
+              const totalClients = new Set(clients.map((c: any) => c.userId || c.id)).size;
               const liveClients = clients.filter((c: any) => c.type === "LIVE").length;
               const demoClients = clients.filter((c: any) => c.type === "DEMO").length;
               const totalPositions = open.length;
