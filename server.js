@@ -1553,12 +1553,21 @@ async function statementCronTick() {
   } catch (e) { /* transient — retried next hour */ }
 }
 // ── Price Alerts ─────────────────────────────────────────────────────────────
+// Cache active alerts for 60 s to avoid a full DB scan every 5 s.
+// Invalidated immediately when an alert fires so the next tick picks up new ones.
 let _alertsRunning = false;
+let _alertCache = [];
+let _alertCacheTs = 0;
+const ALERT_CACHE_TTL = 60000;
 async function checkPriceAlerts(io) {
   if (_alertsRunning) return;
   _alertsRunning = true;
   try {
-    const alerts = await prisma.priceAlert.findMany({ where: { triggered: false }, include: { account: true } });
+    if (Date.now() - _alertCacheTs > ALERT_CACHE_TTL) {
+      _alertCache = await prisma.priceAlert.findMany({ where: { triggered: false }, include: { account: true } });
+      _alertCacheTs = Date.now();
+    }
+    const alerts = _alertCache;
     for (const al of alerts) {
       const st = state[al.symbol];
       if (!st || st.price == null) continue;
@@ -1566,6 +1575,7 @@ async function checkPriceAlerts(io) {
       const hit = al.condition === "ABOVE" ? price >= Number(al.price) : price <= Number(al.price);
       if (!hit) continue;
       await prisma.priceAlert.update({ where: { id: al.id }, data: { triggered: true } });
+      _alertCacheTs = 0; // force cache refresh on next tick so fired alert is gone
       const body = `${al.symbol} ${al.condition === "ABOVE" ? "rose above" : "fell below"} ${Number(al.price)}${al.note ? " — " + al.note : ""}`;
       if (al.account?.userId) {
         await prisma.notification.create({ data: { tenantId: al.tenantId, userId: al.account.userId, title: "Price alert triggered", body, type: "TRADE" } }).catch(() => {});
@@ -1831,7 +1841,7 @@ app.prepare().then(async () => {
   setInterval(pollFinnhubQuotes, 30000); // Quote fallback so prices stay real if the WS is quiet
   loadOpenTrades(); // initial load for tick-level TP/SL cache
   setInterval(loadOpenTrades, 3000); // refresh every 3s — monitor() uses this cache, so keep them in sync
-  setInterval(microTick, 400);
+  setInterval(microTick, 600);
   setInterval(() => monitor(io), 3000); // uses _openTrades cache (no extra DB query)
   setInterval(() => checkPending(io), 3000);
   setInterval(() => checkPriceAlerts(io), 5000); // price alert monitor every 5s
