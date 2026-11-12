@@ -1713,7 +1713,47 @@ app.prepare().then(async () => {
       }
     }
   })();
-  const server = createServer((req, res) => handle(req, res));
+  // ── Stale server-action circuit breaker ──────────────────────────────────
+  // After a deploy, browsers with stale JS call old Next-Action IDs at hundreds
+  // of requests/second (each failure causes an immediate retry). This in-process
+  // rate limiter detects that pattern per-IP and returns 429 immediately,
+  // stopping the loop on the server side without waiting for the browser to reload.
+  //
+  // Thresholds: > 15 Next-Action POSTs per 10 s from the same IP → 429 for 30 s.
+  // A normal user triggers a server action at most a few times per minute.
+  const _actionWindows = new Map(); // ip → { count, windowStart, blockedUntil }
+  const ACT_WINDOW_MS = 10000, ACT_MAX = 15, ACT_BLOCK_MS = 30000;
+  function isActionRateLimited(ip) {
+    const now = Date.now();
+    let e = _actionWindows.get(ip);
+    if (!e) { e = { count: 0, windowStart: now, blockedUntil: 0 }; _actionWindows.set(ip, e); }
+    if (now < e.blockedUntil) return true;
+    if (now - e.windowStart > ACT_WINDOW_MS) { e.count = 0; e.windowStart = now; }
+    e.count++;
+    if (e.count > ACT_MAX) {
+      e.blockedUntil = now + ACT_BLOCK_MS;
+      console.warn("[action-limiter] stale-action storm detected from", ip, "— blocking 30s");
+      return true;
+    }
+    return false;
+  }
+  // Prune stale entries every 5 min so the Map never grows unboundedly.
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, e] of _actionWindows) if (now - e.windowStart > ACT_BLOCK_MS * 2) _actionWindows.delete(ip);
+  }, 5 * 60 * 1000);
+
+  const server = createServer((req, res) => {
+    if (req.method === "POST" && req.headers["next-action"]) {
+      const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+      if (isActionRateLimited(ip)) {
+        res.writeHead(429, { "Content-Type": "text/plain", "Retry-After": "30" });
+        res.end("Too Many Requests");
+        return;
+      }
+    }
+    handle(req, res);
+  });
   const io = new Server(server, { path: "/socket.io" });
   global.__io = io;
   const sub = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
