@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { io, type Socket } from "socket.io-client";
-import MsgpackParser from "socket.io-msgpack-parser";
 import { playSound, soundForNotification, setVol as setSndVol } from "@/lib/sounds";
 import { iconForNotification } from "@/lib/notif";
 
@@ -208,7 +207,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
     // Realtime: the notify pipeline emits "refresh" — reload notifs instantly
     // instead of waiting for the 30s poll.
     let sock: Socket | null = null;
-    try { sock = io({ path: "/socket.io", parser: MsgpackParser }); sock.on("refresh", () => loadNotifs()); } catch {}
+    try { sock = io({ path: "/socket.io" }); sock.on("refresh", () => loadNotifs()); } catch {}
 
     // Tab/browser close = logout (if not remembered)
     function onPageHide() {

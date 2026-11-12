@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
-import MsgpackParser from "socket.io-msgpack-parser";
 import KLineProChart from "@/components/ChartRouter";
 import { playSound, soundForNotification } from "@/lib/sounds";
 import PriceCell from "@/components/PriceCell";
@@ -357,7 +356,7 @@ export default function ClientTerminal() {
   useEffect(() => { fetch("/api/client/pin").then((r) => r.json()).then((d) => { if (d.ok && d.hasPin) { setPinHasPin(true); if (sessionStorage.getItem("cubex-pin-ok") !== "1") setPinLock(true); } }).catch(() => {}); }, []);
 
   useEffect(() => {
-    const socket: Socket = io({ path: "/socket.io", parser: MsgpackParser });
+    const socket: Socket = io({ path: "/socket.io" });
     const pP: Record<string, number> = {};
     const pD: Record<string, number> = {};
     const pS: Record<string, number> = {};

@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import MsgpackParser from "socket.io-msgpack-parser";
 import instruments from "@/config/instruments";
 
 function pnlOf(p: any, price: number) {
@@ -40,7 +39,7 @@ export default function TradeDesk() {
   useEffect(() => { loadOpen(); loadHistory(); loadReports(); }, []);
 
   useEffect(() => {
-    const socket: Socket = io({ path: "/socket.io", parser: MsgpackParser });
+    const socket: Socket = io({ path: "/socket.io" });
     socket.on("ticks", (batch: any[]) => { const upd: Record<string, number> = {}; for (const { symbol, price } of batch) upd[symbol] = price; setPrices((p) => ({ ...p, ...upd })); });
     socket.on("liquidation", () => { loadOpen(); loadReports(); });
     socket.on("refresh", () => { loadOpen(); loadHistory(); loadReports(); });

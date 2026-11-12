@@ -1818,7 +1818,6 @@ app.prepare().then(async () => {
   });
   const io = new Server(server, {
     path: "/socket.io",
-    parser: require("socket.io-msgpack-parser"),
     // Compress WebSocket frames — reduces the ~800 KB history burst on connect to ~100 KB.
     perMessageDeflate: { threshold: 1024 },
     // Generous ping timeout so mobile clients behind NAT don't get dropped.

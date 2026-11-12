@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useCallback } from "react";
 import { io, type Socket } from "socket.io-client";
-import MsgpackParser from "socket.io-msgpack-parser";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Bar = { time: number; open: number; high: number; low: number; close: number; volume: number };
@@ -326,7 +325,7 @@ export default function TVChart({
       ) {
         realtimeCbRef.current = onRealtimeCallback;
         if (socketRef.current) socketRef.current.disconnect();
-        const sock = io({ path: "/socket.io", parser: MsgpackParser });
+        const sock = io({ path: "/socket.io" });
         socketRef.current = sock;
         sock.emit("sub", [symbolInfo.name]);
         const sec = resSecond(resolution);

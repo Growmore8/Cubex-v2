@@ -1,7 +1,6 @@
 "use client";
 import { memo, useEffect, useRef, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
-import MsgpackParser from "socket.io-msgpack-parser";
 import PriceCell from "./PriceCell";
 import { gnum } from "@/lib/format";
 import { SymIcon } from "@/lib/symIcon";
@@ -64,7 +63,7 @@ function DeskMarketWatch({ symbols, selSym, onPick, disabledSyms, onCategoryEdit
   }, [symbols]);
 
   useEffect(() => {
-    const socket: Socket = io({ path: "/socket.io", parser: MsgpackParser });
+    const socket: Socket = io({ path: "/socket.io" });
     socket.emit("sub", symbols.map((s) => s.symbol));
     const pP: Record<string, number> = {}; const pD: Record<string, number> = {}; const pS: Record<string, number> = {}; const pSD: Record<string, number> = {}; const prev: Record<string, number> = {}; const prevSp: Record<string, number> = {};
     const flush = () => {

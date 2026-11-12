@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import MsgpackParser from "socket.io-msgpack-parser";
 import { useDialog } from "@/components/ui/ConfirmDialog";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { PresenceDot, DeviceIcon, isOnline, ago } from "@/components/ui/Presence";
@@ -39,7 +38,7 @@ export default function AdminClientsPage() {
   }
   useEffect(() => {
     load();
-    const socket = io({ path: "/socket.io", parser: MsgpackParser });
+    const socket = io({ path: "/socket.io" });
     socket.on("refresh", () => load());
     return () => { socket.disconnect(); };
   }, []);

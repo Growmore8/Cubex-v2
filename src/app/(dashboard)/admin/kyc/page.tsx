@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import MsgpackParser from "socket.io-msgpack-parser";
 import Link from "next/link";
 
 export default function AdminKycPage() {
@@ -21,7 +20,7 @@ export default function AdminKycPage() {
   }
   useEffect(() => {
     load();
-    const socket = io({ path: "/socket.io", parser: MsgpackParser });
+    const socket = io({ path: "/socket.io" });
     socket.on("refresh", () => load());
     return () => { socket.disconnect(); };
   }, []);

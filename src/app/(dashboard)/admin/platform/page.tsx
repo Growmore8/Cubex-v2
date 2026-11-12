@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { pnlFor } from "@/lib/trademath";
 import { io, Socket } from "socket.io-client";
-import MsgpackParser from "socket.io-msgpack-parser";
 import PriceCell from "@/components/PriceCell";
 import { playSound, soundForNotification, isMuted, setMuted } from "@/lib/sounds";
 import PaymentsPanel from "@/components/PaymentsPanel";
@@ -467,7 +466,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
   }, [openCharts, activeChart, tf, chartInd, chartCfg, layout, panels]);
 
   useEffect(() => {
-    const socket: Socket = io({ path: "/socket.io", parser: MsgpackParser });
+    const socket: Socket = io({ path: "/socket.io" });
     // Batch high-frequency ticks: accumulate in refs, flush to state once per
     // animation frame so 57 symbols can't trigger hundreds of re-renders/sec.
     const pP: Record<string, number> = {};
