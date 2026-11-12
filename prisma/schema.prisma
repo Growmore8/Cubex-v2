@@ -454,6 +454,7 @@ model PriceAlert {
   createdAt DateTime @default(now())
   @@index([accountId])
   @@index([tenantId])
+  @@index([triggered]) // checkPriceAlerts: WHERE triggered = false (every 5s)
 }
 model PaymentRequest {
   id           String        @id @default(uuid())
@@ -490,7 +491,7 @@ model Notification {
   batchId     String?
   read        Boolean  @default(false)
   createdAt   DateTime @default(now())
-  @@index([userId])
+  @@index([userId, createdAt(sort: Desc)]) // listNotifications: filter userId + ORDER BY createdAt DESC LIMIT 30
   @@index([batchId])
 }
 model PushSubscription {

@@ -1169,6 +1169,20 @@ async function purgeOldNotifications() {
     if (r.count) console.log("[notif-cleanup] deleted", r.count, "notifications older than 7 days");
   } catch (e) { console.error("[notif-cleanup]", e); }
 }
+// Apply retention policy: AuditLog keeps 30 days, FeedErrorLog keeps 3 days.
+// Without this, both tables grow indefinitely and slow ORDER BY createdAt queries.
+async function applyLogRetentionPolicy() {
+  try {
+    const keep30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const keep3  = new Date(Date.now() -  3 * 24 * 60 * 60 * 1000);
+    const [a, f] = await Promise.all([
+      prisma.auditLog.deleteMany({ where: { createdAt: { lt: keep30 } } }),
+      prisma.feedErrorLog.deleteMany({ where: { ts: { lt: keep3 } } }),
+    ]);
+    if (a.count) console.log("[retention] removed", a.count, "audit log rows > 30 days");
+    if (f.count) console.log("[retention] removed", f.count, "feed error rows > 3 days");
+  } catch (e) { console.error("[retention]", e); }
+}
 
 async function notifyStaffRaw(tenantId, opts, managerId) {
   try {
@@ -1674,7 +1688,9 @@ function startDemoCleanup() {
 
 app.prepare().then(async () => {
   try { await loadCatalog(); } catch (e) { console.error('[feed] catalog load failed:', e.message); }
-  try { await loadSpreads(); setInterval(loadSpreads, 60000); } catch (e) { console.error('[spreads] initial load failed:', e.message); }
+  // Redis "cubex:spreads" publish already triggers an immediate reload on any admin
+  // change, so the interval is just a safety-net fallback — 5 min is plenty.
+  try { await loadSpreads(); setInterval(loadSpreads, 5 * 60 * 1000); } catch (e) { console.error('[spreads] initial load failed:', e.message); }
   // Auto-seed new global symbols to all tenants on every startup (background, non-blocking)
   // Retries every 15s up to 6 times (90s window) to wait for Next.js to be fully ready.
   (async () => {
