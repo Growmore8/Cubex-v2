@@ -74,26 +74,24 @@ export default function SATenantsPage() {
 
   async function loginAs(t: any) {
     setErr("");
+    // Open the tab immediately (synchronous) so browsers don't block it as a popup.
+    const win = window.open("about:blank", "_blank");
     const r = await fetch("/api/superadmin/impersonate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tenantId: t.id }),
     });
     const d = await r.json();
-    if (!d.ok) { setErr(d.error || "Impersonate failed"); return; }
-    // Use the tenant's custom domain if set, otherwise build subdomain URL.
-    // Opens in a new tab — different domain = separate cookie jar, so the
-    // superadmin session on this tab is completely untouched.
+    if (!d.ok) { win?.close(); setErr(d.error || "Impersonate failed"); return; }
     let tenantOrigin: string;
     if (d.customDomain) {
       tenantOrigin = "https://" + d.customDomain;
     } else {
-      // Derive base domain from current hostname (e.g. trade.cubexenterprises.com → cubexenterprises.com)
       const parts = window.location.hostname.split(".");
       const baseDomain = parts.length > 2 ? parts.slice(1).join(".") : parts.join(".");
       tenantOrigin = window.location.protocol + "//" + d.subdomain + "." + baseDomain;
     }
-    window.open(tenantOrigin + "/api/auth/impersonate?token=" + d.token, "_blank");
+    if (win) win.location.href = tenantOrigin + "/api/auth/impersonate?token=" + d.token;
   }
 
   async function create() {
