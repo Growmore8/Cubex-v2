@@ -12,7 +12,6 @@ export function listClients(tenantId: string, managerId?: string | null) {
   return prisma.account.findMany({
     where: managerId ? { tenantId, managerId } : { tenantId },
     orderBy: { createdAt: "desc" },
-    take: 100,
     include: {
       user: { select: { email: true, status: true, lastLoginIp: true, lastLoginAt: true, lastSeenAt: true, lastDevice: true, promoCode: true } },
       manager: { select: { id: true, name: true } },
