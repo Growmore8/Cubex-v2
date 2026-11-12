@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useCallback } from "react";
 import { io, type Socket } from "socket.io-client";
+import MsgpackParser from "socket.io-msgpack-parser";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Bar = { time: number; open: number; high: number; low: number; close: number; volume: number };
@@ -325,8 +326,9 @@ export default function TVChart({
       ) {
         realtimeCbRef.current = onRealtimeCallback;
         if (socketRef.current) socketRef.current.disconnect();
-        const sock = io({ path: "/socket.io" });
+        const sock = io({ path: "/socket.io", parser: MsgpackParser });
         socketRef.current = sock;
+        sock.emit("sub", [symbolInfo.name]);
         const sec = resSecond(resolution);
         // Crypto can move 10%+ intraday; forex/metals use a tighter 3% filter.
         const isCrypto = /BTC|ETH|XRP|LTC|ADA|DOT|SOL|DOGE|MATIC|BNB/i.test(symbolInfo.name);

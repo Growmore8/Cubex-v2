@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
+import MsgpackParser from "socket.io-msgpack-parser";
 import { ADSS_DARK, ADSS_LIGHT, ADSS_FONT, BUY, SELL, BUYBTN, SELLBTN } from "@/config/theme";
 import { gnum, gmoney, gsign } from "@/lib/format";
 import { contractFor } from "@/config/contracts";
@@ -73,7 +74,7 @@ export default function ManagerDashboard() {
 
   // Socket for live prices + refresh events
   useEffect(() => {
-    const sock = io({ path: "/socket.io" });
+    const sock = io({ path: "/socket.io", parser: MsgpackParser });
     socketRef.current = sock;
     sock.on("prices", (data: any) => {
       startTransition(() => {

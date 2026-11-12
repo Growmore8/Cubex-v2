@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
+import MsgpackParser from "socket.io-msgpack-parser";
 
 export default function AdminPaymentsPage() {
   const [reqs, setReqs] = useState<any[]>([]);
@@ -30,7 +31,7 @@ export default function AdminPaymentsPage() {
   }
   useEffect(() => {
     load();
-    const socket = io({ path: "/socket.io" });
+    const socket = io({ path: "/socket.io", parser: MsgpackParser });
     socket.on("refresh", () => load());
     return () => { socket.disconnect(); };
   }, []);

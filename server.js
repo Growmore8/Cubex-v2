@@ -422,6 +422,7 @@ function applyPrice(sym, price, source) {
 const _tickBatch = {};
 let _batchFlushTimer = null;
 const _lastEmittedPrice = {}; // symbol → { bid, ask } — delta filter: skip unchanged prices
+const _socketSyms = new Map(); // socket.id → Set<symbol> for per-client tick filtering
 function _flushTicks() {
   _batchFlushTimer = null;
   if (!global.__io) return;
@@ -436,15 +437,25 @@ function _flushTicks() {
     return true;
   });
   if (!changed.length) return;
-  if (tenantSymMap.size === 0) {
-    // Fallback: spreads not loaded yet (startup), broadcast to all
+  if (_socketSyms.size === 0 && tenantSymMap.size === 0) {
     global.__io.emit('ticks', changed);
-  } else {
+  } else if (_socketSyms.size === 0) {
     for (const [tenantId, symSet] of tenantSymMap) {
       const tenantTicks = changed.filter(t => symSet.has(t.symbol));
-      if (tenantTicks.length > 0) {
-        global.__io.to('t:' + tenantId).emit('ticks', tenantTicks);
+      if (tenantTicks.length > 0) global.__io.to('t:' + tenantId).emit('ticks', tenantTicks);
+    }
+  } else {
+    // Per-socket: sockets with explicit sub get filtered; others fall back to tenant symbols
+    for (const [sid, sock] of global.__io.sockets.sockets) {
+      let symSet = _socketSyms.get(sid);
+      if (!symSet && sock.rooms) {
+        for (const [tId, tSyms] of tenantSymMap) {
+          if (sock.rooms.has('t:' + tId)) { symSet = tSyms; break; }
+        }
       }
+      if (!symSet) continue;
+      const st = changed.filter(t => symSet.has(t.symbol));
+      if (st.length) sock.emit('ticks', st);
     }
   }
 }
@@ -1807,6 +1818,7 @@ app.prepare().then(async () => {
   });
   const io = new Server(server, {
     path: "/socket.io",
+    parser: require("socket.io-msgpack-parser"),
     // Compress WebSocket frames — reduces the ~800 KB history burst on connect to ~100 KB.
     perMessageDeflate: { threshold: 1024 },
     // Generous ping timeout so mobile clients behind NAT don't get dropped.
@@ -1850,7 +1862,8 @@ app.prepare().then(async () => {
       if (Object.keys(tenantSpreads).length) socket.emit("sym-spreads", tenantSpreads);
       if (sess.role === "CLIENT" || sess.role === "MANAGER") {
         presenceConnect(socket, sess);
-        socket.on("disconnect", () => presenceDisconnect(socket));
+        socket.on("disconnect", () => { presenceDisconnect(socket); _socketSyms.delete(socket.id); });
+        socket.on("sub", (syms) => { if (Array.isArray(syms) && syms.length > 0) _socketSyms.set(socket.id, new Set(syms)); });
       }
       if (sess.role === "CLIENT") {
         // Join account room and send per-account spread overrides immediately

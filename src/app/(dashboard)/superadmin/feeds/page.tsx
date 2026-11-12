@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
+import MsgpackParser from "socket.io-msgpack-parser";
 import PasswordInput from "@/components/ui/PasswordInput";
 
 // ── Feed options per asset category ────────────────────────────────────────
@@ -99,7 +100,7 @@ export default function SAFeeds() {
       if (d.ok) setErrorLog(d.logs.map((l: any) => ({ ...l, ts: new Date(l.ts).getTime() })));
     }).catch(() => {});
 
-    const sock = io({ path: "/socket.io" });
+    const sock = io({ path: "/socket.io", parser: MsgpackParser });
     sock.on("feed-failover", (data: any) => {
       setPrimaryState(data.to);
       setFailoverLog((prev) => [{ from: data.from, to: data.to, ts: data.ts }, ...prev].slice(0, 50));

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, memo, type CSSProperties } from "react";
 import { createChart, ColorType, LineStyle, CandlestickSeries, LineSeries, HistogramSeries, createSeriesMarkers } from "lightweight-charts";
 import { io, Socket } from "socket.io-client";
+import MsgpackParser from "socket.io-msgpack-parser";
 import { RSI, SMA, EMA, BollingerBands, MACD, PSAR, Stochastic, ATR, ADX, bullishengulfingpattern, bearishengulfingpattern, morningstar, eveningstar, hammerpattern, shootingstar, doji } from "technicalindicators";
 
 // Indicators are computed with the `technicalindicators` library; each helper
@@ -687,7 +688,7 @@ function LWChart({
         // the live-update loop will then build bars forward from ticks.
         // No synthetic random-walk — never show fabricated price data.
         if (!ok) {
-          const sock: Socket = io({ path: "/socket.io" });
+          const sock: Socket = io({ path: "/socket.io", parser: MsgpackParser });
           let done = false;
           const finish = () => { if (!done) { done = true; try { sock.disconnect(); } catch {} } };
           sock.on("history", (h: any) => {
@@ -707,7 +708,8 @@ function LWChart({
   // the candle stays accurate) — the same cadence the Buy/Sell buttons use, so the
   // chart and the buttons move at the same speed.
   useEffect(() => {
-    const socket: Socket = io({ path: "/socket.io" });
+    const socket: Socket = io({ path: "/socket.io", parser: MsgpackParser });
+    socket.emit("sub", [symbol]);
     let pClose: number | null = null, pHi = -Infinity, pLo = Infinity;
     // On reconnect after a server outage: re-fetch recent bars to fill any gap that
     // built up while the socket was disconnected. Skip the very first connect.
