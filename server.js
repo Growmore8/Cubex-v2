@@ -1738,7 +1738,7 @@ app.prepare().then(async () => {
   // Thresholds: > 15 Next-Action POSTs per 10 s from the same IP → 429 for 30 s.
   // A normal user triggers a server action at most a few times per minute.
   const _actionWindows = new Map(); // ip → { count, windowStart, blockedUntil }
-  const ACT_WINDOW_MS = 10000, ACT_MAX = 15, ACT_BLOCK_MS = 30000;
+  const ACT_WINDOW_MS = 10000, ACT_MAX = 3, ACT_BLOCK_MS = 300000; // 3/10s → 5-min block
   function isActionRateLimited(ip) {
     const now = Date.now();
     let e = _actionWindows.get(ip);
@@ -1748,7 +1748,7 @@ app.prepare().then(async () => {
     e.count++;
     if (e.count > ACT_MAX) {
       e.blockedUntil = now + ACT_BLOCK_MS;
-      console.warn("[action-limiter] stale-action storm detected from", ip, "— blocking 30s");
+      console.warn("[action-limiter] stale-action storm detected from", ip, "— blocking 5min");
       return true;
     }
     return false;
