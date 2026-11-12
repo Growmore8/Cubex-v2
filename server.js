@@ -421,18 +421,27 @@ function applyPrice(sym, price, source) {
 // Cuts socket emit pressure from ~350/sec (per-symbol) to ~20/sec (batched).
 const _tickBatch = {};
 let _batchFlushTimer = null;
+const _lastEmittedPrice = {}; // symbol → { bid, ask } — delta filter: skip unchanged prices
 function _flushTicks() {
   _batchFlushTimer = null;
   if (!global.__io) return;
   const ticks = Object.values(_tickBatch);
   if (!ticks.length) return;
   for (const k in _tickBatch) delete _tickBatch[k];
+  // Delta filter: only emit ticks where price actually moved
+  const changed = ticks.filter(t => {
+    const prev = _lastEmittedPrice[t.symbol];
+    if (prev && prev.bid === t.bid && prev.ask === (t.real || t.bid)) return false;
+    _lastEmittedPrice[t.symbol] = { bid: t.bid, ask: t.real || t.bid };
+    return true;
+  });
+  if (!changed.length) return;
   if (tenantSymMap.size === 0) {
     // Fallback: spreads not loaded yet (startup), broadcast to all
-    global.__io.emit('ticks', ticks);
+    global.__io.emit('ticks', changed);
   } else {
     for (const [tenantId, symSet] of tenantSymMap) {
-      const tenantTicks = ticks.filter(t => symSet.has(t.symbol));
+      const tenantTicks = changed.filter(t => symSet.has(t.symbol));
       if (tenantTicks.length > 0) {
         global.__io.to('t:' + tenantId).emit('ticks', tenantTicks);
       }
