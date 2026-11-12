@@ -7,6 +7,7 @@ import { getAccountFxRate } from "@/lib/prices";
 import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
 import { getSaDefaultSpreadPips } from "@/lib/spread";
+import { getCachedGlobalSymbols, getCachedTenantById, getCachedTenantSpreads, getCachedSubscription } from "@/lib/catalog-cache";
 
 export async function GET(req: Request) {
   const { session: s, suspended } = await getClientSession();
@@ -20,7 +21,7 @@ export async function GET(req: Request) {
   // from the session but are independent of each other.
   const now = new Date();
   const [sub, activeCount] = await Promise.all([
-    prisma.subscription.findUnique({ where: { tenantId: s.tenantId! }, select: { status: true, endsAt: true } }),
+    getCachedSubscription(s.tenantId!),
     prisma.account.count({ where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } }),
   ]);
 
@@ -90,19 +91,15 @@ export async function GET(req: Request) {
   // to the client). Identical filtering to /api/symbols.
   let symbols: any[] = [];
   try {
-    symbols = await prisma.globalSymbol.findMany({
-      where: { enabled: true },
-      orderBy: { symbol: "asc" },
-      select: { symbol: true, display: true, category: true, digits: true, feed: true },
-    });
+    symbols = await getCachedGlobalSymbols();
     const hidden = await getDisabledSetFor(s);
     // Per-account overrides: a symbol the admin switched off for THIS specific account.
     const ovr = account ? await prisma.accountSymbolOverride.findMany({ where: { accountId: account.id, disabled: true }, select: { symbol: true } }) : [];
     for (const o of ovr) hidden.add(o.symbol);
     if (hidden.size) symbols = symbols.filter((x: any) => !hidden.has(x.symbol));
     // Filter NSE/BSE India stocks for tenants that don't have the indiaStocks feature
-    const tenant = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { features: true } });
-    const indiaEnabled = !!(tenant?.features as any)?.indiaStocks;
+    const tenantFull = await getCachedTenantById(s.tenantId!);
+    const indiaEnabled = !!(tenantFull?.features as any)?.indiaStocks;
     if (!indiaEnabled) symbols = symbols.filter((x: any) => !x.feed || !/^(NSE|BSE):/.test(x.feed));
   } catch { symbols = []; }
 
@@ -114,10 +111,7 @@ export async function GET(req: Request) {
   let groupSpread = 0;
   let accountSpreadMarkup = 0;
   try {
-    const tenantSyms = await prisma.symbol.findMany({
-      where: { tenantId: s.tenantId! },
-      select: { symbol: true, spread: true, spreadType: true, spreadMax: true, category: true },
-    });
+    const tenantSyms = await getCachedTenantSpreads(s.tenantId!);
     for (const ts of tenantSyms) {
       const type = ts.spreadType || "FLOATING";
       const rawMin = Number(ts.spread ?? 0);
@@ -150,8 +144,8 @@ export async function GET(req: Request) {
   // tenant branding for the app header (never "CubeX")
   let brand: { name: string; logoUrl: string | null; primaryColor: string | null; accentColor: string | null } = { name: "", logoUrl: null, primaryColor: null, accentColor: null };
   try {
-    const t = await prisma.tenant.findUnique({ where: { id: s.tenantId! }, select: { name: true, brandName: true, logoUrl: true, primaryColor: true, accentColor: true, swapEnabled: true } });
-    if (t) { brand = { name: t.brandName || t.name, logoUrl: t.logoUrl, primaryColor: (t as any).primaryColor || null, accentColor: (t as any).accentColor || null }; (brand as any).swapEnabled = !!(t as any).swapEnabled; }
+    const t = await getCachedTenantById(s.tenantId!);
+    if (t) { brand = { name: t.brandName || t.name, logoUrl: t.logoUrl, primaryColor: t.primaryColor || null, accentColor: t.accentColor || null }; (brand as any).swapEnabled = !!t.swapEnabled; }
   } catch {}
 
   // Auto-deduct expired bonus

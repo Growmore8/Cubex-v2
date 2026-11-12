@@ -9,15 +9,22 @@ import type { SessionPayload } from "@/types";
 const tKey = (tenantId: string) => `symdis:t:${tenantId}`;
 const mKey = (managerId: string) => `symdis:m:${managerId}`;
 
+const _settingCache = new Map<string, { data: string[]; exp: number }>();
+
 async function readList(key: string): Promise<string[]> {
   try {
+    const hit = _settingCache.get(key);
+    if (hit && Date.now() < hit.exp) return hit.data;
     const s = await prisma.setting.findUnique({ where: { key } });
     const v: any = s?.value;
-    return Array.isArray(v?.symbols) ? v.symbols : [];
+    const data = Array.isArray(v?.symbols) ? v.symbols : [];
+    _settingCache.set(key, { data, exp: Date.now() + 60_000 });
+    return data;
   } catch { return []; }
 }
 async function writeList(key: string, symbols: string[]) {
   await prisma.setting.upsert({ where: { key }, create: { key, value: { symbols } }, update: { value: { symbols } } });
+  _settingCache.delete(key);
 }
 
 export const getTenantDisabled = (tenantId: string) => readList(tKey(tenantId));
