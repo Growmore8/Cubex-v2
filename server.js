@@ -1851,7 +1851,9 @@ app.prepare().then(async () => {
   startDemoCleanup();
   startBillingCron();
   purgeOldNotifications();                                  // on boot
+  applyLogRetentionPolicy();                                // on boot
   setInterval(purgeOldNotifications, 6 * 60 * 60 * 1000);   // + every 6h
+  setInterval(applyLogRetentionPolicy, 6 * 60 * 60 * 1000); // + every 6h
   server.listen(port, () => console.log("> Ready on http://localhost:" + port));
 });
 
