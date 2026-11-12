@@ -963,12 +963,14 @@ function microTick() {
 }
 
 // Spread cache: symbol (with floating support), group, per-account markups, and per-client-per-symbol overrides.
-// symSpreads:    "tenantId:symbol"  → { min, max, type }
-// grpSpreads:    groupId            → pips
-// accMarkups:    accountId          → pips  (account-wide additive markup)
+// symSpreads:      "tenantId:symbol"  → { min, max, type }
+// symCommissions:  "tenantId:symbol"  → commissionPerLot  (avoids per-fill DB query in checkPending)
+// grpSpreads:      groupId            → pips
+// accMarkups:      accountId          → pips  (account-wide additive markup)
 // accSymOverrides: "accountId:symbol" → pips (absolute override — highest priority; 0 = zero spread)
-// realBids:      symbol             → latest real bid from exchange (Kraken/Binance)
+// realBids:        symbol             → latest real bid from exchange (Kraken/Binance)
 const symSpreads = {};
+const symCommissions = {};
 const grpSpreads = {};
 const accMarkups = {};
 const accSymOverrides = {};
@@ -987,7 +989,9 @@ async function loadSpreads() {
     ]);
     const tenantSpreadMap = {}; // tenantId → { symbol → {min,max,type} }
     for (const s of syms) {
-      symSpreads[s.tenantId + ":" + s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FLOATING" };
+      const k = s.tenantId + ":" + s.symbol;
+      symSpreads[k] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FLOATING" };
+      symCommissions[k] = Number(s.commissionPerLot || 0);
       if (!tenantSpreadMap[s.tenantId]) tenantSpreadMap[s.tenantId] = {};
       tenantSpreadMap[s.tenantId][s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FLOATING" };
     }
@@ -1474,9 +1478,8 @@ async function checkPending(io) {
       _filling.add(o.id);
       // BUY opens at ask, SELL opens at bid
       const openPx = o.side === "BUY" ? ask : bid;
-      // Commission on pending fill
-      const symForComm = await prisma.symbol.findFirst({ where: { tenantId: o.account.tenantId, symbol: o.symbol }, select: { commissionPerLot: true } }).catch(() => null);
-      const pendComm = Number(o.lots) * Number(symForComm?.commissionPerLot ?? 0);
+      // Commission on pending fill — read from in-memory cache (populated by loadSpreads) to avoid a DB round-trip per fill
+      const pendComm = Number(o.lots) * (symCommissions[o.account.tenantId + ":" + o.symbol] || 0);
       let filled = false;
       for (let _ta = 0; _ta < 3; _ta++) {
         const ticket = await nextTicket(o.account.tenantId);
@@ -1754,7 +1757,15 @@ app.prepare().then(async () => {
     }
     handle(req, res);
   });
-  const io = new Server(server, { path: "/socket.io" });
+  const io = new Server(server, {
+    path: "/socket.io",
+    // Compress WebSocket frames — reduces the ~800 KB history burst on connect to ~100 KB.
+    perMessageDeflate: { threshold: 1024 },
+    // Generous ping timeout so mobile clients behind NAT don't get dropped.
+    pingTimeout: 60000,
+    // Guard against oversized payloads (default is 1 MB; 2 MB is plenty).
+    maxHttpBufferSize: 2e6,
+  });
   global.__io = io;
   const sub = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
   sub.subscribe("cubex:refresh", "cubex:feeds", "cubex:catalog", "cubex:spreads").catch(() => {});

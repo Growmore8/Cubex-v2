@@ -25,6 +25,8 @@ RUN npm run build
 FROM base AS run
 ENV NODE_ENV=production
 ENV PORT=3000
+# Cap V8 heap so the container's mem_limit triggers GC before OOM kills the process.
+ENV NODE_OPTIONS=--max-old-space-size=900
 # the custom server needs the full app (it loads next() against .next)
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
@@ -42,4 +44,4 @@ EXPOSE 3000
 # (customDomain, supportEmail, slogan, …) in sync so the white-label features work.
 # --accept-data-loss is required for index/constraint swaps (e.g. relaxing a unique
 # key); without it db push aborts and the container crash-loops into a 502.
-CMD ["sh", "-c", "npx prisma db push --skip-generate --accept-data-loss && node server.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push --skip-generate --accept-data-loss && node server.js"]
