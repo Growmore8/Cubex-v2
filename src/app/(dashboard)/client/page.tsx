@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState, startTransition } from "react";
 import { io, Socket } from "socket.io-client";
-import KLineProChart from "@/components/ChartRouter";
+import dynamic from "next/dynamic";
+const KLineProChart = dynamic(() => import("@/components/ChartRouter"), { ssr: false });
 import { playSound, soundForNotification } from "@/lib/sounds";
 import PriceCell from "@/components/PriceCell";
 import toast from "react-hot-toast";

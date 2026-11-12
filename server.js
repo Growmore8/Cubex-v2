@@ -510,7 +510,7 @@ function commitPrice(sym, p) {
   const rawReal = (st.realAt && Date.now() - st.realAt < REAL_TTL && st.ask != null) ? st.ask : null;
   const real = (rawReal != null && rawReal > emitBid) ? rawReal : null;
   _tickBatch[sym] = { symbol: sym, price: p, bid: emitBid, real, candle };
-  if (!_batchFlushTimer && global.__io) _batchFlushTimer = setTimeout(_flushTicks, 50);
+  if (!_batchFlushTimer && global.__io) _batchFlushTimer = setTimeout(_flushTicks, 100);
   try { fastTpSl(sym); } catch (e) { console.error("[fastTpSl]", sym, e?.message || e); }
   recomputeDerived(sym);
 }
@@ -1841,9 +1841,9 @@ app.prepare().then(async () => {
     const h = {};
     if (sess && sess.tenantId) {
       const tenantPrefix = sess.tenantId + ":";
-      for (const s of symbols) { if (meta[s]?.enabled && symSpreads[tenantPrefix + s] !== undefined) h[s] = state[s].candles; }
+      for (const s of symbols) { if (meta[s]?.enabled && symSpreads[tenantPrefix + s] !== undefined) h[s] = state[s].candles.slice(-50); }
     } else {
-      for (const s of symbols) { if (meta[s]?.enabled) h[s] = state[s].candles; }
+      for (const s of symbols) { if (meta[s]?.enabled) h[s] = state[s].candles.slice(-50); }
     }
     socket.emit("history", h);
     // Snapshot of current prices so clients (incl. for FROZEN/closed markets) know the
