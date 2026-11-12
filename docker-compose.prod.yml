@@ -35,6 +35,10 @@ services:
     volumes:
       - cubex-uploads:/app/uploads
     networks: [web]
+    # Hard memory cap: prevents a runaway bug from OOM-killing the entire VPS.
+    # Node.js will GC harder before hitting the wall. Raise if the app legitimately
+    # needs more (monitor with `docker stats` — typical idle is 300-500 MB).
+    mem_limit: 1200m
     # No proxy labels needed — Caddy routes by the Caddyfile (reverse_proxy app:3000).
 
   postgres:

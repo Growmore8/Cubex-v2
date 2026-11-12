@@ -486,13 +486,15 @@ function connectFinnhub() {
 async function pollFinnhubQuotes() {
   if (!FINNHUB_KEY) return;
   const fed = symbols.filter((s) => meta[s] && meta[s].feed);
-  for (const s of fed) {
+  // Run all quote fetches in parallel — sequential await was blocking for
+  // (N symbols × ~300ms each), e.g. 50 symbols = ~15s per poll cycle.
+  await Promise.allSettled(fed.map(async (s) => {
     try {
       const r = await fetch("https://finnhub.io/api/v1/quote?symbol=" + encodeURIComponent(meta[s].feed) + "&token=" + FINNHUB_KEY);
       const d = await r.json();
       if (d && typeof d.c === "number" && d.c > 0) applyPrice(s, d.c, "FH-Q");
     } catch (e) { /* ignore per-symbol quote errors */ }
-  }
+  }));
 }
 
 // ── Binance WebSocket — free real bid/ask for crypto (no API key needed) ──
@@ -1280,7 +1282,11 @@ async function monitor(io) {
   if (_monitorRunning) return; // skip if previous run hasn't finished
   _monitorRunning = true;
   try {
-    const trades = await prisma.trade.findMany({ include: { account: true } });
+    // Use the in-memory cache kept fresh by loadOpenTrades (runs every 3s).
+    // Avoids a duplicate prisma.trade.findMany every 3s — that query was also
+    // running every 3s here AND every 3s in loadOpenTrades = 40 heavy DB
+    // round-trips per minute. fastTpSl handles sub-second TP/SL via the same cache.
+    const trades = _openTrades;
     const byAcc = {};
     for (const t of trades) (byAcc[t.accountId] || (byAcc[t.accountId] = { acc: t.account, list: [] })).list.push(t);
     // MC/margin section — isolated try/catch so any error here cannot block the TP/SL loop below
@@ -1757,9 +1763,9 @@ app.prepare().then(async () => {
   setInterval(pollPrices, 60000);
   setInterval(pollFinnhubQuotes, 30000); // Quote fallback so prices stay real if the WS is quiet
   loadOpenTrades(); // initial load for tick-level TP/SL cache
-  setInterval(loadOpenTrades, 5000); // refresh open trades every 5s (catch new trades/SL changes)
+  setInterval(loadOpenTrades, 3000); // refresh every 3s — monitor() uses this cache, so keep them in sync
   setInterval(microTick, 400);
-  setInterval(() => monitor(io), 3000); // 3s is sufficient; fastTpSl covers sub-second TP/SL
+  setInterval(() => monitor(io), 3000); // uses _openTrades cache (no extra DB query)
   setInterval(() => checkPending(io), 3000);
   setInterval(() => checkPriceAlerts(io), 5000); // price alert monitor every 5s
   startSwapCron(io);
