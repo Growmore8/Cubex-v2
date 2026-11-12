@@ -260,6 +260,7 @@ model FinancialHistory {
   createdAt    DateTime @default(now())
   @@index([accountId])
   @@index([tenantId])
+  @@index([tenantId, appliedAt(sort: Desc)])
 }
 model Symbol {
   id         String  @id @default(uuid())
@@ -355,6 +356,8 @@ model KycDocument {
   reviewedBy String?
   reviewedAt DateTime?
   createdAt  DateTime  @default(now())
+  @@index([accountId])
+  @@index([status])
 }
 model AuditLog {
   id          BigInt        @id @default(autoincrement())
@@ -421,6 +424,7 @@ model WithdrawalMethod {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   @@index([userId])
+  @@index([tenantId])
 }
 model PendingOrder {
   id        String    @id @default(uuid())
@@ -439,6 +443,7 @@ model PendingOrder {
   expiresAt DateTime?
   createdAt DateTime  @default(now())
   @@index([accountId])
+  @@index([tenantId])
 }
 
 model PriceAlert {
@@ -550,6 +555,7 @@ model FeedFailoverLog {
   toFeed    String
   reason    String?
   ts        DateTime @default(now())
+  @@index([ts])
 }
 
 model FeedErrorLog {
@@ -559,6 +565,7 @@ model FeedErrorLog {
   errorType String   // API_KEY | WS_CONNECT | WS_ERROR | WS_TIMEOUT
   message   String
   ts        DateTime @default(now())
+  @@index([ts])
 }
 
 model Signal {

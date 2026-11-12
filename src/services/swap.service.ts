@@ -98,11 +98,15 @@ export async function runSwapRollover(tenantIdFilter?: string): Promise<Rollover
         );
       }
 
-      for (const [accountId, delta] of accountDeltas) {
-        await prisma.account.update({
-          where: { id: accountId },
-          data: { pnl: { increment: new Prisma.Decimal(delta) } },
-        });
+      if (accountDeltas.size > 0) {
+        await prisma.$transaction(
+          [...accountDeltas.entries()].map(([accountId, delta]) =>
+            prisma.account.update({
+              where: { id: accountId },
+              data: { pnl: { increment: new Prisma.Decimal(delta) } },
+            })
+          )
+        );
       }
 
       if (tenantCount > 0) {

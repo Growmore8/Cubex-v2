@@ -361,6 +361,19 @@ const [selAcc, setSelAcc] = useState<any>(null);
   const catMap: Record<string, string> = Object.fromEntries(symbols.map((s) => [s.symbol, s.category || "forex"]));
   function csz(sym: string) { return contractFor(catMap[sym] || "forex", sym); }
 
+  async function loadTrades() {
+    const [o, h] = await Promise.all([
+      fetch("/api/desk/trades").then((r) => r.json()).catch(() => ({ ok: false })),
+      fetch("/api/desk/history").then((r) => r.json()).catch(() => ({ ok: false })),
+    ]);
+    if (o.ok) setOpen(o.trades);
+    if (h.ok) setHistory(h.history);
+    loadPending();
+  }
+  async function loadClients() {
+    const c = await fetch("/api/admin/clients").then((r) => r.json()).catch(() => ({ ok: false }));
+    if (c.ok) setClients(c.clients);
+  }
   async function loadAll() {
     const isMgr = roleRef.current === "MANAGER";
     const [c, sy, o, h, a, mg, gr] = await Promise.all([
@@ -418,7 +431,7 @@ const [selAcc, setSelAcc] = useState<any>(null);
       setNotifs(items); setNotifUnread(items.filter((n: any) => !n.read).length);
     } catch {}
   }
-  useEffect(() => { loadNotifs(); const t = setInterval(loadNotifs, 20000); return () => clearInterval(t); }, []);
+  useEffect(() => { loadNotifs(); }, []);
   async function openNotifs() { setNotifOpen((v) => !v); if (!notifOpen && notifUnread > 0) { try { await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch {} setNotifUnread(0); } }
   // Single toast at a time — a new one replaces the old (no stacking list).
   function toast(msg: string, kind: string) { const id = Date.now() + Math.random(); setToasts([{ id, msg, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500); }
@@ -489,8 +502,19 @@ const [selAcc, setSelAcc] = useState<any>(null);
     const flushIv = setInterval(flush, 150);
     // Single timer clears the up/down flash for all symbols (cheap vs per-symbol timers)
     const clr = setInterval(() => setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; }), 650);
-    socket.on("liquidation", () => { loadAll(); loadNotifs(); loadAccHistory(selAccRef.current?.id); });
-    socket.on("refresh", () => { loadAll(); loadNotifs(); loadAccHistory(selAccRef.current?.id); });
+    socket.on("liquidation", () => { loadTrades(); loadNotifs(); loadAccHistory(selAccRef.current?.id); });
+    socket.on("refresh", (p: any) => {
+      const kind = p?.kind;
+      if (kind === "notification") {
+        loadNotifs();
+      } else if (kind === "payment" || kind === "deposit" || kind === "withdrawal" || kind === "kyc") {
+        loadClients(); loadNotifs();
+      } else if (kind === "trade" || kind === "pending" || !kind) {
+        loadTrades(); loadNotifs(); loadAccHistory(selAccRef.current?.id);
+      } else {
+        loadTrades(); loadNotifs();
+      }
+    });
     return () => { socket.disconnect(); clearInterval(clr); clearInterval(flushIv); };
   }, []);
 

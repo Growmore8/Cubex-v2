@@ -28,6 +28,11 @@ let FINNHUB_KEY = process.env.FINNHUB_KEY || "";
 // the app is killed / network drops and the pagehide beacon never fires.
 const PRESENCE_GRACE_MS = 20000;
 const presence = new Map(); // userId -> { count, info, offTimer }
+const _presenceWriteTs = new Map(); // userId → last DB write timestamp (60s debounce)
+const _userAccCache = new Map(); // userId → accountId (cache socket room join)
+let _pendingCache = null; // last checkPending result (skip cycle when empty)
+let _pendingCacheTs = 0;
+let _redisPipeline = null; // batch Redis writes per microTick cycle
 function cookieVal(raw, name) {
   if (!raw) return null;
   for (const part of String(raw).split(";")) {
@@ -45,6 +50,9 @@ function sessionFromSocket(socket) {
   } catch (e) { return null; }
 }
 async function presenceMarkOnline(info) {
+  const now = Date.now();
+  if (now - (_presenceWriteTs.get(info.sub) || 0) < 60000) return; // skip — written < 60s ago
+  _presenceWriteTs.set(info.sub, now);
   await prisma.user.update({ where: { id: info.sub }, data: { lastSeenAt: new Date() } }).catch(() => {});
 }
 async function presenceMarkOffline(info) {
@@ -65,7 +73,7 @@ async function presenceMarkOffline(info) {
       }).catch(() => {});
       await notifyStaffRaw(info.tenantId, { title: "Client offline", body: `${info.name} (${acc && acc.login || ""}) closed the app`, type: "LOGIN" }, acc && acc.managerId);
     }
-    if (global.__io) global.__io.emit("refresh", {});
+    if (global.__io) global.__io.to("t:" + info.tenantId).emit("refresh", {});
   } catch (e) { console.error("[presenceMarkOffline]", e); }
 }
 function presenceConnect(socket, info) {
@@ -372,7 +380,8 @@ async function loadCatalog() {
     } else {
       td = toTD(x.symbol, x.category);
     }
-    meta[x.symbol] = { digits: x.digits || 5, contract: contractFor(x.category, x.symbol), feed: fh, td, cat: x.category, enabled: x.enabled !== false };
+    const _digs = x.digits || 5;
+    meta[x.symbol] = { digits: _digs, contract: contractFor(x.category, x.symbol), feed: fh, td, cat: x.category, enabled: x.enabled !== false, step: Math.pow(10, -_digs), pip: Math.pow(10, -(_digs - 1)) };
     state[x.symbol] = { price: null, bid: null, ask: null, candles: [], bucket: 0 };
     if (fh) feedToSym[fh] = x.symbol;
     tdToSym[td] = x.symbol;
@@ -403,7 +412,7 @@ function applyPrice(sym, price, source) {
   st.realAt = Date.now();
   // Disabled symbols: write price directly to Redis (for external API) but skip
   // the smooth display walk and socket.io emit — no market watch client needs ticks for them.
-  if (!meta[sym].enabled) { st.price = p; redis.set("price:" + sym, String(p)); return; }
+  if (!meta[sym].enabled) { st.price = p; if (!_redisPipeline) _redisPipeline = redis.pipeline(); _redisPipeline.set("price:" + sym, String(p)); return; }
   if (REAL_EXACT) commitPrice(sym, p);
   else if (st.price == null) commitPrice(sym, p);
 }
@@ -432,16 +441,17 @@ function commitPrice(sym, p) {
     st.candles.push(candle); if (st.candles.length > HISTORY) st.candles.shift(); st.bucket = b;
   } else { candle.high = Math.max(candle.high, p); candle.low = Math.min(candle.low, p); candle.close = p; }
   st.price = p;
-  redis.set("price:" + sym, String(p));
+  if (!_redisPipeline) _redisPipeline = redis.pipeline();
+  _redisPipeline.set("price:" + sym, String(p));
   if (st.bid != null) {
     if (st.realAt && Date.now() - st.realAt < REAL_TTL) {
       const bidTtl = Math.max(1, Math.ceil((REAL_TTL - (Date.now() - st.realAt)) / 1000));
-      redis.set("bid:" + sym, String(st.bid), "EX", bidTtl);
+      _redisPipeline.set("bid:" + sym, String(st.bid), "EX", bidTtl);
       realBids[sym] = st.bid;
     } else {
       // Feed stale: delete Redis key AND null out in-memory state so the monitor /
       // liquidate / pending-order loops also see no stale bid and use their fallback.
-      redis.del("bid:" + sym);
+      _redisPipeline.del("bid:" + sym);
       st.bid = null;
       delete realBids[sym];
     }
@@ -453,9 +463,9 @@ function commitPrice(sym, p) {
   if (st.ask != null && st.realAt) {
     const ageMs = Date.now() - st.realAt;
     if (ageMs < REAL_TTL) {
-      redis.set("ask:" + sym, String(st.ask), "EX", Math.max(1, Math.ceil((REAL_TTL - ageMs) / 1000)));
+      _redisPipeline.set("ask:" + sym, String(st.ask), "EX", Math.max(1, Math.ceil((REAL_TTL - ageMs) / 1000)));
     } else {
-      redis.del("ask:" + sym);
+      _redisPipeline.del("ask:" + sym);
       st.ask = null;
     }
   }
@@ -936,7 +946,7 @@ function microTick() {
     // never looks frozen (feed gap / illiquid period).
     if (REAL_EXACT && st.realAt && Date.now() - st.realAt < REAL_TTL) continue;
     const d = (meta[sym] && meta[sym].digits) || 2;
-    const step = Math.pow(10, -d);
+    const step = meta[sym]?.step ?? Math.pow(10, -d);
     const tgt = st.target != null ? st.target : st.price; // real (or computed) anchor
     const gapPts = Math.round((tgt - st.price) / step);
     const ag = Math.abs(gapPts);
@@ -963,6 +973,8 @@ function microTick() {
     np = r(np, d);
     if (np > 0 && np !== st.price) commitPrice(sym, np);
   }
+  // Flush all Redis writes for this tick in one pipeline round-trip
+  if (_redisPipeline) { _redisPipeline.exec().catch(() => {}); _redisPipeline = null; }
 }
 
 // Spread cache: symbol (with floating support), group, per-account markups, and per-client-per-symbol overrides.
@@ -1066,13 +1078,11 @@ function getSpreadPrice(tenantId, symbol, groupId, accountId) {
   if (accountId) {
     const ov = accSymOverrides[accountId + ":" + symbol];
     if (ov !== undefined) {
-      const digits = (meta[symbol] && meta[symbol].digits) || 5;
-      return ov * Math.pow(10, -(digits - 1));
+      return ov * (meta[symbol]?.pip ?? Math.pow(10, -((meta[symbol]?.digits || 5) - 1)));
     }
   }
   const pips = getSymSpreadPips(tenantId, symbol) + (grpSpreads[groupId] || 0) + (accMarkups[accountId] || 0);
-  const digits = (meta[symbol] && meta[symbol].digits) || 5;
-  return pips * Math.pow(10, -(digits - 1));
+  return pips * (meta[symbol]?.pip ?? Math.pow(10, -((meta[symbol]?.digits || 5) - 1)));
 }
 function getBid(tenantId, symbol, groupId, accountId, ask) {
   // Per-client-per-symbol override: always use fixed spread (ignores FLOATING type)
@@ -1086,8 +1096,7 @@ function getBid(tenantId, symbol, groupId, accountId, ask) {
       // ECN model: bid = real exchange bid − group/account markup pips
       const grpPips = grpSpreads[groupId] || 0;
       const accPips = accMarkups[accountId] || 0;
-      const digits = (meta[symbol] && meta[symbol].digits) || 5;
-      const pip = Math.pow(10, -(digits - 1));
+      const pip = meta[symbol]?.pip ?? Math.pow(10, -((meta[symbol]?.digits || 5) - 1));
       return Math.max(0, rb - (grpPips + accPips) * pip);
     }
     // No real bid yet (feed not connected) — use configured spread as fallback
@@ -1254,11 +1263,11 @@ async function closeTpSl(t, reason, price, io) {
       const body = `${t.symbol} ${t.type} closed @ ${price} | P/L ${pnlAcc >= 0 ? "+" : ""}${cs}${Math.abs(pnlAcc).toFixed(2)}`;
       await prisma.notification.create({ data: { tenantId: t.account.tenantId, userId: t.account.userId, title, body, type: "TRADE" } }).catch(() => {});
       pushToUser(t.account.userId, { title, body }); // push even if app is closed
-      await notifyStaffRaw(t.account.tenantId, { title: (reason === "TP" ? "TP hit" : "SL hit") + " — " + (t.account.login || ""), body, type: "TRADE" }, t.account.managerId);
+      notifyStaffRaw(t.account.tenantId, { title: (reason === "TP" ? "TP hit" : "SL hit") + " — " + (t.account.login || ""), body, type: "TRADE" }, t.account.managerId).catch(() => {});
       await prisma.auditLog.create({ data: { tenantId: t.account.tenantId, action: "trade." + (reason === "TP" ? "tp" : "sl"), detail: (t.account.login || "") + " " + body, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
     }
-    io.emit("refresh", {});
-    io.emit("refresh", { kind: "notification" }); // make client + staff reload notifs (sound + toast)
+    io.to("t:" + t.account.tenantId).emit("refresh", {});
+    io.to("t:" + t.account.tenantId).emit("refresh", { kind: "notification" }); // make client + staff reload notifs (sound + toast)
     console.log("[" + reason + "]", t.symbol, t.type, Number(t.lots) + "L @ " + price, "P/L (USD)", pnl.toFixed(2));
   } catch (e) { console.error("[tp/sl close]", e); } finally { closing.delete(t.id.toString()); }
 }
@@ -1290,11 +1299,11 @@ async function liquidate(acc, list, io) {
     await prisma.$transaction(txWrites);
     const body = acc.login + " margin call — " + list.length + " trade(s) closed, P/L " + liqCs + Math.abs(total).toFixed(2);
     if (acc.userId) { await prisma.notification.create({ data: { tenantId: acc.tenantId, userId: acc.userId, title: "Stop out", body: "Positions liquidated at margin call", type: "TRADE" } }).catch(() => {}); pushToUser(acc.userId, { title: "Stop out", body: "Positions liquidated at margin call" }); }
-    await notifyStaffRaw(acc.tenantId, { title: "⚠ Margin call — " + acc.login, body, type: "TRADE" }, acc.managerId);
+    notifyStaffRaw(acc.tenantId, { title: "⚠ Margin call — " + acc.login, body, type: "TRADE" }, acc.managerId).catch(() => {});
     await prisma.auditLog.create({ data: { tenantId: acc.tenantId, action: "account.liquidated", detail: body, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
-    io.emit("liquidation", { accountId: acc.id, login: acc.login });
-    io.emit("refresh", {});
-    io.emit("refresh", { kind: "notification" }); // client + staff reload notifs (sound + toast)
+    io.to("t:" + acc.tenantId).emit("liquidation", { accountId: acc.id, login: acc.login });
+    io.to("t:" + acc.tenantId).emit("refresh", {});
+    io.to("t:" + acc.tenantId).emit("refresh", { kind: "notification" }); // client + staff reload notifs (sound + toast)
     console.log("[MC] liquidated", acc.login, list.length, "trades, total P/L:", total.toFixed(2));
   } catch (e) { console.error("[liquidate]", e); } finally { liquidating.delete(acc.id); }
 }
@@ -1359,8 +1368,8 @@ async function monitor(io) {
           if (!riskCooldown.has(kMargin) || now - riskCooldown.get(kMargin) > RISK_COOL_MS) {
             riskCooldown.set(kMargin, now);
             const body = acc.login + " margin level at " + mlvl.toFixed(0) + "% (S/O at " + mc + "%) — equity " + monCs + equityAcc.toFixed(2) + ", used margin " + monCs + usedAcc.toFixed(2);
-            await notifyStaffRaw(acc.tenantId, { title: "⚠ Low Margin — " + acc.login, body, type: "RISK" }, acc.managerId);
-            io.emit("refresh", { kind: "notification" });
+            notifyStaffRaw(acc.tenantId, { title: "⚠ Low Margin — " + acc.login, body, type: "RISK" }, acc.managerId).catch(() => {});
+            io.to("t:" + acc.tenantId).emit("refresh", { kind: "notification" });
           }
         } else {
           riskCooldown.delete(kMargin); // condition cleared — reset so next breach re-alerts immediately
@@ -1373,8 +1382,8 @@ async function monitor(io) {
             riskCooldown.set(kFloat, now);
             const pct = ((-floatingAcc / balance) * 100).toFixed(1);
             const body = acc.login + " floating loss " + pct + "% of balance — " + monCs + (-floatingAcc).toFixed(2) + " unrealised loss on " + monCs + balance.toFixed(2) + " balance";
-            await notifyStaffRaw(acc.tenantId, { title: "⚠ High Floating Loss — " + acc.login, body, type: "RISK" }, acc.managerId);
-            io.emit("refresh", { kind: "notification" });
+            notifyStaffRaw(acc.tenantId, { title: "⚠ High Floating Loss — " + acc.login, body, type: "RISK" }, acc.managerId).catch(() => {});
+            io.to("t:" + acc.tenantId).emit("refresh", { kind: "notification" });
           }
         } else {
           riskCooldown.delete(kFloat);
@@ -1438,7 +1447,10 @@ async function checkPending(io) {
   if (_pendingRunning) return;
   _pendingRunning = true;
   try {
+    // Skip cycle if previous scan returned 0 orders and < 10s have passed — avoids full DB scan when nothing pending
+    if (_pendingCache && _pendingCache.length === 0 && Date.now() - _pendingCacheTs < 10000) { _pendingRunning = false; return; }
     const pend = await prisma.pendingOrder.findMany({ include: { account: true } });
+    _pendingCache = pend; _pendingCacheTs = Date.now();
     const now = new Date();
     for (const o of pend) {
       // Per-order try/catch: one order failing (e.g. P2025 race on delete) must not
@@ -1450,7 +1462,7 @@ async function checkPending(io) {
         const expBody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + Number(o.price) + " expired (GTD)";
         if (o.account?.userId) { await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order expired", body: expBody, type: "TRADE" } }).catch(() => {}); pushToUser(o.account.userId, { title: "Pending order expired", body: expBody }); }
         await prisma.auditLog.create({ data: { tenantId: o.account.tenantId, action: "order.expired", detail: (o.account.login || "") + " " + expBody, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
-        if (global.__io) global.__io.emit("refresh", {});
+        if (global.__io) global.__io.to("t:" + o.account.tenantId).emit("refresh", {});
         continue;
       }
       const st = state[o.symbol];
@@ -1495,10 +1507,10 @@ async function checkPending(io) {
       _filling.delete(o.id);
       const pbody = o.symbol + " " + o.side + " " + Number(o.lots) + " @ " + openPx;
       if (o.account && o.account.userId) { await prisma.notification.create({ data: { tenantId: o.account.tenantId, userId: o.account.userId, title: "Pending order filled", body: pbody, type: "TRADE" } }).catch(() => {}); pushToUser(o.account.userId, { title: "Pending order filled", body: pbody }); }
-      await notifyStaffRaw(o.account.tenantId, { title: "Pending filled — " + (o.account.login || ""), body: pbody, type: "TRADE" }, o.account.managerId);
+      notifyStaffRaw(o.account.tenantId, { title: "Pending filled — " + (o.account.login || ""), body: pbody, type: "TRADE" }, o.account.managerId).catch(() => {});
       await prisma.auditLog.create({ data: { tenantId: o.account.tenantId, action: "order.filled", detail: (o.account.login || "") + " " + pbody, performedBy: "SYSTEM", category: "CLIENT" } }).catch(() => {});
-      io.emit("refresh", {});
-      io.emit("refresh", { kind: "notification" }); // client + staff reload notifs (sound + toast)
+      io.to("t:" + o.account.tenantId).emit("refresh", {});
+      io.to("t:" + o.account.tenantId).emit("refresh", { kind: "notification" }); // client + staff reload notifs (sound + toast)
       } catch (e) { _filling.delete(o.id); console.error("[checkPending order]", o.id, e?.message || e); }
     }
   } catch (e) { console.error("[checkPending]", e); } finally { _pendingRunning = false; }
@@ -1590,7 +1602,7 @@ async function checkPriceAlerts(io) {
           body: JSON.stringify({ tenantId: al.tenantId, userId: al.account.userId, holderName: al.account.name || "Trader", symbol: al.symbol, condition: al.condition, price: Number(al.price), note: al.note }),
         }).catch(() => {});
       }
-      if (io) io.emit("refresh", { kind: "notification" });
+      if (io) io.to("t:" + al.tenantId).emit("refresh", { kind: "notification" });
     }
   } catch (e) { console.error("[alerts]", e); } finally { _alertsRunning = false; }
 }
@@ -1738,7 +1750,7 @@ app.prepare().then(async () => {
   // Thresholds: > 15 Next-Action POSTs per 10 s from the same IP → 429 for 30 s.
   // A normal user triggers a server action at most a few times per minute.
   const _actionWindows = new Map(); // ip → { count, windowStart, blockedUntil }
-  const ACT_WINDOW_MS = 10000, ACT_MAX = 3, ACT_BLOCK_MS = 300000; // 3/10s → 5-min block
+  const ACT_WINDOW_MS = 10000, ACT_MAX = 3, ACT_BLOCK_MS = 3600000; // 3/10s → 1-hour block
   function isActionRateLimited(ip) {
     const now = Date.now();
     let e = _actionWindows.get(ip);
@@ -1789,14 +1801,22 @@ app.prepare().then(async () => {
     else if (ch === "cubex:spreads") { loadSpreads().catch(() => {}); }
   });
   io.on("connection", (socket) => {
-    // Only send enabled symbols — disabled stocks have no market-watch clients
-    const h = {}; for (const s of symbols) { if (meta[s]?.enabled) h[s] = state[s].candles; } socket.emit("history", h);
+    // Derive session first so history can be filtered to this tenant's symbols only
+    const sess = sessionFromSocket(socket);
+    // Only send enabled symbols — filter to tenant if known, else all enabled
+    const h = {};
+    if (sess && sess.tenantId) {
+      const tenantPrefix = sess.tenantId + ":";
+      for (const s of symbols) { if (meta[s]?.enabled && symSpreads[tenantPrefix + s] !== undefined) h[s] = state[s].candles; }
+    } else {
+      for (const s of symbols) { if (meta[s]?.enabled) h[s] = state[s].candles; }
+    }
+    socket.emit("history", h);
     // Snapshot of current prices so clients (incl. for FROZEN/closed markets) know the
     // latest price immediately — open positions then show their real last P&L, not 0.
     const px = {}; for (const s of symbols) { const st = state[s]; if (st && st.price != null) px[s] = st.price; }
     socket.emit("prices", px);
     // Presence tracking + tenant room — CLIENT and MANAGER sessions count toward online/offline
-    const sess = sessionFromSocket(socket);
     if (sess && sess.tenantId) {
       socket.join("t:" + sess.tenantId); // tenant room for spread + refresh broadcasts
       // Send current spread data immediately on connect so client has fresh spreads
@@ -1811,19 +1831,28 @@ app.prepare().then(async () => {
       }
       if (sess.role === "CLIENT") {
         // Join account room and send per-account spread overrides immediately
-        prisma.account.findFirst({
-          where: { tenantId: sess.tenantId, userId: sess.sub },
-          select: { id: true },
-        }).then((acc) => {
-          if (!acc) return;
-          socket.data.accountId = acc.id;
-          socket.join("a:" + acc.id);
+        const joinAccountRoom = (accId) => {
+          socket.data.accountId = accId;
+          socket.join("a:" + accId);
           const ov = {};
           for (const key of Object.keys(accSymOverrides)) {
-            if (key.startsWith(acc.id + ":")) ov[key.slice(acc.id.length + 1)] = accSymOverrides[key];
+            if (key.startsWith(accId + ":")) ov[key.slice(accId.length + 1)] = accSymOverrides[key];
           }
           if (Object.keys(ov).length) socket.emit("acc-spreads", ov);
-        }).catch(() => {});
+        };
+        const cachedAccId = _userAccCache.get(sess.sub);
+        if (cachedAccId) {
+          joinAccountRoom(cachedAccId);
+        } else {
+          prisma.account.findFirst({
+            where: { tenantId: sess.tenantId, userId: sess.sub },
+            select: { id: true },
+          }).then((acc) => {
+            if (!acc) return;
+            _userAccCache.set(sess.sub, acc.id);
+            joinAccountRoom(acc.id);
+          }).catch(() => {});
+        }
       }
     }
   });
@@ -1843,10 +1872,10 @@ app.prepare().then(async () => {
   setInterval(pollPrices, 60000);
   setInterval(pollFinnhubQuotes, 30000); // Quote fallback so prices stay real if the WS is quiet
   loadOpenTrades(); // initial load for tick-level TP/SL cache
-  setInterval(loadOpenTrades, 3000); // refresh every 3s — monitor() uses this cache, so keep them in sync
+  setInterval(loadOpenTrades, 15000); // refresh every 15s — fastTpSl handles sub-second precision; MC check tolerates 15s staleness
   setInterval(microTick, 600);
   setInterval(() => monitor(io), 3000); // uses _openTrades cache (no extra DB query)
-  setInterval(() => checkPending(io), 3000);
+  setInterval(() => checkPending(io), 10000);
   setInterval(() => checkPriceAlerts(io), 5000); // price alert monitor every 5s
   startSwapCron(io);
   startStatementCron();

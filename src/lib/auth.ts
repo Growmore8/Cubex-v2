@@ -15,6 +15,15 @@ export function verifyPassword(pw: string, hash: string) {
 // In-memory throttle so we update lastSeenAt at most once/45s per user (single Node
 // server process), regardless of request volume — cheap presence heartbeat.
 const lastBeat = new Map<string, number>();
+
+// Cache staff activeSession DB check for 12s — avoids a DB hit on every request.
+const _sessCache = new Map<string, { ok: boolean; exp: number }>();
+
+export function invalidateSessionCache(userId: string) {
+  for (const key of _sessCache.keys()) {
+    if (key.startsWith(userId + ":")) _sessCache.delete(key);
+  }
+}
 function beat(userId: string) {
   const now = Date.now();
   if (now - (lastBeat.get(userId) || 0) < 45000) return;
@@ -38,8 +47,17 @@ export async function getSession(): Promise<SessionPayload | null> {
   const isStaff = session.role === "ADMIN" || session.role === "MANAGER" || session.role === "SUPERADMIN";
   if (isStaff && session.sid) {
     try {
-      const u = await prisma.user.findUnique({ where: { id: session.sub }, select: { activeSession: true } });
-      if (!u || (u.activeSession && u.activeSession !== session.sid)) return null;
+      const _cacheKey = session.sub + ":" + session.sid;
+      const _cached = _sessCache.get(_cacheKey);
+      let _sessOk: boolean;
+      if (_cached && _cached.exp > Date.now()) {
+        _sessOk = _cached.ok;
+      } else {
+        const u = await prisma.user.findUnique({ where: { id: session.sub }, select: { activeSession: true } });
+        _sessOk = !u || !u.activeSession || u.activeSession === session.sid;
+        _sessCache.set(_cacheKey, { ok: _sessOk, exp: Date.now() + 12000 }); // 12s TTL
+      }
+      if (!_sessOk) return null;
     } catch {}
   }
   beat(session.sub); // presence heartbeat (throttled, fire-and-forget)

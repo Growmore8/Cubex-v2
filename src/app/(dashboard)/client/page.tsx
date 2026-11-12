@@ -140,6 +140,7 @@ export default function ClientTerminal() {
   const [rightTab, setRightTab] = useState<"TRADE"|"SIGNALS"|"NEWS"|"CALENDAR"|"ANALYTICS"|"DOM">("TRADE");
   const [signals, setSignals] = useState<any[]>([]);
   const [signalsLoaded, setSignalsLoaded] = useState(false);
+  const signalsLoadedRef = useRef(false); // ref-safe version for use inside closures
   const [calendar, setCalendar] = useState<any[]>([]);
   const [calendarLoaded, setCalendarLoaded] = useState(false);
   const [calImpact, setCalImpact] = useState<"all" | "high" | "medium" | "low">("all");
@@ -210,12 +211,13 @@ export default function ClientTerminal() {
   useEffect(() => { if (rightTab === "NEWS" && !newsLoaded) { fetch("/api/client/news?category=forex").then((r) => r.json()).then((dd) => { if (dd.ok) { setNews(dd.items || []); setNewsLoaded(true); } }).catch(() => { setNewsLoaded(true); }); } }, [rightTab, newsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (rightTab === "CALENDAR" && !calendarLoaded) { fetch("/api/client/calendar").then((r) => r.json()).then((dd) => { if (dd.ok) { setCalendar(dd.events || []); setCalendarLoaded(true); } }).catch(() => {}); } }, [rightTab, calendarLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   // Tick every second while calendar is open so countdown timers refresh live.
+  // TODO: extract calendar section into a child component so only it re-renders, not all of ClientTerminal.
   useEffect(() => {
     if (rightTab !== "CALENDAR") return;
     const t = setInterval(() => setCalTick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, [rightTab]);
-  useEffect(() => { if (rightTab === "SIGNALS" && !signalsLoaded) { fetch("/api/client/signals").then((r) => r.json()).then((dd) => { if (dd.ok) { setSignals(dd.signals || []); setSignalsLoaded(true); } }).catch(() => { setSignalsLoaded(true); }); } }, [rightTab, signalsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (rightTab === "SIGNALS" && !signalsLoaded) { fetch("/api/client/signals").then((r) => r.json()).then((dd) => { if (dd.ok) { setSignals(dd.signals || []); setSignalsLoaded(true); signalsLoadedRef.current = true; } }).catch(() => { setSignalsLoaded(true); signalsLoadedRef.current = true; }); } }, [rightTab, signalsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -296,6 +298,8 @@ export default function ClientTerminal() {
   useEffect(() => { if (!selSym) return; try { localStorage.setItem("cubex-client-setup", JSON.stringify({ selSym, tf, chartInd, chartCfg })); } catch {} }, [selSym, tf, chartInd, chartCfg]);
   const prevRef = useRef<Record<string, number>>({});
   const timersRef = useRef<Record<string, any>>({});
+  const alertCheckRef = useRef(0);  // throttle: check alerts max 1×/sec
+  const pendingCheckRef = useRef(0); // throttle: check pending max 1×/sec
 
   async function load() {
     const id = accIdRef.current;
@@ -318,7 +322,10 @@ export default function ClientTerminal() {
   // the bell updates live without reloading the whole account).
   function loadNotifs() {
     fetch("/api/client/notifications").then((r) => r.json()).then((nd) => { if (!nd.ok) return; const items = nd.items || []; if (notifPrimed.current) { for (const n of items) { const id = String(n.id); if (!notifSeen.current.has(id)) { playSound(soundForNotification(n)); pushToast(n); } } } items.forEach((n: any) => notifSeen.current.add(String(n.id))); notifPrimed.current = true; setNotis(items); }).catch(() => {});
-    fetch("/api/client/signals").then((r) => r.json()).then((d) => { if (d.ok) { setSignals(d.signals || []); setSignalsLoaded(true); } }).catch(() => {});
+    // Only fetch signals if not already loaded — signals are static and updated via tab-switch lazy load
+    if (!signalsLoadedRef.current) {
+      fetch("/api/client/signals").then((r) => r.json()).then((d) => { if (d.ok) { setSignals(d.signals || []); setSignalsLoaded(true); signalsLoadedRef.current = true; } }).catch(() => {});
+    }
   }
   async function markAllNotifsRead() {
     await fetch("/api/client/notifications", { method: "POST" }).catch(() => {});
@@ -411,7 +418,16 @@ export default function ClientTerminal() {
       setDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; });
       setSpreadDirs((dd) => { let any = false; for (const k in dd) if (dd[k] !== 0) { any = true; break; } return any ? {} : dd; });
     }, 650);
-    socket.on("refresh", (p: any) => { if (p && p.kind === "notification") loadNotifs(); else load(); });
+    socket.on("refresh", (p: any) => {
+      const kind = p?.kind;
+      if (kind === "notification") {
+        loadNotifs();
+      } else if (kind === "sym-spread" || kind === "symbol") {
+        // Symbol config change — no account reload needed; sym-spreads socket event handles this
+      } else {
+        load();
+      }
+    });
     // Real-time spread updates: admin changes spread → server pushes to tenant room → update instantly
     socket.on("sym-spreads", (spreads: Record<string, { min: number; max: number; type: string }>) => {
       startTransition(() => setSymbolSpreads((prev) => ({ ...prev, ...spreads })));
@@ -662,8 +678,10 @@ export default function ClientTerminal() {
     }
   }
 
-  // Price alert trigger — checked on every price update
+  // Price alert trigger — checked on every price update (throttled to 1×/sec)
   useEffect(() => {
+    if (Date.now() - alertCheckRef.current < 1000) return;
+    alertCheckRef.current = Date.now();
     const al = alertsRef.current;
     if (!al.length) return;
     const hit = al.filter((a) => {
@@ -679,8 +697,10 @@ export default function ClientTerminal() {
     setAlerts((prev) => prev.filter((x) => !hit.find((h) => h.id === x.id)));
   }, [prices]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pending order trigger + expiry — checked on every price update
+  // Pending order trigger + expiry — checked on every price update (throttled to 1×/sec)
   useEffect(() => {
+    if (Date.now() - pendingCheckRef.current < 1000) return;
+    pendingCheckRef.current = Date.now();
     const orders = pendingRef.current;
     if (!orders.length) return;
     // Expire orders whose GTC deadline has passed

@@ -16,17 +16,20 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const reqAccId = url.searchParams.get("accountId");
 
+  // Run subscription check and active-account count in parallel — both need tenantId/userId
+  // from the session but are independent of each other.
+  const now = new Date();
+  const [sub, activeCount] = await Promise.all([
+    prisma.subscription.findUnique({ where: { tenantId: s.tenantId! }, select: { status: true, endsAt: true } }),
+    prisma.account.count({ where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } }),
+  ]);
+
   // Kick out if the tenant trial has ended (subscription expired).
-  const sub = await prisma.subscription.findUnique({ where: { tenantId: s.tenantId! }, select: { status: true, endsAt: true } });
   if (sub?.status === "TRIALING" && sub.endsAt && new Date(sub.endsAt) < new Date()) {
     return NextResponse.json({ ok: false, code: "DEACTIVATED", error: "Your demo period has ended. Please contact support to continue." }, { status: 403 });
   }
 
-  // Instant-logout on deactivation or expiry: count accounts that are active AND not past expiresAt.
-  const now = new Date();
-  const activeCount = await prisma.account.count({
-    where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-  });
+  // Instant-logout on deactivation or expiry.
   if (activeCount === 0) {
     // No valid accounts left (deactivated, expired, or cron-deleted) → force logout.
     return NextResponse.json({ ok: false, code: "DEACTIVATED", error: "Your account has expired or been deactivated. Please contact support." }, { status: 403 });
@@ -38,7 +41,7 @@ export async function GET(req: Request) {
     where: reqAccId ? { tenantId: s.tenantId!, userId: s.sub, id: reqAccId, deactivated: false, ...notExpired } : { tenantId: s.tenantId!, userId: s.sub, deactivated: false, ...notExpired },
     orderBy: { createdAt: "asc" },
     include: {
-      trades: { orderBy: { openedAt: "desc" } },
+      trades: { orderBy: { openedAt: "desc" }, take: 200 },
       history: { orderBy: { closedAt: "desc" }, take: 50 },
       financials: { orderBy: { appliedAt: "desc" }, take: 50 },
       user: { select: { name: true, email: true } },
@@ -49,7 +52,7 @@ export async function GET(req: Request) {
       where: { tenantId: s.tenantId!, userId: s.sub, deactivated: false, ...notExpired },
       orderBy: { createdAt: "asc" },
       include: {
-        trades: { orderBy: { openedAt: "desc" } },
+        trades: { orderBy: { openedAt: "desc" }, take: 200 },
         history: { orderBy: { closedAt: "desc" }, take: 50 },
         financials: { orderBy: { appliedAt: "desc" }, take: 50 },
         user: { select: { name: true, email: true } },

@@ -10,13 +10,22 @@ export interface NewsItem {
   image?: string;
 }
 
+let _finnhubKeyCache: string | null = null;
+let _finnhubKeyCacheTs = 0;
+
 async function getFinnhubKey(): Promise<string> {
+  if (_finnhubKeyCache !== null && Date.now() - _finnhubKeyCacheTs < 600000) {
+    return _finnhubKeyCache;
+  }
+  let key = process.env.FINNHUB_KEY || "";
   try {
     const rec = await prisma.setting.findUnique({ where: { key: "feeds" } });
     const v: any = (rec && rec.value) || {};
-    if (typeof v.finnhubKey === "string" && v.finnhubKey.trim()) return v.finnhubKey.trim();
+    if (typeof v.finnhubKey === "string" && v.finnhubKey.trim()) key = v.finnhubKey.trim();
   } catch {}
-  return process.env.FINNHUB_KEY || "";
+  _finnhubKeyCache = key;
+  _finnhubKeyCacheTs = Date.now();
+  return key;
 }
 
 export async function fetchForexNews(category = "forex"): Promise<NewsItem[]> {

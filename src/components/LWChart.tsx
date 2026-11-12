@@ -779,13 +779,13 @@ function LWChart({
         if (cur) onCandleUpdateRef.current?.(cur);
       } catch { /* out-of-order tick during a reseed — ignore */ }
     };
-    // 50 ms on desktop (20 Hz smooth), 100 ms on mobile (saves battery/heat),
-    // paused entirely when the tab is hidden (screen off / app backgrounded).
+    // 300 ms on desktop, 500 ms on mobile — price feed delivers every 600ms so
+    // faster intervals just burn CPU on redundant no-op renders.
     const isMobile = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
-    let iv = setInterval(apply, isMobile ? 100 : 50);
+    let iv = setInterval(apply, isMobile ? 500 : 300);
     const onVis = () => {
       clearInterval(iv);
-      if (!document.hidden) iv = setInterval(apply, isMobile ? 100 : 50);
+      if (!document.hidden) iv = setInterval(apply, isMobile ? 500 : 300);
     };
     document.addEventListener("visibilitychange", onVis);
     return () => { socket.disconnect(); clearInterval(iv); document.removeEventListener("visibilitychange", onVis); };

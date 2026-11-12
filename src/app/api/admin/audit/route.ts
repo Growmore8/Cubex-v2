@@ -4,10 +4,16 @@ import { listAudit } from "@/lib/audit";
 import { assertCan } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
 
+const _auditCache = new Map<string, { data: any; exp: number }>();
+
 export async function GET() {
   const s = await requireAdminOrManager();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   await assertCan(s, "viewAudit");
+
+  const cached = _auditCache.get(s.tenantId!);
+  if (cached && cached.exp > Date.now()) return NextResponse.json(cached.data);
+
   const logs = await listAudit(s.tenantId!);
 
   // Parse logins from detail — matches "(900038)" format (auth/disconnect) or "900038 ..." at start
@@ -37,5 +43,7 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ ok: true, logs: enriched });
+  const result = { ok: true, logs: enriched };
+  _auditCache.set(s.tenantId!, { data: result, exp: Date.now() + 60000 });
+  return NextResponse.json(result);
 }

@@ -43,7 +43,7 @@ export default function TradeDesk() {
     socket.on("ticks", (batch: any[]) => { const upd: Record<string, number> = {}; for (const { symbol, price } of batch) upd[symbol] = price; setPrices((p) => ({ ...p, ...upd })); });
     socket.on("liquidation", () => { loadOpen(); loadReports(); });
     socket.on("refresh", () => { loadOpen(); loadHistory(); loadReports(); });
-    const t = setInterval(loadOpen, 8000);
+    const t = setInterval(loadOpen, 60000); // heartbeat only — socket refresh handles real-time
     return () => { socket.disconnect(); clearInterval(t); };
   }, []);
 

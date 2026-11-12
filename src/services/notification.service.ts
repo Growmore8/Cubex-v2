@@ -2,6 +2,18 @@ import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { emitRefresh } from "@/lib/realtime";
 
+let _superAdminCache: { id: string }[] = [];
+let _superAdminCacheTs = 0;
+
+async function getSuperAdminIds(): Promise<{ id: string }[]> {
+  if (_superAdminCache.length > 0 && Date.now() - _superAdminCacheTs < 300000) {
+    return _superAdminCache;
+  }
+  _superAdminCache = await prisma.user.findMany({ where: { role: "SUPERADMIN" }, select: { id: true } });
+  _superAdminCacheTs = Date.now();
+  return _superAdminCache;
+}
+
 // Real-time in-app delivery: ping the socket bridge so recipients' open apps reload
 // and the bell/notifications update immediately (in addition to web-push + DB).
 function ping(userIds: string[]) {
@@ -42,10 +54,10 @@ export async function notifyStaff(
 ) {
   const or: any[] = [{ role: "ADMIN" }];
   if (managerId) or.push({ id: managerId, role: "MANAGER" });
-  // Fetch tenant staff + superadmins in parallel
+  // Fetch tenant staff + superadmins in parallel (SA list cached 5 min)
   const [staff, supers] = await Promise.all([
     prisma.user.findMany({ where: { tenantId, OR: or }, select: { id: true } }),
-    prisma.user.findMany({ where: { role: "SUPERADMIN" }, select: { id: true } }),
+    getSuperAdminIds(),
   ]);
   const seen = new Set<string>();
   const recipients = [...staff, ...supers].filter((u) => (seen.has(u.id) ? false : seen.add(u.id)));
@@ -61,7 +73,7 @@ export async function notifyStaff(
 // Notify ALL SuperAdmins only (platform-owner visibility) — used for staff
 // login/logout where tenant admins don't need their own/peers' events.
 export async function notifySuperAdmins(tenantId: string, opts: { title: string; body?: string; type?: string }) {
-  const supers = await prisma.user.findMany({ where: { role: "SUPERADMIN" }, select: { id: true } });
+  const supers = await getSuperAdminIds();
   if (!supers.length) return null;
   await prisma.notification.createMany({
     data: supers.map((u) => ({ tenantId, userId: u.id, title: opts.title, body: opts.body || null, type: opts.type || "NOTICE" })),

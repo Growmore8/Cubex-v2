@@ -16,7 +16,7 @@ export default function SADashboard() {
     } catch {}
   }
 
-  useEffect(() => { load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, []);
+  useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, []);
 
   const m = (v: number) => "$" + Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

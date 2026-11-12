@@ -2,6 +2,9 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { SessionPayload } from "@/types";
 
+// Cache tenant suspended status for 30s — called on every authenticated API request.
+const _suspendedCache = new Map<string, { v: boolean; exp: number }>();
+
 // Throws if the staff member is in read-only mode (User LOCKED or tenant SUSPENDED).
 // Call at the top of mutating staff routes so locked accounts can view but not act.
 export async function assertWritable(s: SessionPayload) {
@@ -18,9 +21,13 @@ export async function assertWritable(s: SessionPayload) {
 // effectively logged out the moment SuperAdmin suspends the tenant.
 async function tenantSuspended(tenantId: string | null): Promise<boolean> {
   if (!tenantId) return false;
+  const cached = _suspendedCache.get(tenantId);
+  if (cached && cached.exp > Date.now()) return cached.v;
   try {
     const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { status: true } });
-    return t?.status === "SUSPENDED";
+    const v = t?.status === "SUSPENDED";
+    _suspendedCache.set(tenantId, { v, exp: Date.now() + 30000 }); // 30s TTL
+    return v;
   } catch { return false; }
 }
 

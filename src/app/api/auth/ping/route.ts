@@ -29,30 +29,29 @@ export async function GET() {
       return NextResponse.json({ ok: false, reason: "other-device" });
     }
 
-    // Tenant suspended -> the brokerage is suspended: force an instant logout for
-    // every admin / manager / client of that tenant.
-    if (user.tenantId) {
-      const t = await prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { status: true } });
-      if (t && t.status === "SUSPENDED") return NextResponse.json({ ok: false, reason: "suspended" });
-    }
+    // Run tenant check + client-only queries in parallel
+    const now = new Date();
+    const isClient = user.role === "CLIENT" && !!user.tenantId;
+    const [t, sub, activeAccounts, anyLocked] = await Promise.all([
+      user.tenantId ? prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { status: true } }) : null,
+      isClient ? prisma.subscription.findUnique({ where: { tenantId: user.tenantId! }, select: { status: true, endsAt: true } }) : null,
+      isClient ? prisma.account.count({ where: { userId: session.sub, deactivated: false, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } }) : null,
+      isClient ? prisma.account.count({ where: { userId: session.sub, locked: true } }) : null,
+    ]);
+
+    // Tenant suspended -> force logout for all users of that tenant
+    if (t && t.status === "SUSPENDED") return NextResponse.json({ ok: false, reason: "suspended" });
     const tenantSuspended = false;
 
     // Client: check subscription expiry + account expiry
-    if (user.role === "CLIENT" && user.tenantId) {
+    if (isClient) {
       // Trial subscription ended → kick out immediately
-      const sub = await prisma.subscription.findUnique({ where: { tenantId: user.tenantId }, select: { status: true, endsAt: true } });
       if (sub?.status === "TRIALING" && sub.endsAt && new Date(sub.endsAt) < new Date()) {
         return NextResponse.json({ ok: false, reason: "suspended" });
       }
-      // Count accounts that are not deactivated AND not past their expiry date
-      const now = new Date();
-      const activeAccounts = await prisma.account.count({
-        where: { userId: session.sub, deactivated: false, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-      });
       // No active non-expired accounts (covers cron-deleted AND all-deactivated AND all-expired)
       if (activeAccounts === 0) return NextResponse.json({ ok: false, reason: "deactivated" });
-      const anyLocked = await prisma.account.count({ where: { userId: session.sub, locked: true } });
-      return NextResponse.json({ ok: true, readOnly: anyLocked > 0 });
+      return NextResponse.json({ ok: true, readOnly: (anyLocked ?? 0) > 0 });
     }
 
     const readOnly = user.status === "LOCKED" || tenantSuspended;

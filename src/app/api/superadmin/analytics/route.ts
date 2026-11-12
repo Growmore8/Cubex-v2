@@ -2,12 +2,21 @@ import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 
+// 60-second cache keyed by ?days= param — analytics is superadmin-only and
+// doesn't need live freshness; 180 DB queries per page load without this.
+const _cache = new Map<string, { data: any; ts: number }>();
+const CACHE_TTL = 60000;
+
 export async function GET(req: Request) {
   const s = await requireSuperAdmin();
   if (!s) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
 
   const sp = new URL(req.url).searchParams;
   const days = parseInt(sp.get("days") || "0") || 0; // 0 = all time
+  const cacheKey = String(days);
+  const hit = _cache.get(cacheKey);
+  if (hit && Date.now() - hit.ts < CACHE_TTL) return NextResponse.json(hit.data);
+
   const since = days > 0 ? new Date(Date.now() - days * 86400000) : undefined;
   const dateFilter = since ? { createdAt: { gte: since } } : {};
 
@@ -61,5 +70,7 @@ export async function GET(req: Request) {
     })
   );
 
-  return NextResponse.json({ ok: true, analytics });
+  const result = { ok: true, analytics };
+  _cache.set(cacheKey, { data: result, ts: Date.now() });
+  return NextResponse.json(result);
 }

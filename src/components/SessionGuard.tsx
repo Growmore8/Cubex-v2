@@ -30,7 +30,7 @@ export default function SessionGuard() {
       } catch {}
     }
     check();
-    const t = setInterval(check, 8000);
+    const t = setInterval(check, 30000);
     return () => { alive = false; clearInterval(t); };
   }, []);
 
