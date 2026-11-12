@@ -15,7 +15,10 @@ const handle = app.getRequestHandler();
 const jwt = require("jsonwebtoken");
 const webpush = require("web-push");
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
-const prisma = new PrismaClient();
+// Explicit pool for background tasks: 10 connections, separate from the Next.js
+// pool (src/lib/prisma.ts → 15 conns). Together they stay well under pg's max_connections.
+const _dbUrl = (process.env.DATABASE_URL || "") + ((process.env.DATABASE_URL || "").includes("?") ? "&" : "?") + "connection_limit=10&pool_timeout=15";
+const prisma = new PrismaClient({ datasources: { db: { url: _dbUrl } } });
 const JWT_SECRET = process.env.JWT_SECRET || "";
 let FINNHUB_KEY = process.env.FINNHUB_KEY || "";
 
