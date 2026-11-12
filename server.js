@@ -427,7 +427,17 @@ function _flushTicks() {
   const ticks = Object.values(_tickBatch);
   if (!ticks.length) return;
   for (const k in _tickBatch) delete _tickBatch[k];
-  global.__io.emit('ticks', ticks);
+  if (tenantSymMap.size === 0) {
+    // Fallback: spreads not loaded yet (startup), broadcast to all
+    global.__io.emit('ticks', ticks);
+  } else {
+    for (const [tenantId, symSet] of tenantSymMap) {
+      const tenantTicks = ticks.filter(t => symSet.has(t.symbol));
+      if (tenantTicks.length > 0) {
+        global.__io.to('t:' + tenantId).emit('ticks', tenantTicks);
+      }
+    }
+  }
 }
 
 // Commit an actual DISPLAY price: update the forming candle, cache it, broadcast
@@ -986,6 +996,7 @@ function microTick() {
 // realBids:        symbol             → latest real bid from exchange (Kraken/Binance)
 const symSpreads = {};
 const symCommissions = {};
+const tenantSymMap = new Map(); // tenantId → Set<symbol> — built by loadSpreads, used to scope tick broadcasts
 const grpSpreads = {};
 const accMarkups = {};
 const accSymOverrides = {};
@@ -1003,12 +1014,15 @@ async function loadSpreads() {
       prisma.globalSymbol.findMany({ select: { symbol: true, category: true } }),
     ]);
     const tenantSpreadMap = {}; // tenantId → { symbol → {min,max,type} }
+    tenantSymMap.clear();
     for (const s of syms) {
       const k = s.tenantId + ":" + s.symbol;
       symSpreads[k] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FLOATING" };
       symCommissions[k] = Number(s.commissionPerLot || 0);
       if (!tenantSpreadMap[s.tenantId]) tenantSpreadMap[s.tenantId] = {};
       tenantSpreadMap[s.tenantId][s.symbol] = { min: Number(s.spread || 0), max: Number(s.spreadMax || 0), type: s.spreadType || "FLOATING" };
+      if (!tenantSymMap.has(s.tenantId)) tenantSymMap.set(s.tenantId, new Set());
+      tenantSymMap.get(s.tenantId).add(s.symbol);
     }
     for (const g of grps) grpSpreads[g.id] = Number(g.spread || 0);
     for (const a of accs) accMarkups[a.id] = Number(a.spreadMarkup);
